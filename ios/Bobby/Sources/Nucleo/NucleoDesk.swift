@@ -552,6 +552,10 @@ final class NucleoDesk {
     var sessionChanged: () -> Void = {}
     /// The person tapped the question Bobby's CIO wrote for a read (the symbol of that read; never the words).
     var nextQuestionPicked: (_ symbol: String) -> Void = { _ in }
+    /// A read begins: the page's `ask` passed every check. `token` is the single-use token it asked
+    /// with, spent by now, or nil for a question in words. This is how native learns that the page
+    /// took a question it was offered (`NucleoSession.offerRead`): the page says nothing else.
+    var askStarted: (_ token: String?) -> Void = { _ in }
     /// Whether Bobby may put a one-tap question after a read whose access receipt is this one (§3.5):
     /// the CIO's, and the chips that ask about another asset. Asked once per read. On a no the CIO's
     /// question never reaches the page and the reply says `oneTap: false`, so the row keeps only
@@ -752,11 +756,13 @@ final class NucleoDesk {
         let requestId = UUID().uuidString.lowercased()
         let generation = generation()
         let job: Job
+        var spent: String?
         switch source {
         case let .token(token):
             purgeTokens()
             guard let entry = tokens.removeValue(forKey: token), entry.expires > Date(), entry.generation == generation
             else { throw NucleoFault.invalid("unknown or expired token") }
+            spent = token
             // A fallback chip ("Continue with Quick") is the user's own choice of level: keep it.
             if let level = entry.level, entry.persistLevel { setLevel(level) }
             job = Job(requestId: requestId, question: entry.question, asset: entry.asset, generation: generation, startedAt: Date(),
@@ -778,6 +784,7 @@ final class NucleoDesk {
                       generation: generation, startedAt: Date(), level: currentLevel(), origin: chip ? .chip : .person)
         }
         // 4.
+        askStarted(spent)
         emit("ask.stage", ["requestId": requestId, "stage": "resolving"])
         return await withCheckedContinuation { (continuation: CheckedContinuation<[String: Any], Never>) in
             let task = Task { [weak self] in
@@ -831,6 +838,17 @@ final class NucleoDesk {
     /// looks at that meter before the read is offered.
     func token(for asset: NucleoAsset, question: String) -> String {
         issueToken(asset, question: question, level: .rapido, origin: .followUp)
+    }
+
+    /// The page has not asked with this token yet and it is still good: not expired, same reader.
+    func holds(_ token: String) -> Bool {
+        guard let entry = tokens[token] else { return false }
+        return entry.expires > Date() && entry.generation == generation()
+    }
+
+    /// A question native offered and gave up on: nothing can be asked with its token any more.
+    func discard(token: String) {
+        tokens[token] = nil
     }
 
     private func purgeTokens(now: Date = Date()) {

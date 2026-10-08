@@ -48,9 +48,11 @@ enum HarnessNudges {
                     act: { nudge, session in
                         // Decided again at the tap: what was drawn may be older than the last receipt.
                         guard let move = harness.move, moveId(move) == nudge.id, harness.readsOpen else { return }
-                        harness.notePicked(symbol: move.symbol)
+                        // The line leaves the glass at the tap; the tap is written when the page asks the question.
+                        let tapped = harness.noteTapped(symbol: move.symbol)
                         session.startRead(symbol: move.symbol, name: move.name, isEquity: move.isEquity,
-                                          question: HarnessCopy.changedQuestion(symbol: move.symbol))
+                                          question: HarnessCopy.changedQuestion(symbol: move.symbol),
+                                          taken: { harness.notePicked(symbol: move.symbol, at: tapped) })
                     })
     }
 

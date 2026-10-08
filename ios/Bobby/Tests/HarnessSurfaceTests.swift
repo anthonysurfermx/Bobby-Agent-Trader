@@ -140,6 +140,8 @@ final class HarnessSurfaceTests: XCTestCase {
         profile.onboarded = true
         session.companions.companionId = "orb"
         session.briefingSheetDelay = 0
+        // This suite does not test the wait for a page that is waking (NucleoReadStartTests does).
+        session.wakeTick = 0
         session.briefingGate = BriefingTapGate(appActive: { true }, signedIn: { false }, deskBusy: { false }, listening: { false }, narrating: { false })
         session.desk.meterChanged = { _, _ in }
         session.desk.clock = NucleoDesk.Clock(now: { NucleoFixtures.recordedAt(symbol: $0, kind: "candles") ?? Date() },

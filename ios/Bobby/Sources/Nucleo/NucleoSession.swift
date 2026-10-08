@@ -112,6 +112,11 @@ final class NucleoSession: ObservableObject {
     var briefingGate: BriefingTapGate!
     /// Pause between a sheet going away and the next one presenting (SwiftUI dismissal animation).
     var briefingSheetDelay: TimeInterval = 0.4
+    /// How the session waits for the two things it times itself: the wake of a page (`pageAwake`)
+    /// and a question offered again (`offerRead`). Tests put a clock of their own here.
+    var after: (_ delay: TimeInterval, _ work: @escaping () -> Void) -> Void = { delay, work in
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
 
     private(set) var currentPage: String?
     private var cancellables = Set<AnyCancellable>()
@@ -170,6 +175,8 @@ final class NucleoSession: ObservableObject {
         desk.debateEvent = { [weak self] event in self?.notch.live(event) }
         // A Bobby-authored question was picked: the harness counts it (only while it may record), by asset.
         desk.nextQuestionPicked = { [weak self] symbol in self?.harness?.notePicked(symbol: symbol) }
+        // A read began: with the token of the question native offered, the page took it.
+        desk.askStarted = { [weak self] token in self?.readStarted(token: token) }
         // Bobby's own question is put after a read only when the receipt of that read says the next
         // one is answered: it never leads into the sign-in or the paywall. (Fixture replies carry no receipt.)
         if !fixtures { desk.offersNextQuestion = { HarnessWall.open($0) } }
@@ -443,32 +450,113 @@ final class NucleoSession: ObservableObject {
 
     /// Asks Bobby about an asset native already knows, on the glass: a follow-up's button, a row of a
     /// board. The page runs it exactly like a chip that carries a token. With a sheet open the sheet
-    /// goes away first. False when the glass cannot take a question now.
+    /// goes away first. False when the glass cannot take a question now. `taken` runs once, when the
+    /// page asks the question (`offerRead`), and never when it does not.
     @discardableResult
-    func startRead(symbol: String, name: String, isEquity: Bool, question: String) -> Bool {
+    func startRead(symbol: String, name: String, isEquity: Bool, question: String, taken: (() -> Void)? = nil) -> Bool {
         guard !tornDown, profile.acceptedRiskNotice, onboarded, currentPage == NucleoPage.app.name, !desk.isBusy, !speechPromptOpen else { return false }
         let asset = NucleoAsset(symbol: symbol, name: name, isEquity: isEquity, assetClass: isEquity ? "equity" : "crypto")
         if sheet != nil || openSheet != nil {
-            readHandoff = (asset, question, accountGeneration)
+            readHandoff = (asset, question, accountGeneration, taken)
             sheet = nil
             return true
         }
-        emit("ask.start", ["token": desk.token(for: asset, question: question), "question": question])
+        offerRead(asset, question: question, taken: taken)
         return true
     }
 
-    private var readHandoff: (asset: NucleoAsset, question: String, generation: UUID?)?
+    private var readHandoff: (asset: NucleoAsset, question: String, generation: UUID?, taken: (() -> Void)?)?
 
     /// The sheet a read was started from is gone: the page hears about the read after it hears the sheet closed.
+    /// Only with the app in front: an event sent to a page that is behind waits there, and the read
+    /// would start by itself when they come back.
     private func continueReadHandoff() {
         guard let handoff = readHandoff else { return }
         readHandoff = nil
         guard !tornDown, handoff.generation == accountGeneration else { return }
         DispatchQueue.main.async { [weak self] in
             guard let self, !self.tornDown, handoff.generation == self.accountGeneration, self.sheet == nil, self.openSheet == nil,
-                  self.profile.acceptedRiskNotice, !self.desk.isBusy else { return }
-            self.emit("ask.start", ["token": self.desk.token(for: handoff.asset, question: handoff.question), "question": handoff.question])
+                  self.profile.acceptedRiskNotice, !self.desk.isBusy, self.briefingGate?.appActive() ?? false else { return }
+            self.offerRead(handoff.asset, question: handoff.question, taken: handoff.taken)
         }
+    }
+
+    /// A question the page was handed and has not taken yet.
+    private struct ReadOffer {
+        let token: String
+        let question: String
+        let generation: UUID?
+        /// How many more times it may be offered.
+        var repeats: Int
+        let taken: (() -> Void)?
+    }
+
+    private var readOffer: ReadOffer?
+
+    /// How often a question the page did not take is offered again, and how far apart.
+    /// The page takes `ask.start` only from its idle home (or a finished read's FOLLOWUPS) and says
+    /// nothing when it does not: it is still waking after a load, or coming home from a read it just
+    /// closed. Those are the states that end by themselves, in 1.4 s and 1.7 s of the page's clock at
+    /// the most (Nucleo/tests/bridge-boot.test.mjs pins both). Eight offers half a second apart
+    /// reach 4 s after the first one: more than twice the longest of them, for a phone that draws
+    /// slowly, and still close enough to the tap that the read is its answer and not a surprise.
+    /// Half a second apart, because that is the longest a page that has just come home is kept
+    /// waiting, and an offer costs one event the page ignores. A page that stays where it is (a
+    /// finished read still on the glass, an open keyboard) takes none of them: the question is
+    /// dropped and nothing is written, and only a change to the page can do better.
+    static let readOfferRepeats = 8
+    var readOfferSpacing: TimeInterval = 0.5
+
+    /// Hands a question to the page: `ask.start` with a single-use token, now, and again while the
+    /// page has not asked with it. The token is the same every time and the desk spends it on the
+    /// first `ask`, so one tap is one read at the most however often it is offered. It stops when
+    /// the page takes it (`readStarted`) and is dropped, token and all, when a sheet comes up, the
+    /// reader changes, consent goes, the app leaves the front, the mic opens, another read begins,
+    /// the session ends, or the offers run out.
+    private func offerRead(_ asset: NucleoAsset, question: String, taken: (() -> Void)?) {
+        // One question at a time: a newer tap replaces what was still on offer.
+        dropReadOffer()
+        let offer = ReadOffer(token: desk.token(for: asset, question: question), question: question, generation: accountGeneration,
+                              repeats: Self.readOfferRepeats, taken: taken)
+        readOffer = offer
+        emit("ask.start", ["token": offer.token, "question": question])
+        offerReadAgain(offer.token)
+    }
+
+    private func offerReadAgain(_ token: String) {
+        after(readOfferSpacing) { [weak self] in
+            // Taken, dropped or replaced since: nothing to do.
+            guard let self, let offer = self.readOffer, offer.token == token else { return }
+            guard offer.repeats > 0, self.readOfferStands(offer) else { self.dropReadOffer(); return }
+            self.readOffer?.repeats -= 1
+            self.emit("ask.start", ["token": token, "question": offer.question])
+            self.offerReadAgain(token)
+        }
+    }
+
+    /// Every guard of `startRead` and of the handoff, asked again before each offer, with what only
+    /// a later offer can run into: the app behind, the mic open, a token the desk no longer holds.
+    private func readOfferStands(_ offer: ReadOffer) -> Bool {
+        guard !tornDown, offer.generation == accountGeneration, desk.holds(offer.token),
+              profile.acceptedRiskNotice, onboarded, currentPage == NucleoPage.app.name,
+              sheet == nil, openSheet == nil, !speechPromptOpen, !desk.isBusy, let gate = briefingGate else { return false }
+        return gate.appActive() && !gate.listening()
+    }
+
+    /// The question on offer is given up: its token dies with it, so it can never be asked later.
+    private func dropReadOffer() {
+        guard let offer = readOffer else { return }
+        readOffer = nil
+        desk.discard(token: offer.token)
+    }
+
+    /// The desk began a read. With the token on offer: the page took the question, and the tap that
+    /// asked it counts now. Any other read: the glass is busy with something else, and the offer goes.
+    private func readStarted(token: String?) {
+        guard let offer = readOffer else { return }
+        guard offer.token == token else { dropReadOffer(); return }
+        readOffer = nil
+        offer.taken?()
     }
 
     func haptic(_ kind: String) { haptics.play(kind) }
@@ -499,14 +587,74 @@ final class NucleoSession: ObservableObject {
         }
     }
 
-    /// The page's first call: it is ready for events.
+    /// The page's first call: it is ready for events, and it is only starting to wake.
     private func pageStarted(_ page: String?) -> [String: Any] {
         if let page { currentPage = page }
         emitter?.pageReady()
         bootOnce()
+        // A page that has just loaded: a board waits for it (`pageAwake`), counted from here.
+        pageAwake = wakeTick <= 0
+        wakeCounting = false
+        wakeRun += 1
         // After this reply reaches the page: a tap stored at cold launch opens now (emit drops before here).
         scheduleBriefingDrain()
         return sessionJSON()
+    }
+
+    // MARK: - The page wakes up (1.8)
+
+    /// How long a freshly loaded app page needs in front, with nothing over it, before a board may
+    /// cover it. After its `session` reply the page starts (with native's answers to `theses` and
+    /// `roster`, or by itself after 0.5 s) and wakes for 0.9 s: 1.4 s at the most before it is at its
+    /// idle home, all of it on the page's OWN clock, which runs only in front and stands still under
+    /// a native sheet (Nucleo/src/app 99-boot.js, 60-fsm.js WAKE, 90-loop.js `canRun`; pinned in
+    /// Nucleo/tests/bridge-boot.test.mjs). A board opened before that sits over a glass that never
+    /// drew, and the question its row asks is dropped by a page that is not listening yet. So the
+    /// wait is four ticks of 0.4 s: 1.6 s, the page's 1.4 s and room for a slow first frame (Android
+    /// waits the same, V18Runtime.SETTLE_MS). It is counted in ticks, each one asking whether the
+    /// page is still running, so a sheet, the app behind or a system prompt stops the count and the
+    /// next thing that happens starts it over: time the page spent covered is not time it had.
+    /// A page slower than this is what offering a question again is for (`offerRead`).
+    static let wakeTicks = 4
+    /// Zero: a page is awake the moment it asks for its session (suites that do not test the wait).
+    var wakeTick: TimeInterval = 0.4
+
+    /// The page on the glass has had its time to wake since it loaded.
+    private var pageAwake = false
+    private var wakeCounting = false
+    private var wakeLeft = 0
+    /// Which count is running: a page that loads again starts another, and the ticks of the old one do nothing.
+    private var wakeRun = 0
+
+    /// The page's own clock runs: the app page, in front, nothing over it.
+    private var pageRuns: Bool {
+        guard !tornDown, currentPage == NucleoPage.app.name, sheet == nil, openSheet == nil, !speechPromptOpen,
+              let gate = briefingGate else { return false }
+        return gate.appActive()
+    }
+
+    /// Counts the page's time on the glass, from its first `session` call with the app active. It
+    /// stops when the page stops running and starts over the next time something happens
+    /// (`scheduleBriefingDrain`), so nothing ticks while nobody looks.
+    private func countWake() {
+        guard !pageAwake, !wakeCounting, pageRuns else { return }
+        wakeCounting = true
+        wakeLeft = Self.wakeTicks
+        wakeRun += 1
+        wakeTickSoon(wakeRun)
+    }
+
+    private func wakeTickSoon(_ run: Int) {
+        after(wakeTick) { [weak self] in
+            guard let self, run == self.wakeRun, self.wakeCounting else { return }
+            guard self.pageRuns else { self.wakeCounting = false; return }
+            self.wakeLeft -= 1
+            if self.wakeLeft > 0 { self.wakeTickSoon(run); return }
+            self.wakeCounting = false
+            self.pageAwake = true
+            // A board that waited for the page opens now.
+            self.scheduleBriefingDrain()
+        }
     }
 
     /// After consent only (R11): the dictation vocabulary, the account check and one sync.
@@ -709,6 +857,7 @@ final class NucleoSession: ObservableObject {
         NudgeCenter.shared.forgetMoment()
         sheetHandoff = nil
         readHandoff = nil
+        dropReadOffer()
         NucleoLevelCenter.shared.accountChanged(force: true)
         paywallStatus = "cancelled"
         finishPaywall()
@@ -948,6 +1097,8 @@ final class NucleoSession: ObservableObject {
     /// Drains on the next main-queue turn (after the current bridge reply), or after `delay`.
     func scheduleBriefingDrain(after delay: TimeInterval = 0) {
         guard !tornDown else { return }
+        // Something happened: a page that was covered or behind may be running again.
+        countWake()
         if delay > 0 {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 self?.drainBriefingIntent()
@@ -1056,10 +1207,12 @@ final class NucleoSession: ObservableObject {
 
     /// Honours a tapped follow-up behind the same gate as a reminder tap, with no account needed (the
     /// harness lives on this phone). The asset's follow-up lands on the glass: the harness writes
-    /// the line and its button asks Bobby. A sector or a week opens its board. Consumed once.
+    /// the line and its button asks Bobby. A sector or a week opens its board, and a board waits
+    /// for a page that has woken up (`pageAwake`): its rows ask Bobby through the page. Consumed once.
     @discardableResult
     func drainHarnessIntent() -> Bool {
-        guard !tornDown, let gate = briefingGate, harnessIntent.pending != nil, let harness else { return false }
+        guard !tornDown, let gate = briefingGate, let waiting = harnessIntent.pending, let harness else { return false }
+        guard waiting.step == .asset || pageAwake else { return false }
         guard currentPage == NucleoPage.app.name,
               gate.appActive(),
               profile.acceptedRiskNotice, onboarded,
@@ -1075,8 +1228,12 @@ final class NucleoSession: ObservableObject {
         return openNative(.followUp)
     }
 
-    /// The mic closes and the voice stops; an in-flight read keeps going.
+    /// The mic closes and the voice stops; an in-flight read keeps going. A question the page had
+    /// not taken yet is dropped, and so is one still waiting for its sheet to go: it never starts
+    /// by itself when they come back.
     func appWentBackground() {
+        readHandoff = nil
+        dropReadOffer()
         speech.cancel()
         nucleoVoice.stop()
         emit("app.state", ["state": "background"])
@@ -1094,6 +1251,7 @@ final class NucleoSession: ObservableObject {
     func teardown() {
         guard !tornDown else { return }
         heldBriefId = nil
+        dropReadOffer()
         finishPaywall()
         speech.cancel()
         nucleoVoice.teardown()
@@ -1119,6 +1277,11 @@ final class NucleoSession: ObservableObject {
                 // signed out opens now (re-authorized against this account).
                 if self.signedIn { self.scheduleBriefingDrain() } else { self.heldBriefId = nil; self.briefingIntent.clear() }
             }
+            .store(in: &cancellables)
+        // A sheet comes up over the glass, whoever opened it: a question the page had not taken is dropped.
+        $sheet
+            .compactMap { $0 }
+            .sink { [weak self] _ in self?.dropReadOffer() }
             .store(in: &cancellables)
         newsIntent.$pending
             .compactMap { $0 }
@@ -1203,6 +1366,7 @@ final class NucleoSession: ObservableObject {
         V18Focus.clear()
         sheetHandoff = nil
         readHandoff = nil
+        dropReadOffer()
         emit("account.changed", ["wasSignedIn": !wasAnonymous, "signedIn": accountUserID != nil])
     }
 }

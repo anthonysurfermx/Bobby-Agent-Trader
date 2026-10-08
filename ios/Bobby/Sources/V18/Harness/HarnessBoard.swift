@@ -89,15 +89,23 @@ struct HarnessBoardSheet: View {
     @ObservedObject private var receipts = BobbyAccessCenter.shared
     @ObservedObject private var levels = NucleoLevelCenter.shared
 
+    /// A row was tapped: Bobby is asked about its asset on the glass (the sheet goes away first).
+    /// The tap is written as acted on when the page asks the question, with the moment of the tap.
+    @MainActor
+    static func ask(_ row: HarnessBoard.Row, session: NucleoSession, harness: HarnessCenter = .shared) {
+        guard harness.readsOpen else { return }
+        let tapped = harness.noteTapped(symbol: row.symbol)
+        session.startRead(symbol: row.symbol, name: row.name, isEquity: row.isEquity,
+                          question: HarnessCopy.lookQuestion(symbol: row.symbol),
+                          taken: { harness.notePicked(symbol: row.symbol, at: tapped) })
+    }
+
     var body: some View {
         Group {
             if let board {
                 // A row asks Bobby, which is a read: rows are only buttons when the next read is answered.
                 HarnessBoardContent(board: board, asks: HarnessCenter.shared.readsOpen, onClose: onClose) { row in
-                    guard HarnessCenter.shared.readsOpen else { return }
-                    HarnessCenter.shared.notePicked(symbol: row.symbol)
-                    session.startRead(symbol: row.symbol, name: row.name, isEquity: row.isEquity,
-                                      question: HarnessCopy.lookQuestion(symbol: row.symbol))
+                    Self.ask(row, session: session)
                 }
             } else {
                 Theme.nucleoSurface.ignoresSafeArea()
