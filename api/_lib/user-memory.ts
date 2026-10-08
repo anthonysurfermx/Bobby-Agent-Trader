@@ -208,14 +208,21 @@ export interface ReaderContext {
    * explanation the reader wants. Never a risk tolerance, suitability or sizing input.
    */
   prefs?: { horizon?: MemoryHorizon; experience?: Experience; explainRiskDepth?: RiskPref };
-  /** The asset asked about now, when asked before. */
   /** The asset asked about now, when asked before. `timesThisWeek` counts this question too (2 = "second time this week"). */
   thisAsset?: {
     asks: number; lastAskedDaysAgo: number; lastHorizon: AskedHorizon; timesThisWeek: number;
-    /** The weekday of the last ask (UTC), in the answer's language, when it was 1–6 days ago. */
+    /** The weekday of the last ask (UTC), in the answer's language, when that was one to six calendar days back: never today's weekday. */
     lastAskedOn?: string;
-    /** Price at the last ask and the change since, computed here from the evidence's price: quote, never recompute. */
-    priceThen?: number; changeSinceLastAskPct?: number;
+    /**
+     * The price change since the last ask, finished here so no model does arithmetic on a reader's history:
+     * `change` is the figure as it is to be quoted, written out in the answer's locale with its sign ("+3.2%"),
+     * and `since` the day it counts from (that weekday, or the whole days counted, "12 days ago", once the weekday
+     * would be today's or older). Present only when
+     * changeSinceLastAsk trusts both prices. The stored price itself is never handed to a model.
+     */
+    sinceLastAsk?: { change: string; since: string };
+    /** The same change as a number, for the reply's memory receipt only: readerForModel drops it before any prompt. */
+    changeSinceLastAskPct?: number;
   };
   /** The reader's first name from their Apple/Google profile, when shared. */
   firstName?: string;
@@ -226,8 +233,42 @@ export interface ReaderContext {
 /** A usable price: finite and positive, else null. */
 const positive = (v: unknown): number | null => { const n = Number(v); return Number.isFinite(n) && n > 0 && n < 1e12 ? n : null; };
 
+export type AssetClass = 'equity' | 'crypto';
+/**
+ * The largest move between two asks that is still quoted, in % of the earlier price. At or beyond it no figure
+ * is given: the stored price and today's may not be prices of the same thing.
+ *   · A stock. A split leaves the stored price on the old share count: 2-for-1 reads as -50%, 3-for-2 as -33%, a
+ *     1-for-2 reverse split as +100%. With the bound at 25% either way, the smallest split in common use
+ *     (3-for-2) is refused even after a further 12% genuine rise, and a reverse split unless the stock also
+ *     truly fell by more than a third. The price of the bound: a stock that really moved 25% between two asks
+ *     gets no callback (the answer still describes the move from the evidence).
+ *   · A crypto asset has no splits. What the bound catches there is a redenomination or a token migration (a
+ *     change of unit, tenfold or more) and a stored price that belonged to another instrument. Genuine moves are
+ *     far larger than a stock's, so the bound is a factor of 2.5 either way (-60%, +150%); beyond it, in the 90
+ *     days memory keeps an asset, the two prices are more often two different things than one move.
+ * A bound cannot see a small corporate action (a 5-for-4 split, a stock dividend) or a ticker handed to another
+ * company: only a dated corporate-action feed could, and the desk has none.
+ */
+export const CALLBACK_MOVE_BOUND: Record<AssetClass, { down: number; up: number }> = { equity: { down: 25, up: 25 }, crypto: { down: 60, up: 150 } };
+
+/**
+ * The change from the price stored at the last ask to the evidence's price now, in %, one decimal, with its
+ * sign; null when it cannot be trusted: a price missing, zero, negative or not finite, or a move at or beyond
+ * the class bound. An unknown class is held to the stricter bound.
+ */
+export function changeSinceLastAsk(priceThen: unknown, priceNow: unknown, assetClass: AssetClass = 'equity'): number | null {
+  const then = positive(priceThen), now = positive(priceNow);
+  if (then === null || now === null) return null;
+  const pct = Math.round((now / then - 1) * 1000) / 10;
+  const bound = CALLBACK_MOVE_BOUND[assetClass] ?? CALLBACK_MOVE_BOUND.equity;
+  return Number.isFinite(pct) && pct > -bound.down && pct < bound.up ? pct : null;
+}
+
+/** The figure as the answer quotes it: its sign, at most one decimal, the percent sign, in the answer's locale. */
+export const signedPercent = (pct: number, locale: string) => new Intl.NumberFormat(locale, { style: 'percent', signDisplay: 'exceptZero', maximumFractionDigits: 1 }).format(pct / 100);
+
 /** Compact the summary for the model; null when memory is off or holds nothing useful. */
-export function readerContext(summary: MemorySummary | null, symbol: string, now = Date.now(), firstName?: string | null, priceNow?: number | null, language: AppLanguage = 'en', locale?: string): ReaderContext | null {
+export function readerContext(summary: MemorySummary | null, symbol: string, now = Date.now(), firstName?: string | null, priceNow?: number | null, language: AppLanguage = 'en', locale?: string, assetClass: AssetClass = 'equity'): ReaderContext | null {
   if (!summary?.enabled) return null;
   const ctx: ReaderContext = {};
   if (firstName) ctx.firstName = firstName;
@@ -239,20 +280,39 @@ export function readerContext(summary: MemorySummary | null, symbol: string, now
   if (summary.thisAsset) {
     const days = Math.max(0, Math.floor((now - Date.parse(summary.thisAsset.lastAskedAt)) / 86_400_000));
     ctx.thisAsset = { asks: summary.thisAsset.asks, lastAskedDaysAgo: Number.isFinite(days) ? days : 0, lastHorizon: summary.thisAsset.lastHorizon, timesThisWeek: (Number.isFinite(summary.thisAsset.asksThisWeek) ? summary.thisAsset.asksThisWeek : 0) + 1 };
-    if (days >= 1 && days <= 6) {
-      ctx.thisAsset.lastAskedOn = new Intl.DateTimeFormat(appLocale(language, locale), { weekday: 'long', timeZone: 'UTC' }).format(new Date(summary.thisAsset.lastAskedAt));
+    const spoken = appLocale(language, locale);
+    // A weekday names a day only while it cannot be today's: one to six calendar days back (UTC, as the weekday
+    // itself is). Counted in elapsed days alone, an ask six days and 23 hours old fell on the weekday it is now,
+    // and "since Wednesday" said on a Wednesday reads as today.
+    const calendarDays = Math.floor(now / 86_400_000) - Math.floor(Date.parse(summary.thisAsset.lastAskedAt) / 86_400_000);
+    if (days >= 1 && calendarDays >= 1 && calendarDays <= 6) {
+      ctx.thisAsset.lastAskedOn = new Intl.DateTimeFormat(spoken, { weekday: 'long', timeZone: 'UTC' }).format(new Date(summary.thisAsset.lastAskedAt));
     }
-    const then = summary.thisAsset.lastPrice ?? null;
-    // A callback only across days: the same-day move is just the chart.
-    if (then && positive(priceNow) && days >= 1) {
-      ctx.thisAsset.priceThen = then;
-      ctx.thisAsset.changeSinceLastAskPct = Math.round(((priceNow as number) / then - 1) * 1000) / 10;
+    // A callback only across days (the same-day move is just the chart), and only with a figure that can be
+    // trusted. It is finished here, figure and day; the model gets no price to compute another from.
+    const change = Number.isFinite(days) && days >= 1 ? changeSinceLastAsk(summary.thisAsset.lastPrice, priceNow, assetClass) : null;
+    if (change !== null) {
+      ctx.thisAsset.changeSinceLastAskPct = change;
+      ctx.thisAsset.sinceLastAsk = {
+        change: signedPercent(change, spoken),
+        since: ctx.thisAsset.lastAskedOn ?? new Intl.RelativeTimeFormat(spoken, { numeric: 'always' }).format(-days, 'day'),
+      };
     }
   }
   // The asked asset is already in thisAsset; oftenAsks names the others the reader keeps coming back to.
   const often = summary.top.filter((a) => a.asks >= OFTEN_MIN_ASKS && a.symbol !== symbol).slice(0, 5).map(({ symbol: s, asks }) => ({ symbol: s, asks }));
   if (often.length) ctx.oftenAsks = often;
   return Object.keys(ctx).length ? ctx : null;
+}
+
+/**
+ * The reader as a model may see it: everything but the raw change, which stays with the server for the receipt.
+ * The CIO is handed the finished `sinceLastAsk` (or nothing), so there is one figure and one way to say it.
+ */
+export function readerForModel(reader: ReaderContext): ReaderContext {
+  if (reader.thisAsset?.changeSinceLastAskPct === undefined) return reader;
+  const { changeSinceLastAskPct: _serverOnly, ...thisAsset } = reader.thisAsset;
+  return { ...reader, thisAsset };
 }
 
 /**
@@ -268,7 +328,9 @@ export function readerContext(summary: MemorySummary | null, symbol: string, now
  *     about longer ago reads as never asked. Null when the count was not read, because memory is paused or the
  *     summary could not be read: a number the server does not have is not sent as a zero.
  *   · `lastAskedDaysAgo`, `changeSinceLastAskPct`: about the ask before this one; null when there was none or it
- *     cannot be computed. They are the numbers the CIO's reader carried, not a second reading.
+ *     cannot be computed, and the change also when it cannot be trusted (changeSinceLastAsk: a move at or beyond
+ *     the class bound reads as a split or another instrument). They are the reader's own numbers, not a second
+ *     reading: the change is the figure the CIO was handed written out, here as a number.
  * The desk builds no receipt when memory does not apply: the reply then has no `memory` key at all.
  */
 export interface MemoryReceipt { recorded: boolean; asks: number | null; lastAskedDaysAgo: number | null; changeSinceLastAskPct: number | null }
