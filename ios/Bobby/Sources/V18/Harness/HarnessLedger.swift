@@ -69,7 +69,8 @@ struct HarnessEvent: Codable, Equatable {
         /// The app came to the front. Never written any more: the first 1.8 build kept one per half
         /// hour and nothing read them, so the ledger refuses them and drops the ones it finds.
         case appOpen
-        /// A follow-up's moment passed with the notification handed to iOS.
+        /// A follow-up's moment passed with the notification handed to iOS, and nothing the phone
+        /// could see says it was not shown (HarnessCenter.settle).
         case sent
         /// They tapped a follow-up notification. Kept, and an answer to nothing.
         case opened
@@ -183,6 +184,20 @@ struct HarnessLedger: Codable, Equatable {
     /// Removes events matching `drop` (the pointer of a thesis that was archived, for instance).
     mutating func remove(where drop: (HarnessEvent) -> Bool) {
         events.removeAll(where: drop)
+    }
+
+    /// One asset's notes go: what was asked, saved and tapped about it. The follow-ups already
+    /// shown stay counted, without the asset (forgetting an asset never makes Bobby come back
+    /// more). A pointer to a thesis stays: it is not a note of the harness and goes with its thesis.
+    mutating func forget(symbol raw: String) {
+        guard let symbol = Self.validSymbol(raw) else { return }
+        let shown = events.filter { $0.symbol == symbol && [.sent, .opened, .returned].contains($0.kind) }
+        remove { $0.symbol == symbol && $0.kind != .thesis }
+        for var event in shown {
+            event.symbol = nil
+            event.sector = nil
+            note(event)
+        }
     }
 
     /// What was written about a read before the person said yes gains what was held back until
@@ -391,7 +406,9 @@ struct HarnessStore {
 
     /// What was kept and what was planned go; a no stays (the Memory screen's "Delete everything").
     /// Erasing notes is not a way to be asked again: a reader who turned follow-ups off stays off.
-    /// Any other answer goes with the notes, so a yes is asked for again before anything is kept.
+    /// Any other answer goes with the notes: the reader is undecided again, the phone keeps only
+    /// the question itself, and the yes is asked for anew (HarnessCenter.erasedEverything also
+    /// clears the offer's history on the glass, or it would never be made again).
     func forgetNotes(owner: String?) {
         let refused = mode(owner: owner) == .off
         forget(owner: owner)

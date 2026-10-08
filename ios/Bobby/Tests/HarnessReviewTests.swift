@@ -17,6 +17,7 @@ import XCTest
 ///    take for shown is written as shown.
 ///  - What was kept signed out before any yes starts no chain in an account that had already said yes.
 ///  - A byte-order mark in a question is white space when native compares the tapped words.
+///  - Signed out, the Memory screen is one sentence and one row; the count of follow-ups reads right for one.
 @MainActor
 final class HarnessReviewTests: XCTestCase {
     private final class Recorder: NucleoEmitting {
@@ -44,6 +45,7 @@ final class HarnessReviewTests: XCTestCase {
     private var user: String?
     private var generation = UUID()
     private var reads: BobbyReadAccess?
+    private var levelLoader: ((BobbyMeterAuth) async throws -> [String: Any]?)?
 
     override func setUp() async throws {
         try await super.setUp()
@@ -61,12 +63,18 @@ final class HarnessReviewTests: XCTestCase {
         reads = Self.free(left: 5)
         NucleoFixtures.activate(scenario: "levels", timeScale: 0.01)
         NucleoFixtures.clearLog()
+        // What the phone hears about the levels is what a case says (`heardLevels`): a session that
+        // starts asks for the balance by itself, and here nobody answers.
+        levelLoader = NucleoLevelCenter.shared.load
+        NucleoLevelCenter.shared.load = { _ in nil }
+        NucleoLevelCenter.shared.accountChanged(force: true)
     }
 
     override func tearDown() async throws {
         NucleoFixtures.deactivate()
         // What a case told the app about the levels' allowances does not outlive it.
         NucleoLevelCenter.shared.accountChanged(force: true)
+        if let levelLoader { NucleoLevelCenter.shared.load = levelLoader }
         for key in Self.profileKeys {
             if let v = savedProfile[key] { UserDefaults.standard.set(v, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) }
         }
@@ -87,6 +95,7 @@ final class HarnessReviewTests: XCTestCase {
     }
 
     private static let pro = BobbyReadAccess(tier: "pro", used: 40, limit: nil, remaining: nil, resetsAt: nil, paywall: false)
+    private static let languages = ["en", "es", "fr", "pt", "it", "de"]
 
     private func make() -> HarnessCenter {
         let center = HarnessCenter(notifier: fake, defaults: defaults)
@@ -162,12 +171,12 @@ final class HarnessReviewTests: XCTestCase {
         return envelope["result"] as? [String: Any] ?? [:]
     }
 
-    /// What `GET /api/bobby-access` says about a free account's levels: Deep untouched, and this many Max reads left of two.
-    private func heardLevels(maxLeft: Int, maxGifted: Int = 0) {
+    /// What `GET /api/bobby-access` says about a free account's levels: this many Deep reads left of six, and this many Max reads of two.
+    private func heardLevels(deepLeft: Int = 6, maxLeft: Int, maxGifted: Int = 0) {
         NucleoLevelCenter.shared.apply([
             "access": Self.free(left: 15).json,
             "levels": ["tier": "free", "levels": [
-                "profundo": ["used": 0, "limit": 6, "remaining": 6, "bonus": 0, "windowDays": 7],
+                "profundo": ["used": 6 - deepLeft, "limit": 6, "remaining": deepLeft, "bonus": 0, "windowDays": 7],
                 "maximo": ["used": 2 - maxLeft, "limit": 2, "remaining": maxLeft, "bonus": maxGifted, "windowDays": 7],
             ]],
         ])
@@ -208,6 +217,92 @@ final class HarnessReviewTests: XCTestCase {
         heardLevels(maxLeft: 0)
         reads = Self.pro
         XCTAssertNil(session.sessionJSON()["oneTap"])
+    }
+
+    /// The read that spends the last one of a level: the phone has not heard the new balance when its row is drawn.
+    func testTheLastReadOfALevelTakesTheChipsOffItsOwnRow() async throws {
+        reads = Self.free(left: 15)
+        let center = make()
+        let (session, bridge, _) = makeSession(harness: center)
+        defer { session.teardown() }
+        session.desk.currentLevel = { .maximo }
+        _ = await call(bridge, "session", ["page": "app"])
+        heardLevels(maxLeft: 1)
+        XCTAssertNil(session.sessionJSON()["oneTap"], "one Max read is left: the home keeps its chips")
+        // They type their last Max question, and it is answered.
+        XCTAssertFalse(session.offersOneTap(afterRead: Self.free(left: 14), at: .maximo), "a chip of its row would be one more Max read")
+        XCTAssertEqual(session.sessionJSON()["oneTap"] as? Bool, false, "and so would a chip of the home")
+        // The balance arrives and says the same.
+        heardLevels(maxLeft: 0)
+        XCTAssertEqual(session.sessionJSON()["oneTap"] as? Bool, false)
+        // A gifted Max read, or the week turning over, opens it again; a read Bobby started (Quick) takes nothing from Max.
+        heardLevels(maxLeft: 1)
+        XCTAssertNil(session.sessionJSON()["oneTap"])
+        XCTAssertTrue(session.offersOneTap(afterRead: Self.free(left: 13), at: .rapido))
+        XCTAssertNil(session.sessionJSON()["oneTap"])
+        // Not knowing a level's count is a no after a read and changes nothing on the home.
+        NucleoLevelCenter.shared.accountChanged(force: true)
+        reads = Self.free(left: 12)
+        XCTAssertFalse(session.offersOneTap(afterRead: Self.free(left: 12), at: .rapido))
+        XCTAssertNil(session.sessionJSON()["oneTap"])
+        // Bobby Pro: a level that ran out is a notice with "Continue with Quick", not a sign-in or a paywall.
+        heardLevels(maxLeft: 0)
+        XCTAssertTrue(session.offersOneTap(afterRead: Self.pro, at: .maximo))
+        reads = Self.pro
+        XCTAssertNil(session.sessionJSON()["oneTap"])
+    }
+
+    /// The same through the real desk: a typed question at Deep, the last Deep read of the week.
+    func testThroughTheDeskTheReadThatSpendsTheLastDeepHandsBackNoQuestionThatAsksByItself() async throws {
+        reads = Self.free(left: 15)
+        let center = make()
+        let (session, bridge, _) = makeSession(harness: center)
+        defer { session.teardown() }
+        session.desk.currentLevel = { .profundo }
+        var ran: [NucleoAnalysisLevel] = []
+        session.desk.debateStarted = { ran.append($0) }
+        // The app's own rule, with the receipt the server would have sent (a fixture reply carries none).
+        session.desk.offersNextQuestion = { [unowned session] _, level in session.offersOneTap(afterRead: Self.free(left: 14), at: level) }
+        heardLevels(deepLeft: 1, maxLeft: 2)
+        _ = await call(bridge, "session", ["page": "app"])
+        XCTAssertNil(session.sessionJSON()["oneTap"])
+        let last = await call(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
+        XCTAssertEqual(last["status"] as? String, "ok", "the read itself is delivered")
+        XCTAssertEqual(ran, [.profundo])
+        XCTAssertEqual(last["oneTap"] as? Bool, false, "its row offers no chip: one more Deep read is the wall")
+        XCTAssertNil((last["synthesis"] as? [String: Any])?["followUp"], "one flag covers the row: Bobby's own question is withheld with the chips")
+        XCTAssertEqual(session.sessionJSON()["oneTap"] as? Bool, false, "and the home offers none")
+        // With Deep reads to spare the same read hands back its row as it always was.
+        heardLevels(deepLeft: 3, maxLeft: 2)
+        let open = await call(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
+        XCTAssertEqual(open["status"] as? String, "ok")
+        XCTAssertNil(open["oneTap"])
+        XCTAssertEqual((open["synthesis"] as? [String: Any])?["followUp"] as? String, Self.offered)
+        XCTAssertNil(session.sessionJSON()["oneTap"])
+    }
+
+    func testTheLevelsOwnAllowanceIsAskedOnlyWhereItIsAWall() throws {
+        func meter(_ json: [String: Any]) throws -> NucleoLevelMeter { try XCTUnwrap(NucleoLevelMeter(json: json)) }
+        let deep = try meter(["used": 5, "limit": 6, "remaining": 1, "bonus": 0, "windowDays": 7])
+        let spentUp = try meter(["used": 6, "limit": 6, "remaining": 0, "bonus": 0, "windowDays": 7])
+        let guest = BobbyReadAccess(tier: "anon", used: 2, limit: 6, remaining: 4, resetsAt: nil, paywall: true)
+        XCTAssertEqual(HarnessWall.levelOpen(.rapido, access: Self.free(left: 0), meter: nil), true, "Quick is the receipt's own meter")
+        XCTAssertEqual(HarnessWall.levelOpen(.profundo, access: Self.free(left: 5), meter: deep), true)
+        XCTAssertEqual(HarnessWall.levelOpen(.profundo, access: Self.free(left: 5), meter: deep, spent: 1), false, "the read just answered took the last one")
+        XCTAssertEqual(HarnessWall.levelOpen(.profundo, access: Self.free(left: 5), meter: spentUp), false)
+        XCTAssertEqual(HarnessWall.levelOpen(.profundo, access: Self.free(left: 5),
+                                             meter: try meter(["used": 6, "limit": 6, "remaining": 0, "bonus": 1, "windowDays": 7])), true, "a gifted read of that level")
+        XCTAssertEqual(HarnessWall.levelOpen(.profundo, access: guest, meter: spentUp), false, "a guest's Deep allowance, with the sign-in behind it")
+        XCTAssertEqual(HarnessWall.levelOpen(.maximo, access: Self.pro, meter: spentUp), true, "Bobby Pro meets a notice, not a wall")
+        XCTAssertNil(HarnessWall.levelOpen(.maximo, access: Self.free(left: 5), meter: nil), "no count: the phone cannot tell")
+        XCTAssertNil(HarnessWall.levelOpen(.maximo, access: Self.free(left: 5), meter: try meter(["windowDays": 7])), "a meter with no limit and nothing left to read says nothing")
+        XCTAssertEqual(HarnessWall.levelOpen(.maximo, access: Self.free(left: 5), meter: try meter(["used": 2, "limit": 2])), false,
+                       "by what was used, when that is what the server sent")
+        XCTAssertNil(HarnessWall.levelOpen(.maximo, access: nil, meter: nil), "a receipt the phone does not have changes nothing about the level")
+        XCTAssertEqual(HarnessWall.levelOpen(.maximo, access: nil, meter: spentUp), false)
+        // Where the iPhone is not Android: it reads a count of used reads the server left out as none used
+        // (NucleoLevelMeter, as the level sheet does), where Android keeps it unknown. The server always sends it.
+        XCTAssertEqual(HarnessWall.levelOpen(.maximo, access: Self.free(left: 5), meter: try meter(["limit": 2])), true)
     }
 
     // MARK: 2. A no stays a no, signed in or out
@@ -435,6 +530,66 @@ final class HarnessReviewTests: XCTestCase {
         XCTAssertEqual(center.upcoming.map(\.step), [.week], "the week is still to come")
     }
 
+    /// A tap proves its own notice was shown, whatever the phone could tell before it: iOS takes a
+    /// tapped notice off its list, so with notifications switched off since, the look found nothing.
+    func testATapProvesItsNoticeWasShownWhateverTheSettingsSayNow() async throws {
+        let center = make()
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        let tap = try XCTUnwrap(HarnessTap.tap(from: try XCTUnwrap(fake.requests["v18.follow.asset"]).request().content.userInfo))
+        clock = at(8, 17)
+        fake.permission = .denied
+        await center.appActive()
+        XCTAssertTrue(sent(center).isEmpty, "the phone could not tell")
+        await center.opened(tap)
+        XCTAssertEqual(sent(center).map(\.at), [at(8, 16, 40)], "the tap says it was shown: written once, at its moment")
+        XCTAssertEqual(center.ledger.events(.opened).count, 1)
+        await center.opened(tap)
+        XCTAssertEqual(sent(center).count, 1)
+        XCTAssertEqual(center.ledger.events(.opened).count, 1)
+        XCTAssertEqual(center.status, .denied, "and a tap is not taken for a permission")
+    }
+
+    /// One still in the notification centre was shown, and so was one with the permission still on.
+    func testAFollowUpStillOnTheScreenOrStillAllowedIsWrittenAsShown() async {
+        let center = make()
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        clock = at(8, 17)
+        fake.deliver(before: clock)
+        fake.permission = .denied                       // switched off after it was shown: it is still in the notification centre
+        await center.appActive()
+        XCTAssertEqual(sent(center).map(\.at), [at(8, 16, 40)])
+        XCTAssertTrue(said(center).contains("Follow-ups: 1 shown, 0 tapped, 0 answered."))
+        // The week, with notifications on and the notice already cleared by the person: iOS showed what it accepted.
+        fake.permission = .allowed
+        await center.appActive()
+        XCTAssertEqual(Set(fake.requests.keys), ["v18.follow.week"])
+        clock = at(12, 17)
+        fake.deliver(before: clock)
+        fake.removeDelivered(HarnessCenter.identifiers)
+        await center.appActive()
+        XCTAssertEqual(sent(center).map(\.step), [.asset, .week])
+    }
+
+    /// Bobby may notify, and every place a notification could show is switched off in Settings:
+    /// iOS accepts a follow-up and shows it nowhere. For follow-ups that is a no from the phone.
+    func testFollowUpsIOSWouldShowNowhereAreANoFromThePhone() {
+        typealias Phone = SystemHarnessNotifier
+        XCTAssertEqual(Phone.permission(authorization: .authorized, lockScreen: .enabled, list: .enabled, alerts: .enabled), .allowed)
+        XCTAssertEqual(Phone.permission(authorization: .authorized, lockScreen: .disabled, list: .enabled, alerts: .disabled), .allowed,
+                       "the notification centre alone still shows it")
+        XCTAssertEqual(Phone.permission(authorization: .authorized, lockScreen: .enabled, list: .disabled, alerts: .disabled), .allowed)
+        XCTAssertEqual(Phone.permission(authorization: .authorized, lockScreen: .disabled, list: .disabled, alerts: .enabled), .allowed)
+        XCTAssertEqual(Phone.permission(authorization: .authorized, lockScreen: .disabled, list: .disabled, alerts: .disabled), .denied,
+                       "allowed, and nowhere to show one")
+        XCTAssertEqual(Phone.permission(authorization: .authorized, lockScreen: .notSupported, list: .notSupported, alerts: .notSupported), .denied)
+        XCTAssertEqual(Phone.permission(authorization: .provisional, lockScreen: .disabled, list: .enabled, alerts: .disabled), .allowed)
+        XCTAssertEqual(Phone.permission(authorization: .denied, lockScreen: .enabled, list: .enabled, alerts: .enabled), .denied)
+        XCTAssertEqual(Phone.permission(authorization: .notDetermined, lockScreen: .disabled, list: .disabled, alerts: .disabled), .notDetermined,
+                       "never asked: their yes may still ask")
+    }
+
     // MARK: 6. A chip starts no chain in an account that said yes, whichever way it gets there
 
     /// An account with follow-ups on signs out. Signed out (undecided) they tap "How is BTC
@@ -488,5 +643,59 @@ final class HarnessReviewTests: XCTestCase {
         XCTAssertTrue(NucleoDeskIO.sameQuestion("\u{FEFF}\(Self.offered)", Self.offered))
         XCTAssertTrue(NucleoDeskIO.sameQuestion("What changed\u{FEFF}in NVDA?", "What changed in NVDA?"), "inside, it separates two words, as a space does")
         XCTAssertFalse(NucleoDeskIO.sameQuestion("\u{FEFF}\(Self.offered)", "What would have to change in AMD for this read to change?"))
+    }
+
+    // MARK: 8. Signed out, the Memory screen is one sentence and one row
+
+    /// What stood on the face before: the sentence, a paragraph about where the phone keeps things,
+    /// the shortcuts, the theses and the notes (about 66 words before the first note). Now the title,
+    /// one sentence and the row "On this iPhone", as for an account and as on Android.
+    func testSignedOutTheMemoryScreenIsOneSentenceAndOneRow() {
+        XCTAssertEqual(MemoryView.foldedFace(note: MemoryError.signedOut.message),
+                       ["Memory", "Sign in with Apple so Bobby can remember your assets and preferences.", "On this iPhone"])
+        L.select("es")
+        XCTAssertEqual(MemoryView.foldedFace(note: MemoryError.signedOut.message),
+                       ["Memoria", "Inicia sesión con Apple para que Bobby recuerde tus activos y preferencias.", "En este iPhone"])
+        for language in Self.languages {
+            L.select(language)
+            for note in [MemoryError.signedOut.message, MemoryView.riskRequired] {
+                let face = MemoryView.foldedFace(note: note)
+                XCTAssertEqual(face.count, 3, "the title, one sentence, the row that unfolds")
+                let words = face.joined(separator: " ").split(whereSeparator: { $0 == " " || $0 == "\u{00A0}" || $0 == "\u{202F}" }).filter { $0 != ":" }
+                XCTAssertLessThanOrEqual(words.count, 22, "\(language): about twenty words (V18-DESIGN.md, Memory): \(face)")
+                XCTAssertFalse(face.contains(MemoryView.onThisPhoneNote), "\(language): where the phone keeps things is said inside the row")
+            }
+        }
+        L.select("en")
+    }
+
+    // MARK: 9. The count of follow-ups reads right for one
+
+    func testTheCountOfFollowUpsReadsRightForOneInEveryLanguage() throws {
+        var ledger = HarnessLedger()
+        let shown = at(6, 19)
+        ledger.note(HarnessEvent(kind: .ask, at: at(5, 10), symbol: "NVDA", name: "NVIDIA", isEquity: true, price: 100))
+        ledger.note(HarnessEvent(kind: .sent, at: shown, symbol: "NVDA", step: .asset))
+        ledger.note(HarnessEvent(kind: .opened, at: shown.addingTimeInterval(600), symbol: "NVDA", step: .asset, ref: shown))
+        ledger.note(HarnessEvent(kind: .returned, at: shown.addingTimeInterval(900), symbol: "NVDA", step: .asset, ref: shown))
+        let expected = [
+            "en": "Follow-ups: 1 shown, 1 tapped, 1 answered.",
+            "es": "Seguimientos mostrados: 1. Tocados: 1. Respondidos: 1.",
+            "fr": "Suivis affichés : 1. Touchés : 1. Avec réponse : 1.",
+            "pt": "Seguimentos mostrados: 1. Tocados: 1. Respondidos: 1.",
+            "it": "Aggiornamenti mostrati: 1. Toccati: 1. Con risposta: 1.",
+            "de": "Follow-ups: 1 gezeigt, 1 angetippt, 1 beantwortet.",
+        ]
+        // A number in front of a participle that would have to agree with it ("1 mostrados", "1 affichés").
+        let disagreement = try NSRegularExpression(pattern: #"\d+\s+(mostrados|tocados|respondidos|affichés|touchés|mostrati|toccati)"#)
+        for language in Self.languages {
+            L.select(language)
+            let general = HarnessNotes.make(ledger: ledger, mode: .on, upcoming: [], now: at(7, 12), calendar: calendar).general
+            XCTAssertTrue(general.contains(try XCTUnwrap(expected[language])), "\(language): \(general)")
+            for line in general {
+                XCTAssertEqual(disagreement.numberOfMatches(in: line, range: NSRange(line.startIndex..., in: line)), 0, "\(language): \(line)")
+            }
+        }
+        L.select("en")
     }
 }

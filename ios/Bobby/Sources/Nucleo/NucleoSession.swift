@@ -107,6 +107,8 @@ final class NucleoSession: ObservableObject {
     /// The harness this session feeds and draws from. Nil in fixture mode and in the unit-test host
     /// (suites that test it pass their own).
     let harness: HarnessCenter?
+    /// 1.8: what the phone knows about the level a chip would run at (the one the person saved).
+    let levels = HarnessLevels()
     /// Whose thesis book a reminder tap is read against; tests stand in for the signed-in account.
     var reminderOwner: (() -> String?)?
     var briefingGate: BriefingTapGate!
@@ -179,7 +181,8 @@ final class NucleoSession: ObservableObject {
         desk.askStarted = { [weak self] token in self?.readStarted(token: token) }
         // Bobby's own question is put after a read only when the receipt of that read says the next
         // one is answered: it never leads into the sign-in or the paywall. (Fixture replies carry no receipt.)
-        if !fixtures { desk.offersNextQuestion = { HarnessWall.open($0) } }
+        levels.saved = { [unowned desk = self.desk] in desk.currentLevel() }
+        if !fixtures { desk.offersNextQuestion = { [weak self] access, level in self?.offersOneTap(afterRead: access, at: level) ?? false } }
         desk.sessionChanged = { [weak self] in self?.sessionChanged() }
         speech.emit = { [weak self] name, payload in
             self?.emit(name, payload)
@@ -373,8 +376,29 @@ final class NucleoSession: ObservableObject {
         // Bobby never invites someone into a wall: when the phone KNOWS the next read is refused, the
         // home offers no chip that asks by itself. Not knowing (a first launch, no network) changes
         // nothing, and without the key the session is what it always was.
-        if let harness, HarnessWall.closed(harness.access()) { json["oneTap"] = false }
+        if homeIsAtTheWall { json["oneTap"] = false }
         return json
+    }
+
+    // MARK: - A question that asks by itself (1.8)
+
+    /// After a read with this access receipt, answered at `level`: may its row carry a question that
+    /// asks by itself? Two meters are asked. The question Bobby's CIO wrote runs at Quick: the receipt
+    /// counts those. A chip ("How is BTC looking?") runs at the level the person saved: Deep and Max
+    /// have an allowance of their own, and with it used up the upgrade wall (or the sign-in) is what a
+    /// chip would open. One answer covers the whole row, so both must hold, and after a read not
+    /// knowing is a no, for the level as for the receipt. Nothing is lost but a chip.
+    func offersOneTap(afterRead access: BobbyReadAccess?, at level: NucleoAnalysisLevel) -> Bool {
+        levels.heard(level)
+        return HarnessWall.open(access) && levels.open(access) == true
+    }
+
+    /// The idle home, from what the phone knows now: the next read is refused, or a chip would run
+    /// at a level that is used up. Not knowing is not the wall: the home keeps its chips.
+    var homeIsAtTheWall: Bool {
+        guard let harness else { return false }
+        let said = harness.access()
+        return HarnessWall.closed(said) || levels.open(said) == false
     }
 
     // MARK: - The nudge (1.8)
@@ -1304,12 +1328,14 @@ final class NucleoSession: ObservableObject {
             .compactMap { $0 }
             .sink { [weak self] _ in self?.scheduleBriefingDrain() }
             .store(in: &cancellables)
-        // 1.8: the phone heard how many reads are left (a receipt, the meter read at launch, a purchase).
-        // When that flips whether the next read is refused, the home loses or regains its one-tap chips.
-        if let harness {
-            Publishers.Merge(BobbyAccessCenter.shared.$access.map { _ in () }, NucleoLevelCenter.shared.$quickAccess.map { _ in () })
+        // 1.8: the phone heard how many reads are left (a receipt, the meter read at launch, a purchase),
+        // what a level has left, or which level a chip would run at. When that flips whether the home
+        // is at the wall, it loses or regains its one-tap chips.
+        if harness != nil {
+            Publishers.Merge4(BobbyAccessCenter.shared.$access.map { _ in () }, NucleoLevelCenter.shared.$quickAccess.map { _ in () },
+                              NucleoLevelCenter.shared.$meters.map { _ in () }, NucleoLevelCenter.shared.$level.map { _ in () })
                 .receive(on: DispatchQueue.main)
-                .map { [weak harness] in HarnessWall.closed(harness?.access()) }
+                .map { [weak self] in self?.homeIsAtTheWall ?? false }
                 .removeDuplicates()
                 .dropFirst()
                 .sink { [weak self] _ in self?.sessionChanged() }

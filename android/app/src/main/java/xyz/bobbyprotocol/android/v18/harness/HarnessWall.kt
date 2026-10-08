@@ -14,8 +14,9 @@ import xyz.bobbyprotocol.android.v18.credits.ReadAccess
 // paywall (Bobby Pro through Google Play, where this build can sell it). The phone does not ask
 // Google Play anything here: the server's `paywall` flag is the whole answer, as on iOS.
 //
-// Android goes one step further than iOS: a chip keeps the level the person saved (as on iOS), so
-// the saved level's own allowance is asked too before a chip is offered (`levelOpen`).
+// A chip keeps the level the person saved, so the saved level's own allowance is asked too before
+// a chip is offered (`levelOpen`). The iPhone has the same rule (HarnessWall.levelOpen in
+// ios/Bobby/Sources/V18/Harness/HarnessCenter.swift).
 
 object HarnessWall {
     /** The level a read Bobby started runs at, and the one whose meter the receipt counts. */

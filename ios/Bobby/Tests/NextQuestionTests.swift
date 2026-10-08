@@ -203,7 +203,7 @@ final class NextQuestionTests: XCTestCase {
         var pickedSymbols: [String] = []
         let (session, bridge) = make(harness: nil)
         defer { session.teardown() }
-        session.desk.offersNextQuestion = { _ in receipts += 1; return false }
+        session.desk.offersNextQuestion = { _, _ in receipts += 1; return false }
         session.desk.nextQuestionPicked = { pickedSymbols.append($0) }
         let read = await ask(bridge, ["question": "Should I buy NVIDIA right now?"])
         let synthesis = try XCTUnwrap(read["synthesis"] as? [String: Any])

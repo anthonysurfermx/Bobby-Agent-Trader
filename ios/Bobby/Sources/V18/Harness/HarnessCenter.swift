@@ -19,6 +19,9 @@
 //    glass, a board row, the question Bobby wrote after a read) is offered and launched only when
 //    the phone knows the next read is answered (`HarnessWall`), and it runs at the Quick level
 //    whatever level is saved. The line and the board are still shown: they need no read.
+//    A chip that asks about an asset runs at the level the person saved, and Deep and Max have an
+//    allowance of their own: a chip is offered only while that level has a read left too
+//    (`HarnessWall.levelOpen`, `HarnessLevels`).
 //  - What iOS holds is always the plan of whoever uses the phone now: another account, or none,
 //    cancels the previous reader's follow-ups before anything else.
 //  - A follow-up names the asset the person asked about and nothing else: no price, no figure, no
@@ -41,6 +44,17 @@
 //  - A follow-up whose moment has passed is written to the ledger as `sent` exactly once; whether
 //    the person did something with it within a day (`returned`) is what the next plan learns from.
 //    A tap alone (`opened`) is written down and changes nothing.
+//  - What the iPhone can know about "shown". iOS shows a local notification it accepted at its
+//    moment, and tells the app nothing when it does (only a tap, or a delivery with the app in
+//    front, reaches the app). So `sent` is written for a follow-up iOS accepted once its moment has
+//    passed, with one exception the phone can see: when it next looks (`look`), Bobby's
+//    notifications are off, or nowhere to show one is left, and the notice is not in the
+//    notification centre (`deliveredIds`). Then nobody can say it was shown, and nothing is
+//    written: the caps, the day to answer and "Follow-ups: N shown" on Memory never count it. A
+//    tap proves its own notice was shown and writes it whatever the settings say now. What the
+//    phone cannot see and still counts as shown: a notice a Focus or the scheduled summary held
+//    back, one that arrived while the phone was off, and one whose permission was switched off and
+//    on again around its moment.
 //  - Only a question the person asked in their own words (typed, spoken) is followed up. A read
 //    whose question Bobby wrote (the button of a follow-up, a board row, the question after a
 //    read, a chip that asks about an asset) is written with its origin and starts nothing: one
@@ -50,7 +64,17 @@
 //  - A no stays a no. Follow-ups turned off (the switch, or "Stop" on a notification) survive a
 //    sign-in, a sign-out and the Memory screen's "Delete everything": what was kept is erased,
 //    the refusal is not, and the offer is not made again by itself. An account that said no takes
-//    nothing from a signed-out reader either.
+//    nothing from a signed-out reader either. And it crosses both ways on this phone: a no said
+//    signed out goes with the person into their account whatever that account had said before,
+//    and a no said in an account is still a no once signed out. Only their own later yes lifts it
+//    (`accept`).
+//  - A yes that was erased (Memory's "Delete everything", a withdrawn risk notice) is asked for
+//    again: the offer's own history on the glass goes with it (`forgetOffer`).
+//  - "Forget" beside a remembered asset on the Memory screen also erases what this phone keeps to
+//    come back to it: its follow-up notes and the follow-up that was coming (`assetForgotten`).
+//  - The Memory notes promise a day ("Bobby comes back on…", "Your week arrives on…") only while
+//    the phone will show the follow-up: with Bobby's notifications off, or nowhere left to show
+//    one, the plan exists and nothing arrives (`notes`).
 //  - What the person said about how long they are looking (the horizon their question named, the
 //    one chosen on a save, a thesis) is written only once they said yes to follow-ups. Until then
 //    it is held in memory for the last few reads, and the yes writes it for those.
@@ -180,6 +204,10 @@ protocol HarnessNotifying: AnyObject {
     /// Takes already delivered notifications off the lock screen and the notification centre.
     func removeDelivered(_ ids: [String])
     func pendingIds() async -> Set<String>
+    /// The notifications iOS delivered that still sit in the notification centre. One the person
+    /// cleared or tapped is no longer among them: being there proves a notice was shown, not being
+    /// there proves nothing.
+    func deliveredIds() async -> Set<String>
 }
 
 @MainActor
@@ -194,10 +222,22 @@ final class SystemHarnessNotifier: HarnessNotifying {
     }
 
     func status() async -> ReminderPermission {
-        switch await center.notificationSettings().authorizationStatus {
+        let settings = await center.notificationSettings()
+        return Self.permission(authorization: settings.authorizationStatus, lockScreen: settings.lockScreenSetting,
+                               list: settings.notificationCenterSetting, alerts: settings.alertSetting)
+    }
+
+    /// Where the person stands for follow-ups. Allowed means iOS will show one: Bobby may notify,
+    /// and iOS says there is somewhere to show it (alerts, the lock screen or the notification
+    /// centre: what a person sees in Settings as Lock Screen, Notification Center and Banners).
+    /// With all of them switched off iOS accepts a notice and shows it nowhere, which for a
+    /// follow-up is a no from the phone, like a denied permission.
+    nonisolated static func permission(authorization: UNAuthorizationStatus, lockScreen: UNNotificationSetting,
+                                       list: UNNotificationSetting, alerts: UNNotificationSetting) -> ReminderPermission {
+        switch authorization {
         case .notDetermined: return .notDetermined
         case .denied: return .denied
-        default: return .allowed
+        default: return [lockScreen, list, alerts].contains(.enabled) ? .allowed : .denied
         }
     }
 
@@ -225,6 +265,10 @@ final class SystemHarnessNotifier: HarnessNotifying {
     func pendingIds() async -> Set<String> {
         Set(await center.pendingNotificationRequests().map(\.identifier))
     }
+
+    func deliveredIds() async -> Set<String> {
+        Set(await center.deliveredNotifications().map(\.request.identifier))
+    }
 }
 
 /// The unit-test host never touches the phone's notifications (suites build their own fake).
@@ -237,6 +281,7 @@ final class SilentHarnessNotifier: HarnessNotifying {
     func remove(_ ids: [String]) {}
     func removeDelivered(_ ids: [String]) {}
     func pendingIds() async -> Set<String> { [] }
+    func deliveredIds() async -> Set<String> { [] }
 }
 
 /// The line on the glass when the person comes back: the asset they asked about and, when the
@@ -284,10 +329,58 @@ enum HarnessWall {
         return left <= 0 && access.bonus <= 0 && access.paywall
     }
 
+    /// Whether a read at `level` is answered as far as that level's own allowance goes. A chip Bobby
+    /// wrote ("How is BTC looking?") runs at the level the person saved, and Deep and Max each have an
+    /// allowance apart from the general reads the receipt counts: with it used up the server refuses
+    /// the read before it looks at the general meter, and what stands there is the upgrade wall for
+    /// a free account and the sign-in for a guest. True when the phone knows the read is answered,
+    /// false when it knows that wall is there, nil when it cannot tell.
+    ///  - Quick: yes. Its meter is the receipt's, and `open` and `closed` answer for it.
+    ///  - Bobby Pro: yes. A level that ran out for the month is a notice with "Continue with Quick",
+    ///    not a sign-in or a wall.
+    ///  - Deep or Max otherwise: what is left of the level (the plan's reads and gifted ones), less
+    ///    `spent`, the reads at that level answered since the phone last heard the meter.
+    static func levelOpen(_ level: NucleoAnalysisLevel, access: BobbyReadAccess?, meter: NucleoLevelMeter?, spent: Int = 0) -> Bool? {
+        guard level.isPremium else { return true }
+        if let access, access.isPro { return true }
+        guard let meter, let plan = meter.remaining ?? meter.limit.map({ max(0, $0 - meter.used) }) else { return nil }
+        return plan + meter.bonus - spent > 0
+    }
+
     /// The receipt to go by, newest source first. One whose reset moment has passed says nothing
     /// about the reads there are now: it is skipped, and with none left the phone asks again.
     static func current(_ receipts: [BobbyReadAccess?], now: Date) -> BobbyReadAccess? {
         receipts.compactMap { $0 }.first { receipt in receipt.resetsDate.map { $0 > now } ?? true }
+    }
+}
+
+/// What the phone knows about the level a chip would run at (the one the person saved). The meters
+/// are the ones the level sheet shows (NucleoLevelCenter); a read just answered at a level is not in
+/// them until the balance is read again, so it is counted here until the meters are heard to say
+/// something else.
+@MainActor
+final class HarnessLevels {
+    /// The level the person saved: the one a chip runs at.
+    var saved: () -> NucleoAnalysisLevel = { NucleoLevelCenter.shared.level }
+    /// What the phone last heard about each level's own allowance.
+    var meters: () -> [NucleoAnalysisLevel: NucleoLevelMeter] = { NucleoLevelCenter.shared.meters }
+    /// Whose meters they are: another reader's read spends nothing of this one's.
+    var generation: () -> UUID = { AccountSession.shared.generation }
+
+    /// The level of a read answered since the meters last changed, when it has an allowance of its own.
+    private var spent: (level: NucleoAnalysisLevel, generation: UUID, meters: [NucleoAnalysisLevel: NucleoLevelMeter])?
+
+    /// A read was just answered at `level`.
+    func heard(_ level: NucleoAnalysisLevel) {
+        spent = level.isPremium ? (level, generation(), meters()) : nil
+    }
+
+    /// `HarnessWall.levelOpen` for the level saved now: true, false, or nil when the phone cannot tell.
+    func open(_ access: BobbyReadAccess?) -> Bool? {
+        let said = meters()
+        if let was = spent, was.generation != generation() || was.meters != said { spent = nil }
+        let level = saved()
+        return HarnessWall.levelOpen(level, access: access, meter: said[level], spent: spent?.level == level ? 1 : 0)
     }
 }
 
@@ -298,6 +391,9 @@ final class HarnessCenter: ObservableObject {
     nonisolated static let kind = "follow-up"
     /// The reader's ledger was erased from outside (the Memory screen's "Delete everything").
     static let erased = Notification.Name("V18.harnessErased")
+    /// One asset was forgotten from outside (the Memory screen's "Forget"): `userInfo` carries the
+    /// symbol and the tag of the reader who forgot it.
+    static let forgotten = Notification.Name("V18.harnessForgotten")
     /// An asset is worth coming back to once this long has passed since they asked.
     static let dueAfter: TimeInterval = 20 * 3_600
     /// And for this long.
@@ -361,6 +457,9 @@ final class HarnessCenter: ObservableObject {
     var linesKept: (_ owner: String?) -> Int
     /// And they are kept no longer than the ledger keeps the question they were about.
     var pruneLines: (_ owner: String?, _ before: Date) -> Void
+    /// The glass forgets that it made the offer ("Shall I keep you posted on NVDA?") to this reader
+    /// and that they tapped it: called when a yes is erased, so that it is asked for again.
+    var forgetOffer: (_ owner: String?) -> Void
     /// The glass has something new to draw (the session listens).
     var changed: () -> Void = {}
     /// The reader's active theses: the asset and the horizon they set, never the words.
@@ -374,6 +473,9 @@ final class HarnessCenter: ObservableObject {
     /// What this launch handed to iOS (id → what it said and when), so nothing is written twice.
     private var issued: [String: HarnessNotice] = [:]
     private var focus: (symbol: String, at: Date)?
+    /// The follow-ups that sat in the notification centre when the phone last looked (`look`). Nil
+    /// until it has: before that nothing is known, and a follow-up iOS accepted counts as shown.
+    private var onScreen: Set<String>?
     /// Events written without what the person said about their horizon, kept whole here until they
     /// say yes. In memory only: it never outlives the launch or the reader.
     private var held: [HarnessEvent] = []
@@ -404,6 +506,7 @@ final class HarnessCenter: ObservableObject {
         forgetLines = { symbol, owner in NudgeCenter.forget(prefix: HarnessNudges.movePrefix(symbol), owner: owner, defaults: defaults) }
         linesKept = { owner in NudgeCenter.count(prefix: HarnessNudges.movePrefix(), owner: owner, defaults: defaults) }
         pruneLines = { owner, before in NudgeCenter.prune(prefix: HarnessNudges.movePrefix(), before: before, owner: owner, defaults: defaults) }
+        forgetOffer = { owner in HarnessCenter.forgetOfferHistory(owner: owner, defaults: defaults) }
         theses = { owner in
             ThesisBook(defaults: defaults).active(owner: owner).map { ($0.symbol, $0.horizon.map(HarnessHorizon.init(thesis:)), $0.createdAt) }
         }
@@ -419,9 +522,12 @@ final class HarnessCenter: ObservableObject {
     /// Bobby may start a read of its own: the phone knows the next one is answered.
     var readsOpen: Bool { HarnessWall.open(access()) }
 
-    /// What the phone keeps for follow-ups, in sentences (the Memory screen).
+    /// What the phone keeps for follow-ups, in sentences (the Memory screen). "Bobby comes back on…"
+    /// and "Your week arrives on…" are said only when the phone will show them: with Bobby's
+    /// notifications off, or nowhere left to show one, the plan exists and nothing arrives.
     var notes: HarnessNotes {
-        HarnessNotes.make(ledger: ledger, mode: mode, upcoming: upcoming, now: now(), calendar: calendar(), lines: linesKept(owner))
+        HarnessNotes.make(ledger: ledger, mode: mode, upcoming: status == .allowed ? upcoming : [], now: now(), calendar: calendar(),
+                          lines: linesKept(owner))
     }
 
     // MARK: Start
@@ -451,6 +557,17 @@ final class HarnessCenter: ObservableObject {
         NotificationCenter.default.publisher(for: Self.erased)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in Task { @MainActor in await self?.reloadAfterErase() } }
+            .store(in: &cancellables)
+        // "Forget" on an asset in Memory: what this centre holds about it, and what iOS holds, follows the store.
+        NotificationCenter.default.publisher(for: Self.forgotten)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] note in
+                guard let symbol = note.userInfo?["symbol"] as? String, let reader = note.userInfo?["owner"] as? String else { return }
+                Task { @MainActor in
+                    guard let self, Self.ownerTag(self.owner) == reader else { return }
+                    await self.forget(symbol: symbol)
+                }
+            }
             .store(in: &cancellables)
         // A thesis was written, changed or archived: its horizon times the next follow-up.
         NotificationCenter.default.publisher(for: ThesisBook.didChange)
@@ -599,6 +716,9 @@ final class HarnessCenter: ObservableObject {
         if owner != user { load(owner: user) }
         mode = .on
         store.write(mode, owner: owner)
+        // Their latest word on this phone is a yes: a no said signed out before it no longer waits
+        // to follow them into this account at the next sign-in.
+        if owner != nil, store.mode(owner: nil) == .off { store.write(.undecided, owner: nil) }
         // They said yes: what the last reads carried and was only in memory is written now, the read
         // that prompted the yes first. A question gains what it named; a save, never written before
         // the yes, goes in whole.
@@ -636,13 +756,7 @@ final class HarnessCenter: ObservableObject {
     /// back more. A pointer to a thesis is not a note of the harness: it goes with its thesis.
     func forget(symbol raw: String) async {
         guard let symbol = HarnessLedger.validSymbol(raw) else { return }
-        let shown = ledger.events.filter { $0.symbol == symbol && [.sent, .opened, .returned].contains($0.kind) }
-        ledger.remove { $0.symbol == symbol && $0.kind != .thesis }
-        for var event in shown {
-            event.symbol = nil
-            event.sector = nil
-            ledger.note(event)
-        }
+        ledger.forget(symbol: symbol)
         store.write(ledger, owner: owner)
         held.removeAll { $0.symbol?.uppercased() == symbol }
         quotes[symbol] = nil
@@ -661,10 +775,14 @@ final class HarnessCenter: ObservableObject {
     /// they do next with it can (`answerIfUseful`), tapped or not.
     func opened(_ tap: HarnessTap) async {
         guard recording, accepts(tap) else { return }
-        // A tapped notification was shown: iOS lets Bobby show them.
-        status = .allowed
-        settle()
+        // A tapped notification was shown, whatever the phone's settings say by now.
+        settle(shown: tap)
         let clock = now()
+        // And if the phone had already let its moment pass unwritten (it could not tell then), it is written now.
+        if let stamp = tap.stamp, stamp <= clock,
+           !ledger.events(.sent).contains(where: { $0.step == tap.step && abs($0.at.timeIntervalSince(stamp)) < 1 }) {
+            note(HarnessEvent(kind: .sent, at: stamp, symbol: tap.symbol, step: tap.step, sector: tap.sector))
+        }
         let ref = tap.stamp ?? ledger.events(.sent).last { $0.step == tap.step }?.at
         guard !ledger.events.contains(where: { $0.kind == .opened && $0.step == tap.step && $0.ref != nil && $0.ref == ref }) else { return }
         note(HarnessEvent(kind: .opened, at: clock, symbol: tap.symbol, step: tap.step, sector: tap.sector, ref: ref))
@@ -677,7 +795,8 @@ final class HarnessCenter: ObservableObject {
     /// written as shown; whether it is answered depends on what they do with that line.
     func firedInForeground(_ tap: HarnessTap) async {
         guard recording, accepts(tap) else { return }
-        settle()
+        // iOS showed no banner for this one: the glass does, now.
+        settle(shown: tap)
         if tap.step == .asset, let symbol = tap.symbol { focus = (symbol, now()) }
         await replan()
         await refreshMove()
@@ -688,7 +807,7 @@ final class HarnessCenter: ObservableObject {
     /// Back in the app: follow-ups that fired are written down, the plan is brought up to date and
     /// the glass learns whether there is something to come back to.
     func appActive() async {
-        status = await notifier.status()
+        await look()
         guard consent() != .withdrawn else { return }
         if currentUser() != owner { await accountChanged(); return }
         // What the glass remembers about its lines lasts as long as the question they were about.
@@ -706,29 +825,59 @@ final class HarnessCenter: ObservableObject {
     }
 
     /// Another account, or none. A signed-out reader who signs in keeps what the phone learned,
-    /// unless that account said no: then nothing is taken over (off keeps nothing). A no said signed
-    /// out goes with them and also stays on the phone: signed out again, it is still a no.
+    /// unless that account said no: then nothing is taken over (off keeps nothing). A no crosses
+    /// both ways on this phone. Said signed out, it goes with the person into their account whatever
+    /// that account had said before (it is the later word; their own yes in the account lifts it,
+    /// `accept`) and also stays on the phone: signed out again, it is still a no. Said in an account,
+    /// it is still a no once signed out.
     /// The switch itself never waits for anything: by the time this suspends, the centre already
     /// holds the reader who is using the phone, so two changes in a row cannot cross.
     func accountChanged() async {
         let user = currentUser()
         guard user != owner else { return }
-        let wasLocal = owner == nil
+        let wasLocal = owner == nil, leaving = owner
         // What the reader who is leaving was already shown is written into their own ledger first.
         if consent() == .accepted { settle() }
         // The previous reader's follow-ups never reach the next one: not the ones still to come,
         // and not the ones already on the lock screen.
         purge()
+        // An account that said no signs out: on this phone it is still a no. The signed-out reader
+        // is not offered follow-ups again by themselves; what they kept, if anything, is theirs and stays.
+        if let leaving, user == nil, store.mode(owner: leaving) == .off, store.mode(owner: nil) == .undecided,
+           store.ledger(owner: nil).isEmpty {
+            store.write(.off, owner: nil)
+        }
         if wasLocal, user != nil, consent() == .accepted {
-            let local = store.ledger(owner: nil), localMode = store.mode(owner: nil)
-            let theirMode = store.mode(owner: user)
-            if theirMode != .off {
-                var theirs = store.ledger(owner: user)
-                theirs.merge(local)
+            let localMode = store.mode(owner: nil), theirMode = store.mode(owner: user)
+            if localMode == .off, theirMode != .off {
+                // The no goes with them, whatever the account had said before. And off keeps nothing:
+                // what the account had noted, and what it had planned, goes too.
+                store.forget(owner: user)
+                store.write(.off, owner: user)
+                forgetLines(nil, user)
+            } else if theirMode != .off {
+                // An account that said no keeps nothing, so nothing is moved into it.
+                var theirs = store.ledger(owner: user), mine = store.ledger(owner: nil)
+                if theirMode == .on, localMode == .undecided {
+                    // Before any yes the phone kept one bare entry per read, and there a chip's read looks
+                    // like a typed question. This account has already said yes, and with follow-ups on a
+                    // chip starts no chain: since the two cannot be told apart, none of them does. They
+                    // stay as assets the person asked about, for the glass and for the week.
+                    let asked = mine.events.filter(\.isQuestion)
+                    mine.remove { $0.isQuestion }
+                    for var event in asked {
+                        event.origin = .followUp
+                        mine.note(event)
+                    }
+                }
+                theirs.merge(mine)
                 store.write(theirs, owner: user)
                 if theirMode == .undecided, localMode != .undecided { store.write(localMode, owner: user) }
             }
+            // Nothing of what was asked signed out stays under the signed-out reader: neither the notes
+            // nor what the glass kept about its lines. A no said signed out does.
             store.forget(owner: nil)
+            forgetLines(nil, nil)
             if localMode == .off { store.write(.off, owner: nil) }
         }
         load(owner: user)
@@ -838,15 +987,30 @@ final class HarnessCenter: ObservableObject {
         store.write(ledger, owner: owner)
     }
 
+    /// What the phone can see of what iOS did with the follow-ups it accepted: whether Bobby may
+    /// still show notifications, and which of them sit in the notification centre.
+    private func look() async {
+        let permission = await notifier.status()
+        let there = await notifier.deliveredIds()
+        status = permission
+        onScreen = there
+    }
+
     /// Follow-ups whose moment has passed: the ones iOS held become `sent`; all of them leave the plan.
-    private func settle() {
+    /// iOS shows what it accepted at its moment and tells the app nothing, so a follow-up it
+    /// accepted counts as shown, with one exception the phone can see: it has looked, Bobby's
+    /// notifications are off (or nowhere is left to show one), and the notice is not in the
+    /// notification centre. Then nobody can say it was shown, and it is not written. One that was
+    /// tapped, or that came due with the app in front (`shown`), was seen for sure.
+    private func settle(shown tap: HarnessTap? = nil) {
         let clock = now()
         let passed = planned.filter { $0.followUp.fireAt <= clock }
         guard !passed.isEmpty else { return }
-        // iOS accepted it while it could show notifications: it counts as shown, even if the
-        // permission was taken away afterwards (counting too many only makes Bobby quieter).
         for item in passed where item.handed {
             let followUp = item.followUp
+            // A tap the app built itself carries no moment: its step says which one it is.
+            let proven = tap.map { $0.step == followUp.step && ($0.stamp.map { abs($0.timeIntervalSince(followUp.fireAt)) < 1 } ?? true) } ?? false
+            if !proven, let onScreen, status != .allowed, !onScreen.contains(followUp.id) { continue }
             ledger.note(HarnessEvent(kind: .sent, at: followUp.fireAt, symbol: followUp.symbol, step: followUp.step, sector: followUp.sector))
         }
         planned.removeAll { $0.followUp.fireAt <= clock }
@@ -928,6 +1092,8 @@ final class HarnessCenter: ObservableObject {
 
     /// Forgets this reader and cancels what iOS holds. `keeping` is the switch afterwards.
     private func erase(keeping next: HarnessMode) async {
+        // A yes that goes without a no in its place (the risk notice was withdrawn) is asked for again.
+        if mode == .on, next == .undecided { forgetOffer(owner) }
         store.forget(owner: owner)
         store.write(next, owner: owner)
         ledger = HarnessLedger()
@@ -948,5 +1114,40 @@ final class HarnessCenter: ObservableObject {
     /// The Memory screen's "Delete everything" and the tests: this reader's ledger goes, the switch stays.
     func forgetLedger() async {
         await erase(keeping: mode)
+    }
+
+    // MARK: What the Memory screen erases (it works on the store; the centre in use hears about it)
+
+    /// The offer's history on the glass for one reader: how often it was drawn and that it was tapped.
+    static func forgetOfferHistory(owner: String?, defaults: UserDefaults = .standard) {
+        NudgeCenter.forget(prefix: HarnessNudges.offerId, owner: owner, defaults: defaults)
+    }
+
+    /// Memory's "Delete everything" for `user`: the notes and the plan go, with the follow-ups
+    /// planned. A yes goes with them, and the offer on the glass is made again after their next
+    /// read (its own history is cleared, or it would never return); until they answer it the phone
+    /// keeps what it keeps for anyone undecided, the question itself. A no stays. The centre that
+    /// is serving that reader reloads (`erased`).
+    static func erasedEverything(owner user: String?, defaults: UserDefaults = .standard) {
+        let store = HarnessStore(defaults: defaults)
+        let saidYes = store.mode(owner: user) == .on
+        store.forgetNotes(owner: user)
+        if saidYes { forgetOfferHistory(owner: user, defaults: defaults) }
+        NotificationCenter.default.post(name: erased, object: nil)
+    }
+
+    /// Memory's "Forget" on one asset, for `user`: what this phone keeps to come back to that asset
+    /// goes with it. Its notes leave the store here, with what the glass kept about its line; the
+    /// centre that is serving that reader then drops what it holds in memory and cancels the
+    /// follow-up that was coming (`forgotten` → `forget(symbol:)`). A thesis pointer stays: it goes
+    /// with its thesis.
+    static func assetForgotten(_ raw: String, owner user: String?, defaults: UserDefaults = .standard) {
+        guard let symbol = HarnessLedger.validSymbol(raw) else { return }
+        let store = HarnessStore(defaults: defaults)
+        var ledger = store.ledger(owner: user)
+        ledger.forget(symbol: symbol)
+        store.write(ledger, owner: user)
+        NudgeCenter.forget(prefix: HarnessNudges.movePrefix(symbol), owner: user, defaults: defaults)
+        NotificationCenter.default.post(name: forgotten, object: nil, userInfo: ["symbol": symbol, "owner": ownerTag(user)])
     }
 }

@@ -8,7 +8,8 @@
 //   memory-on               the memory screen with memory on
 //   memory-deleted          the memory screen right after "Delete everything"
 //   memory-offline          the memory screen when the server does not answer (the phone's part still shows)
-//   memory-signed-out       the memory screen with nobody signed in (what this iPhone keeps still shows)
+//   memory-signed-out       the memory screen with nobody signed in: one sentence and the row "On this iPhone"
+//   memory-signed-out-open  the same with that row unfolded (what this iPhone keeps)
 #if DEBUG
 import SwiftUI
 
@@ -24,6 +25,7 @@ enum MemoryQA {
             "memory-deleted": { AnyView(MemoryScreenFixture(state: .deleted)) },
             "memory-offline": { AnyView(MemoryScreenFixture(state: .offline)) },
             "memory-signed-out": { AnyView(MemoryScreenFixture(state: .signedOut)) },
+            "memory-signed-out-open": { AnyView(MemoryScreenFixture(state: .signedOut, localStartsOpen: true)) },
         ]
     }
 
@@ -96,16 +98,18 @@ private struct MemoryConsentFixture: View {
 private struct MemoryScreenFixture: View {
     enum Screen { case off, on, deleted, offline, signedOut }
     let state: Screen
+    let localStartsOpen: Bool
     @StateObject private var center: MemoryCenter
 
-    init(state: Screen) {
+    init(state: Screen, localStartsOpen: Bool = false) {
         self.state = state
+        self.localStartsOpen = localStartsOpen
         _center = StateObject(wrappedValue: MemoryQA.center(suite: "qa.v18.memory.screen", online: state != .offline,
                                                             signedIn: state != .signedOut))
     }
 
     var body: some View {
-        MemoryView(center: center, riskAccepted: true, onClose: {})
+        MemoryView(center: center, riskAccepted: true, onClose: {}, localStartsOpen: localStartsOpen)
             .task {
                 switch state {
                 case .off, .offline, .signedOut:

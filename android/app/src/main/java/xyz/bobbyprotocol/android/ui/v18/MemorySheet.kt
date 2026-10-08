@@ -56,7 +56,7 @@ import xyz.bobbyprotocol.android.v18.theses.V18HostWords
 // opens). MemoryCenter owns account isolation and makes deletion complete (server, shortcuts,
 // theses, and what the other 1.8 features keep). What the phone keeps is there for everyone, signed
 // in or not, behind the same row, "On this phone": signed out the screen is one sentence and that row.
-// (iOS draws that part unfolded for a signed-out reader, three paragraphs before the first note.)
+// (The iPhone draws the same face: MemoryView.folded.)
 
 @Composable
 fun MemorySheet(host: V18Host, onClose: () -> Unit) {

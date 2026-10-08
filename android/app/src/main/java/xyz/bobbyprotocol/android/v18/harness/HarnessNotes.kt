@@ -225,7 +225,7 @@ data class HarnessNotes(
                 }
             }
             if (shown + tapped + answered > 0) {
-                general.add(copy.text("Follow-ups: {0} shown, {1} tapped, {2} answered.", "Seguimientos: {0} mostrados, {1} tocados, {2} respondidos.", shown, tapped, answered))
+                general.add(copy.text("Follow-ups: {0} shown, {1} tapped, {2} answered.", "Seguimientos mostrados: {0}. Tocados: {1}. Respondidos: {2}.", shown, tapped, answered))
             }
             // Not in the ledger: the glass's own count of the lines it drew, one per asset and question.
             if (drawn > 0) {

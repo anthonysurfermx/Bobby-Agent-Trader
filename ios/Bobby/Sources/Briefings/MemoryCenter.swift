@@ -13,10 +13,11 @@
 //    it was asked for (user id + generation + this center's epoch) and late answers are dropped.
 //  - Writes are explicit corrections, one at a time, shown only after the server answers.
 //  - "Delete everything" needs a confirmation: `requestForgetAll` only arms it; `confirmForgetAll` sends.
-//  - 1.8: deletion is complete. "Forget" also takes the asset out of this phone's shortcut row, and
-//    "Delete everything" also clears that row, the theses written on this phone and the notes the
-//    phone keeps for follow-ups (V18/Harness), for this account only. The phone's part runs first and needs no network; `notice` says honestly whether the
-//    server confirmed its part.
+//  - 1.8: deletion is complete. "Forget" also takes the asset out of this phone's shortcut row and
+//    out of what the follow-ups keep (its notes, the follow-up that was coming), and "Delete
+//    everything" also clears that row, the theses written on this phone and the notes the phone
+//    keeps for follow-ups (V18/Harness), for this account only. The phone's part runs first and
+//    needs no network; `notice` says honestly whether the server confirmed its part.
 //  - R11: no network before the risk notice is accepted; signed out = no calls.
 //  - The server's text is never shown; failures map to the app's own copy.
 import Combine
@@ -317,8 +318,9 @@ final class MemoryCenter: ObservableObject {
         return await write("PATCH", Self.path, body: [field.rawValue: value ?? NSNull()])
     }
 
-    /// Forget one remembered asset: first on this phone (its shortcut, no network needed), then on the
-    /// server. True when the server confirmed; otherwise `notice` says its part is still there.
+    /// Forget one remembered asset: first on this phone (its shortcut and what the follow-ups keep
+    /// about it, no network needed), then on the server. True when the server confirmed; otherwise
+    /// `notice` says its part is still there.
     @discardableResult
     func forget(_ symbol: String) async -> Bool {
         guard symbol.range(of: MemorySnapshot.symbolPattern, options: .regularExpression) != nil else { return false }
@@ -328,6 +330,8 @@ final class MemoryCenter: ObservableObject {
         let generation = currentGeneration()
         notice = nil
         DeskMemory.forget(symbol: symbol, owner: user, defaults: defaults)
+        // What this phone keeps to come back to that asset goes with it: its follow-up notes, and the follow-up that was coming.
+        HarnessCenter.assetForgotten(symbol, owner: user, defaults: defaults)
         forgotAt[symbol.uppercased()] = now()
         local = readLocal()
         let ok = await write("DELETE", Self.path + "?symbol=" + BriefingsAPI.queryValue(symbol), body: nil)
@@ -360,9 +364,9 @@ final class MemoryCenter: ObservableObject {
         DeskMemory.forgetWatchlist(owner: user, defaults: defaults)
         ThesisBook(defaults: defaults).deleteAll(owner: user)
         // 1.8: what the harness learned on this phone goes too, with the follow-ups it planned. A no
-        // to follow-ups is not a note: it stays, so erasing never brings the offer back.
-        HarnessStore(defaults: defaults).forgetNotes(owner: user)
-        NotificationCenter.default.post(name: HarnessCenter.erased, object: nil)
+        // to follow-ups is not a note: it stays, so erasing never brings the offer back. A yes goes
+        // with the notes and is asked for again.
+        HarnessCenter.erasedEverything(owner: user, defaults: defaults)
         forgotAllAt = now()
         local = readLocal()
         let ok = await write("DELETE", Self.path, body: nil)

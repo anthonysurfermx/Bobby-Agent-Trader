@@ -459,7 +459,7 @@
   },
   "Bobby keeps these on this phone, not on its servers. The text of a thesis is sent, with that question, only when you start a review: to Bobby and to the AI providers that write the answer.": {
     "fr": "Bobby garde ces éléments sur ce téléphone, pas sur ses serveurs. Le texte d'une thèse est envoyé, avec cette question, seulement quand tu lances une révision : à Bobby et aux fournisseurs d'IA qui rédigent la réponse.",
-    "pt": "O Bobby guarda isto neste telemóvel, não nos seus servidores. O texto de uma tese é enviado, com essa pergunta, apenas quando inicias uma revisão: ao Bobby e aos fornecedores de IA que escrevem a resposta.",
+    "pt": "O Bobby guarda isto neste telefone, não nos seus servidores. O texto de uma tese é enviado, com essa pergunta, apenas quando inicias uma revisão: ao Bobby e aos fornecedores de IA que escrevem a resposta.",
     "it": "Bobby conserva questi dati su questo telefono, non sui suoi server. Il testo di una tesi viene inviato, con quella domanda, solo quando avvii una revisione: a Bobby e ai fornitori di IA che scrivono la risposta.",
     "de": "Bobby speichert das auf diesem Gerät, nicht auf seinen Servern. Der Text einer These wird nur gesendet, wenn du eine Überprüfung startest, zusammen mit dieser Frage: an Bobby und an die KI-Anbieter, die die Antwort schreiben."
   },
@@ -603,7 +603,7 @@
   },
   "Clear the shortcuts on this phone": {
     "fr": "Effacer les raccourcis de ce téléphone",
-    "pt": "Limpar os atalhos deste telemóvel",
+    "pt": "Limpar os atalhos deste telefone",
     "it": "Cancella le scorciatoie su questo telefono",
     "de": "Schnellzugriffe auf diesem Gerät leeren"
   },
@@ -793,7 +793,7 @@
   },
   "Delete this thesis? It is removed from this phone for good.": {
     "fr": "Supprimer cette thèse ? Elle est effacée de ce téléphone définitivement.",
-    "pt": "Eliminar esta tese? É apagada deste telemóvel de vez.",
+    "pt": "Eliminar esta tese? É apagada deste telefone de vez.",
     "it": "Eliminare questa tesi? Viene rimossa da questo telefono per sempre.",
     "de": "Diese These löschen? Sie wird endgültig von diesem Gerät entfernt."
   },
@@ -805,19 +805,19 @@
   },
   "Deleted on this phone. Bobby's servers did not confirm, so what they remember is still there. Try again.": {
     "fr": "Supprimé sur ce téléphone. Les serveurs de Bobby n'ont pas confirmé : ce qu'ils retiennent est toujours là. Réessaie.",
-    "pt": "Eliminado neste telemóvel. Os servidores do Bobby não confirmaram, por isso o que recordam continua lá. Tenta novamente.",
+    "pt": "Eliminado neste telefone. Os servidores do Bobby não confirmaram, por isso o que recordam continua lá. Tenta novamente.",
     "it": "Eliminato su questo telefono. I server di Bobby non hanno confermato, quindi ciò che ricordano è ancora lì. Riprova.",
     "de": "Auf diesem Gerät gelöscht. Bobbys Server haben nicht bestätigt, daher ist dort noch vorhanden, was sie gespeichert haben. Versuch es noch einmal."
   },
   "Deleted: what Bobby's servers remembered, the shortcuts on this phone and the theses you wrote here, with Bobby's follow-up notes.": {
     "fr": "Supprimé : ce que les serveurs de Bobby retenaient, les raccourcis de ce téléphone et les thèses que tu as écrites ici, avec les notes de suivi de Bobby.",
-    "pt": "Eliminado: o que os servidores do Bobby recordavam, os atalhos deste telemóvel e as teses que escreveste aqui, com as notas de seguimento do Bobby.",
+    "pt": "Eliminado: o que os servidores do Bobby recordavam, os atalhos deste telefone e as teses que escreveste aqui, com as notas de seguimento do Bobby.",
     "it": "Eliminato: ciò che i server di Bobby ricordavano, le scorciatoie su questo telefono e le tesi che hai scritto qui, con le note di Bobby sugli aggiornamenti.",
     "de": "Gelöscht: was Bobbys Server gespeichert hatten, die Schnellzugriffe auf diesem Gerät und die Thesen, die du hier geschrieben hast, samt Bobbys Follow-up-Notizen."
   },
   "Deleted: what Bobby's servers remembered, the shortcuts on this phone and the theses you wrote here.": {
     "fr": "Supprimé : ce que les serveurs de Bobby retenaient, les raccourcis de ce téléphone et les thèses que tu as écrites ici.",
-    "pt": "Eliminado: o que os servidores do Bobby recordavam, os atalhos deste telemóvel e as teses que escreveste aqui.",
+    "pt": "Eliminado: o que os servidores do Bobby recordavam, os atalhos deste telefone e as teses que escreveste aqui.",
     "it": "Eliminato: ciò che i server di Bobby ricordavano, le scorciatoie su questo telefono e le tesi che hai scritto qui.",
     "de": "Gelöscht: was Bobbys Server gespeichert hatten, die Schnellzugriffe auf diesem Gerät und die Thesen, die du hier geschrieben hast."
   },
@@ -1009,7 +1009,7 @@
   },
   "Follow-ups are off in this phone's settings.": {
     "fr": "Les suivis sont désactivés dans les réglages de ce téléphone.",
-    "pt": "O seguimento está desligado nas definições deste telemóvel.",
+    "pt": "O seguimento está desligado nas definições deste telefone.",
     "it": "Gli aggiornamenti sono disattivati nelle impostazioni di questo telefono.",
     "de": "Follow-ups sind in den Einstellungen dieses Geräts aus."
   },
@@ -1026,9 +1026,9 @@
     "de": "Follow-ups kommen gegen {0}."
   },
   "Follow-ups: {0} shown, {1} tapped, {2} answered.": {
-    "fr": "Suivis : {0} affichés, {1} touchés, {2} avec réponse.",
-    "pt": "Seguimentos: {0} mostrados, {1} tocados, {2} respondidos.",
-    "it": "Aggiornamenti: {0} mostrati, {1} toccati, {2} con risposta.",
+    "fr": "Suivis affichés : {0}. Touchés : {1}. Avec réponse : {2}.",
+    "pt": "Seguimentos mostrados: {0}. Tocados: {1}. Respondidos: {2}.",
+    "it": "Aggiornamenti mostrati: {0}. Toccati: {1}. Con risposta: {2}.",
     "de": "Follow-ups: {0} gezeigt, {1} angetippt, {2} beantwortet."
   },
   "Forget removes an asset's shortcut. Delete everything clears the shortcuts and the theses you wrote.": {
@@ -1045,7 +1045,7 @@
   },
   "Forgotten on this phone. Bobby's servers did not confirm, so they still remember {0}. Try again.": {
     "fr": "Oublié sur ce téléphone. Les serveurs de Bobby n'ont pas confirmé : ils retiennent encore {0}. Réessaie.",
-    "pt": "Esquecido neste telemóvel. Os servidores do Bobby não confirmaram, por isso ainda recordam {0}. Tenta novamente.",
+    "pt": "Esquecido neste telefone. Os servidores do Bobby não confirmaram, por isso ainda recordam {0}. Tenta novamente.",
     "it": "Dimenticato su questo telefono. I server di Bobby non hanno confermato, quindi ricordano ancora {0}. Riprova.",
     "de": "Auf diesem Gerät vergessen. Bobbys Server haben nicht bestätigt, daher merken sie sich {0} noch. Versuch es noch einmal."
   },
@@ -1213,7 +1213,7 @@
   },
   "Include questions from this phone": {
     "fr": "Inclure les questions de ce téléphone",
-    "pt": "Incluir perguntas deste telemóvel",
+    "pt": "Incluir perguntas deste telefone",
     "it": "Includi le domande di questo telefono",
     "de": "Fragen von diesem Gerät einbeziehen"
   },
@@ -1723,7 +1723,7 @@
   },
   "Notes Bobby keeps on this phone to choose when to come back. They are not sent to the AI.": {
     "fr": "Notes que Bobby garde sur ce téléphone pour choisir quand revenir. Elles ne sont pas envoyées à l’IA.",
-    "pt": "Notas que o Bobby guarda neste telemóvel para escolher quando voltar. Não são enviadas à IA.",
+    "pt": "Notas que o Bobby guarda neste telefone para escolher quando voltar. Não são enviadas à IA.",
     "it": "Note che Bobby tiene su questo telefono per scegliere quando tornare. Non vengono inviate all’IA.",
     "de": "Notizen, die Bobby auf diesem Gerät behält, um zu wählen, wann es sich meldet. Sie gehen nicht an die KI."
   },
@@ -1761,7 +1761,7 @@
   },
   "On this phone": {
     "fr": "Sur ce téléphone",
-    "pt": "Neste telemóvel",
+    "pt": "Neste telefone",
     "it": "Su questo telefono",
     "de": "Auf diesem Gerät"
   },
@@ -1781,7 +1781,7 @@
   },
   "Only on this phone.": {
     "fr": "Uniquement sur ce téléphone.",
-    "pt": "Só neste telemóvel.",
+    "pt": "Só neste telefone.",
     "it": "Solo su questo telefono.",
     "de": "Nur auf diesem Gerät."
   },
@@ -1817,7 +1817,7 @@
   },
   "Paused across web and phone: no new asks are saved or personalized.": {
     "fr": "Suspendue sur le web et le téléphone : les nouvelles consultations ne sont ni enregistrées ni personnalisées.",
-    "pt": "Pausada na web e no telemóvel: novas consultas não são guardadas nem personalizadas.",
+    "pt": "Pausada na web e no telefone: novas consultas não são guardadas nem personalizadas.",
     "it": "Sospesa sul web e sul telefono: le nuove richieste non vengono salvate né personalizzate.",
     "de": "Im Web und auf dem Gerät pausiert: Neue Anfragen werden nicht gespeichert oder personalisiert."
   },
@@ -1897,7 +1897,7 @@
   },
   "Questions from this phone are not added to account memory.": {
     "fr": "Les questions de ce téléphone ne s'ajoutent pas à la mémoire du compte.",
-    "pt": "As perguntas deste telemóvel não entram na memória da conta.",
+    "pt": "As perguntas deste telefone não entram na memória da conta.",
     "it": "Le domande di questo telefono non entrano nella memoria dell'account.",
     "de": "Fragen von diesem Gerät kommen nicht ins Konto-Gedächtnis."
   },
@@ -2203,13 +2203,13 @@
   },
   "Saved on this phone only. When you ask for a review, your words are sent to Bobby and to the AI providers that write the review. They are not stored there.": {
     "fr": "Enregistrée sur ce téléphone uniquement. Quand tu demandes un réexamen, tes mots sont envoyés à Bobby et aux fournisseurs d’IA qui rédigent le réexamen. Ils n’y sont pas conservés.",
-    "pt": "Guardada apenas neste telemóvel. Quando pedes uma revisão, as tuas palavras são enviadas ao Bobby e aos fornecedores de IA que escrevem a revisão. Não ficam guardadas lá.",
+    "pt": "Guardada apenas neste telefone. Quando pedes uma revisão, as tuas palavras são enviadas ao Bobby e aos fornecedores de IA que escrevem a revisão. Não ficam guardadas lá.",
     "it": "Salvata solo su questo telefono. Quando chiedi un riesame, le tue parole vengono inviate a Bobby e ai fornitori di IA che scrivono il riesame. Lì non vengono conservate.",
     "de": "Nur auf diesem Gerät gespeichert. Wenn du eine Überprüfung anforderst, werden deine Worte an Bobby und an die KI-Anbieter gesendet, die die Überprüfung schreiben. Dort werden sie nicht gespeichert."
   },
   "Saved on this phone.": {
     "fr": "Enregistrée sur ce téléphone.",
-    "pt": "Guardado neste telemóvel.",
+    "pt": "Guardado neste telefone.",
     "it": "Salvato su questo telefono.",
     "de": "Auf diesem Gerät gespeichert."
   },
@@ -2775,13 +2775,13 @@
   },
   "This deletes what Bobby's servers remember about your account, the shortcuts on this phone and the theses you wrote here, with Bobby's follow-up notes. It cannot be undone.": {
     "fr": "Cela supprime ce que les serveurs de Bobby retiennent sur ton compte, les raccourcis de ce téléphone et les thèses que tu as écrites ici, avec les notes de suivi de Bobby. C'est irréversible.",
-    "pt": "Isto elimina o que os servidores do Bobby recordam sobre a tua conta, os atalhos deste telemóvel e as teses que escreveste aqui, com as notas de seguimento do Bobby. Não pode ser anulado.",
+    "pt": "Isto elimina o que os servidores do Bobby recordam sobre a tua conta, os atalhos deste telefone e as teses que escreveste aqui, com as notas de seguimento do Bobby. Não pode ser anulado.",
     "it": "Questo elimina ciò che i server di Bobby ricordano del tuo account, le scorciatoie su questo telefono e le tesi che hai scritto qui, con le note di Bobby sugli aggiornamenti. Non si può annullare.",
     "de": "Das löscht, was Bobbys Server über dein Konto gespeichert haben, die Schnellzugriffe auf diesem Gerät und die Thesen, die du hier geschrieben hast, samt Bobbys Follow-up-Notizen. Das lässt sich nicht rückgängig machen."
   },
   "This deletes what Bobby's servers remember about your account, the shortcuts on this phone and the theses you wrote here. It cannot be undone.": {
     "fr": "Cela supprime ce que les serveurs de Bobby retiennent sur ton compte, les raccourcis de ce téléphone et les thèses que tu as écrites ici. C'est irréversible.",
-    "pt": "Isto elimina o que os servidores do Bobby recordam sobre a tua conta, os atalhos deste telemóvel e as teses que escreveste aqui. Não pode ser anulado.",
+    "pt": "Isto elimina o que os servidores do Bobby recordam sobre a tua conta, os atalhos deste telefone e as teses que escreveste aqui. Não pode ser anulado.",
     "it": "Questo elimina ciò che i server di Bobby ricordano del tuo account, le scorciatoie su questo telefono e le tesi che hai scritto qui. Non si può annullare.",
     "de": "Das löscht, was Bobbys Server über dein Konto gespeichert haben, die Schnellzugriffe auf diesem Gerät und die Thesen, die du hier geschrieben hast. Das lässt sich nicht rückgängig machen."
   },
@@ -2933,13 +2933,13 @@
   },
   "Use that Google Play account on this phone; retry.": {
     "fr": "Utilise ce compte Google Play sur ce téléphone, puis réessaie.",
-    "pt": "Usa essa conta Google Play neste telemóvel e tenta outra vez.",
+    "pt": "Usa essa conta Google Play neste telefone e tenta outra vez.",
     "it": "Usa quell'account Google Play su questo telefono e riprova.",
     "de": "Nutze dieses Google Play-Konto auf diesem Gerät und versuch es erneut."
   },
   "Use this if you paid for Bobby Pro with your Google Play account on another phone or after reinstalling. Codes and gifts never need restoring.": {
     "fr": "À utiliser si tu as payé Bobby Pro avec ton compte Google Play sur un autre téléphone ou après une réinstallation. Les codes et les cadeaux n'ont jamais besoin d'être restaurés.",
-    "pt": "Usa isto se pagaste Bobby Pro com a tua conta Google Play noutro telemóvel ou depois de reinstalares. Códigos e ofertas nunca precisam de ser restaurados.",
+    "pt": "Usa isto se pagaste Bobby Pro com a tua conta Google Play noutro telefone ou depois de reinstalares. Códigos e ofertas nunca precisam de ser restaurados.",
     "it": "Usalo se hai pagato Bobby Pro con il tuo account Google Play su un altro telefono o dopo una reinstallazione. Codici e regali non vanno mai ripristinati.",
     "de": "Nutze das, wenn du Bobby Pro mit deinem Google Play-Konto auf einem anderen Gerät bezahlt hast oder nach einer Neuinstallation. Codes und Geschenke müssen nie wiederhergestellt werden."
   },

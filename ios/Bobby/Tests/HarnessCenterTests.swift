@@ -55,6 +55,8 @@ final class FakeHarnessNotifier: HarnessNotifying {
 
     func pendingIds() async -> Set<String> { Set(requests.keys) }
 
+    func deliveredIds() async -> Set<String> { Set(delivered.keys) }
+
     /// iOS delivered what was due: it is no longer pending, and it sits on the lock screen.
     func deliver(before date: Date) {
         for (id, notice) in requests where notice.fireAt <= date { delivered[id] = notice }
@@ -467,13 +469,14 @@ final class HarnessCenterTests: XCTestCase {
     }
 
     func testAnAccountThatSaidNoTakesNothingFromTheSignedOutReader() async {
-        user = "u1"
-        let center = make()
-        await center.turnOff()                          // on this phone, u1 said no
         let store = HarnessStore(defaults: defaults)
         for decided in [true, false] {
+            // u1 said no on this phone under an earlier build, which did not carry an account's no to the signed-out reader.
+            defaults.removePersistentDomain(forName: suiteName)
+            fake = FakeHarnessNotifier()
+            store.write(.off, owner: "u1")
             user = nil
-            await center.accountChanged()
+            let center = make()
             // Signed out, someone asks, and (once) says yes and saves with a week's review.
             await ask(center, "NVDA")
             if decided {

@@ -1,6 +1,7 @@
 // The harness (1.8): what the phone keeps for follow-ups, said in sentences. The Memory screen
 // shows exactly this ("On this iPhone"), so nothing the planner reads about a person is hidden
-// from them, and each asset's notes can be erased there.
+// from them, and each asset's notes can be erased there ("Forget" beside an asset Bobby's servers
+// remember erases the same notes on its way: HarnessCenter.assetForgotten).
 // Invariants:
 //  - One computation. The sentences come from the ledger the planner plans from and from the same
 //    `HarnessProfile.make` it calls: the screen cannot describe a profile the planner does not use.
@@ -236,8 +237,10 @@ struct HarnessNotes: Equatable {
             }
         }
         if shown + tapped + answered > 0 {
+            // A label and its count wherever a participle would have to agree with the number (es, fr,
+            // pt, it): "1 mostrados" is wrong, "mostrados: 1" is a tally and right for any count.
             notes.general.append(L.t("Follow-ups: \(shown) shown, \(tapped) tapped, \(answered) answered.",
-                                     "Seguimientos: \(shown) mostrados, \(tapped) tocados, \(answered) respondidos."))
+                                     "Seguimientos mostrados: \(shown). Tocados: \(tapped). Respondidos: \(answered)."))
         }
         // Not in the ledger: the glass's own count of the lines it drew, one per asset and question.
         if drawn > 0 {

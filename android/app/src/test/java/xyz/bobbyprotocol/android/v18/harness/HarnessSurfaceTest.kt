@@ -815,7 +815,7 @@ class HarnessSurfaceTest {
         val full = notes(sample(full = true), drawn = 2)
         assertEquals(listOf("Your week arrives on Oct 19.", "Follow-ups arrive around 7:00 PM.", "Follow-ups: 3 shown, 3 tapped, 3 answered.", "“Since you asked” lines shown: 2."),
                      full.general)
-        assertEquals(listOf("Tu semana llega el 19 oct.", "El seguimiento llega hacia las 19:00.", "Seguimientos: 3 mostrados, 3 tocados, 3 respondidos.", "Líneas “desde que preguntaste” mostradas: 2."),
+        assertEquals(listOf("Tu semana llega el 19 oct.", "El seguimiento llega hacia las 19:00.", "Seguimientos mostrados: 3. Tocados: 3. Respondidos: 3.", "Líneas “desde que preguntaste” mostradas: 2."),
                      notes(sample(full = true), spoken = "es", drawn = 2).general)
         assertEquals("one paragraph for TalkBack", "Asked once, on Oct 3.", full.assets[1].text)
 
@@ -1243,6 +1243,6 @@ class HarnessSurfaceTest {
             assertNotNull(problem("NVDA!", spoken))
         }
         assertEquals(emptyList<String>(), hits("Notes Bobby keeps. Back to your question.", "en"))
-        assertNull(problem("Notas que o Bobby guarda neste telemóvel.", "pt"))
+        assertNull(problem("Notas que o Bobby guarda neste telefone.", "pt"))
     }
 }

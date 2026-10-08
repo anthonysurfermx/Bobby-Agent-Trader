@@ -3,7 +3,9 @@
 // provider, for how long); when iPhone questions are not in memory its "Turn on" opens that sheet
 // (one consent path, MemoryConsentSheet). Corrections, remembered assets, the on-phone section and
 // confirmed deletion follow; MemoryCenter owns account isolation and makes deletion complete
-// (server, shortcuts, theses). What the phone keeps shows to everyone, signed in or not.
+// (server, shortcuts, theses, follow-up notes). What the phone keeps is there for everyone, signed
+// in or not, behind the same row, "On this iPhone": signed out the screen is one sentence and that
+// row (V18-DESIGN.md gives Memory about twenty words; Android draws the same face).
 // "On this iPhone" also says, in sentences, what the phone keeps to plan follow-ups (HarnessNotes):
 // every asset's notes can be erased there, and so can all of them. There is no second screen.
 import SwiftUI
@@ -20,6 +22,8 @@ struct MemoryView: View {
     @ObservedObject var harness: HarnessCenter = .shared
     /// The review fixtures show fixed notes: nothing is read and nothing can be erased.
     var fixedNotes: HarnessNotes? = nil
+    /// "On this iPhone" starts unfolded (the review fixtures of the notes; a person unfolds it with a tap).
+    var localStartsOpen = false
     @State private var showingConsent = false
 
     private var signedIn: Bool { center.currentUser() != nil }
@@ -28,7 +32,7 @@ struct MemoryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top, spacing: 0) {
-                    Text(L.t("Memory", "Memoria")).quietFont(26, .light, design: .rounded, relativeTo: .title)
+                    Text(Self.title).quietFont(26, .light, design: .rounded, relativeTo: .title)
                         .foregroundStyle(Theme.cream).padding(.top, 6)
                         .accessibilityAddTraits(.isHeader)
                     Spacer(minLength: 8)
@@ -85,14 +89,11 @@ struct MemoryView: View {
 
     @ViewBuilder private var content: some View {
         if !signedIn {
-            BriefingNote(text: MemoryError.signedOut.message).accessibilityIdentifier("memory-signed-out")
-            // Nobody signed in: the phone still keeps a shortcut row and theses of its own. No server call.
-            onThisPhone(mentionsDeletion: false)
+            // Nobody signed in: the phone still keeps a shortcut row, theses and follow-up notes of its
+            // own. No server call. One sentence and one row that unfolds, as for an account.
+            folded(note: MemoryError.signedOut.message, id: "memory-signed-out")
         } else if !riskAccepted {
-            BriefingNote(text: L.t("Accept the risk notice first: until then Bobby sends nothing to its servers.",
-                                   "Primero acepta el aviso de riesgo: hasta entonces Bobby no envía nada a sus servidores."))
-                .accessibilityIdentifier("memory-risk-required")
-            onThisPhone(mentionsDeletion: false)
+            folded(note: Self.riskRequired, id: "memory-risk-required")
         } else if let s = center.snapshot {
             loaded(s)
         } else if center.loading {
@@ -110,6 +111,26 @@ struct MemoryView: View {
             .padding(.top, 24)
             onThisPhone(mentionsDeletion: true)
             deleteEverything(showsError: false)
+        }
+    }
+
+    static var riskRequired: String {
+        L.t("Accept the risk notice first: until then Bobby sends nothing to its servers.",
+            "Primero acepta el aviso de riesgo: hasta entonces Bobby no envía nada a sus servidores.")
+    }
+
+    static var title: String { L.t("Memory", "Memoria") }
+    static var localLabel: String { L.t("On this iPhone", "En este iPhone") }
+
+    /// Every word on the face of the screen while there is no account memory to show (nobody signed
+    /// in, or the risk notice is missing): the title, one sentence and the row that unfolds. What
+    /// the phone keeps, and the paragraph about where it lives, are one tap away.
+    static func foldedFace(note: String) -> [String] { [title, note, localLabel] }
+
+    @ViewBuilder private func folded(note: String, id: String) -> some View {
+        QuietNote(text: note, id: id).padding(.top, 10).padding(.bottom, 6)
+        QuietDisclosure(label: Self.localLabel, open: localStartsOpen, id: "memory-local") {
+            VStack(alignment: .leading, spacing: 0) { onThisPhone(mentionsDeletion: false) }
         }
     }
 
@@ -150,7 +171,7 @@ struct MemoryView: View {
                 ForEach(MemoryPref.allCases) { field in prefPicker(field, current: s.value(field)) }
             }
         }
-        QuietDisclosure(label: L.t("On this iPhone", "En este iPhone"), id: "memory-local") {
+        QuietDisclosure(label: Self.localLabel, open: localStartsOpen, id: "memory-local") {
             VStack(alignment: .leading, spacing: 0) { onThisPhone(mentionsDeletion: true) }
         }
         QuietDisclosure(label: L.t("How it works", "Cómo funciona"), id: "memory-retention") {

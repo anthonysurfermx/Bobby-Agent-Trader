@@ -63,7 +63,7 @@ extension NativeTranslations18 {
         result["Follow-ups arrive around {0}."] = ["fr": "Les suivis arrivent vers {0}.", "pt": "O seguimento chega por volta das {0}.", "it": "Gli aggiornamenti arrivano verso le {0}.", "de": "Follow-ups kommen gegen {0}."]
         result["Quiet until {0}."] = ["fr": "Silencieux jusqu’au {0}.", "pt": "Em silêncio até {0}.", "it": "In silenzio fino al {0}.", "de": "Ruhe bis {0}."]
         result["Fewer follow-ups for now."] = ["fr": "Moins de suivis pour l’instant.", "pt": "Menos seguimento por agora.", "it": "Meno aggiornamenti per ora.", "de": "Vorerst weniger Follow-ups."]
-        result["Follow-ups: {0} shown, {1} tapped, {2} answered."] = ["fr": "Suivis : {0} affichés, {1} touchés, {2} avec réponse.", "pt": "Seguimentos: {0} mostrados, {1} tocados, {2} respondidos.", "it": "Aggiornamenti: {0} mostrati, {1} toccati, {2} con risposta.", "de": "Follow-ups: {0} gezeigt, {1} angetippt, {2} beantwortet."]
+        result["Follow-ups: {0} shown, {1} tapped, {2} answered."] = ["fr": "Suivis affichés : {0}. Touchés : {1}. Avec réponse : {2}.", "pt": "Seguimentos mostrados: {0}. Tocados: {1}. Respondidos: {2}.", "it": "Aggiornamenti mostrati: {0}. Toccati: {1}. Con risposta: {2}.", "de": "Follow-ups: {0} gezeigt, {1} angetippt, {2} beantwortet."]
         // The sectors.
         result["Semiconductors"] = ["fr": "Semi-conducteurs", "pt": "Semicondutores", "it": "Semiconduttori", "de": "Halbleiter"]
         result["Big tech"] = ["fr": "Géants de la tech", "pt": "Grandes tecnológicas", "it": "Big tech", "de": "Big Tech"]

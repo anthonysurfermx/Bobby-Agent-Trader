@@ -1350,6 +1350,18 @@
       ]
     },
     {
+      "name": "A follow-up moved to the next day keeps its hour across a clock change (Australia/Sydney, 4 October): Sunday at 21:00 on the clock, 23 hours after Saturday's.",
+      "now": "2026-10-03T10:00:00+10:00",
+      "timeZone": "Australia/Sydney",
+      "events": [
+        {"kind": "ask", "at": "2026-10-02T22:30:00+10:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-03T09:30:00+10:00", "symbol": "NVDA", "step": "week"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-04T21:00:00+11:00", "symbol": "NVDA", "days": 2}
+      ]
+    },
+    {
       "name": "A question at one in the morning about today, from someone who answers in the evening: the next day at that hour, never that same evening.",
       "now": "2026-10-07T01:01:00-06:00",
       "timeZone": "America/Mexico_City",

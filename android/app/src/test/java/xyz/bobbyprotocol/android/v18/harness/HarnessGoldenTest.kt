@@ -120,7 +120,7 @@ class HarnessGoldenTest {
         val defaults = file.getJSONObject("defaults")
         val sectors = file.getJSONObject("sectors")
         val cases = objects(file.getJSONArray("cases"))
-        assertTrue("the contract shrank: ${cases.size} cases", cases.size >= 95)
+        assertTrue("the contract shrank: ${cases.size} cases", cases.size >= 96)
         val names = HashSet<String>()
         val failures = ArrayList<String>()
         for (raw in cases) {

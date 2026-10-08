@@ -112,15 +112,24 @@ enum NucleoDeskIO {
     /// it is dropped whole, never cut.
     static let nextQuestionLimit = 160
 
+    /// White space as the page reads it. U+FEFF, the byte-order mark a server may leave at the head
+    /// of a string, is white space for the page (JavaScript's `\s` includes it): it shows the question
+    /// without it and a tap sends the words without it. Swift's `isWhitespace` does not include it and
+    /// trimming does not remove it, so native says so itself, or a tap on that question would be taken
+    /// for the person's own words.
+    static func isQuestionSpace(_ character: Character) -> Bool { character.isWhitespace || character == "\u{FEFF}" }
+
     static func nextQuestion(_ value: Any?) -> String? {
-        guard let text = (value as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty,
-              text.count <= nextQuestionLimit else { return nil }
+        guard let raw = value as? String else { return nil }
+        let head = raw.drop(while: isQuestionSpace)
+        let text = String(head.dropLast(head.reversed().prefix(while: isQuestionSpace).count))
+        guard !text.isEmpty, text.count <= nextQuestionLimit else { return nil }
         return text
     }
 
     /// Two wordings of one question differ only in their spaces (the page collapses them before it shows or asks it).
     static func sameQuestion(_ a: String, _ b: String) -> Bool {
-        func words(_ s: String) -> [Substring] { s.split(whereSeparator: \.isWhitespace) }
+        func words(_ s: String) -> [Substring] { s.split(whereSeparator: isQuestionSpace) }
         return words(a) == words(b)
     }
 
@@ -557,10 +566,12 @@ final class NucleoDesk {
     /// took a question it was offered (`NucleoSession.offerRead`): the page says nothing else.
     var askStarted: (_ token: String?) -> Void = { _ in }
     /// Whether Bobby may put a one-tap question after a read whose access receipt is this one (§3.5):
-    /// the CIO's, and the chips that ask about another asset. Asked once per read. On a no the CIO's
-    /// question never reaches the page and the reply says `oneTap: false`, so the row keeps only
-    /// "Another question", which the person types. Always, until a rule says otherwise.
-    var offersNextQuestion: (BobbyReadAccess?) -> Bool = { _ in true }
+    /// the CIO's, and the chips that ask about another asset. Asked once per read, with the level
+    /// that read ran at: a chip of its row runs at the level the person saved, which has an allowance
+    /// of its own, and the read just answered is not yet in what the phone last heard about it. On a
+    /// no the CIO's question never reaches the page and the reply says `oneTap: false`, so the row
+    /// keeps only "Another question", which the person types. Always, until a rule says otherwise.
+    var offersNextQuestion: (BobbyReadAccess?, NucleoAnalysisLevel) -> Bool = { _, _ in true }
     var recordQuery: (_ symbol: String, _ isEquity: Bool) -> Void = { DeskMemory().recordQuery(symbol: $0, isEquity: $1) }
     /// Whose bearer the metered read carries (fixture mode: nobody).
     var meterAuth: BobbyMeterAuth = .account
@@ -1042,7 +1053,7 @@ final class NucleoDesk {
             result["level"] = debate.level ?? level.rawValue
             // Bobby never invites someone into a wall: when the next read would be refused, this read
             // hands back no question that asks by itself. Without the key the reply is what it always was.
-            let offers = offersNextQuestion(access)
+            let offers = offersNextQuestion(access, level)
             if !offers { result["oneTap"] = false }
             if var synthesis = debate.synthesis {
                 if !offers { synthesis.followUp = nil }
