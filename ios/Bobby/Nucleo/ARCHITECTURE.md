@@ -835,8 +835,8 @@ The phone keeps a ledger per reader (`HarnessLedger`; 300 events, 60 days; no qu
   | `ERROR`, `CONFIRM_ASSET`, `UNKNOWN_ASSET` | yes | A read that ended without a verdict: its caption and its chips leave. The question that waited behind a chip is not asked with it. |
   | `BOOT`, `WAKE` | no | Nothing is drawn yet. The page is home 1.4 s after its session reply at the most; native lets no board cover it before that, and offers the question again. |
   | `RESTORE` | no | A restored read stands at `HANDBACK` in the same turn: no event can arrive in between. |
-  | `LISTENING` | no | The mic is open: the person is asking in their own voice. Native refuses first (`readOfferStands`). |
-  | `SENDING`, `RESOLVING`, `THINK_WAIT` | no | A read is on its way and the desk is busy: native refuses first. It is also what keeps a token offered twice from being asked twice. |
+  | `LISTENING` | no | The mic is open: the person is asking in their own voice, and a read started now would cut them off. Native offers nothing again while the mic is open, and drops the question (`readOfferStands`). |
+  | `SENDING`, `RESOLVING`, `THINK_WAIT` | no | A read is on its way and the desk is busy: native starts nothing then (`startRead`). It is also what keeps a token offered twice from being asked twice. |
   | `PULLING` | no | A finger is on the glass, moving the cards. When it lifts the page is in `CARDS` or `HANDBACK`, where the next offer is taken. |
   | `SAVING` | no | The save just pressed is being written, and what it brings back belongs to the read on the glass. 1.8 s later the page is in `FOLLOWUPS`, where the next offer is taken. |
   | `RETURNING` | no | The glass is on its way home, for 1.7 s at the most. The next offer is taken from `IDLE`, on a glass that has finished clearing. |
