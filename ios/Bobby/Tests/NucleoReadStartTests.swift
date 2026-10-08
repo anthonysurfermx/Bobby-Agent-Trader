@@ -4,19 +4,25 @@ import XCTest
 @testable import Bobby
 
 /// A read native starts (1.8): a row of a board, the button of the line on the glass. The page
-/// takes such a question only from its idle home and says nothing when it does not, and its own
-/// clock stands still under a native sheet (pinned on the shipping page by
-/// `Nucleo/tests/bridge-boot.test.mjs`, "PINNED FACTS native works around"). These tests drive the
-/// real session, bridge, desk and harness against a stand-in for that page, on a clock of their own.
+/// takes such a question wherever a new read is what the person expects (its idle home, a
+/// finished read: the table of `Nucleo/ARCHITECTURE.md` §9.5) and says nothing where it does not,
+/// and its own clock stands still under a native sheet (pinned on the shipping page by
+/// `Nucleo/tests/bridge-boot.test.mjs`, "PINNED FACTS native leans on", and `ask-start.cases.mjs`).
+/// These tests drive the real session, bridge, desk and harness against a stand-in for that page,
+/// on a clock of their own.
 @MainActor
 final class NucleoReadStartTests: XCTestCase {
     /// The app page, as far as this path goes. What it does here is what the shipping page does:
     ///  - BOOT until its `session` call is answered, then WAKE for 0.9 s of its OWN clock, then IDLE;
     ///  - its clock runs only in front and with no native sheet over it (`native.sheet`);
-    ///  - `ask.start {token}` is taken only from IDLE and with no sheet: the page calls `ask {token}`
-    ///    and is busy with that read. Anywhere else the event is dropped and nothing is remembered.
+    ///  - `ask.start {token}` is taken from IDLE and over a finished read, with no sheet: the page
+    ///    calls `ask {token}` and is busy with that read. While it wakes, while a read is on its
+    ///    way and at a gate the event is dropped and nothing is remembered.
+    ///  - a gate (the person's own question waits for a sign-in or for Bobby Pro) is where the
+    ///    shipping page stays, for 45 s, without taking a question: these tests use it wherever
+    ///    they need a page that does not listen. (Until 2026-10-08 an open keyboard was one too.)
     private final class Page: NucleoEmitting {
-        enum State: Equatable { case boot, wake, idle, sending, read, typing }
+        enum State: Equatable { case boot, wake, idle, sending, read, gate }
 
         private(set) var state: State = .boot
         private(set) var sheetOpen = false
@@ -43,7 +49,7 @@ final class NucleoReadStartTests: XCTestCase {
                 sheetOpen = payload["state"] as? String == "open"
                 if sheetOpen { coveredIn.append(state) }
             case "ask.start":
-                guard let token = payload["token"] as? String, !token.isEmpty, !sheetOpen, state == .idle else { return }
+                guard let token = payload["token"] as? String, !token.isEmpty, !sheetOpen, state == .idle || state == .read else { return }
                 state = .sending
                 asked.append(token)
                 ask(["token": token])
@@ -70,15 +76,16 @@ final class NucleoReadStartTests: XCTestCase {
             if state == .wake, ownClock >= wakeSeconds - 1e-9 { state = .idle }
         }
 
-        /// The person opens the keyboard and starts to write: the page takes no question while it is up.
-        func openKeyboard() { if state == .idle { state = .typing } }
+        /// A question of their own was refused for a sign-in: the page stands at its gate, and takes
+        /// no question there.
+        func standAtAGate() { if state == .idle { state = .gate } }
 
-        /// They put the keyboard away without sending.
-        func closeKeyboard() { if state == .typing { state = .idle } }
+        /// They say "Not now": the page goes home.
+        func leaveTheGate() { if state == .gate { state = .idle } }
 
-        /// They send what they typed.
+        /// They sign in, and the question that waited at the gate is asked again.
         func send(_ question: String) {
-            guard state == .typing, !sheetOpen else { return }
+            guard state == .gate, !sheetOpen else { return }
             state = .sending
             ask(["question": question])
         }
@@ -284,9 +291,9 @@ final class NucleoReadStartTests: XCTestCase {
     private static let nvda = HarnessBoard.Row(symbol: "NVDA", name: "NVIDIA", isEquity: true)
 
     /// A board (opened from the profile) whose NVDA row is tapped while the page will not take a
-    /// question: the keyboard was open under it. Returns the token the question was offered with.
+    /// question: a gate was on the glass under it. Returns the token the question was offered with.
     private func offeredToAPageThatDoesNotListen(_ world: World, _ center: HarnessCenter) async throws -> String {
-        world.page.openKeyboard()
+        world.page.standAtAGate()
         XCTAssertTrue(world.session.present(.followUp))
         HarnessBoardSheet.ask(Self.nvda, session: world.session, harness: center)
         XCTAssertNil(world.session.sheet)
@@ -306,7 +313,7 @@ final class NucleoReadStartTests: XCTestCase {
     private func assertDropped(_ token: String, after offered: Int, _ world: World, _ center: HarnessCenter,
                                file: StaticString = #filePath, line: UInt = #line) async {
         XCTAssertFalse(world.session.desk.holds(token), "the token died with the offer", file: file, line: line)
-        world.page.closeKeyboard()
+        world.page.leaveTheGate()
         await pass(6, in: world)
         XCTAssertEqual(offers(world).count, offered, "nothing is offered after it was dropped", file: file, line: line)
         XCTAssertEqual(world.page.asked, [], "the page never asked with it", file: file, line: line)
@@ -576,7 +583,7 @@ final class NucleoReadStartTests: XCTestCase {
     func testANewerTapReplacesTheQuestionStillOnOffer() async throws {
         let (world, center) = try await awake()
         defer { world.session.teardown() }
-        world.page.openKeyboard()
+        world.page.standAtAGate()
         var taken: [String] = []
         XCTAssertTrue(world.session.startRead(symbol: "NVDA", name: "NVIDIA", isEquity: true, question: "one", taken: { taken.append("NVDA") }))
         let first = try XCTUnwrap(offers(world).last)
@@ -584,7 +591,7 @@ final class NucleoReadStartTests: XCTestCase {
         let second = try XCTUnwrap(offers(world).last)
         XCTAssertNotEqual(first, second)
         XCTAssertFalse(world.session.desk.holds(first), "the older question can no longer be asked")
-        world.page.closeKeyboard()
+        world.page.leaveTheGate()
         await pass(1, in: world)
         await world.page.answered()
         XCTAssertEqual(world.page.asked, [second])
@@ -707,7 +714,7 @@ final class NucleoReadStartTests: XCTestCase {
         let token = try await offeredToAPageThatDoesNotListen(world, center)
         await pass(1, in: world)
         XCTAssertEqual(offers(world).count, 3)
-        // They send what they were typing: the desk is busy with their question, not Bobby's.
+        // They sign in at the gate and their own question is asked again: the desk is busy with it, not with Bobby's.
         world.page.send("Should I buy NVIDIA right now?")
         await settle()
         XCTAssertFalse(world.session.desk.holds(token), "dropped as their read begins")
@@ -739,7 +746,7 @@ final class NucleoReadStartTests: XCTestCase {
         let token = try await offeredToAPageThatDoesNotListen(world, center)
         world.session.revokeRiskNoticeConsent()
         XCTAssertFalse(world.session.desk.holds(token))
-        world.page.closeKeyboard()
+        world.page.leaveTheGate()
         await pass(6, in: world)
         XCTAssertEqual(offers(world).count, 1)
         XCTAssertEqual(world.page.asked, [])
@@ -750,7 +757,7 @@ final class NucleoReadStartTests: XCTestCase {
         let token = try await offeredToAPageThatDoesNotListen(world, center)
         world.session.teardown()
         XCTAssertFalse(world.session.desk.holds(token))
-        world.page.closeKeyboard()
+        world.page.leaveTheGate()
         await pass(6, in: world)
         XCTAssertEqual(offers(world).count, 1)
         XCTAssertEqual(world.page.asked, [])

@@ -28,8 +28,8 @@ interface V18Desk {
     val riskNotice: RiskNotice
     /**
      * The app page (not onboarding) asked for its session: it can draw a nudge. It is not yet a page
-     * that takes `ask.start`: it asks for its session first and wakes up afterwards, and only its
-     * idle home or a finished read starts a question (the host waits for that, see `pageReady`).
+     * that takes `ask.start`: it asks for its session first and wakes up afterwards, and it starts
+     * no question while it wakes (the host waits for that, see `pageReady`).
      */
     val onGlass: Boolean
     /** A read is running. */
@@ -271,8 +271,8 @@ class V18Runtime(
 
     /**
      * The page's first call after a load: it hears events from here on, and it is still waking up.
-     * It takes `ask.start` only from its idle home or a finished read, which it reaches about a
-     * second later on its own clock, and that clock stands still under a sheet. So a stored tap does
+     * It takes no `ask.start` until it is at its idle home, which it reaches about a second later
+     * on its own clock, and that clock stands still under a sheet. So a stored tap does
      * not open over it yet: a board opened now would sit over a glass that never drew, and the
      * question its row asks would be dropped by a page that is not listening. The tap opens once
      * the page has had `SETTLE_MS` in front with nothing over it.
@@ -518,11 +518,13 @@ class V18Runtime(
     private fun keeps(handler: (String) -> Boolean, url: String): Boolean = try { handler(url) } catch (_: Exception) { false }
 
     /**
-     * Hands a question to the page. The page takes `ask.start` only from its idle home or a
-     * finished read, and says nothing when it does not (it is still waking up after a load, or a
-     * sheet has only just left). So the host checks: while the token is still unused it offers the
-     * same question again, a few times, and then lets it go. The token is single use, so a
-     * question is never asked twice.
+     * Hands a question to the page. The page takes `ask.start` wherever a new read is what the
+     * person expects: its idle home, a finished read, its cards, an open keyboard, another face of
+     * the sphere (the table of ios/Bobby/Nucleo/ARCHITECTURE.md §9.5, which the page tests run
+     * against this copy too). Where it does not, it says nothing: it is still waking up after a
+     * load, coming home from a read, writing a save, or a sheet has only just left. So the host
+     * checks: while the token is still unused it offers the same question again, a few times, and
+     * then lets it go. The token is single use, so a question is never asked twice.
      */
     private fun emitAskStart(symbol: String, name: String, isEquity: Boolean, question: String) {
         val token = desk.readToken(symbol, name, isEquity, question)

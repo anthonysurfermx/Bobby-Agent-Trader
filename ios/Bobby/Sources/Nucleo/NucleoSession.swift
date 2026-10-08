@@ -494,16 +494,18 @@ final class NucleoSession: ObservableObject {
     private var readOffer: ReadOffer?
 
     /// How often a question the page did not take is offered again, and how far apart.
-    /// The page takes `ask.start` only from its idle home (or a finished read's FOLLOWUPS) and says
-    /// nothing when it does not: it is still waking after a load, or coming home from a read it just
-    /// closed. Those are the states that end by themselves, in 1.4 s and 1.7 s of the page's clock at
-    /// the most (Nucleo/tests/bridge-boot.test.mjs pins both). Eight offers half a second apart
-    /// reach 4 s after the first one: more than twice the longest of them, for a phone that draws
-    /// slowly, and still close enough to the tap that the read is its answer and not a surprise.
-    /// Half a second apart, because that is the longest a page that has just come home is kept
-    /// waiting, and an offer costs one event the page ignores. A page that stays where it is (a
-    /// finished read still on the glass, an open keyboard) takes none of them: the question is
-    /// dropped and nothing is written, and only a change to the page can do better.
+    /// The page takes `ask.start` wherever a new read is what the person expects: its idle home, a
+    /// finished read, its cards, an open keyboard, another face of the sphere (the table of
+    /// Nucleo/ARCHITECTURE.md §9.5). Where it does not, it says nothing: it is still waking after
+    /// a load, coming home from a read it just closed, or writing a save. Those are the states
+    /// that end by themselves, in 1.4 s, 1.7 s and 1.8 s of the page's clock at the most
+    /// (Nucleo/tests/bridge-boot.test.mjs and ask-start.cases.mjs pin them). Eight offers half a
+    /// second apart reach 4 s after the first one: more than twice the longest of them, for a
+    /// phone that draws slowly, and still close enough to the tap that the read is its answer and
+    /// not a surprise. Half a second apart, because that is the longest a page that has just come
+    /// home is kept waiting, and an offer costs one event the page ignores. Where the page stays
+    /// and still says no (the person's own question waits at a sign-in or Bobby Pro gate, consent
+    /// is missing) the offers run out: the question is dropped and nothing is written.
     static let readOfferRepeats = 8
     var readOfferSpacing: TimeInterval = 0.5
 
