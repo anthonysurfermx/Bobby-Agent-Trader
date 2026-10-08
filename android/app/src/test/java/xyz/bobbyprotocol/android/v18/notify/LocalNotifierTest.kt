@@ -53,6 +53,20 @@ class LocalNotifierTest {
         assertEquals(setOf("v18.reminder.3fa85f64"), notifier.pendingIds())
     }
 
+    @Test fun aNoticeMayCarryWhatALockedPhoneShowsAndOneButton() {
+        notifier.permission = LocalNotifier.Permission.ALLOWED
+        val plain = notice(id = "v18.follow.asset", channel = LocalNotice.CHANNEL_FOLLOW_UPS, payload = mapOf(LocalNotice.KIND to "follow-up"))
+        assertNull("a notice has neither unless its feature says so", plain.publicBody)
+        assertNull(plain.action)
+        val whole = plain.copy(publicBody = "Back to your question.", action = LocalNotice.Action("stop", "Stop"))
+        assertTrue(notifier.schedule(whole))
+        assertEquals("what the phone keeps is what it was handed", whole, notifier.notice("v18.follow.asset"))
+        assertFalse("a public version says something", LocalNotice.valid(plain.copy(publicBody = " ")))
+        assertFalse("a button has a plain name", LocalNotice.valid(plain.copy(action = LocalNotice.Action("Stop now", "Stop"))))
+        assertFalse("and a label", LocalNotice.valid(plain.copy(action = LocalNotice.Action("stop", " "))))
+        assertFalse("that fits on a button", LocalNotice.valid(plain.copy(action = LocalNotice.Action("stop", "x".repeat(LocalNotice.ACTION_LABEL_LIMIT + 1)))))
+    }
+
     @Test fun whatIsListedIsWhatThePhoneWillDeliver() {
         notifier.permission = LocalNotifier.Permission.ALLOWED
         notifier.schedule(notice(id = "v18.follow.asset", inMs = hour, channel = LocalNotice.CHANNEL_FOLLOW_UPS, payload = mapOf(LocalNotice.KIND to "follow-up", LocalNotice.OWNER to "local")))

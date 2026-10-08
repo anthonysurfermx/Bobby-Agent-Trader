@@ -159,8 +159,15 @@ class HarnessCenterTest {
             assertTrue("a notice the phone can keep and hand back", LocalNotice.valid(planned))
             assertTrue("one notice per step, replaced in place", planned.id in HarnessCenter.IDENTIFIERS)
         }
-        assertEquals("NVDA, a day later. See how it moved.", notice(HarnessStep.ASSET)?.body)
+        assertEquals("where it came from, and nothing else", "NVDA: back to your question.", notice(HarnessStep.ASSET)?.body)
         assertEquals("Your week with NVDA.", notice(HarnessStep.WEEK)?.body)
+        // What a locked phone that hides sensitive content shows instead leaves the asset out, and each carries its one button.
+        assertEquals("Back to your question.", notice(HarnessStep.ASSET)?.publicBody)
+        assertEquals("Your week.", notice(HarnessStep.WEEK)?.publicBody)
+        for (planned in phone.memory.scheduled) {
+            assertFalse(planned.publicBody.orEmpty().contains("NVDA"))
+            assertEquals(LocalNotice.Action(HarnessCenter.STOP_ACTION, "Stop"), planned.action)
+        }
     }
 
     /** iOS pins its calendar trigger here; on Android the notice carries one planned instant. */
@@ -310,13 +317,15 @@ class HarnessCenterTest {
         assertEquals(listOf(HarnessStep.ASSET to at(8, 16, 40), HarnessStep.WEEK to at(12, 16, 40)), center.upcoming.map { it.step to it.fireAt })
         assertEquals("BTC", center.upcoming.firstOrNull()?.symbol)
         // A read Bobby started that is not a chip (the question after a read, a follow-up's button) is
-        // written with its origin before the yes too, so a later yes never follows it.
+        // not written at all before the yes, so a later yes never follows it.
         center.turnOff()
         HarnessStore(raw).forget(null)
         val undecided = make()
         undecided.noteAsk("TSLA", "Tesla", true, 300.0, origin = HarnessEvent.Origin.FOLLOW_UP)
-        assertEquals(listOf<HarnessEvent.Origin?>(HarnessEvent.Origin.FOLLOW_UP), events(undecided, HarnessEvent.Kind.ASK).map { it.origin })
+        assertTrue("undecided: nothing of a read Bobby started", undecided.ledger.isEmpty)
         assertNull(undecided.ledger.question(clock))
+        undecided.accept()
+        assertEquals(emptyList<HarnessFollowUp>(), undecided.upcoming)
     }
 
     @Test fun savingAReadOfTheAssetAnswersItsFollowUp() = runTest {
@@ -679,8 +688,8 @@ class HarnessCenterTest {
         center.appActive()
         assertNotNull(center.move)
         center.notePicked("NVDA")
-        assertNull(center.move)
-        assertEquals(1, events(center, HarnessEvent.Kind.PICKED).size)
+        assertNull("the line they acted on leaves the glass", center.move)
+        assertEquals("undecided: the tap itself is not written", 0, events(center, HarnessEvent.Kind.PICKED).size)
         ask(center, "NVDA", price = 99.0)
         center.refreshMove()
         assertNull("they are looking at it now", center.move)
@@ -735,8 +744,9 @@ class HarnessCenterTest {
         var stored = HarnessStore(raw).ledger(null)
         assertTrue("undecided: nothing they said about their horizon is on the phone yet",
                    stored.events.all { it.horizon == null && it.horizonHours == null && it.thread == null })
+        assertEquals("undecided: the question, and not the save", listOf(HarnessEvent.Kind.ASK), stored.events.map { it.kind })
         val kept = raw.values.getValue(HarnessStore.key(HarnessStore.PREFIX, null))
-        assertFalse(kept, kept.contains("horizon") || kept.contains("thread"))
+        assertFalse(kept, kept.contains("horizon") || kept.contains("thread") || kept.contains("saved"))
         assertEquals(stored, center.ledger)
         // The yes: the read that prompted it is still in memory, and its entries become whole in place.
         clock = at(7, 16, 45)
@@ -746,7 +756,7 @@ class HarnessCenterTest {
         assertEquals(true, stored.events(HarnessEvent.Kind.ASK).firstOrNull()?.thread)
         assertEquals("the review they chose on the save of that read", 168, stored.events(HarnessEvent.Kind.SAVED).firstOrNull()?.horizonHours)
         assertEquals("at the moment it happened", at(7, 16, 42), stored.events(HarnessEvent.Kind.SAVED).firstOrNull()?.at)
-        assertEquals("completed in place: nothing is written twice", 2, stored.events.size)
+        assertEquals("the question completed in place, the save written whole: nothing twice", 2, stored.events.size)
         assertEquals("the review they chose on the save: a week from the question", listOf(HarnessStep.ASSET), kinds(center.upcoming))
         assertEquals(at(14, 16, 40), center.upcoming.firstOrNull()?.fireAt)
         assertEquals(7, center.upcoming.firstOrNull()?.days)
@@ -867,7 +877,7 @@ class HarnessCenterTest {
         center.market = { symbol ->
             quoted.add(symbol)
             gate.await()
-            HarnessQuote(120.0, null)
+            HarnessQuote(66.0, null)
         }
         val coming = launch(start = CoroutineStart.UNDISPATCHED) { center.appActive() }
         // The app came to the front twice (launch, then resume): one price read, not two.
@@ -883,7 +893,7 @@ class HarnessCenterTest {
         again.join()
         next.join()
         assertEquals("their own question, their own price: the first reader's 100 never reaches them", 60.0, center.move?.priceThen)
-        assertEquals(100.0, center.move?.pct ?: 0.0, 0.001)
+        assertEquals(10.0, center.move?.pct ?: 0.0, 0.001)
         assertEquals(center.move, center.moveOnGlass())
     }
 
@@ -924,12 +934,15 @@ class HarnessCenterTest {
         val center = make()
         ask(center, "NVDA")
         center.accept()
-        assertEquals("NVDA, a day later. See how it moved.", notice(HarnessStep.ASSET)?.body)
+        assertEquals("NVDA: back to your question.", notice(HarnessStep.ASSET)?.body)
+        assertEquals("Stop", notice(HarnessStep.ASSET)?.action?.label)
         assertFalse(center.wordsAreStale)
         language = "es"
         assertTrue(center.wordsAreStale)
         center.rewriteWords()
-        assertEquals("NVDA, un día después. Mira cómo se movió.", notice(HarnessStep.ASSET)?.body)
+        assertEquals("NVDA: de vuelta a tu pregunta.", notice(HarnessStep.ASSET)?.body)
+        assertEquals("what a locked phone shows, and the button, are rewritten with it", "De vuelta a tu pregunta.", notice(HarnessStep.ASSET)?.publicBody)
+        assertEquals("Ya no", notice(HarnessStep.ASSET)?.action?.label)
         assertEquals("Tu semana con NVDA.", notice(HarnessStep.WEEK)?.body)
         assertEquals("the moment does not move", at(8, 16, 40), notice(HarnessStep.ASSET)?.fireAtEpochMs)
         assertFalse(center.wordsAreStale)
@@ -938,7 +951,7 @@ class HarnessCenterTest {
         language = "fr"
         center.rewriteWords()
         assertEquals(2, pending().size)
-        assertEquals("NVDA, un día después. Mira cómo se movió.", notice(HarnessStep.ASSET)?.body)
+        assertEquals("NVDA: de vuelta a tu pregunta.", notice(HarnessStep.ASSET)?.body)
         assertFalse(center.wordsAreStale)
     }
 
@@ -1004,7 +1017,7 @@ class HarnessCenterTest {
         assertEquals(HarnessMode.UNDECIDED, center.mode)
         assertNull("nobody is signed in", center.owner)
         var told = 0
-        center.onErased = { told += 1 }
+        center.forgetLines = { symbol, _ -> if (symbol == null) told += 1 }
 
         center.forgetLedger()
         assertTrue(center.kept.value.isEmpty())

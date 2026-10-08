@@ -522,6 +522,17 @@ class HarnessStore(private val store: KeyValueStore) {
         for (prefix in listOf(PREFIX, MODE_PREFIX, PLAN_PREFIX)) store.remove(key(prefix, owner))
     }
 
+    /**
+     * What was kept and what was planned go; a no stays (the Memory screen's "Delete everything").
+     * Erasing notes is not a way to be asked again: a reader who turned follow-ups off stays off.
+     * Any other answer goes with the notes, so a yes is asked for again before anything is kept.
+     */
+    fun forgetNotes(owner: String?) {
+        val refused = mode(owner) == HarnessMode.OFF
+        forget(owner)
+        if (refused) write(HarnessMode.OFF, owner)
+    }
+
     companion object {
         const val PREFIX = "v18.harness.v1."
         const val MODE_PREFIX = "v18.harness.mode."

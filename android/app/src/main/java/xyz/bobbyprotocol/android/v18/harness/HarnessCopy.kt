@@ -5,15 +5,22 @@ import xyz.bobbyprotocol.android.v18.V18Host
 import xyz.bobbyprotocol.android.v18.V18Text
 import java.text.DecimalFormat
 import java.text.NumberFormat
+import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.floor
 
 // The harness (1.8): the words. A follow-up is a moment in time, never a claim about the market:
-// the lock screen says "a day later, see how it moved", and the number is read when the person
-// opens it. Nothing here says Bobby watched, noticed or found anything.
+// the lock screen says where it came from ("back to your question") and nothing else, and the
+// number is read when the person opens it. Nothing here says Bobby watched, noticed or found
+// anything, and nothing tells the person to do something.
 // The same English and Spanish as ios/Bobby/Sources/V18/Harness/HarnessCopy.swift; French,
 // Portuguese, Italian and German come from the catalog through `lookup`.
+// HarnessSurfaceTest sweeps every pair of words written in this folder, in six languages, against
+// the words Bobby never says.
 
 /**
  * `locale` is the app's (`es-MX`, `de-DE`…), for the notation of a number. `lookup` is the app's
@@ -22,16 +29,19 @@ import kotlin.math.floor
 class HarnessCopy(private val locale: () -> String, private val lookup: (String, String) -> String) {
     constructor(host: V18Host) : this({ host.locale }, { en, es -> host.text(en, es) })
 
-    private fun text(en: String, es: String, vararg args: Any?): String = V18Text.fill(lookup(en, es), *args)
+    /** English and Spanish as written; the other four from the catalog; `{0}`, `{1}` filled last. */
+    internal fun text(en: String, es: String, vararg args: Any?): String = V18Text.fill(lookup(en, es), *args)
 
     // The lock screen (written in the app's language when the follow-up is planned)
 
+    /**
+     * Provenance only: the asset and "back to your question". No figure, no direction, no day
+     * count, no instruction. The week says what it holds and no number either.
+     */
     fun body(followUp: HarnessFollowUp): String {
         val symbol = followUp.symbol ?: ""
         return when (followUp.step) {
-            HarnessStep.ASSET ->
-                if (followUp.days <= 1) text("{0}, a day later. See how it moved.", "{0}, un día después. Mira cómo se movió.", symbol)
-                else text("{0}, {1} days later. See how it moved.", "{0}, {1} días después. Mira cómo se movió.", symbol, followUp.days)
+            HarnessStep.ASSET -> text("{0}: back to your question.", "{0}: de vuelta a tu pregunta.", symbol)
             HarnessStep.SECTOR ->
                 text("{0} today. {1} is part of it.", "{0} hoy. {1} es parte.", followUp.sector?.let { sectorTitle(it) } ?: "", symbol)
             HarnessStep.WEEK ->
@@ -39,6 +49,18 @@ class HarnessCopy(private val locale: () -> String, private val lookup: (String,
                 else text("Your week: {0} and {1} more.", "Tu semana: {0} y {1} más.", symbol, followUp.others)
         }
     }
+
+    /**
+     * What a locked phone that hides sensitive content shows in place of the body (the notice's
+     * public version): the same sentence without the asset. The ticker is never on a locked screen there.
+     */
+    fun publicBody(step: HarnessStep): String = when (step) {
+        HarnessStep.ASSET, HarnessStep.SECTOR -> text("Back to your question.", "De vuelta a tu pregunta.")
+        HarnessStep.WEEK -> text("Your week.", "Tu semana.")
+    }
+
+    /** The notice's one button: follow-ups off, without opening the app. */
+    val stopAction: String get() = text("Stop", "Ya no")
 
     // The glass (46 characters for the line, 22 for the button, in every language)
 
@@ -53,7 +75,11 @@ class HarnessCopy(private val locale: () -> String, private val lookup: (String,
 
     val offerButton: String get() = text("Yes, tell me", "Sí, cuéntame")
 
-    /** The move since they asked, with the number when the phone has both prices. */
+    /**
+     * The move since they asked, with the number when the phone may say one: `pct` comes from
+     * `move(then, now, isEquity)` and from nowhere else. The line is drawn like every other line of
+     * the glass (one size, one ink): the same up and down, no colour, no arrow.
+     */
     fun moveLine(symbol: String, pct: Double?, days: Int): String {
         val fallback = if (days <= 1) text("{0}, a day later", "{0}, un día después", symbol)
         else text("{0}, {1} days later", "{0}, {1} días después", symbol, days)
@@ -64,6 +90,12 @@ class HarnessCopy(private val locale: () -> String, private val lookup: (String,
     }
 
     val moveButton: String get() = text("What changed?", "¿Qué cambió?")
+
+    /**
+     * The button of the same line when the next read would be refused: the person keeps the line,
+     * which costs nothing, and Bobby asks nothing of them.
+     */
+    val moveSeen: String get() = text("Got it", "Entendido")
 
     // The questions Bobby is asked on the person's tap
 
@@ -124,9 +156,71 @@ class HarnessCopy(private val locale: () -> String, private val lookup: (String,
         return format.format(value)
     }
 
+    // Dates (the Memory screen's sentences)
+
+    private val language: String get() = Locale.forLanguageTag(locale()).language
+
+    /**
+     * "Oct 5" / "5 oct": the day and the abbreviated month, in the app's language and on the
+     * phone's own calendar day. One fixed order per language (the app speaks six), and never a
+     * full stop at the end: the sentence it goes into brings its own.
+     */
+    fun day(at: Long, zone: ZoneId): String {
+        val pattern = when (language) {
+            "es", "fr", "it" -> "d MMM"
+            "pt" -> "d 'de' MMM"
+            "de" -> "d. MMM"
+            else -> "MMM d"
+        }
+        val said = DateTimeFormatter.ofPattern(pattern, Locale.forLanguageTag(locale())).format(Instant.ofEpochMilli(at).atZone(zone))
+        return said.trimEnd('.')
+    }
+
+    /** "7:00 PM" in English, "19:00" in the other five. */
+    fun hour(hour: Int): String {
+        val time = LocalTime.of(minOf(maxOf(hour, 0), 23), 0)
+        return if (language == "en") DateTimeFormatter.ofPattern("h:mm a", Locale.US).format(time) else DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT).format(time)
+    }
+
     private fun length(text: String): Int = text.codePointCount(0, text.length)
 
     companion object {
         const val NOTIFICATION_TITLE = "Bobby"
+
+        /**
+         * How far the price may be from the one at the question for the phone to say a number. The
+         * line stays on the glass for up to `HarnessCenter.DUE_DAYS` (two weeks) after the question,
+         * so each bound is for a fortnight, not for a day, and holds at every age.
+         *  - A stock: more than 0.7 and less than 1.4 times the price at the question (-30% to +40%).
+         *    The top of the band is twice its bottom, so a 2-for-1 split, or any larger one, forward
+         *    or reverse, on top of ANY move the band itself would print lands outside it: 100 → 62 is
+         *    2-for-1 and +24%, 0.62, no number. An earnings day (a quarter either way) is inside.
+         *    What stays possible: a 3-for-2 split (0.67) with a rise of 5% or more on top reads as a
+         *    fall of up to 30%. By size alone it cannot be told from one, and the phone has no list of
+         *    corporate actions to ask.
+         *  - Crypto has no splits. What goes wrong there is a ticker that now names another coin, a
+         *    redenomination or a bad tick: 0.2 to 5 times (-80% to +400%) lets a small coin's wildest
+         *    ordinary week through and stops those.
+         * Outside the bound the phone says no number, never a corrected one. Both ends are exclusive.
+         */
+        const val STOCK_MOVE_ABOVE = 0.7
+        const val STOCK_MOVE_BELOW = 1.4
+        const val CRYPTO_MOVE_ABOVE = 0.2
+        const val CRYPTO_MOVE_BELOW = 5.0
+
+        /**
+         * THE gate: the move between the price at the question and the price now, in percent. Null
+         * when the phone has no business saying a number: a price is missing, zero, negative or not
+         * a number, or the move is outside what this kind of asset does. The glass and the week's
+         * board both ask here and nowhere else.
+         */
+        fun move(then: Double?, now: Double?, isEquity: Boolean): Double? {
+            if (then == null || now == null || !then.isFinite() || !now.isFinite() || then <= 0 || now <= 0) return null
+            val ratio = now / then
+            val above = if (isEquity) STOCK_MOVE_ABOVE else CRYPTO_MOVE_ABOVE
+            val below = if (isEquity) STOCK_MOVE_BELOW else CRYPTO_MOVE_BELOW
+            if (!ratio.isFinite() || ratio <= above || ratio >= below) return null
+            return (ratio - 1) * 100
+        }
     }
 }

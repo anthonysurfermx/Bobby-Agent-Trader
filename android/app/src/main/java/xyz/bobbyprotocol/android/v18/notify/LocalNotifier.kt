@@ -14,7 +14,7 @@ import java.time.ZonedDateTime
 // is idle. Copy must never promise a minute. Because of that a notice says what it asks of a late
 // phone (`LocalNotice.Delivery`), and `NoticeTiming` decides what the worker does when it finally runs.
 
-/** One planned line: what the phone shows and what a tap carries. */
+/** One planned line: what the phone shows, what a locked phone shows instead, and what a tap carries. */
 data class LocalNotice(
     /** Stable per thing planned (`v18.reminder.<thesisId>`, `v18.follow.<step>`): scheduling the same id again replaces it. */
     val id: String,
@@ -34,7 +34,23 @@ data class LocalNotice(
      * follow-up keeps to the day's allowed hours and expires; a thesis reminder is shown however late.
      */
     val delivery: Delivery = Delivery.of(channel),
+    /**
+     * What a locked phone that hides sensitive content shows in place of `body`: the same line
+     * without whatever the person would not want read over their shoulder (a follow-up leaves the
+     * asset out). Null: the phone shows its own "contents hidden" line.
+     */
+    val publicBody: String? = null,
+    /**
+     * One button on the notice, acted on without opening the app (a follow-up's "Stop"). The phone
+     * hands `name` and the payload to the feature of `KIND`; it never starts an activity.
+     */
+    val action: Action? = null,
 ) {
+    /** `name` is what the feature is told (`stop`); `label` is what the button says, in the app's language. */
+    data class Action(val name: String, val label: String) {
+        val isValid: Boolean get() = ACTION_PATTERN.matches(name) && label.isNotBlank() && label.length <= ACTION_LABEL_LIMIT
+    }
+
     /**
      * The system may hold planned work back for hours while the phone is idle, and a phone that was
      * off runs what it missed when it comes back. A notice may therefore ask for:
@@ -93,12 +109,14 @@ data class LocalNotice(
         val ID_PATTERN = Regex("^[A-Za-z0-9][A-Za-z0-9_.:-]{0,95}$")
         const val PAYLOAD_LIMIT = 16
         const val VALUE_LIMIT = 200
+        val ACTION_PATTERN = Regex("^[a-z][a-z0-9_.-]{0,31}$")
+        const val ACTION_LABEL_LIMIT = 40
 
         /** A notice the phone can keep and hand back: a plain id, a known channel, something to say, a small payload. */
         fun valid(notice: LocalNotice): Boolean =
             ID_PATTERN.matches(notice.id) && notice.channel in CHANNELS && notice.title.isNotBlank() && notice.body.isNotBlank() &&
                 notice.payload.size <= PAYLOAD_LIMIT && notice.payload.all { (key, value) -> key.isNotEmpty() && key.length <= 40 && value.length <= VALUE_LIMIT } &&
-                notice.delivery.isValid
+                notice.delivery.isValid && (notice.publicBody == null || notice.publicBody.isNotBlank()) && (notice.action == null || notice.action.isValid)
     }
 }
 

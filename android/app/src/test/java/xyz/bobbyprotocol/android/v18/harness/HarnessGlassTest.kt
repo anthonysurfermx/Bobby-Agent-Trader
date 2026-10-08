@@ -23,6 +23,7 @@ import xyz.bobbyprotocol.android.v18.ThesisHorizon
 import xyz.bobbyprotocol.android.v18.V18Reader
 import xyz.bobbyprotocol.android.v18.V18Routes
 import xyz.bobbyprotocol.android.v18.V18TestBench
+import xyz.bobbyprotocol.android.v18.credits.ReadAccess
 import xyz.bobbyprotocol.android.v18.notify.LocalNotice
 
 /**
@@ -58,6 +59,7 @@ class HarnessGlassTest {
             }
             assertTrue(language, copy.offerButton.length <= NucleoNudge.CTA_LIMIT)
             assertTrue(language, copy.moveButton.length <= NucleoNudge.CTA_LIMIT)
+            assertTrue(language, copy.moveSeen.length <= NucleoNudge.CTA_LIMIT)
         }
     }
 
@@ -105,13 +107,13 @@ class HarnessGlassTest {
         val sector = HarnessFollowUp(HarnessStep.SECTOR, t0, symbol = "NVDA", sector = "semis")
         val week = HarnessFollowUp(HarnessStep.WEEK, t0, symbol = "NVDA", others = 2)
         val alone = HarnessFollowUp(HarnessStep.WEEK, t0, symbol = "NVDA", others = 0)
-        assertEquals("NVDA, a day later. See how it moved.", english.body(asset))
-        assertEquals("NVDA, 3 days later. See how it moved.", english.body(later))
+        assertEquals("NVDA: back to your question.", english.body(asset))
+        assertEquals("no day count on the lock screen", "NVDA: back to your question.", english.body(later))
         assertEquals("Semiconductors today. NVDA is part of it.", english.body(sector))
         assertEquals("Your week: NVDA and 2 more.", english.body(week))
         assertEquals("Your week with NVDA.", english.body(alone))
         val spanish = HarnessWords.copy("es")
-        assertEquals("NVDA, un día después. Mira cómo se movió.", spanish.body(asset))
+        assertEquals("NVDA: de vuelta a tu pregunta.", spanish.body(asset))
         assertEquals("Semiconductores hoy. NVDA es parte.", spanish.body(sector))
         assertEquals("Tu semana: NVDA y 2 más.", spanish.body(week))
         val seen = HashSet<String>()
@@ -128,7 +130,8 @@ class HarnessGlassTest {
 
     /** Everything the harness can say, in the language of `copy`. */
     private fun everything(copy: HarnessCopy): List<String> = listOf(
-        copy.offerLine("NVDA"), copy.offerLine("ABCDEFGHIJKLMNOPQRST"), copy.offerButton, copy.moveButton, copy.switchLabel, copy.switchDetail,
+        copy.offerLine("NVDA"), copy.offerLine("ABCDEFGHIJKLMNOPQRST"), copy.offerButton, copy.moveButton, copy.moveSeen, copy.stopAction,
+        copy.publicBody(HarnessStep.ASSET), copy.publicBody(HarnessStep.WEEK), copy.switchLabel, copy.switchDetail,
         copy.weekTitle, copy.sinceAsked, copy.last24h, copy.boardFoot, copy.boardEmpty, copy.changedQuestion("NVDA"), copy.lookQuestion("NVDA"),
         copy.moveLine("NVDA", 3.0, 1), copy.moveLine("NVDA", 0.0, 1), copy.moveLine("NVDA", null, 1), copy.moveLine("NVDA", null, 2),
         copy.body(HarnessFollowUp(HarnessStep.ASSET, t0, symbol = "NVDA")),
@@ -313,6 +316,8 @@ class HarnessGlassTest {
         HarnessNudges.register(bench.host)
         val center = Harness.center(bench.host)
         runCurrent()
+        // A notice is only ever on the shade of someone who said yes; a tap is written only then.
+        assertEquals(HarnessCenter.Outcome.ON, center.accept())
         bench.host.noteTap(tapped(bench, "asset", "NVDA"))
         runCurrent()
         assertNull("the asset's follow-up is a line on the glass, not a screen", bench.shell.sheetRoute)
@@ -430,7 +435,10 @@ class HarnessGlassTest {
         val bench = V18TestBench(backgroundScope)
         HarnessNudges.register(bench.host)
         val center = Harness.center(bench.host)
+        // The phone knows the next read is answered (a row asks nothing otherwise: HarnessSurfaceTest).
+        center.access = { ReadAccess("free", 3, 20, 17, null, true) }
         runCurrent()
+        assertEquals(HarnessCenter.Outcome.ON, center.accept())
         // From the glass: the page is told at once, with a token and the question native wrote.
         assertTrue(bench.host.startRead("NVDA", "NVIDIA", true, center.copy.changedQuestion("NVDA")))
         val first = bench.desk.events("ask.start").first()
@@ -486,6 +494,8 @@ class HarnessGlassTest {
             quoted.add(symbol)
             if (symbol == "NVDA") HarnessQuote(102.3, 0.4) else null
         }
+        // The phone knows the next read is answered: the line's button may ask Bobby.
+        center.access = { ReadAccess("free", 3, 20, 17, null, true) }
         runCurrent()
         bench.deliver(symbol = "NVDA", price = 100.0)
         bench.clock += 26 * hour
@@ -502,7 +512,7 @@ class HarnessGlassTest {
         assertEquals("done", bench.host.nudgeAct(nudge.getString("id")).getString("status"))
         val asked = bench.desk.events("ask.start").single()
         assertEquals("What changed in NVDA since I asked?", asked.getString("question"))
-        assertEquals(1, center.ledger.events(HarnessEvent.Kind.PICKED).size)
+        assertTrue("undecided: the tap itself is not written", center.ledger.events(HarnessEvent.Kind.PICKED).isEmpty())
         assertNull(center.move)
         assertTrue("no sheet: the glass answers", bench.shell.opened.isEmpty())
     }
@@ -559,12 +569,12 @@ class HarnessGlassTest {
         runCurrent()
         bench.deliver(symbol = "NVDA")
         center.accept()
-        assertEquals("NVDA, a day later. See how it moved.", bench.notifier.notice("v18.follow.asset")?.body)
+        assertEquals("NVDA: back to your question.", bench.notifier.notice("v18.follow.asset")?.body)
         bench.desk.language = "es"
         bench.host.nudgeJson()
-        assertEquals("drawing the glass only reads", "NVDA, a day later. See how it moved.", bench.notifier.notice("v18.follow.asset")?.body)
+        assertEquals("drawing the glass only reads", "NVDA: back to your question.", bench.notifier.notice("v18.follow.asset")?.body)
         runCurrent()
-        assertEquals("NVDA, un día después. Mira cómo se movió.", bench.notifier.notice("v18.follow.asset")?.body)
+        assertEquals("NVDA: de vuelta a tu pregunta.", bench.notifier.notice("v18.follow.asset")?.body)
         assertEquals(2, bench.notifier.pendingIds().size)
         assertFalse(center.wordsAreStale)
     }
@@ -580,8 +590,9 @@ class HarnessGlassTest {
         bench.desk.riskNotice = RiskNotice.ACCEPTED
         bench.deliver(symbol = "NVDA")
         bench.host.readSaved("r1", "NVDA")
-        assertEquals(listOf<String?>("NVDA"), center.ledger.events(HarnessEvent.Kind.SAVED).map { it.symbol })
+        assertTrue("undecided: a save is not written", center.ledger.events(HarnessEvent.Kind.SAVED).isEmpty())
         center.accept()
+        assertEquals("the yes writes the save of the read that prompted it", listOf<String?>("NVDA"), center.ledger.events(HarnessEvent.Kind.SAVED).map { it.symbol })
         assertEquals(2, bench.notifier.pendingIds().size)
         // Memory's "Delete everything".
         bench.host.eraseEverything()

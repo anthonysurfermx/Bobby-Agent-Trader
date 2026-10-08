@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -25,8 +26,16 @@ import xyz.bobbyprotocol.android.MainActivity
 import xyz.bobbyprotocol.android.R
 import xyz.bobbyprotocol.android.data.BobbyLocales
 import xyz.bobbyprotocol.android.data.BobbyRepository
+import xyz.bobbyprotocol.android.v18.NudgeCenter
+import xyz.bobbyprotocol.android.v18.RiskNotice
 import xyz.bobbyprotocol.android.v18.V18Process
 import xyz.bobbyprotocol.android.v18.V18Reader
+import xyz.bobbyprotocol.android.v18.harness.Harness
+import xyz.bobbyprotocol.android.v18.harness.HarnessCenter
+import xyz.bobbyprotocol.android.v18.harness.HarnessCopy
+import xyz.bobbyprotocol.android.v18.harness.HarnessNudges
+import xyz.bobbyprotocol.android.v18.harness.HarnessStore
+import xyz.bobbyprotocol.android.v18.harness.HarnessTap
 import xyz.bobbyprotocol.android.v18.notify.LocalNotice
 import xyz.bobbyprotocol.android.v18.notify.LocalNotifier
 import xyz.bobbyprotocol.android.v18.notify.NoticePermission
@@ -51,6 +60,11 @@ import java.util.concurrent.TimeUnit
 // reminder is shown however late. The decision is tested on the JVM. That WorkManager posts a due
 // notice, and that its tap reaches the activity, is checked on an emulator
 // (V18DeviceInstrumentedTest); the wait and the drop were never seen on a device.
+//
+// A notice is private (`VISIBILITY_PRIVATE`). One that carries a `publicBody` also has a public
+// version: what a locked phone set to hide sensitive content shows instead, so a follow-up's asset
+// is never read off a locked screen there. One that carries an `action` has one button, which
+// reaches `LocalNoticeActionReceiver` as a broadcast: nothing of the app comes to the front.
 
 /** Plans, lists and clears Bobby's own local notices. `ask` is the activity's permission launcher. */
 class AndroidLocalNotifier(context: Context, private val ask: suspend () -> Boolean) : LocalNotifier {
@@ -105,8 +119,15 @@ internal class LocalNoticeIndex(context: Context) {
             val payload = LinkedHashMap<String, String>()
             json.optJSONObject("payload")?.let { map -> for (key in map.keys()) payload[key] = map.optString(key) }
             val channel = json.getString("channel")
+            // Absent in what Android 1.2.0's first builds stored: such a notice has neither.
+            val hidden = if (json.isNull("publicBody")) null else (json.opt("publicBody") as? String)?.takeIf { it.isNotBlank() }
+            val action = json.optJSONObject("action")?.let { stored ->
+                val name = stored.opt("name") as? String
+                val label = stored.opt("label") as? String
+                if (name == null || label == null) null else LocalNotice.Action(name, label).takeIf { it.isValid }
+            }
             LocalNotice(id, json.getString("title"), json.getString("body"), json.getLong("fireAt"), channel, payload,
-                        LocalNotice.Delivery.fromJson(json.optJSONObject("delivery"), channel))
+                        LocalNotice.Delivery.fromJson(json.optJSONObject("delivery"), channel), hidden, action)
         } catch (_: Exception) { null }
     }
 
@@ -114,6 +135,8 @@ internal class LocalNoticeIndex(context: Context) {
     fun put(notice: LocalNotice) {
         val json = JSONObject().put("title", notice.title).put("body", notice.body).put("fireAt", notice.fireAtEpochMs)
             .put("channel", notice.channel).put("payload", LocalNotices.payloadJson(notice.payload)).put("delivery", notice.delivery.toJson())
+        if (notice.publicBody != null) json.put("publicBody", notice.publicBody)
+        if (notice.action != null) json.put("action", JSONObject().put("name", notice.action.name).put("label", notice.action.label))
         prefs.edit().putString(notice.id, json.toString()).commit()
     }
 
@@ -129,6 +152,10 @@ object LocalNotices {
     /** The extra a tapped notice carries to MainActivity: its payload as a JSON object of strings. */
     const val EXTRA = "v18.notice"
     const val ACTION = "xyz.bobbyprotocol.android.V18_NOTICE"
+    /** The broadcast a notice's own button sends (`LocalNoticeActionReceiver`), and what it carries besides the payload. */
+    const val ACTION_BUTTON = "xyz.bobbyprotocol.android.V18_NOTICE_ACTION"
+    const val EXTRA_ID = "v18.notice.id"
+    const val EXTRA_BUTTON = "v18.notice.button"
     internal const val NOTIFICATION_ID = 2180
     internal const val WORK_TAG = "bobby-v18-notice"
     internal const val WORK_ID = "id"
@@ -209,14 +236,81 @@ object LocalNotices {
             .setData(Uri.parse("bobby-notice://v18/" + Uri.encode(notice.id)))
             .putExtra(EXTRA, payloadJson(notice.payload).toString())
         val tap = PendingIntent.getActivity(context, NOTIFICATION_ID, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val notification = NotificationCompat.Builder(context, notice.channel)
+        val builder = NotificationCompat.Builder(context, notice.channel)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(notice.title)
             .setContentText(notice.body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(notice.body))
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-            .setAutoCancel(true).setOnlyAlertOnce(true).setContentIntent(tap).build()
-        manager.notify(notice.id, NOTIFICATION_ID, notification)
+            .setAutoCancel(true).setOnlyAlertOnce(true).setContentIntent(tap)
+        // The one button: a broadcast to this app, never an activity. It is on the public version too,
+        // so saying no does not ask for the phone to be unlocked first.
+        val button = notice.action?.let { action ->
+            val press = Intent(context, LocalNoticeActionReceiver::class.java).setAction(ACTION_BUTTON)
+                .setData(Uri.parse("bobby-notice://v18/" + Uri.encode(notice.id) + "/" + Uri.encode(action.name)))
+                .putExtra(EXTRA, payloadJson(notice.payload).toString()).putExtra(EXTRA_ID, notice.id).putExtra(EXTRA_BUTTON, action.name)
+            NotificationCompat.Action.Builder(0, action.label,
+                PendingIntent.getBroadcast(context, NOTIFICATION_ID, press, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)).build()
+        }
+        if (button != null) builder.addAction(button)
+        // What a locked phone that hides sensitive content shows instead: the same title, the line
+        // without the asset, the same tap. Never the body.
+        notice.publicBody?.let { hidden ->
+            val locked = NotificationCompat.Builder(context, notice.channel)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(notice.title)
+                .setContentText(hidden)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setAutoCancel(true).setContentIntent(tap)
+            if (button != null) locked.addAction(button)
+            builder.setPublicVersion(locked.build())
+        }
+        manager.notify(notice.id, NOTIFICATION_ID, builder.build())
+    }
+
+    /**
+     * A notice's own button was pressed. Runs on the main thread, from a broadcast: no activity is
+     * started and none needs to exist. The notice leaves the shade, then its feature acts.
+     *
+     * A follow-up's "Stop" does what the Follow-ups switch does when it is turned off, through the
+     * same call (`HarnessCenter.stop` → `turnOff`): with the app alive, on the centre the app is
+     * using, so the switch and the glass follow at once; with no app, on a centre built over what
+     * is on disk. Either way only for the reader the notice was planned for.
+     */
+    internal fun pressed(context: Context, id: String, button: String, payload: Map<String, String>) {
+        val app = context.applicationContext
+        (app.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(id, NOTIFICATION_ID)
+        if (payload[LocalNotice.KIND] != HarnessCenter.KIND || button != HarnessCenter.STOP_ACTION) return
+        val tap = HarnessTap.from(payload) ?: return
+        val live = V18Process.runtime
+        if (live != null) {
+            Harness.center(live).stop(tap)
+            return
+        }
+        // Whoever uses the phone now, read from disk: there is no session to ask.
+        val owner = BobbyRepository(app).session.value?.userId
+        val store = V18Process.store(app)
+        val center = HarnessCenter(AndroidLocalNotifier(app) { false }, HarnessStore(store), HarnessCopy({ "en-US" }) { en, _ -> en })
+        center.currentUser = { owner }
+        // Saying no needs no consent; nothing else is done with this centre.
+        center.consent = { RiskNotice.WITHDRAWN }
+        center.forgetLines = { symbol, reader -> NudgeCenter.forget(listOf(HarnessNudges.movePrefix(symbol)), reader, store) }
+        center.load(owner)
+        center.stop(tap)
+    }
+}
+
+/**
+ * Receives the button of a notice (`LocalNotices.post` builds its intent). Not exported: only this
+ * app's own PendingIntent reaches it. It opens nothing.
+ */
+class LocalNoticeActionReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != LocalNotices.ACTION_BUTTON) return
+        val id = intent.getStringExtra(LocalNotices.EXTRA_ID)?.takeIf { LocalNotice.ID_PATTERN.matches(it) } ?: return
+        val button = intent.getStringExtra(LocalNotices.EXTRA_BUTTON)?.takeIf { LocalNotice.ACTION_PATTERN.matches(it) } ?: return
+        val payload = LocalNotices.payload(intent.getStringExtra(LocalNotices.EXTRA)) ?: return
+        try { LocalNotices.pressed(context, id, button, payload) } catch (_: Exception) { }
     }
 }
 

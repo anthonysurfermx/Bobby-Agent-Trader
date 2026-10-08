@@ -17,7 +17,9 @@ import java.util.Locale
 //    it is the one place (with the Follow-ups switch) where the system may be asked for permission;
 //  - the move, when they come back (on their own or through a follow-up) to an asset they asked
 //    about at least a day ago: "NVDA +2.3% since you asked" · "What changed?". The number costs
-//    nothing; the button asks Bobby, which is a read like any other.
+//    nothing; the button asks Bobby, which is a read. So the button is only there when the phone
+//    knows that read is answered (HarnessWall): otherwise the same line carries "Got it", which
+//    asks nothing, and Bobby never walks anyone into a sign-in or a paywall.
 // A port of ios/Bobby/Sources/V18/Harness/HarnessNudges.swift.
 object HarnessNudges {
     const val OFFER_KEY = "harness.offer"
@@ -60,24 +62,30 @@ object HarnessNudges {
                     harness.rewriteWords()
                 }
             }
-            harness.moveOnGlass()?.let { nudge(it, harness.copy) }
+            harness.moveOnGlass()?.let { nudge(it, harness.copy, asks = harness.readsOpen) }
         },
         { nudge ->
+            // Decided again at the tap: what was drawn may be older than the last receipt.
             val move = harness.moveOnGlass()
-            if (move != null && moveId(move) == nudge.id) {
+            if (move != null && moveId(move) == nudge.id && harness.readsOpen) {
                 harness.notePicked(move.symbol)
                 host.startRead(move.symbol, move.name, move.isEquity, harness.copy.changedQuestion(move.symbol))
             }
         },
     )
 
-    fun nudge(move: HarnessMove, copy: HarnessCopy): NucleoNudge =
-        NucleoNudge(moveId(move), copy.moveLine(move.symbol, move.pct, move.days), copy.moveButton)
+    /** `asks`: the next read would be answered. Without it the line is the same and its button asks nothing. */
+    fun nudge(move: HarnessMove, copy: HarnessCopy, asks: Boolean = true): NucleoNudge =
+        NucleoNudge(moveId(move), copy.moveLine(move.symbol, move.pct, move.days), if (asks) copy.moveButton else copy.moveSeen)
 
     /** `harness.move.<symbol>.<day asked>`: one line per asset per question, however often it is drawn. */
-    fun moveId(move: HarnessMove): String {
-        val symbol = move.symbol.lowercase(Locale.ROOT).filter { it in 'a'..'z' || it in '0'..'9' || it == '.' || it == '-' }
-        return "harness.move.$symbol.${dayStamp(move.askedAt)}"
+    fun moveId(move: HarnessMove): String = movePrefix(move.symbol) + dayStamp(move.askedAt)
+
+    /** `harness.move.` for every line, `harness.move.<symbol>.` for one asset's. */
+    fun movePrefix(symbol: String? = null): String {
+        if (symbol == null) return "$MOVE_KEY."
+        val safe = symbol.lowercase(Locale.ROOT).filter { it in 'a'..'z' || it in '0'..'9' || it == '.' || it == '-' }
+        return "$MOVE_KEY.$safe."
     }
 
     private fun dayStamp(at: Long): String {

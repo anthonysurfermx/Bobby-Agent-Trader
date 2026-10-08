@@ -5,7 +5,9 @@ import kotlin.math.abs
 
 // The harness (1.8): where a sector or a week follow-up lands. One list: the assets, each with how
 // far it moved, and a tap that asks Bobby about it. The numbers are read when the screen opens
-// (one request per row, none of them a read); a row whose number could not be read shows none.
+// (one request per row, none of them a read); a row whose number could not be read, or should not
+// be said, shows none. A row asks Bobby, which is a read: when the next one would be refused the
+// rows are plain (Harness.pick launches nothing, ui/v18/FollowUpSheet.kt draws no chevron).
 // Pure, so tests pin what the screen shows (ui/v18/FollowUpSheet.kt draws it). A port of
 // `HarnessBoard` in ios/Bobby/Sources/V18/Harness/HarnessBoard.swift.
 
@@ -33,17 +35,13 @@ data class HarnessBoard(
 
     /**
      * One row's number from a fresh price. A sector reads the day's change; a week compares with
-     * the price at the question, and shows nothing when either price is missing.
+     * the price at the question, and shows nothing when either price is missing or the move is one
+     * the phone should not put a number on (a split, a renamed ticker: `HarnessCopy.move`, the
+     * same gate the line on the glass goes through).
      */
-    fun change(row: Row, price: Double?, changePct: Double?): Double? {
-        val value: Double? = when (kind) {
-            is Kind.Sector -> changePct
-            Kind.Week -> {
-                val then = row.priceThen
-                if (then != null && price != null && then > 0 && price > 0) (price / then - 1) * 100 else null
-            }
-        }
-        return value?.takeIf { it.isFinite() && abs(it) < 1_000 }
+    fun change(row: Row, price: Double?, changePct: Double?): Double? = when (kind) {
+        is Kind.Sector -> changePct?.takeIf { it.isFinite() && abs(it) < 1_000 }
+        Kind.Week -> HarnessCopy.move(row.priceThen, price, row.isEquity)
     }
 
     /** The same board with that row's number. */
