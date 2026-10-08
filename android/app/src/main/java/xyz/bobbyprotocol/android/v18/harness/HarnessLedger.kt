@@ -3,6 +3,7 @@ package xyz.bobbyprotocol.android.v18.harness
 import org.json.JSONArray
 import org.json.JSONObject
 import xyz.bobbyprotocol.android.v18.KeyValueStore
+import xyz.bobbyprotocol.android.v18.ThesisHorizon
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
@@ -42,6 +43,35 @@ enum class HarnessStep(val raw: String) {
     }
 }
 
+/**
+ * How long the person is looking, in the desk's own five values (`Horizon` in
+ * api/_lib/desk-debate.ts, returned in every reply's `sufficiency` block). A fixed value, never
+ * the words they used.
+ */
+enum class HarnessHorizon(val raw: String) {
+    INTRADAY("intraday"), WEEK("week"), MONTH("month"), LONG("long"), UNSPECIFIED("unspecified");
+
+    /**
+     * Whole days between a question and its first follow-up. A horizon only ever lengthens the
+     * wait: "today" is still the next day. Null: no follow-up about the asset at all, the week only.
+     */
+    val waitDays: Int?
+        get() = when (this) {
+            INTRADAY, UNSPECIFIED -> 1
+            WEEK -> 3
+            MONTH -> 7
+            LONG -> null
+        }
+
+    companion object {
+        /** What the desk's reply says. Anything else is no horizon. */
+        fun named(raw: Any?): HarnessHorizon? = (raw as? String)?.let { name -> entries.firstOrNull { it.raw == name } }
+
+        /** A thesis is at least weeks long: "weeks" waits like a month, anything longer is long. */
+        fun ofThesis(thesis: ThesisHorizon): HarnessHorizon = if (thesis == ThesisHorizon.WEEKS) MONTH else LONG
+    }
+}
+
 /** One thing the person did, or one follow-up the phone showed them. */
 data class HarnessEvent(
     val kind: Kind,
@@ -57,6 +87,14 @@ data class HarnessEvent(
     val sector: String? = null,
     /** `OPENED`, `RETURNED`: the moment of the follow-up they answer (its `SENT` has that `at`). */
     val ref: Long? = null,
+    /** `ASK`: who started it, when it was not the person. */
+    val origin: Origin? = null,
+    /** `ASK`: a second question of their own about the read on screen. */
+    val thread: Boolean? = null,
+    /** `ASK`: the horizon the question named. `THESIS`: the one they set on it. */
+    val horizon: HarnessHorizon? = null,
+    /** `SAVED`: the review horizon they chose, 24, 72 or 168. */
+    val horizonHours: Int? = null,
 ) {
     enum class Kind(val raw: String) {
         /** A read was delivered. */
@@ -75,10 +113,22 @@ data class HarnessEvent(
          */
         RETURNED("returned"),
         /** They acted on a follow-up inside the app (the line on the glass, a row of a board). */
-        PICKED("picked");
+        PICKED("picked"),
+        /** A thesis they wrote about this asset is active. A pointer: the words stay in the thesis book. */
+        THESIS("thesis");
 
         companion object {
             fun of(raw: String?): Kind? = entries.firstOrNull { it.raw == raw }
+        }
+    }
+
+    /** Who started a read. The person's own question has none. */
+    enum class Origin(val raw: String) {
+        /** Bobby did: the button of a follow-up, a row of a board, the question Bobby wrote after a read, a chip. */
+        FOLLOW_UP("followUp");
+
+        companion object {
+            fun of(raw: String?): Origin? = entries.firstOrNull { it.raw == raw }
         }
     }
 
@@ -95,6 +145,10 @@ data class HarnessEvent(
         if (step != null) json.put("step", step.raw)
         if (sector != null) json.put("sector", sector)
         if (ref != null) json.put("ref", ref)
+        if (origin != null) json.put("origin", origin.raw)
+        if (thread != null) json.put("thread", thread)
+        if (horizon != null) json.put("horizon", horizon.raw)
+        if (horizonHours != null) json.put("horizonHours", horizonHours)
         return json
     }
 
@@ -104,7 +158,8 @@ data class HarnessEvent(
             val at = HarnessJson.long(json, "at") ?: return null
             return HarnessEvent(kind, at, HarnessJson.text(json, "symbol"), HarnessJson.text(json, "name"), json.opt("isEquity") as? Boolean,
                                 HarnessJson.double(json, "price"), HarnessStep.of(HarnessJson.text(json, "step")), HarnessJson.text(json, "sector"),
-                                HarnessJson.long(json, "ref"))
+                                HarnessJson.long(json, "ref"), Origin.of(HarnessJson.text(json, "origin")), json.opt("thread") as? Boolean,
+                                HarnessHorizon.named(json.opt("horizon")), HarnessJson.int(json, "horizonHours"))
         }
     }
 }

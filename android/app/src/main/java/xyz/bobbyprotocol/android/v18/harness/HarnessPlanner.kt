@@ -84,10 +84,30 @@ data class HarnessPlanned(val followUp: HarnessFollowUp, val handed: Boolean) {
     }
 }
 
+/** The follow-ups one question gets, in order, and how many of them at most. */
+data class HarnessChain(val steps: List<HarnessStep>, val maxPerQuestion: Int) {
+    companion object {
+        /** The asset, then the week. */
+        val ASSET_THEN_WEEK = HarnessChain(listOf(HarnessStep.ASSET, HarnessStep.WEEK), 2)
+        /**
+         * The asset, its sector the day after, then the week. The sector lands on a list of assets
+         * the person did not ask about (HarnessBoard), which is why it does not ship.
+         */
+        val WITH_SECTOR = HarnessChain(listOf(HarnessStep.ASSET, HarnessStep.SECTOR, HarnessStep.WEEK), 3)
+
+        /** THE OWNER'S CHOICE, in one line: `ASSET_THEN_WEEK` or `WITH_SECTOR`. Both are tested. */
+        val SHIPPED: HarnessChain = ASSET_THEN_WEEK
+    }
+}
+
 object HarnessPlanner {
     const val IDENTIFIER_PREFIX = "v18.follow."
 
     class Options(
+        /** The steps a question gets, each at most once, in this order. */
+        var chain: List<HarnessStep> = HarnessChain.SHIPPED.steps,
+        /** Follow-ups one question gets at most, whatever the person does with them. */
+        var maxPerQuestion: Int = HarnessChain.SHIPPED.maxPerQuestion,
         /** A paying account with the Monday briefing on already gets its week from the server. */
         var weeklyCovered: Boolean = false,
         /** Local hours follow-ups may be planned for. */
@@ -111,7 +131,9 @@ object HarnessPlanner {
         var quietAfter: Int = 3,
         var quietDays: Long = 14,
         var sectorOf: (String) -> String? = { symbol -> HarnessSectors.of(symbol)?.id },
-    )
+    ) {
+        constructor(chain: HarnessChain, weeklyCovered: Boolean = false) : this(chain.steps, chain.maxPerQuestion, weeklyCovered)
+    }
 
     /** A time of day, local. */
     data class TimeOfDay(val hour: Int, val minute: Int)
