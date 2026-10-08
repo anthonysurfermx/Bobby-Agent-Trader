@@ -65,7 +65,8 @@ import java.util.Locale
 //    read, a chip that asks about an asset) is written with its origin and starts nothing: one
 //    tap on something Bobby put there never earns another chain. The one exception is the yes
 //    itself: before it there is no chain to protect, so a chip is kept the way a question is, and
-//    saying yes to "Shall I keep you posted on NVDA?" follows that read.
+//    saying yes to "Shall I keep you posted on NVDA?" follows that read. (What was kept that way
+//    signed out starts nothing in an account that had already said yes: `accountChanged`.)
 //  - What the person said about how long they are looking (the horizon their question named, the
 //    one chosen on a save, a thesis), a save itself and that a question was their second about a
 //    read are written only once they said yes to follow-ups. Until then they are held in memory
@@ -599,7 +600,17 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
             } else if (theirMode != HarnessMode.OFF) {
                 // An account that said no keeps nothing, so nothing is moved into it.
                 val theirs = store.ledger(user)
-                theirs.merge(store.ledger(null))
+                val mine = store.ledger(null)
+                if (theirMode == HarnessMode.ON && localMode == HarnessMode.UNDECIDED) {
+                    // Before any yes the phone kept one bare entry per read, and there a chip's read looks
+                    // like a typed question. This account has already said yes, and with follow-ups on a
+                    // chip starts no chain: since the two cannot be told apart, none of them does. They
+                    // stay as assets the person asked about, for the glass and for the week.
+                    val asked = mine.events.filter { it.isQuestion }
+                    mine.remove { it.isQuestion }
+                    for (event in asked) mine.note(event.copy(origin = HarnessEvent.Origin.FOLLOW_UP))
+                }
+                theirs.merge(mine)
                 store.write(theirs, user)
                 if (theirMode == HarnessMode.UNDECIDED && localMode != HarnessMode.UNDECIDED) store.write(localMode, user)
             }

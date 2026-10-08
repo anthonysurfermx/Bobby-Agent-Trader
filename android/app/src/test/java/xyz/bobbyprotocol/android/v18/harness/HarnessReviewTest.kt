@@ -278,6 +278,47 @@ class HarnessReviewTest {
         assertNull(raw.values[modeKey(null)])
     }
 
+    // A chip starts no chain in an account that said yes, whichever way it gets there
+
+    /**
+     * An account with follow-ups on signs out. Signed out (undecided) they tap "How is BTC
+     * looking?", which the phone keeps as a bare entry like any question, and sign in again.
+     */
+    @Test fun whatWasKeptSignedOutBeforeAnyYesStartsNoChainInAnAccountThatAlreadySaidYes() = runTest {
+        user = "u1"
+        val center = make()
+        ask(center, "NVDA")
+        center.accept()
+        switchTo(null)
+        center.accountChanged()
+        clock = at(8, 10)
+        center.noteAsk("BTC", "Bitcoin", false, 61_250.0, origin = HarnessEvent.Origin.FOLLOW_UP, chip = true)
+        assertEquals(HarnessMode.UNDECIDED, center.mode)
+        assertNull("before any yes a chip is kept the way a question is", center.ledger.events.single().origin)
+        clock = at(8, 11)
+        switchTo("u1")
+        center.accountChanged()
+        assertEquals(HarnessMode.ON, center.mode)
+        assertEquals("the chain is still the one question they typed", "NVDA", center.ledger.question(clock)?.symbol)
+        assertEquals(listOf(HarnessStep.ASSET to at(8, 16, 40), HarnessStep.WEEK to at(12, 16, 40)), center.upcoming.map { it.step to it.fireAt })
+        assertEquals("NVDA", center.upcoming.first().symbol)
+        assertEquals("and BTC is still an asset they asked about, for the glass and the week",
+                     listOf("BTC", "NVDA"), center.ledger.assets(since = at(1, 0), now = clock).map { it.symbol })
+        assertTrue("nothing stays under the signed-out reader", HarnessStore(raw).ledger(null).isEmpty)
+        // A signed-out reader who had said yes brings their own questions with them, as before.
+        raw.values.clear()
+        switchTo(null)
+        val other = make()
+        clock = at(8, 12)
+        ask(other, "TSLA")
+        other.accept()
+        HarnessStore(raw).write(HarnessMode.ON, "u2")
+        switchTo("u2")
+        other.accountChanged()
+        assertEquals("TSLA", other.ledger.question(clock)?.symbol)
+        assertEquals("TSLA", other.upcoming.first().symbol)
+    }
+
     // A yes that was erased is asked for again
 
     @Test fun aYesThatWasErasedWithTheNotesIsAskedForAgain() = runTest {
