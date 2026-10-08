@@ -41,7 +41,9 @@ import org.junit.runners.Parameterized
 import xyz.bobbyprotocol.android.billing.BillingOfferingsStatus
 import xyz.bobbyprotocol.android.billing.BillingState
 import xyz.bobbyprotocol.android.v18.harness.Harness
+import xyz.bobbyprotocol.android.v18.harness.HarnessBoard
 import xyz.bobbyprotocol.android.v18.harness.HarnessCenter
+import xyz.bobbyprotocol.android.v18.harness.HarnessWall
 import xyz.bobbyprotocol.android.v18.memory.MemoryCenter
 import xyz.bobbyprotocol.android.v18.memory.MemoryConsentModel
 import xyz.bobbyprotocol.android.v18.reminders.ReminderCenter
@@ -238,18 +240,73 @@ class V18ScreensInstrumentedTest(private val language: String) {
         compose.onNodeWithTag("memory-forget-all", useUnmergedTree = true).performScrollTo()
         shot("memory-unfolded")
 
-        // Nothing was asked about on this phone yet, so the follow-ups keep nothing and say nothing.
-        assertAbsent("memory-local-follow-ups")
-        // Three questions later (no yes to follow-ups was ever given): what the phone noted is listed with
-        // the rest of what it keeps, and "Clear" removes it.
+        // Nothing was asked about on this phone yet: the follow-up notes are one quiet line.
+        assertShown("memory-notes-empty")
+        assertAbsent("memory-notes-header")
+        // Three questions later (no yes to follow-ups was ever given): what the phone noted is said in
+        // sentences with the rest of what it keeps, and "Erase notes" removes it.
         compose.runOnUiThread { V18Fixtures.askedThisWeek(stage) }
-        await("memory-local-follow-ups")
-        assertTrue(compose.onAllNodes(hasTestTag("memory-local-follow-ups") and hasText("NVDA", substring = true), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
-        compose.onNodeWithTag("memory-clear-follow-ups", useUnmergedTree = true).performScrollTo()
-        shot("memory-follow-ups-kept")
-        tap("memory-clear-follow-ups")
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("memory-local-follow-ups", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
+        await("memory-note-NVDA")
+        for (tag in listOf("memory-notes-header", "memory-note-BTC", "memory-note-AAPL", "memory-note-forget-NVDA")) assertShown(tag)
+        compose.onNodeWithTag("memory-notes-erase", useUnmergedTree = true).performScrollTo()
+        shot("memory-notes-signed-in")
+        tap("memory-notes-erase")
+        await("memory-notes-empty")
+        assertAbsent("memory-note-NVDA")
         assertTrue(compose.runOnUiThread<Boolean> { Harness.center(stage.host).ledger.isEmpty })
+    }
+
+    // ---- The follow-up notes on Memory: what Bobby keeps on this phone, in sentences ----
+
+    @Test fun memoryNotesWithThreeAssets() {
+        // Nobody signed in: what the phone keeps is on the screen without an account.
+        val stage = open(owner = null) { desk.shortcuts = listOf("NVDA", "BTC") }
+        onStage(stage) { V18Fixtures.followUpNotes(stage) }
+        present(stage, "memory", "memory-signed-out")
+        await("memory-note-NVDA")
+        expandSheet()
+        compose.onNodeWithTag("memory-notes-erase", useUnmergedTree = true).performScrollTo()
+        for (tag in listOf("memory-notes-header", "memory-note-BTC", "memory-note-TSLA", "memory-note-forget-NVDA", "memory-note-forget-BTC", "memory-note-forget-TSLA")) assertShown(tag)
+        // Facts, what the person said as theirs, and what Bobby does: one sentence each.
+        val nvda = if (language == "es") listOf("Preguntaste 3 veces", "Tu pregunta era sobre esta semana.", "Guardaste una lectura, para revisar en una semana.", "Bobby vuelve el 12")
+                   else listOf("Asked 3 times, last on Oct 5.", "Your question was about this week.", "You saved a read, to review in a week.", "Bobby comes back on Oct 12.")
+        for (sentence in nvda) assertSaid("memory-note-NVDA", sentence)
+        assertSaid("memory-note-TSLA", if (language == "es") "Tu tesis mira a semanas." else "Your thesis looks weeks ahead.")
+        assertSaid("memory-note-BTC", if (language == "es") "Preguntaste una vez" else "Asked once, on Oct 3.")
+        assertTrue("No price is said anywhere in the notes", compose.onAllNodes(hasContentDescription("128", substring = true), useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
+        shot("memory-notes-three")
+        // Erase, for one asset: its notes go, the others stay.
+        tap("memory-note-forget-BTC")
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("memory-note-BTC", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
+        assertShown("memory-note-NVDA")
+        assertTrue(compose.runOnUiThread<Boolean> { Harness.center(stage.host).ledger.events.none { it.symbol == "BTC" } })
+    }
+
+    @Test fun memoryNotesWithNothingKept() {
+        val stage = open(owner = null)
+        present(stage, "memory", "memory-signed-out")
+        await("memory-notes-empty")
+        expandSheet()
+        compose.onNodeWithTag("memory-notes-empty", useUnmergedTree = true).performScrollTo()
+        assertWritten(if (language == "es") "Sin notas de seguimiento." else "No follow-up notes.")
+        assertAbsent("memory-notes-header")
+        assertAbsent("memory-notes-erase")
+        shot("memory-notes-empty")
+    }
+
+    @Test fun memoryNotesWithFollowUpsOff() {
+        val stage = open(owner = null)
+        // They asked, said yes, and then said no: nothing is kept, and the screen says why.
+        compose.runOnUiThread { V18Fixtures.askedThisWeek(stage) }
+        assertEquals(HarnessCenter.Outcome.ON, onStage(stage) { Harness.center(stage.host).accept() })
+        compose.runOnUiThread { Harness.center(stage.host).turnOff() }
+        present(stage, "memory", "memory-signed-out")
+        await("memory-notes-empty")
+        expandSheet()
+        compose.onNodeWithTag("memory-notes-empty", useUnmergedTree = true).performScrollTo()
+        assertWritten(if (language == "es") "El seguimiento está apagado." else "Follow-ups are off.")
+        assertAbsent("memory-note-NVDA")
+        shot("memory-notes-off")
     }
 
     @Test fun memoryConsent() {
@@ -310,7 +367,38 @@ class V18ScreensInstrumentedTest(private val language: String) {
         assertShown("follow-row-AAPL")
         assertTrue(compose.onAllNodes(hasTestTag("follow-row-AAPL") and hasContentDescription("%", substring = true), useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
         assertTrue("A board row reads a price, never an analysis", stage.network.paths("POST").none { it == DEBATE })
+        // Reads are left: a row asks Bobby.
+        await("follow-foot")
+        assertTrue(compose.onAllNodes(hasTestTag("follow-row-NVDA") and hasClickAction(), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         shot("follow-up-board")
+    }
+
+    @Test fun followUpBoardWhenTheNextReadWouldBeRefused() {
+        // The week used up and the Bobby Pro screen behind it: the board is the same, and no row invites a read.
+        val stage = weekStage(V18Fixtures.freeAccountAtTheWall())
+        compose.runOnUiThread {
+            Harness.center(stage.host).focusBoard(null)
+            stage.present(V18Routes.FOLLOW_UP)
+        }
+        await("follow-row-NVDA")
+        compose.waitUntil(20_000) {
+            listOf("follow-row-NVDA", "follow-row-BTC").all { row ->
+                compose.onAllNodes(hasTestTag(row) and hasContentDescription("%", substring = true), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+            }
+        }
+        // The balance has been heard by now (the stage answered it before the board opened).
+        compose.waitUntil(20_000) { compose.runOnUiThread<Boolean> { HarnessWall.closed(Harness.center(stage.host).access()) } }
+        compose.waitForIdle()
+        assertAbsent("follow-foot")
+        for (row in listOf("follow-row-NVDA", "follow-row-BTC", "follow-row-AAPL")) {
+            assertTrue("$row is a plain row at the wall", compose.onAllNodes(hasTestTag(row) and hasClickAction(), useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
+        }
+        assertFalse("A row that is tapped anyway launches nothing", compose.runOnUiThread<Boolean> {
+            Harness.pick(stage.host, HarnessBoard.Row("NVDA", "NVIDIA", true))
+        })
+        assertTrue(stage.desk.events("ask.start").isEmpty())
+        assertTrue(stage.network.paths("POST").none { it == DEBATE })
+        shot("follow-up-board-wall")
     }
 
     // ---- The two densest screens at the largest font size ----
@@ -358,10 +446,10 @@ class V18ScreensInstrumentedTest(private val language: String) {
     }
 
     /** A reader who asked about three assets this week, said yes to follow-ups and set one reminder. */
-    private fun weekStage(): V18Stage {
+    private fun weekStage(balance: JSONObject = V18Fixtures.freeAccount()): V18Stage {
         lateinit var theses: V18Fixtures.Theses
         val stage = open {
-            network.answer("GET", ACCESS, V18Fixtures.freeAccount())
+            network.answer("GET", ACCESS, balance)
             network.answer("POST", "/api/voice-tool") { call -> V18Fixtures.market(call) }
             theses = V18Fixtures.theses(this)
         }
@@ -437,6 +525,16 @@ class V18ScreensInstrumentedTest(private val language: String) {
 
     private fun assertAbsent(tag: String) {
         assertTrue("Expected no $tag on the screen", compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
+    }
+
+    /** The block tagged `tag` says `sentence` (its sentences are read as one paragraph). */
+    private fun assertSaid(tag: String, sentence: String) {
+        assertTrue("Expected $tag to say: $sentence",
+                   compose.onAllNodes(hasTestTag(tag) and hasContentDescription(sentence, substring = true), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+    }
+
+    private fun assertWritten(text: String) {
+        assertTrue("Expected the screen to say: $text", compose.onAllNodes(hasText(text), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
     }
 
     /** What a tap does, asked of the control itself: a row below the fold of a half-height sheet is still reached. */
