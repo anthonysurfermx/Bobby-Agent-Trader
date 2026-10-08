@@ -284,6 +284,43 @@ try {
       eq([nextQuestionViolation(question, lang, symbol), value, lines], [null, question, []], `${lang}: "${question}" is a what-or-why question and is served as written, with nothing logged`);
     }
 
+    // The ordinary sample (scripts/fixtures/next-question-ordinary.json; its head says how it was written). In its
+    // first hour in production the word list replaced three English questions of three; on the blind sample it
+    // served 32% to 47%. `languages` is that blind sample and `later` two further batches: at least 90% of each, per
+    // language, must be served as written, and a run below that names every question refused. `holdout` is a batch
+    // the list was not widened for: its rate is printed as what an unseen question meets, and may only not fall.
+    {
+      type Rows = Record<(typeof LANGS)[number], Array<[string, string]>>;
+      const sample = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/next-question-ordinary.json', import.meta.url)), 'utf8')) as { languages: Rows; later: Rows; holdout: Rows };
+      const run = (rows: Array<[string, string]>, lang: (typeof LANGS)[number]) => {
+        const refused: string[] = [], tally: Record<string, number> = {};
+        for (const [symbol, question] of rows) {
+          const { value, lines } = silent(() => servedFollowUp(question, lang, symbol));
+          if (value === question && lines.length === 0) continue;
+          const reason = lines.map((l) => JSON.parse(l).reason).join('+') || 'changed';
+          tally[reason] = (tally[reason] ?? 0) + 1;
+          refused.push(`      ${reason}: ${symbol} · ${question}`);
+        }
+        const shown = rows.length - refused.length;
+        return { shown, refused, line: `${shown}/${rows.length} (${(100 * shown / rows.length).toFixed(1)}%)${refused.length ? ` ${JSON.stringify(tally)}` : ''}` };
+      };
+      // What the holdout met when it was written (2026-10-08). A floor, so a change that refuses more shows up.
+      const HOLDOUT_FLOOR: Record<(typeof LANGS)[number], number> = { en: 9, es: 9, fr: 10, pt: 10, it: 9, de: 11 };
+      const report: string[] = [];
+      for (const lang of LANGS) {
+        const all = [...sample.languages[lang], ...sample.later[lang], ...sample.holdout[lang]];
+        ok(sample.languages[lang].length >= 150 && new Set(all.map(([, question]) => question)).size === all.length, `${lang}: at least 150 ordinary questions in the blind sample, and no question twice`);
+        ok(all.every(([symbol, question]) => !/\d/.test(question.split(symbol).join(''))), `${lang}: no ordinary question carries a number of its own`);
+        const blind = run(sample.languages[lang], lang), later = run(sample.later[lang], lang), holdout = run(sample.holdout[lang], lang);
+        report.push(`  ${lang}: blind ${blind.line} · later ${later.line} · holdout, not widened for, ${holdout.line}`);
+        for (const [name, part, rows] of [['blind sample', blind, sample.languages[lang]], ['later batches', later, sample.later[lang]]] as const) {
+          ok(part.shown / rows.length >= 0.9, `${lang}: the ${name} is served as written ${part.line}, under the 90% the word list must keep. Refused:\n${part.refused.join('\n')}`);
+        }
+        ok(holdout.shown >= HOLDOUT_FLOOR[lang], `${lang}: the holdout is served as written ${holdout.line}, fewer than the ${HOLDOUT_FLOOR[lang]} it met when it was written. Refused:\n${holdout.refused.join('\n')}`);
+      }
+      console.log(`next question, ordinary sample served as written:\n${report.join('\n')}`);
+    }
+
     // Whether or when to act, in each language: refused, whatever the wording.
     const ACT: Record<(typeof LANGS)[number], string[]> = {
       en: ['Is now a good moment for BTC?', 'Is it too late for BTC?', 'Should I add to BTC here?', 'When should I enter BTC?', 'What is the best entry for BTC?', 'Why not hold BTC through the week?', 'What should I do with BTC now?',
@@ -330,7 +367,10 @@ try {
         'Pourquoi garder BTC ?', 'Que doit faire celui qui détient BTC ?', 'Pourquoi changer BTC maintenant ?', 'Que voudrait dire changer BTC maintenant ?', 'Pourquoi suivre BTC cette semaine ?', 'Que signifie rester sur BTC ?'],
       pt: ['Por que não pegar BTC agora?', 'Qual é o dia certo para pegar BTC?', 'O que deve fazer quem tem BTC?', 'Como aproveitar a queda de BTC?', 'Por que ficar com BTC?', 'Por que mudar BTC agora?', 'O que significaria fechar BTC hoje?', 'O que esperar de BTC?', 'O que significa ficar em BTC?'],
       it: ['Perché non prendere BTC adesso?', 'Qual è il giorno giusto per BTC?', 'Cosa dovrebbe fare chi possiede BTC?', 'Come sfruttare il calo di BTC?', 'Perché cambiare BTC adesso?', 'Cosa significherebbe chiudere BTC oggi?', 'Cosa aspettarsi da BTC?', 'Cosa significa restare su BTC?'],
-      de: ['Warum nicht jetzt bei BTC zugreifen?', 'Was ist der beste Moment für BTC?', 'Was sollte man mit BTC jetzt machen?', 'Wie die Schwäche von BTC nutzen?', 'Was sollte ein Anleger mit BTC jetzt machen?', 'Warum BTC jetzt behalten?', 'Was spricht für mehr BTC?', 'Was tun, wenn BTC fällt?', 'Was bedeutet es, bei BTC zu bleiben?'],
+      de: ['Warum nicht jetzt bei BTC zugreifen?', 'Was ist der beste Moment für BTC?', 'Was sollte man mit BTC jetzt machen?', 'Wie die Schwäche von BTC nutzen?', 'Was sollte ein Anleger mit BTC jetzt machen?', 'Warum BTC jetzt behalten?', 'Was spricht für mehr BTC?', 'Was tun, wenn BTC fällt?', 'Was bedeutet es, bei BTC zu bleiben?',
+        // Until 2026-10-08 only the word list refused these two (they were in UNLISTED below). German keeps its finite
+        // verb second, so the asset standing there is a bare infinitive put to the reader: an act, whatever the verb.
+        'Warum BTC jetzt einsammeln?', 'Warum BTC jetzt fallen lassen?'],
     };
     // A verb, a noun or a tense nobody listed as refused: only the word list stands between these and the chip.
     const UNLISTED: Record<(typeof LANGS)[number], string[]> = {
@@ -339,7 +379,7 @@ try {
       fr: ['Qu’est-ce qui rend BTC si tentant ?', 'Pourquoi BTC montera cette semaine ?', 'Quelle aubaine représente BTC ?'],
       pt: ['O que torna BTC tão tentador?', 'Por que BTC subirá esta semana?', 'Que jogada os traders veem em BTC?'],
       it: ['Cosa rende BTC così allettante?', 'Perché BTC salirà questa settimana?', 'Che colpo rappresenta BTC?', 'Perché tenersi BTC?', 'Cosa farà BTC domani?'],
-      de: ['Was macht BTC so verlockend?', 'Warum steigt BTC morgen weiter?', 'Warum BTC jetzt einsammeln?', 'Warum BTC jetzt fallen lassen?'],
+      de: ['Was macht BTC so verlockend?', 'Warum steigt BTC morgen weiter?', 'Warum sammeln Fonds BTC ein?', 'Was lockt Anleger jetzt zu BTC?'],
     };
     for (const lang of LANGS) for (const question of UNLISTED[lang]) {
       const { value, lines } = silent(() => servedFollowUp(question, lang, 'BTC'));
@@ -353,6 +393,11 @@ try {
       eq(nextQuestionViolation(question, lang, 'BTC'), 'act', `${lang}: "${question}" asks whether or when to act`);
       eq(silent(() => servedFollowUp(question, lang, 'BTC')).value, FALLBACK[lang], `${lang}: …and the fixed question is served in its place`);
     }
+    // "Action" is a chart word in "price action" and a stock in Spanish; which action to take is a question about acting.
+    for (const [question, lang] of [['What action makes sense for BTC now?', 'en'], ['Which action fits the BTC trend?', 'en'], ['¿Qué acción tiene sentido con BTC ahora?', 'es'], ['¿Qué acción conviene con BTC?', 'es']] as const) {
+      eq(nextQuestionViolation(question, lang, 'BTC'), 'act', `${lang}: "${question}" asks which action to take`);
+    }
+    eq([nextQuestionViolation('What does the BTC price action show?', 'en', 'BTC'), nextQuestionViolation('¿Qué muestra la acción del precio de BTC?', 'es', 'BTC')], [null, null], 'price action is still a chart word');
     // The other rules, each by its class.
     for (const [question, lang, want, what] of [
       ['Could BTC retest its range low?', 'en', 'opener', 'a yes/no question'],
@@ -472,9 +517,57 @@ try {
       ['¿Por qué ayer cayó BTC?', 'es', null, '"ayer" only looks like an infinitive'],
       ['Que montre le graphique hebdomadaire de BTC ?', 'fr', null, '"montre" only looks like one'],
     ] as const) eq(nextQuestionViolation(question, lang, 'BTC'), want, `${what}: ${want ?? 'passes'}`);
+    // The second pass (2026-10-08): the constructions that let an ordinary question through, each beside the question
+    // that is still refused. The reasons are at the head of api/_lib/desk-next-question-lexicon.ts.
+    for (const [question, lang, want] of [
+      // A timeframe by the name each language gives the chart is not a number; a time ahead and any other number are.
+      ['What does the 4-hour chart say about BTC?', 'en', null], ['¿Qué muestra el gráfico de 4 horas de BTC?', 'es', null], ['Que montre le graphique en H4 de BTC ?', 'fr', null], ['Cosa mostra il grafico a 4 ore di BTC?', 'it', null],
+      ['O que mostra o gráfico de 4 horas de BTC?', 'pt', null], ['Was zeigt der 4-Stunden-Chart von BTC?', 'de', null], ['What happens to BTC in 4 hours?', 'en', 'number'], ['What does the 24-hour chart say about BTC?', 'en', 'number'],
+      ['What does the four-hour chart say about BTC?', 'en', 'number'],
+      // A term in quotation marks is read like any other word; "on-chain" is one word.
+      ['What does "overbought" mean for the BTC trend?', 'en', null], ['What does "buy the dip" mean for BTC?', 'en', 'word'], ['Que dit l’activité on-chain de BTC sur sa hausse ?', 'fr', null],
+      // French: the genitive is not an amount of it, "celle du secteur" is a thing, "que faudrait-il pour que" and "prendre fin" and what would strengthen a read are not acts.
+      ['Pourquoi la tendance du BTC faiblit-elle ?', 'fr', null], ['Que signifie avoir du BTC cette semaine ?', 'fr', 'act'], ['Pourquoi la tendance de BTC est-elle plus solide que celle du secteur ?', 'fr', null],
+      ['Que faudrait-il pour que la tendance de BTC prenne fin ?', 'fr', null], ['Quel élément renforcerait la lecture baissière de BTC ?', 'fr', null], ['Pourquoi un investisseur renforcerait-il BTC ?', 'fr', 'act'],
+      // "Where does it come from" asks why, in the five languages that ask it that way.
+      ['D’où vient la faiblesse de BTC ?', 'fr', null], ['¿De dónde viene la debilidad de BTC?', 'es', null], ['De onde vem a fraqueza de BTC?', 'pt', null], ['Da dove viene la debolezza di BTC?', 'it', null],
+      ['Woher kommt die Schwäche von BTC?', 'de', null], ['Where does BTC go from here?', 'en', 'opener'],
+      // A word that acts in one language only: English "sensible" and "prudent".
+      ['¿Por qué BTC es tan sensible a las noticias de tasas?', 'es', null], ['Pourquoi le marché reste-t-il prudent sur BTC ?', 'fr', null], ['Why is BTC the prudent move here?', 'en', 'act'],
+      // A level, a breakout or a trend that holds; the market acting on the asset; the progressive of Portugal; a range left behind "de".
+      ['Why is the BTC price holding above its average?', 'en', null], ['What would have to happen for the BTC breakout to hold?', 'en', null], ['Why did support not hold for BTC?', 'en', null], ['What would it take for BTC to hold?', 'en', 'act'],
+      ['What level to hold on BTC?', 'en', 'act'], ['What macro trends are affecting BTC right now?', 'en', null], ['O que está a travar BTC abaixo da resistência?', 'pt', null], ['O que está a acumular BTC?', 'pt', 'act'],
+      ['O que explica a saída de BTC da lateralização?', 'pt', null], ['Cosa spiega l’uscita di BTC dalla fase laterale?', 'it', null],
+      // German: no finite verb where it belongs is a bare infinitive; "wird" as "becomes" and as the passive is not the future; "machen" as "make it so".
+      ['Warum BTC jetzt schliessen?', 'de', 'act'], ['Wie die Schwäche von BTC sehen?', 'de', 'act'], ['Was bedeutet es, BTC jetzt zu schliessen?', 'de', 'act'], ['Was braucht es, um BTC zu bewegen?', 'de', null],
+      ['Was wäre nötig, damit der Trend von BTC wieder bullisch wird?', 'de', null], ['Warum wird der Trend von BTC als neutral beschrieben?', 'de', null], ['Warum werden die Tageskerzen von BTC immer kleiner?', 'de', null],
+      ['Warum wird BTC diese Woche steigen?', 'de', 'word'], ['Was spricht dafür, dass BTC bullisch wird?', 'de', 'word'], ['Was würde die Erholung von BTC überzeugender machen?', 'de', null],
+      // "US" in capitals is the country.
+      ['Why is BTC sensitive to US rate news?', 'en', null], ['What does BTC mean for us?', 'en', 'act'],
+      // English words that pass only in a named company, each beside the same word where it still costs the question.
+      ['What is driving the BTC price action this week?', 'en', null], ['What action makes sense for BTC?', 'en', 'act'], ['Which indicator best explains the BTC move?', 'en', null],
+      ['What is the best stock in the BTC sector?', 'en', 'unlisted'], ['Why is BTC holding up better than the market?', 'en', null], ['Which is better than BTC?', 'en', 'unlisted'], ['What is weighing on BTC despite good news?', 'en', null],
+      ['What makes BTC a good pick?', 'en', 'unlisted'], ['What role do ETF flows play in the BTC trend?', 'en', null], ['Why did BTC volume pick up overnight?', 'en', null], ['Why did traders pick up BTC this week?', 'en', 'unlisted'],
+      ['Why has BTC been range-bound this month?', 'en', null], ['Why is BTC bound to rise?', 'en', 'word'], ['What would flip the read on BTC from bullish to neutral?', 'en', null], ['What would flip the BTC trend to bearish?', 'en', null], ['What would flip BTC?', 'en', 'unlisted'], ['Why is BTC returning to its range?', 'en', 'unlisted'],
+      ['Which timeframe gives the most reliable read on BTC?', 'en', null], ['Why is BTC a reliable asset?', 'en', 'unlisted'], ['What is different about the BTC pullback this time?', 'en', null],
+      ['Why are the BTC candles getting smaller?', 'en', null], ['Why is getting BTC so hard?', 'en', 'act'], ['What is the case for additional BTC?', 'en', 'act'], ['Why did funds cut BTC this week?', 'en', 'act'],
+      ['What caused the wave of liquidations in BTC?', 'en', null], ['What would a liquidation of BTC mean?', 'en', 'unlisted'], ['What do options data say about BTC?', 'en', null], ['What options make sense for BTC?', 'en', 'unlisted'],
+      // The same in the other five languages.
+      ['¿Qué indicador explica mejor la caída de BTC?', 'es', null], ['¿Cuál es mejor que BTC?', 'es', 'unlisted'], ['¿Por qué BTC va rezagado frente al mercado?', 'es', null], ['¿Qué explica el renovado interés en BTC?', 'es', null],
+      ['¿Qué interés tiene BTC ahora?', 'es', 'unlisted'], ['¿Por qué la tendencia de BTC no está clara esta mañana?', 'es', null], ['¿Por qué sube BTC mañana?', 'es', 'unlisted'], ['¿Qué valor tiene BTC?', 'es', 'unlisted'],
+      ['Quel indicateur explique le mieux la baisse de BTC ?', 'fr', null], ['Quel est l’intérêt de BTC ?', 'fr', 'unlisted'], ['Qu’est-ce qui explique le regain d’intérêt pour BTC ?', 'fr', null], ['Que donne BTC ce mois-ci ?', 'fr', 'unlisted'],
+      ['Qual indicador explica melhor a queda de BTC?', 'pt', null], ['Qual é o interesse de BTC?', 'pt', 'unlisted'], ['Cosa c’entra lo spread con il trend di BTC?', 'it', null], ['Cosa offre BTC?', 'it', 'unlisted'],
+      ['Che interesse ha BTC?', 'it', 'unlisted'], ['Welcher Indikator erklärt die Schwäche von BTC am besten?', 'de', null], ['Was ist besser als BTC?', 'de', 'unlisted'], ['Warum hält sich BTC besser als der Markt?', 'de', null],
+      ['Was liefert BTC?', 'de', 'unlisted'], ['Was tut sich bei BTC?', 'de', null], ['Warum ist jetzt die Zeit für BTC?', 'de', 'act'],
+    ] as const) eq(nextQuestionViolation(question, lang, 'BTC'), want, `second pass, ${lang}: "${question}": ${want ?? 'passes'}`);
+    // The same through the desk, with the names it knows the asset by: "du Bitcoin" hangs on a noun or is an amount of it.
+    eq([silent(() => servedFollowUp('Pourquoi le taux de financement du Bitcoin est-il devenu négatif ?', 'fr', 'BTC')).value, silent(() => servedFollowUp('Que signifie avoir du Bitcoin cette semaine ?', 'fr', 'BTC')).value],
+      ['Pourquoi le taux de financement du Bitcoin est-il devenu négatif ?', FALLBACK.fr], 'the French genitive of a named asset is served; the partitive is replaced');
     eq([nextQuestionViolation(42, 'en', 'BTC'), nextQuestionViolation(null, 'en', 'BTC'), nextQuestionViolation(undefined, 'en', 'BTC'), nextQuestionViolation({ text: 'What?' }, 'en', 'BTC')], ['shape', 'shape', 'shape', 'shape'], 'anything but a string is refused');
     // The longest text the wire allows, built to make a pattern try every split of it, is still read at once.
-    for (const [lang, unit] of [['de', 'einsein'], ['de', 'sechsech'], ['de', 'siebsieben'], ['it', 'ununo'], ['it', 'trentatre'], ['it', 'undiciotto'], ['it', 'unodue'], ['es', 'veintidieci'], ['en', 'a-b-'], ['en', 'a b '], ['es', 'y si por que no '], ['it', 'e se perche non ']] as const) {
+    for (const [lang, unit] of [['de', 'einsein'], ['de', 'sechsech'], ['de', 'siebsieben'], ['it', 'ununo'], ['it', 'trentatre'], ['it', 'undiciotto'], ['it', 'unodue'], ['es', 'veintidieci'], ['en', 'a-b-'], ['en', 'a b '], ['es', 'y si por que no '], ['it', 'e se perche non '],
+      // The patterns of the second pass that look behind them over a run of words.
+      ['de', 'wird a '], ['de', 'wurde a bullisch '], ['de', 'erklart a am '], ['en', 'for the a breakout to '], ['en', 'role a '], ['fr', 'tendance haussiere du '], ['fr', 'resiste t il mieux ']] as const) {
       const longest = `Was ${unit.repeat(Math.floor((FOLLOW_UP_MAX - 6) / unit.length))}x?`;
       const started = performance.now();
       nextQuestionViolation(longest, lang, 'BTC');
