@@ -431,6 +431,31 @@ try {
   console.error = originalError;
   eq([failed.statusCode, failed.body.code, 'agents' in failed.body], [503, 'analysis_failed', false], 'a rejected model answer is a failed analysis, no verdict');
   ok(errors.some(line => line.includes('[desk-debate] model output rejected advice')) && !errors.some(line => line.includes('Deberías') || line.includes('Should I buy')), 'only the rejection class is logged');
+  // The same violation in the next question alone is not a failed analysis: the read is served and the chip is
+  // replaced by the fixed question in the reply's language (every rule: scripts/test-desk-levels.mts).
+  let asked = 0, refunds = 0;
+  globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes('rpc/bobby_consume_desk_quota')) return json(true);
+    if (url.includes('rpc/bobby_consume_read')) return json({ allowed: true, readId: 89, tier: 'anon', used: 1, limit: 3, remaining: 2 });
+    if (url.includes('bobby_reads?id=eq.') && init?.method === 'DELETE') { refunds++; return json([]); }
+    if (url.includes('/api/okx-candles')) return json({ candles: Array.from({ length: 100 }, (_, i) => ({ ts: Date.now() - (100 - i) * H * 1000, open: 100 + i, high: 102 + i, low: 99 + i, close: 101 + i, volume: 5 })) });
+    if (new URL(url).hostname === 'api.openai.com') {
+      const content = ++asked === 3
+        ? { analysis: 'La evidencia no alcanza todavía: falta una confirmación clara.', verdict: 'wait', direction: 'none', synthesis: { ...synthesis, followUp: '¿Deberías comprar BTC ya?' } }
+        : { analysis: asked === 1 ? base.alpha : base.red };
+      return json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(content) } }] });
+    }
+    return quotaOk(input, init);
+  }) as typeof fetch;
+  const chipErrors: string[] = [];
+  console.error = (...args: unknown[]) => { chipErrors.push(args.map(String).join(' ')); };
+  const chipOnly = await post({ symbol: 'BTC', question: 'Should I buy?', language: 'es' });
+  console.error = originalError;
+  eq([chipOnly.statusCode, chipOnly.body.agents?.verdict, chipOnly.body.agents?.synthesis?.headline], [200, 'wait', synthesis.headline], 'a bad next question alone: the read is served, verdict and synthesis as written');
+  eq(chipOnly.body.agents.synthesis.followUp, '¿Qué tendría que cambiar en BTC para que cambie esta lectura?', '…with the fixed question in the reply\'s language in its place');
+  eq([asked, refunds], [3, 0], '…after the three calls of any read, and with nothing given back');
+  ok(chipErrors.some(line => line.includes('"event":"follow_up_replaced"') && line.includes('"reason":"advice"')) && !chipErrors.some(line => line.includes('Deberías') || line.includes('Should I buy') || line.includes('model output rejected')), '…and a log line with the class of the replacement, never a text and never a rejection');
   // The public-cycle guard (same patterns): the 2026-09-28 transcript that reached /protocol.
   for (const [text, want, what] of [
     ['Tras analizar el pulso, la mejor operación en este momento es abrir una posición corta (short) en BTC.', 'advice', 'a "best trade is to open" recommendation'],

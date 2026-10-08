@@ -11,7 +11,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { ArrowRight, Mic, MicOff, X } from 'lucide-react';
 import { COMPANIONS, companionName, getCompanion, getVibe, levelFor, nextLevelFor, petArt, petFor, petUnlocked, PET_UNLOCK_XP, toolArt, toolHasArt, toolSlot, wornGear, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
-import { pick, speechLocale, t } from '@/lib/companions/i18n';
+import { lang, pick, speechLocale, t } from '@/lib/companions/i18n';
 import { clientLanguagePath } from '@/lib/client-language';
 import { RISK_NOTICE_VERSION, progressStore, quickAccessName, quickAccessRow, useProgress, type ThesisSnapshot } from '@/lib/companions/progress';
 import { consentCurrent, heldQuestion, packWaiting, parseDeskLink, unpackWaiting, type HeldStep } from '@/lib/desk-entry';
@@ -25,7 +25,9 @@ import SignInPrompt, { recordAsk, shouldPromptAfterAsk, shouldPromptNow } from '
 import { EvolutionOverlay, GearCatalog, ToolDetail, ToolUnlockOverlay } from '@/components/companion/CompanionOverlays';
 import LandSeedCard from '@/components/companion/LandSeedCard';
 import { DeskSwapCard, SwapSheet } from '@/components/companion/DeskSwap';
-import { WalletBalancePill } from '@/components/companion/DeskWallet';
+import { WalletBalancePill, useWalletConnected } from '@/components/companion/DeskWallet';
+import { STOCK_SWAPS_VISIBLE } from '@/lib/base-swap/stock-visibility';
+import { deskSuggestions, deskSurfaces, howLooksIn, type DeskAllowances } from '@/lib/desk-suggestions';
 import ProgressSync from '@/components/companion/ProgressSync';
 import { bobbySupabase } from '@/lib/bobby-db-client';
 import { track } from '@/lib/track';
@@ -76,7 +78,7 @@ function greeting(name?: string | null): string {
   return t(en, es, pt) + tail;
 }
 /** The question a starter chip asks, and the one /desk?ask=SYMBOL starts. */
-const howLooks = (sym: string) => t(`How does ${sym} look?`, `¿Cómo se ve ${sym}?`, `Como está ${sym}?`);
+const howLooks = (sym: string) => howLooksIn(sym, lang(), speechLocale());
 /** What this page was holding behind the notice when it reloaded, in the language it reloaded into. Reads only. */
 function waitingAtLoad(): HeldStep | null {
   let raw: string | null = null;
@@ -720,6 +722,7 @@ export default function NucleoDesk() {
   const openTraderLand = useCallback(() => { sfxTock(); navigate(clientLanguagePath('/trader-land')); }, [navigate]);
 
   const desktop = useMediaQuery('(min-width: 1024px)');
+  const walletConnected = useWalletConnected();
   const debate = useMemo(() => (answer ? debateFor(answer, agents) : null), [answer, agents]);
   const attachments = useMemo(() => {
     const queued = new Set(drops.map((d) => `${d.companionId}-${d.tier}`));
@@ -736,6 +739,10 @@ export default function NucleoDesk() {
   const working = WORKING.includes(phase);
   const reading = working || phase === 'reveal';
   const done = phase === 'complete' && !!debate && !!answer && !!snapshot;
+  // The transaction surfaces on screen, decided once (src/lib/desk-suggestions.ts): the header pill, the swap
+  // card, the swap sheet and the profile drawer render from these, and the chips read them, so a question Bobby
+  // wrote is never offered beside one.
+  const surfaces = deskSurfaces({ done, direction: debate?.direction ?? null, symbol: snapshot?.symbol ?? null, stocksVisible: STOCK_SWAPS_VISIBLE, desktop, consented, walletConnected, sheet: shown });
   const verdictKind: SphereVerdict = !debate ? 'wait' : debate.direction === 'long' ? 'ready' : debate.direction === 'short' ? 'pass' : 'wait';
   const verdictWord = !debate ? null : agentsFailed ? t('No verdict', 'Sin veredicto', 'Sem veredito') : debate.direction === 'long' ? 'Long' : debate.direction === 'short' ? 'Short' : t('No trade', 'No trade', 'No trade');
   const verdictSub = !debate ? null : agentsFailed ? t('The agents did not finish', 'Los agentes no terminaron', 'Os agentes não terminaram') : debate.direction !== 'none' && answer?.convictionPct != null
@@ -771,7 +778,7 @@ export default function NucleoDesk() {
         )}
       </div>
       <div className="flex min-w-[44px] items-center justify-end gap-2 sm:min-w-[92px]">
-        {desktop && consented && <WalletBalancePill onClick={() => { sfxTock(); setSheet('swap'); }} />}
+        {surfaces.walletPill && <WalletBalancePill onClick={() => { sfxTock(); setSheet('swap'); }} />}
         <LangMenu />
         <button type="button" className="n-face-btn" onClick={() => { sfxTock(); if (consented) setSheet('profile'); else holdFor({ kind: 'profile' }); }} aria-label={t(`Your profile · ${displayName}, level ${level.number}`, `Tu perfil · ${displayName}, nivel ${level.number}`, `Seu perfil · ${displayName}, nível ${level.number}`)} title={displayName}>
           <svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="20" fill="none" stroke="rgba(242,237,228,.12)" strokeWidth="2" /><circle cx="22" cy="22" r="20" fill="none" stroke="#FFF8EC" strokeWidth="2" strokeLinecap="round" strokeDasharray={2 * Math.PI * 20} strokeDashoffset={2 * Math.PI * 20 * (1 - xpArc)} transform="rotate(-90 22 22)" /></svg>
@@ -961,7 +968,7 @@ export default function NucleoDesk() {
     </motion.div>
   ) : null;
 
-  const swapCard = done && debate?.direction === 'long' && snapshot ? (
+  const swapCard = surfaces.swapCard && snapshot ? (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="n-swapwrap">
       <DeskSwapCard symbol={snapshot.symbol} conviction={answer?.convictionPct ?? null} />
     </motion.div>
@@ -1024,19 +1031,18 @@ export default function NucleoDesk() {
     </div>
   ) : null;
 
-  // After a read: the CIO's own follow-up question first (it runs as a new question on the same asset),
-  // then another question of the reader's, then their other assets.
+  // After a read: the CIO's own follow-up question first (it runs as a new question on the same asset), then
+  // another question of the reader's, then their other assets. Which of them are shown is decided in
+  // src/lib/desk-suggestions.ts: Bobby's question is left out while a transaction surface is on screen, and
+  // while the reader has no read left to ask it with (a tap would open the sign-in or the Bobby Pro dialog).
   const followUp = done && snapshot && !agentsFailed ? agents?.synthesis?.followUp ?? null : null;
-  const suggestions: Array<{ label: string; ariaLabel?: string; go: () => void }> = done && snapshot
-    ? [
-      // The follow-up carries the asset only when it writes the ticker itself, in capitals and as a whole word: "near
-      // resistance" is not NEAR, and "consolidación" does not name SOL. Otherwise the symbol leads the question.
-      ...(followUp ? [{ label: followUp, go: () => { void ask(followUp.split(/[^\p{L}\p{N}.]+/u).includes(snapshot.symbol) ? followUp : `${snapshot.symbol} · ${followUp}`, followUp); } }] : []),
-      { label: t(`Another question about ${snapshot.symbol}`, `Otra pregunta sobre ${snapshot.symbol}`, `Outra pergunta sobre ${snapshot.symbol}`), go: () => { setInput(`${snapshot.symbol} `); inputRef.current?.focus(); } },
-      ...quickAccessRow(progress, 4).filter((q) => q !== snapshot.symbol).slice(0, followUp ? 1 : 2).map((sym) => ({ label: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } })),
-    ]
-    // The chip shows the company (LVMH); the question it sends keeps the symbol the server resolves (MC.PA).
-    : quickAccessRow(progress).map((sym) => ({ label: quickAccessName(sym), ariaLabel: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } }));
+  const allowances: DeskAllowances = { read: allowanceFor('rapido', accessState)?.state ?? null, level: deskLevel === 'rapido' ? null : allowanceFor(deskLevel, accessState)?.state ?? null };
+  const suggestions: Array<{ label: string; ariaLabel?: string; go: () => void }> = deskSuggestions({
+    done, symbol: snapshot?.symbol ?? null, followUp, surfaces, allowances,
+    quickAccess: quickAccessRow(progress, 4).map((symbol) => ({ symbol, name: quickAccessName(symbol) })), language: lang(), locale: speechLocale(),
+  }).map((chip) => (chip.kind === 'followUp' ? { label: chip.label, go: () => { void ask(chip.question, chip.label); } }
+    : chip.kind === 'another' ? { label: chip.label, go: () => { setInput(`${chip.symbol} `); inputRef.current?.focus(); } }
+      : { label: chip.label, ariaLabel: chip.ariaLabel, go: () => { void ask(chip.symbol, chip.question); } }));
   const chips = !reading && phase !== 'confirm' ? (
     <div className="w-full">
       {meterLine && <div className="mb-4 text-center text-[13px]" style={{ color: '#8A8378' }}>{meterLine}</div>}
@@ -1110,7 +1116,7 @@ export default function NucleoDesk() {
       {dock}
 
       <AnimatePresence>
-        {shown === 'profile' && (
+        {surfaces.profile && (
           <NucleoProfile
             companion={companion} displayName={displayName} level={level} xp={progress.xp}
             mascotState={listening ? 'listening' : voice.speaking ? 'speaking' : reading ? 'thinking' : 'idle'}
@@ -1168,7 +1174,7 @@ export default function NucleoDesk() {
         {shown === 'board' && <BoardSheet key="board" onPick={(s) => { setSheet('none'); void ask(s); }} onClose={() => setSheet('none')} />}
         {signInPrompt && consented && !evolution && !drops[0] && sheet === 'none' && <SignInPrompt key="signin-prompt" xp={progress.xp} note={signinNote ?? undefined} onClose={() => { setSignInPrompt(false); setSigninNote(null); }} />}
         {shown === 'catalog' && <GearCatalog key="catalog" current={companion} xp={progress.xp} level={level.number} onClose={() => setSheet('profile')} />}
-        {shown === 'swap' && <SwapSheet key="swap" initialSymbol={snapshot?.symbol ?? null} onClose={() => setSheet('none')} />}
+        {surfaces.swapSheet && <SwapSheet key="swap" initialSymbol={snapshot?.symbol ?? null} onClose={() => setSheet('none')} />}
         {shown === 'pet' && (() => { const pet = petFor(companion.id); const has = petUnlocked(progress.xp); return pet ? (
           <motion.div key="pet" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 md:items-center" onClick={() => setSheet('profile')}>
             <div className="n-card w-full max-w-md space-y-3 rounded-b-none p-6 text-center md:rounded-[28px]" onClick={(e) => e.stopPropagation()}>

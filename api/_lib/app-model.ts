@@ -2,9 +2,13 @@ import type { ModelSpec } from './llm.js';
 
 /** One model policy for app text, debate and the thesis reviewer; audio has its own provider. */
 export const DEFAULT_APP_TEXT_MODEL = 'claude-haiku-5-5';
+export const DEFAULT_PRO_TEXT_MODEL = 'claude-opus-5-5';
+export type AppTextTier = 'free' | 'pro';
 
-export function appTextModel(env: NodeJS.ProcessEnv = process.env): string {
-  const model = env.BOBBY_APP_TEXT_MODEL?.trim() || DEFAULT_APP_TEXT_MODEL;
+export function appTextModel(env: NodeJS.ProcessEnv = process.env, tier: AppTextTier = 'free'): string {
+  const model = tier === 'pro'
+    ? env.BOBBY_PRO_TEXT_MODEL?.trim() || DEFAULT_PRO_TEXT_MODEL
+    : env.BOBBY_APP_TEXT_MODEL?.trim() || DEFAULT_APP_TEXT_MODEL;
   if (!/^claude-[a-z0-9][a-z0-9.-]{2,63}$/.test(model)) throw new Error('Invalid app text model configuration');
   return model;
 }
@@ -17,6 +21,6 @@ export const appPrimaryProvider = (env: NodeJS.ProcessEnv = process.env): ModelS
 export const hasAppTextBackend = (env: NodeJS.ProcessEnv = process.env): boolean =>
   Boolean(env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY);
 
-export function appModelSpec(effort: 'low' | 'medium' | 'high', maxTokens: number, timeoutMs: number): ModelSpec {
-  return { provider: 'anthropic', model: appTextModel(), effort, maxTokens, timeoutMs };
+export function appModelSpec(effort: 'low' | 'medium' | 'high', maxTokens: number, timeoutMs: number, tier: AppTextTier = 'free'): ModelSpec {
+  return { provider: 'anthropic', model: appTextModel(process.env, tier), effort, maxTokens, timeoutMs };
 }

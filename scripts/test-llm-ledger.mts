@@ -8,6 +8,7 @@ process.env.OPENAI_API_KEY = 'test-openai';
 process.env.ANTHROPIC_API_KEY = 'test-anthropic';
 delete process.env.BOBBY_LLM_PRIMARY;
 delete process.env.BOBBY_APP_TEXT_MODEL;
+delete process.env.BOBBY_PRO_TEXT_MODEL;
 delete process.env.BOBBY_DESK_MODEL;
 delete process.env.RESEND_API_KEY;
 
@@ -63,7 +64,19 @@ const rateLimited = () => json({ error: { type: 'rate_limit_error' } }, 429);
 const spec = { provider: 'anthropic' as const, model: 'claude-haiku-5-5', maxTokens: 500, timeoutMs: 20_000 };
 const schema = { name: 's', schema: { type: 'object' } };
 const tool = { name: 'emit_verdict', description: 'Return the verdict', parameters: { type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false } };
+const proTool = { name: 'emit_allocation', description: 'Return a bounded allocation', parameters: {
+  type: 'object', properties: {
+    verdict: { type: 'string', enum: ['wait', 'buy'] },
+    allocation: { type: 'number', minimum: 0, maximum: 100 },
+    note: { type: 'string', minLength: 2, maxLength: 32 },
+    steps: { type: 'array', minItems: 1, maxItems: 2, items: {
+      type: 'object', properties: { amount: { type: 'integer', minimum: 1, maximum: 3 } }, required: ['amount'], additionalProperties: false,
+    } },
+  }, required: ['verdict', 'allocation', 'note', 'steps'], additionalProperties: false,
+} };
+const validProInput = { verdict: 'wait', allocation: 25, note: 'Valid allocation', steps: [{ amount: 2 }] };
 const base = { endpoint: 'bobby-cycle', system: 'system fixture', user: 'user fixture' };
+const proBase = { ...base, tier: 'pro' as const };
 const privateMarker = 'PRIVATE_PROMPT_AND_TOKEN';
 
 // Byte-at-a-time fragments split UTF-8 characters, JSON, and CRLF across transport chunks.
@@ -104,6 +117,12 @@ try {
 
   // Central model selection and exact input/cache-tier boundaries.
   eq(appTextModel({}), 'claude-haiku-5-5', 'Haiku is the app default');
+  eq(appTextModel({}, 'free'), 'claude-haiku-5-5', 'verified free access selects Haiku');
+  eq(appTextModel({}, 'pro'), 'claude-opus-5-5', 'verified Pro access selects Opus');
+  eq(appTextModel({ BOBBY_APP_TEXT_MODEL: 'claude-sonnet-5-5' }, 'pro'), 'claude-opus-5-5', 'a free override never changes the Pro model');
+  eq(appTextModel({ BOBBY_PRO_TEXT_MODEL: 'claude-sonnet-5-5' }, 'free'), 'claude-haiku-5-5', 'a Pro override never changes the free model');
+  eq(appTextModel({ BOBBY_PRO_TEXT_MODEL: ' claude-sonnet-5-5 ' }, 'pro'), 'claude-sonnet-5-5', 'the independent Pro override trims whitespace');
+  assert.throws(() => appTextModel({ BOBBY_PRO_TEXT_MODEL: 'gpt-6-luna' }, 'pro')); checks++;
   eq(appTextModel({ BOBBY_APP_TEXT_MODEL: ' claude-sonnet-5-5 ' }), 'claude-sonnet-5-5', 'controlled app model overrides trim whitespace');
   assert.throws(() => appTextModel({ BOBBY_APP_TEXT_MODEL: 'gpt-6-luna' })); checks++;
   eq(modelPrice('claude-haiku-5-5', 100000), [.10, .01, .50], 'exactly 100k input keeps the low Haiku tier');
@@ -115,6 +134,8 @@ try {
   close(modelCost('claude-haiku-5-5', 0, 100000, 1000), .0015, 'cached input counts toward the exact low-tier boundary');
   close(modelCost('claude-haiku-5-5', 1, 100000, 1000), .0075005, 'cached plus uncached input selects the high tier');
   eq(modelCost('claude-sonnet-5-5', 0, 1e6, 0), .10, 'Sonnet cached input uses its corrected price');
+  eq(modelPrice('claude-opus-5-5', 1_000_000), [4, .20, 20], 'Opus has standard prices across the full context window');
+  close(modelCost('claude-opus-5-5', 900_000, 100_000, 1000), 3.64, 'Opus input, cache read and output cost at the verified rates');
   eq(modelCost('claude-haiku-4-5-20251001', 1e6, 0, 0), MODEL_PRICES['claude-haiku-4-5'][0], 'an older dated id is priced by its family');
   eq(modelCost('mystery-model', 0, 0, 1e6), Math.max(...Object.values(MODEL_PRICES).map(price => price[2])), 'unknown models use the dearest known price');
   reset(() => json(claudeData('{"a":1}', 'end_turn', { input_tokens: 90, cache_creation_input_tokens: 10, cache_read_input_tokens: 100001, output_tokens: 20 })));
@@ -147,6 +168,27 @@ try {
   await callLlm({ ...base, effort: 'high', maxTokens: 2000 }); await settledLedger();
   eq([calls[0].body.output_config.effort, 'thinking' in calls[0].body], ['high', false], 'plain higher-effort text keeps adaptive thinking available');
 
+  // Account tier is a per-request decision, including concurrent requests in the same warm worker.
+  reset(() => json({ stop_reason: 'end_turn', content: [{ type: 'thinking', thinking: privateMarker, signature: privateMarker },
+    { type: 'text', text: 'Pro answer' }], usage: { input_tokens: 600, cache_read_input_tokens: 20, output_tokens: 400 } }));
+  const proAnswer = await callLlm({ ...proBase, maxTokens: 100, model: 'claude-haiku-5-5' });
+  eq(proAnswer, { text: 'Pro answer', toolInput: null, provider: 'anthropic', model: 'claude-opus-5-5' }, 'Pro text selects Opus and excludes thinking blocks');
+  rows = await settledLedger();
+  eq([calls[0].body.model, calls[0].body.max_tokens, calls[0].body.output_config.effort], ['claude-opus-5-5', 2048, 'low'], 'Pro raises short output ceilings for always-on thinking');
+  ok(!('thinking' in calls[0].body) && !('temperature' in calls[0].body) && !('top_p' in calls[0].body), 'Opus ordinary text sends no unsupported thinking or sampling settings');
+  eq([rows[0].model, rows[0].tokens_out, rows[0].ok], ['claude-opus-5-5', 400, true], 'Pro ledger records all billed output tokens');
+  close(rows[0].usd, .010404, 'Pro ledger uses Opus cache pricing');
+  reset(claudeOk('longer Pro answer'));
+  await callLlm({ ...proBase, effort: 'medium', maxTokens: 8000 }); await settledLedger();
+  eq([calls[0].body.max_tokens, calls[0].body.output_config.effort], [8000, 'medium'], 'Pro keeps an explicitly larger output ceiling and effort');
+  const configuredFreeModel = process.env.BOBBY_APP_TEXT_MODEL, configuredProModel = process.env.BOBBY_PRO_TEXT_MODEL;
+  const routedReply: Reply = call => json(claudeData(call.body.model));
+  reset(routedReply, routedReply, routedReply);
+  const interleaved = await Promise.all([callLlm({ ...base, tier: 'free' }), callLlm(proBase), callLlm({ ...base, tier: 'free' })]);
+  await settledLedger();
+  eq(interleaved.map(answer => answer.model), ['claude-haiku-5-5', 'claude-opus-5-5', 'claude-haiku-5-5'], 'interleaved free and Pro requests never inherit another account model');
+  eq([process.env.BOBBY_APP_TEXT_MODEL, process.env.BOBBY_PRO_TEXT_MODEL], [configuredFreeModel, configuredProModel], 'tier routing never mutates global model configuration');
+
   // Forced tools preserve optional visible text and require exactly one matching object input.
   reset(() => json({ stop_reason: 'tool_use', content: [{ type: 'text', text: 'Validated ' }, { type: 'thinking', thinking: privateMarker },
     { type: 'tool_use', name: tool.name, input: { verdict: 'wait' } }, { type: 'text', text: 'answer' }], usage: { input_tokens: 100, output_tokens: 50 } }));
@@ -172,6 +214,56 @@ try {
     eq([calls.length, rows[0].ok, rows[0].stop, rows[0].tokens_out], [1, false, stop, 50], `${stop} never retries or falls back, and still bills output`);
   }
 
+  // Opus cannot force tools: structured JSON preserves the caller's toolInput contract safely.
+  const originalProSchema = JSON.stringify(proTool.parameters);
+  reset(() => json({ ...claudeData(JSON.stringify(validProInput)), content: [{ type: 'thinking', thinking: privateMarker },
+    { type: 'text', text: JSON.stringify(validProInput) }] }));
+  const proVerdict = await callLlm({ ...proBase, tool: proTool, maxTokens: 500 });
+  rows = await settledLedger();
+  eq([proVerdict.toolInput, proVerdict.provider, proVerdict.model], [validProInput, 'anthropic', 'claude-opus-5-5'], 'Opus schema output becomes the existing toolInput object');
+  ok(!proVerdict.text.includes(privateMarker), 'Opus structured output excludes thinking text');
+  eq([calls[0].body.model, calls[0].body.max_tokens, calls[0].body.output_config.format.type], ['claude-opus-5-5', 2048, 'json_schema'], 'Opus tools use native structured output with a thinking allowance');
+  ok(!('thinking' in calls[0].body) && !('tools' in calls[0].body) && !('tool_choice' in calls[0].body), 'Opus structured tools never send disabled thinking or forced tools');
+  const wireSchema = calls[0].body.output_config.format.schema;
+  eq([wireSchema.type, wireSchema.required, wireSchema.additionalProperties, wireSchema.properties.verdict.enum],
+    ['object', proTool.parameters.required, false, ['wait', 'buy']], 'wire schema keeps the result shape and allowed verdicts');
+  ok(!('minimum' in wireSchema.properties.allocation) && !('maximum' in wireSchema.properties.allocation)
+    && !('minLength' in wireSchema.properties.note) && !('maxLength' in wireSchema.properties.note)
+    && !('maxItems' in wireSchema.properties.steps) && !('minimum' in wireSchema.properties.steps.items.properties.amount),
+    'wire schema removes unsupported constraints recursively');
+  eq(JSON.stringify(proTool.parameters), originalProSchema, 'wire normalization never changes the original validation schema');
+  eq([rows[0].ok, rows[0].stop], [true, 'end_turn'], 'validated Opus JSON is one successful billed result');
+  for (const [label, invalid] of [
+    ['missing required field', { allocation: 25, note: 'valid', steps: [{ amount: 2 }] }],
+    ['wrong type', { ...validProInput, allocation: '25' }],
+    ['invalid enum', { ...validProInput, verdict: 'sell' }],
+    ['range below minimum', { ...validProInput, allocation: -1 }],
+    ['range above maximum', { ...validProInput, allocation: 101 }],
+    ['string too short', { ...validProInput, note: 'x' }],
+    ['string too long', { ...validProInput, note: 'x'.repeat(33) }],
+    ['extra root property', { ...validProInput, other: true }],
+    ['extra nested property', { ...validProInput, steps: [{ amount: 2, other: true }] }],
+    ['nested integer type', { ...validProInput, steps: [{ amount: 1.5 }] }],
+    ['nested numeric range', { ...validProInput, steps: [{ amount: 4 }] }],
+    ['too few array items', { ...validProInput, steps: [] }],
+    ['too many array items', { ...validProInput, steps: [{ amount: 1 }, { amount: 2 }, { amount: 3 }] }],
+    ['null result', null], ['array result', [validProInput]],
+  ] as const) {
+    reset(claudeOk(JSON.stringify(invalid)));
+    await rejects(callLlm({ ...proBase, tool: proTool }), `Pro ${label} fails original schema validation`);
+    rows = await settledLedger();
+    eq([calls.length, rows.length, rows[0].ok, rows[0].tokens_out], [1, 1, false, 50], `Pro ${label} stays a failed billed request without retry or fallback`);
+  }
+  reset(claudeOk(`{${privateMarker}`));
+  await rejects(callLlm({ ...proBase, tool: proTool }), 'malformed Pro tool JSON fails without private payload leakage', error => error instanceof Error && !error.message.includes(privateMarker));
+  rows = await settledLedger(); eq([calls.length, rows[0].ok], [1, false], 'malformed Pro tool JSON never becomes success or provider fallback');
+  for (const stop of ['refusal', 'max_tokens']) {
+    reset(() => json(claudeData(JSON.stringify(validProInput), stop)));
+    await rejects(callLlm({ ...proBase, tool: proTool }), `Pro ${stop} cannot accept even complete-looking JSON`, error => error instanceof LlmIncompleteError);
+    rows = await settledLedger();
+    eq([calls.length, rows[0].ok, rows[0].stop], [1, false, stop], `Pro ${stop} never retries or falls back`);
+  }
+
   // Quota/billing and absent keys can fail over; safety and transport errors cannot.
   for (const [label, refusal] of [['rate', rateLimited], ['billing', noCredit]] as const) {
     reset(refusal, openaiOk('backup'));
@@ -181,6 +273,21 @@ try {
     eq([calls[1].body.model, calls[1].body.max_completion_tokens, 'max_tokens' in calls[1].body, 'temperature' in calls[1].body, 'top_p' in calls[1].body], ['gpt-6-luna', 777, false, false, false], `${label} fallback keeps the cap and OpenAI parameter contract`);
     eq(rows.map(row => [row.provider, row.ok]), [['anthropic', false], ['openai', true]], `${label} records both provider attempts`);
   }
+  reset(rateLimited, openaiOk('Pro quota backup'));
+  eq(await callLlm({ ...proBase, maxTokens: 100 }), { text: 'Pro quota backup', toolInput: null, provider: 'openai', model: 'gpt-6-luna' }, 'Pro quota fallback reports the actual serving model');
+  rows = await settledLedger();
+  eq(rows.map(row => [row.model, row.provider, row.ok]), [['claude-opus-5-5', 'anthropic', false], ['gpt-6-luna', 'openai', true]], 'Pro fallback preserves both attempted and successful model metadata');
+  const openaiToolReply = (input: unknown) => () => json({ choices: [{ finish_reason: 'tool_calls', message: { content: null,
+    tool_calls: [{ type: 'function', function: { name: proTool.name, arguments: JSON.stringify(input) } }] } }],
+    usage: { prompt_tokens: 100, completion_tokens: 50 } });
+  reset(rateLimited, openaiToolReply(validProInput));
+  const backedUpTool = await callLlm({ ...proBase, tool: proTool });
+  rows = await settledLedger();
+  eq([backedUpTool.toolInput, backedUpTool.provider, backedUpTool.model], [validProInput, 'openai', 'gpt-6-luna'], 'Pro tool fallback preserves validated input and actual serving model');
+  reset(rateLimited, openaiToolReply({ ...validProInput, allocation: 101 }));
+  await rejects(callLlm({ ...proBase, tool: proTool }), 'quota fallback cannot bypass original Pro tool bounds');
+  rows = await settledLedger();
+  eq(rows.map(row => [row.model, row.ok, row.tokens_out]), [['claude-opus-5-5', false, 0], ['gpt-6-luna', false, 50]], 'out-of-range fallback tools remain failed billable responses without a third attempt');
   delete process.env.ANTHROPIC_API_KEY;
   reset(openaiOk('key fallback')); await callLlm(base); await settledLedger();
   eq(calls.map(call => new URL(call.url).hostname), ['api.openai.com'], 'a missing Anthropic key spends only OpenAI');
@@ -219,6 +326,27 @@ try {
   }, cancel() { terminalCancelled = true; } }), { headers: { 'Content-Type': 'text/event-stream' } }));
   eq((await streamText(streamBase)).text, 'terminal', 'message_stop completes even while the provider socket stays open');
   await settledLedger(); ok(terminalCancelled, 'the completed stream releases the still-open provider reader');
+
+  const proDeltas: string[] = [];
+  reset(() => sse([{ type: 'message_start', message: { usage: { input_tokens: 90, cache_read_input_tokens: 10, output_tokens: 0 } } },
+    { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '', signature: '' } },
+    { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: privateMarker } },
+    { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: privateMarker } },
+    textDelta('Pro visible'),
+    { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 120, output_tokens_details: { thinking_tokens: 90 } } },
+    { type: 'message_stop' }]));
+  eq(await streamText({ ...streamBase, tier: 'pro', maxTokens: 200, onDelta: text => { proDeltas.push(text); } }),
+    { text: 'Pro visible', toolInput: null, provider: 'anthropic', model: 'claude-opus-5-5' }, 'Pro SSE returns only the completed visible answer and actual model');
+  rows = await settledLedger();
+  eq(proDeltas, ['Pro visible'], 'Pro thinking and signatures never become app text');
+  eq([calls[0].body.model, calls[0].body.max_tokens, 'thinking' in calls[0].body, 'tool_choice' in calls[0].body],
+    ['claude-opus-5-5', 2048, false, false], 'Pro stream reserves thinking tokens without unsupported flags');
+  eq([rows[0].model, rows[0].tokens_in, rows[0].tokens_cached, rows[0].tokens_out, rows[0].tokens_reasoning, rows[0].ok],
+    ['claude-opus-5-5', 100, 10, 120, 90, true], 'Pro SSE counts billed thinking output and cache usage');
+  close(rows[0].usd, .002762, 'Pro SSE bills the verified Opus token rates');
+  reset(() => sse([start, textDelta('Pro partial'), { type: 'error', error: { type: 'rate_limit_error' } }]));
+  await rejects(streamText({ ...streamBase, tier: 'pro' }), 'Pro partial streaming cannot fail over after quota error');
+  rows = await settledLedger(); eq([calls.length, rows[0].model, rows[0].ok], [1, 'claude-opus-5-5', false], 'Pro partial output remains one failed attempt without replay');
 
   // Before visible output a quota refusal can use the OpenAI SSE contract.
   reset(rateLimited, () => sse([{ choices: [{ delta: { content: 'backup' }, finish_reason: null }] },

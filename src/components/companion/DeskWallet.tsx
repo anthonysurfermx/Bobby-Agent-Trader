@@ -66,6 +66,11 @@ export function useBaseBalances(symbols: readonly string[]) {
 
 const PILL_SYMBOLS: readonly string[] = ['USDC'];
 
+/** Whether a wallet is connected: the one condition under which the pill below renders anything. */
+export function useWalletConnected(): boolean {
+  return useAccount().isConnected;
+}
+
 /** The header pill: USDC to trade with and ETH for gas, once a wallet is connected. Tapping it opens the swap sheet. */
 export function WalletBalancePill({ onClick }: { onClick?: () => void }) {
   const { isConnected, balances, ethUnits, loading } = useBaseBalances(PILL_SYMBOLS);
