@@ -52,12 +52,18 @@ const setOf = (text: string): ReadonlySet<string> => new Set(wordsOf(text));
  */
 const ASSET = 'xassetx';
 
-// The desk's own timeframe names are not prices: "on the 4H chart" stays a question about the chart.
-const TIMEFRAME_CODE = /(?<![\p{L}\p{N}])(?:[14][hH]|1[dDwW])(?![\p{L}\p{N}])/gu;
+// The desk's own timeframe names are not prices: "on the 4H chart" stays a question about the chart. So are the
+// same four as each language writes the name of a chart: "the 4-hour chart", "el gráfico de 4 horas", "le graphique
+// en H4", "il grafico a 4 ore", "der 4-Stunden-Chart". Only where it names a chart (a compound before its noun, or
+// behind the noun of a chart) and only one and four hours, one day and one week, which are the charts the desk
+// reads: "in 4 hours" is a time ahead, and "four-hour", "24-hour" and "1M" are still numbers.
+const CHART_NOUN = { es: '(?:gr[aá]fic[oa]s?|velas?|candles?|temporalidad|marco|cierre|fechamento|tend[eê]ncia) de ', fr: '(?:graphiques?|bougies?|cl[oô]ture|tendance) (?:en |[aà] |de )?', it: '(?:grafic[oi]|candel[ae]|timeframe|trend|chiusura) a ' };
+const TIMEFRAME_CODE = new RegExp(`(?<![\\p{L}\\p{N}])(?:[14]h|1[dw]|[hdw]1|h4|[14]-(?:hour|hr|stunden)(?=[- ])|(?<=${CHART_NOUN.es})[14] horas?|(?<=${CHART_NOUN.fr})[14] ?heures?|(?<=${CHART_NOUN.it})[14] or[ae])(?![\\p{L}\\p{N}])`, 'giu');
 // One sentence, read after folding: the letters a–z (the six languages have no other once their accents are
 // set aside, so a Cyrillic or Greek look-alike is refused here), spaces, commas, apostrophes and hyphens or
-// dashes, an optional opening ¿ and one closing question mark.
-const ONE_QUESTION = /^¿?[a-z'’ ,\-‐–—]+\?$/;
+// dashes, the quotation marks a term is set in ("overbought", « suracheté »), an optional opening ¿ and one
+// closing question mark. A quoted word is read like any other: the marks set nothing aside.
+const ONE_QUESTION = /^¿?[a-z'’‘"“”„«» ,\-‐–—]+\?$/;
 // One clause: a comma joins a second one, and the second is where a statement or an instruction rides behind a
 // question ("What a run, grab it before Friday?"). German alone needs its comma, before the word that opens a
 // subordinate clause ("Was passiert, wenn…", "…, damit sich diese Analyse ändert?"), and gets that one only.
@@ -75,13 +81,15 @@ const SPELLED_OUT = /(?<![a-z])[a-z](?:[-‐–—][a-z]){2,}(?![a-z])/;
 // ("Is now…", "Should…", "¿Conviene…?", "When…", "Lohnt sich…") is a yes/no or a timing question and is refused
 // whatever follows. An optional "and" may lead, and a preposition may stand before the question word
 // ("¿De qué depende…?", "À quoi tient…", "Unter welchen Bedingungen…"). Italian elides its own: "cos’è", "com’è".
+// "Where does it come from" is a why, and only with that verb: "D’où vient la faiblesse…", "¿De dónde viene…?",
+// "De onde vem…", "Da dove viene…", "Woher kommt…". English "where" is not here: it asks for a level.
 const OPENERS: Record<AppLanguage, RegExp> = {
   en: /^(?:(?:and|so|but) )?(?:what|why|which|how)\b/,
-  es: /^(?:y si\b|(?:(?:y|pero|entonces) )?(?:(?:(?:a|de|en|con|para|por|sobre|hasta|desde) )?(?:que|cual|cuales)|como)\b)/,
-  fr: /^(?:et si\b|(?:(?:et|mais|alors) )?(?:(?:(?:a|de|sur|pour|en|par|vers|avec|dans) )?(?:que|qu|quoi|quel|quelle|quels|quelles)|pourquoi|comment)\b)/,
-  pt: /^(?:e se\b|(?:(?:e|mas|entao) )?(?:o que|(?:(?:a|de|em|com|para|por|sobre|ate|desde|do|no) )?(?:que|qual|quais)|porque|como)\b)/,
-  it: /^(?:e se\b|(?:(?:e|ma|allora) )?(?:(?:(?:a|di|da|in|su|con|per) )?(?:che|cosa|cos|quale|quali|qual)|perche|come|com)\b)/,
-  de: /^(?:(?:und|aber) )?(?:(?:(?:an|auf|aus|bei|mit|nach|von|zu|fur|uber|unter|in|durch) )?(?:was|welche|welcher|welches|welchen|welchem)|warum|wieso|weshalb|weswegen|wie|woran|wodurch|worauf|wovon|womit|worin|wofur|wonach|woraus)\b/,
+  es: /^(?:y si\b|de donde vienen?\b|(?:(?:y|pero|entonces) )?(?:(?:(?:a|de|en|con|para|por|sobre|hasta|desde) )?(?:que|cual|cuales)|como)\b)/,
+  fr: /^(?:et si\b|d ou (?:vient|viennent)\b|(?:(?:et|mais|alors) )?(?:(?:(?:a|de|sur|pour|en|par|vers|avec|dans) )?(?:que|qu|quoi|quel|quelle|quels|quelles)|pourquoi|comment)\b)/,
+  pt: /^(?:e se\b|de onde vem\b|(?:(?:e|mas|entao) )?(?:o que|(?:(?:a|de|em|com|para|por|sobre|ate|desde|do|no) )?(?:que|qual|quais)|porque|como)\b)/,
+  it: /^(?:e se\b|da dove (?:viene|vengono)\b|(?:(?:e|ma|allora) )?(?:(?:(?:a|di|da|in|su|con|per) )?(?:che|cosa|cos|quale|quali|qual)|perche|come|com)\b)/,
+  de: /^(?:(?:und|aber) )?(?:(?:(?:an|auf|aus|bei|mit|nach|von|zu|fur|uber|unter|in|durch) )?(?:was|welche|welcher|welches|welchen|welchem)|warum|wieso|weshalb|weswegen|wie|woran|wodurch|worauf|wovon|womit|worin|wofur|wonach|woraus|woher (?:kommt|kommen))\b/,
 };
 
 // The reader (or Bobby) as the subject: "should I…", "¿qué hago…?", "was soll ich…", and the unnamed "one" of
@@ -97,6 +105,12 @@ const PERSONAL: Record<AppLanguage, ReadonlySet<string>> = {
   it: setOf('io mi me mio mia miei mie noi nostro nostra nostri nostre tu ti te tuo tua tuoi tue voi vostro vostra qualcuno chi chiunque gente persona persone'),
   de: setOf('ich mir mich mein meine meinen meinem meiner meines wir uns unser unsere unseren unserem unserer du dir dich dein deine deinen deinem deiner man jemand jemanden jemandem wer wem wen leute'),
 };
+
+// French "celle du secteur", "ceux de la veille": before "de" the demonstrative stands for a thing ("that of"),
+// not for a person ("celui qui détient…", which stays refused).
+const THAT_OF = { said: setOf('celui celle ceux celles'), of: setOf('de du des d') };
+const namesSomeone = (words: readonly string[], language: AppLanguage) => words.some((word, at) =>
+  PERSONAL[language].has(word) && !(language === 'fr' && THAT_OF.said.has(word) && THAT_OF.of.has(words[at + 1] ?? '')));
 
 // A suggestion opens with an allowed word and still proposes an act: "Why not take it today?", "How about…",
 // "¿Qué tal…?", "Pourquoi ne pas…", "Wie wäre es mit…". `always` is the construction that is one whatever
@@ -155,13 +169,13 @@ const DOES: Record<AppLanguage, { verb: ReadonlySet<string>; caused: RegExp } | 
 // English: a verb in -ing, or after "to", with the asset as its object is an act named as a thing ("what would
 // dropping NVDA change?", "what would it mean to trade NVDA here?"). The verbs that move a price take the asset
 // as their object without anyone acting ("what is driving NVDA?", "what would it take to move NVDA?").
-const MOVES_IT = setOf('move moving drive driving push pushing pull pulling lift lifting drag dragging pressure pressuring support supporting hurt hurting help helping fuel fueling fuelling hit hitting weigh weighing cause causing make making lead leading trigger triggering limit limiting capping reject rejecting slow slowing stall stalling stop stopping holding keeping');
+const MOVES_IT = setOf('move moving drive driving push pushing pull pulling lift lifting drag dragging pressure pressuring support supporting hurt hurting help helping fuel fueling fuelling hit hitting weigh weighing cause causing make making lead leading trigger triggering limit limiting capping reject rejecting slow slowing stall stalling stop stopping holding keeping affect affecting influence influencing impact impacting');
 const NOT_A_VERB = setOf('the this that these those a an its their all any both each every no other another such during something anything nothing everything');
 const ACTS_ON_IT = new RegExp(` (?:to ([a-z]+)|([a-z]+ing)) (?:(?:the|this|that|these|those|some|more|any|all|a|an) )?${ASSET}(?! s )`, 'g');
 // The listed verbs that are an act once the asset is their object, whoever is named as doing it: "why would
 // traders drop NVDA?" proposes it as surely as "what if someone…". English keeps its object behind its verb, so
 // "NVDA dropped" and "why did NVDA not follow the market?" are not read here.
-const TAKES_IT_UP = new RegExp(` (?:drop|drops|dropped|close|closes|closed|follow|follows|followed|fade|fades|faded|open|opens|opened|build|builds|built|fill|fills|filled|back) (?:(?:the|this|that|these|those|some|more|any|all|a|an) )?${ASSET}(?! s )`);
+const TAKES_IT_UP = new RegExp(` (?:drop|drops|dropped|close|closes|closed|follow|follows|followed|fade|fades|faded|open|opens|opened|build|builds|built|fill|fills|filled|back|cut|cuts|raise|raises|raised|track|tracks|tracked) (?:(?:the|this|that|these|those|some|more|any|all|a|an) )?${ASSET}(?! s )`);
 
 // An infinitive with the asset as its object is an act named as a thing: "¿qué significaría cerrar NVDA hoy?",
 // "que voudrait dire changer NVDA ?". It is the asset that acts, or is acted on by the market, only when a helper
@@ -171,13 +185,23 @@ const GOVERNED: Record<AppLanguage, { verb: RegExp; by: RegExp } | null> = {
   en: null, de: null,
   es: { verb: /^[a-z]+(?:ar|er|ir)$/, by: / (?:puede|pueden|podria|podrian|pudo|pueda|debe|deben|hace|hacen|haria|harian|hizo|hacer|suele|logra|logro|(?:tiene|tienen|tendria|tendrian|tenia|tuvo) que)$/ },
   fr: { verb: /^[a-z]+(?:er|ir|oir|dre|ire|aire|oire|vre|pre|ure|ttre|aitre|oitre)$/, by: / (?:peut|peuvent|pourrait|pourraient|pouvait|doit|doivent|devrait|devraient|fait|font|ferait|feraient|faire)$/ },
-  pt: { verb: /^[a-z]+(?:ar|er|ir)$/, by: / (?:pode|podem|poderia|poderiam|podia|deve|devem|faz|fazem|faria|fariam|fez|fazer|(?:tem|teria|teriam|tinha|teve) (?:de|que))$/ },
+  // "está a travar a EDP" is the progressive of Portugal ("is holding EDP back"): what is doing it is the subject of "está".
+  pt: { verb: /^[a-z]+(?:ar|er|ir)$/, by: / (?:pode|podem|poderia|poderiam|podia|deve|devem|faz|fazem|faria|fariam|fez|fazer|(?:tem|teria|teriam|tinha|teve) (?:de|que)|(?:esta|estao|estava|estavam|continua|continuam|volta|voltam|comeca|comecam) a)$/ },
   it: { verb: /^[a-z]+(?:are|ere|ire|rre)$/, by: / (?:puo|possono|potrebbe|potrebbero|poteva|deve|devono|dovrebbe|dovrebbero|fa|fanno|farebbe|farebbero|fare|far)$/ },
 };
+// German keeps its finite verb second ("Warum fällt BTC?"). The asset, an article or a preposition there instead
+// means there is none: a bare infinitive put to the reader ("Warum BTC jetzt schließen?", "Wie die Schwäche von BTC
+// nutzen?"). And "BTC … zu <infinitive>" closing the question names an act on it ("Was bedeutet es, BTC jetzt zu
+// schließen?"), unless the verb is one that moves a price or reads it ("…, um BTC zu bewegen?"), the asset hangs
+// on a preposition ("bei BTC zu sehen"), or the asset is the one that would do it ("Was fehlt BTC, um zu steigen?").
+const BARE_DE = new RegExp(`^ (?:(?:und|aber) )?(?:warum|wieso|weshalb|weswegen|wie) (?:${ASSET}|der|die|das|den|dem|des|ein|eine|einen|einem|einer|diese|dieser|dieses|diesen|diesem|jetzt|noch|heute|bei|in|im|auf|mit|von|an|am|aus|nach|zu|fur|uber|unter|vor) `);
+const TO_IT_DE = new RegExp(`(?<! (?:bei|von|in|an|auf|zu|fur|uber|mit|gegenuber)) ${ASSET} (?:(?!um |daran |darauf |dazu |davon |davor |dabei )[a-z]+ )?zu ([a-z]+) $`);
+const MOVES_IT_DE = setOf('bewegen treiben stutzen belasten bremsen drucken stabilisieren drehen beeinflussen erklaren verstehen lesen bestatigen');
+
 // To stay in the asset is to keep it, whatever the verb's form: "what does staying in NVDA mean?", "¿qué significa
 // seguir en NVDA?", "bei NVDA bleiben".
 const STAYS: Record<AppLanguage, RegExp> = {
-  en: new RegExp(` (?:stay|staying|remain|remaining|be|being) (?:in|with|on|out of|away from) ${ASSET} `),
+  en: new RegExp(` (?:stay|staying|remain|remaining|be|being|sit|sits|sitting) (?:in|with|on|out of|away from) ${ASSET} `),
   es: new RegExp(` (?:seguir|quedar|permanecer|estar|continuar) (?:en|con|dentro de|fuera de|lejos de) ${ASSET} `),
   fr: new RegExp(` (?:rester|demeurer|etre) (?:sur|dans|en|avec|hors de) ${ASSET} `),
   pt: new RegExp(` (?:ficar|seguir|continuar|permanecer|estar) (?:em|com|dentro de|fora de|longe de) ${ASSET} `),
@@ -194,14 +218,20 @@ const PICK: Record<AppLanguage, RegExp> = {
   de: / (?:aktie|coin|token) fur (?:heute|diese|dieser|diesen|die|den) /,
 };
 
-// An amount of the asset is a position: "the case for more NVDA", "algo de NVDA", "etwas NVDA".
+// An amount of the asset is a position: "the case for more NVDA", "algo de NVDA", "etwas NVDA". French "du Bitcoin"
+// is one ("avoir du Bitcoin") unless it hangs on something the asset has, with or without its adjective: "la
+// tendance du Bitcoin", "le taux de financement du Bitcoin", "la tendance haussière du Bitcoin". The nouns are a
+// closed list: after any other word "du" plus the asset is still an amount.
+const FR_ITS = 'tendance|tendances|cours|prix|graphique|graphiques|momentum|volume|volumes|volatilite|hausse|baisse|repli|rebond|mouvement|mouvements|dominance|financement|funding|range|support|supports|resistance|resistances'
+  + '|niveau|niveaux|sommet|sommets|creux|cassure|consolidation|correction|structure|dynamique|faiblesse|force|evolution|chute|recul|comportement|marche|reseau|halving|adoption|lecture|analyse|scenario|moyenne|moyennes|rsi|macd|cas|sujet';
+const FR_ITS_KIND = 'haussier|haussiere|baissier|baissiere|neutre|recent|recente|actuel|actuelle|journalier|journaliere|hebdomadaire|mensuel|mensuelle|mobile|mobiles|relative|technique|generale|court terme|long terme';
 const AMOUNT_OF_IT: Record<AppLanguage, RegExp> = {
-  en: new RegExp(` (?:some|more|less|fewer|any|enough|extra|much) (?:${ASSET}(?! s )|shares |stock |coins |tokens )`),
-  es: new RegExp(` (?:mas|menos|algo de|poco de|tanto) ${ASSET} `),
-  fr: new RegExp(` (?:plus de|moins de|peu de|davantage de|du) ${ASSET} `),
-  pt: new RegExp(` (?:mais|menos|algum|pouco de) ${ASSET} `),
-  it: new RegExp(` (?:piu|meno|po di|altro) ${ASSET} `),
-  de: new RegExp(` (?:mehr|weniger|etwas) ${ASSET} `),
+  en: new RegExp(` (?:some|more|less|fewer|any|enough|extra|much|additional|further) (?:${ASSET}(?! s )|shares |stock |coins |tokens )`),
+  es: new RegExp(`(?: (?:mas|menos|algo de|poco de|tanto) ${ASSET}| ${ASSET} adicional(?:es)?) `),
+  fr: new RegExp(`(?:(?: (?:plus de|moins de|peu de|davantage de)|(?<! (?:${FR_ITS})(?: (?:${FR_ITS_KIND}))?) du) ${ASSET}| ${ASSET} supplementaires?) `),
+  pt: new RegExp(`(?: (?:mais|menos|algum|pouco de) ${ASSET}| ${ASSET} adiciona(?:l|is)) `),
+  it: new RegExp(`(?: (?:(?<!di )piu|meno|po di|altro) ${ASSET}| ${ASSET} aggiuntiv[oaie]) `), // "ha mosso di più NVDA" is "the most"
+  de: new RegExp(` (?:mehr|weniger|etwas|zusatzliche[rsnm]?) ${ASSET} `),
 };
 
 // Whether or when to act, in the six languages at once (a reply may borrow a word: "hold", "trade", "target").
@@ -216,7 +246,7 @@ const ACT_WORDS = setOf(`
   opportunity opportunities attractive upside fomo hodl hodling
   purchase purchases purchased purchasing acquire acquires acquired acquiring own owns owned owning grab grabs grabbing grabbed
   dump dumps dumping dumped offload offloading unload unloading liquidate liquidating ditch ditching swap swapping shorting bet bets betting scoop scoops scooped scooping
-  moment moments timing late early optimal smart smarter smartest wise wiser wisest sensible prudent savvy keep keeping
+  moment moments timing late early optimal smart smarter smartest wise wiser wisest savvy keep keeping
 
   entro entras entramos entrando entrada entradas salgo espero esperamos mantengo aguanto invierto opero operacion operaciones agrego anado acumulo
   posicion posiciones objetivo objetivos conviene convendria convenga convenia debo debes debemos deberia deberias deberiamos puedo podemos hago hacemos
@@ -241,9 +271,10 @@ const ACT_WORDS = setOf(`
 // A word that acts in one language and is an ordinary word in another is read only where it acts: Spanish
 // "salida" and "inversión", the French verb "trader" (an English noun), "tôt" and "dois", Portuguese "saída",
 // "compensa" and "cedo", Italian "uscita", "leva" (Portuguese "leads") and "presto", German "Chance" (the English
-// and French "chance") and "spät".
+// and French "chance") and "spät", and English "sensible" and "prudent" (in Spanish and French "sensible" is
+// sensitive, "sensible a las tasas", and French "prudent" is cautious, "le marché reste prudent").
 const ACT_WORDS_IN: Record<AppLanguage, ReadonlySet<string>> = {
-  en: setOf(''),
+  en: setOf('sensible prudent'),
   es: setOf('salida salidas inversion inversiones pronto'),
   fr: setOf('sortie sorties trader dois attends occasion occasions tot pari'),
   pt: setOf('saida saidas compensa cedo pego'),
@@ -269,6 +300,8 @@ const ACT_PHRASES = [
   'open a long', 'open a short', 'get in', 'get out', 'getting in', 'getting out', 'jump in', 'pile in', 'load up', 'cash out', 'stay in', 'stay out', 'sit out', 'sitting out', 'step in',
   'how much', 'how many', 'how long', 'how soon', 'how to', 'how high', 'how low', 'how far', 'miss out', 'missing out', 'to trade', 'a trade', 'the trade', 'this trade', 'that trade', 'trade it', 'trade this', 'trade that',
   'trade here', 'trade now', 'trade idea', 'best trade', 'good trade', 'stop loss', 'safe to', 'what price', 'which price',
+  // "action" is a chart word in "price action" and a stock in Spanish ("la acción"); asking which action to take is neither.
+  'what action', 'which action', 'take action', 'taking action', 'action to take', 'accion tiene sentido', 'accion tendria sentido', 'accion conviene', 'accion tomar', 'tomar accion', 'accion a tomar',
   'to long', 'to short', 'long it', 'short it', 'a long here', 'a short here', 'snap up', 'stock up', 'good deal', 'screaming deal', 'sweet deal', 'a steal',
   'stay with', 'be in xassetx', 'being in xassetx', 'been in xassetx', 'smart move', 'right move', 'best move', 'good move', 'the day for', 'the day to', 'the week for', 'the week to', 'el dia para', 'la semana para', 'le jour pour', 'la semaine pour', 'o dia para', 'a semana para', 'il giorno per', 'la settimana per', 'der tag fur', 'die woche fur',
   'buen momento', 'mal momento', 'mejor momento', 'momento de', 'momento para', 'hora de', 'es hora', 'demasiado tarde', 'muy tarde', 'tarde para', 'es tarde', 'demasiado pronto', 'muy pronto', 'pronto para',
@@ -305,17 +338,35 @@ const WHEN: Record<AppLanguage, { asked: RegExp; time: ReadonlySet<string>; good
 // de range", "salir del rango", "uscita dal range"), which is a breakout; a trend's "inversión"; "its own".
 const NEUTRAL: Record<AppLanguage, readonly RegExp[]> = {
   en: [/ (?:at|for) (?:the|this) moment $/, / (?:its|their|s) own(?= )/g, / right now(?= )/g,
-    // The asset holds a level; nobody holds the asset: "why is NVDA holding above its average?", "what is keeping it up?".
-    / (?<=(?:is|are|was|were|been|keeps|kept|still|not|isn t|xassetx) )(?:holding|keeping)(?= )/g],
+    // The asset holds a level; nobody holds the asset: "why is NVDA holding above its average?", "what is keeping it up?",
+    // "why is NVDA's price holding above its average?".
+    / (?<=(?:is|are|was|were|been|keeps|kept|still|not|isn t|xassetx|price|trend|support) )(?:holding|keeping)(?= )/g,
+    // A breakout, a level or a trend that holds: "what would have to happen for NVDA's breakout to hold?", "why did
+    // support not hold?". Only with one of these as its subject: "to hold" behind anything else is still an act.
+    /(?<= for (?:the |this |that |its |xassetx s )(?:[a-z]+ )?(?:breakout|breakdown|support|resistance|trend|uptrend|downtrend|rally|rebound|bounce|recovery|level|floor|range|move|pattern|structure) to) hold(?= )/g,
+    /(?<= (?:did|does|would|could|might|can) (?:the |this |that |its |xassetx s )?(?:[a-z]+ )?(?:breakout|breakdown|support|resistance|trend|uptrend|downtrend|rally|rebound|bounce|recovery|level|floor|range|move|pattern|structure)(?: not)?) hold(?= )/g],
   es: [/ (?:en este momento|en estos momentos|por el momento|de momento) $/,
-    / (?:salidas?|salir) (?:xassetx )?(?:del|de la|de su|de) (?:rango|canal|lateral|consolidacion|triangulo|zona|banda|cuna|rectangulo)(?= )/g, / inversion de (?:la )?tendencia(?= )/g],
+    / (?:salidas?|salir|sale|salen|salga|salgan|saldria) (?:(?:de )?xassetx )?(?:del|de la|de su|de) (?:rango|canal|lateral|consolidacion|triangulo|zona|banda|cuna|rectangulo)(?= )/g, / inversion de (?:la )?tendencia(?= )/g],
   fr: [/ (?:en ce moment|pour le moment) $/,
-    / (?:sorties?|sortir) (?:xassetx )?(?:du|de la|de son|de sa|de ce|de cette|de|d un|d une) (?:range|canal|consolidation|triangle|zone|bande|biseau|rectangle|fourchette|intervalle)(?= )/g, / sorties? (?:par le (?:haut|bas)|haussieres?|baissieres?)(?= )/g],
+    / (?:sorties?|sortir|sort|sorte|sortent|sortait|sortirait) (?:(?:de |d )?xassetx )?(?:du|de la|de son|de sa|de ce|de cette|de|d un|d une) (?:range|canal|consolidation|triangle|zone|bande|biseau|rectangle|fourchette|intervalle)(?= )/g, / sorties? (?:par le (?:haut|bas)|haussieres?|baissieres?)(?= )/g,
+    // "Que faudrait-il pour que la tendance…" is "what would it take for the trend to…": the clause behind "pour que"
+    // has its own subject, and a person there is refused as a person. "Que faudrait-il faire…" is untouched.
+    /(?<= (?:que|qu)) faudrait(?= il pour (?:que|qu) )/g,
+    // A trend "prend fin" (comes to an end): nobody takes anything.
+    / (?:prend|prenne|prennent|prenait|prendrait|pris)(?= fin )/g,
+    // "Qu'est-ce qui renforcerait la lecture…": what would strengthen the read or the trend. Only the conditional, or
+    // the infinitive under a helper, and only before one of these nouns: "renforcer BTC" and "renforcer sa ligne" add
+    // to a position and stay refused.
+    / renforcerai(?:t|ent)(?= (?:la|le|les|l|cette|ce|cet|ces|un|une) (?:lecture|tendance|scenario|argument|these|hausse|baisse|momentum|biais|mouvement|rebond|repli|pression|dynamique|analyse|idee|cassure|sentiment|demande|conviction|confiance) )/g,
+    /(?<= (?:peut|peuvent|pourrait|pourraient|vient|viendrait)) renforcer(?= (?:la|le|les|l|cette|ce|cet|ces|un|une) (?:lecture|tendance|scenario|argument|these|hausse|baisse|momentum|biais|mouvement|rebond|repli|pression|dynamique|analyse|idee|cassure|sentiment|demande|conviction|confiance) )/g],
   pt: [/ (?:neste momento|no momento|de momento) $/,
-    / (?:saidas?|sair) (?:xassetx )?(?:do|da|de|deste|desta|do seu|da sua) (?:range|intervalo|canal|consolidacao|lateralizacao|triangulo|zona|faixa|retangulo)(?= )/g],
+    / (?:saidas?|sair|sai|saem|saia|saiam|sairia) (?:(?:de |do |da )?xassetx )?(?:do|da|de|deste|desta|do seu|da sua) (?:range|intervalo|canal|consolidacao|lateralizacao|triangulo|zona|faixa|retangulo)(?= )/g],
   it: [/ (?:in questo momento|al momento|per il momento) $/,
-    / (?:uscit[ae]|uscire) (?:xassetx )?(?:dal|dalla|dallo|dall|da|dal suo|dalla sua) (?:range|canale|consolidamento|laterale|lateralita|triangolo|zona|fascia|congestione|rettangolo)(?= )/g],
-  de: [/ (?:im moment|in diesem moment|zum jetzigen zeitpunkt|zum aktuellen zeitpunkt|zu diesem zeitpunkt) $/],
+    / (?:uscit[ae]|uscire|esce|escono|esca|escano|uscirebbe) (?:(?:di |del |della )?xassetx )?(?:dal|dalla|dallo|dall|da|dal suo|dalla sua) (?:fase laterale|fase di consolidamento|range|canale|consolidamento|laterale|lateralita|triangolo|zona|fascia|congestione|rettangolo)(?= )/g],
+  de: [/ (?:im moment|in diesem moment|zum jetzigen zeitpunkt|zum aktuellen zeitpunkt|zu diesem zeitpunkt) $/,
+    // "Was würde die Erholung überzeugender machen?": what would make it so. Only "machen" closing the question behind
+    // one of these adjectives and under "würde" or "könnte": "Was soll ich machen?" and "…mit BTC jetzt machen?" still act.
+    /(?<= (?:wurde|wurden|konnte|konnten) (?:[a-z]+ ){1,10}(?:bullisch|barisch|neutral|uberzeugender|glaubwurdiger|starker|schwacher|klarer|stabiler|wahrscheinlicher|unwahrscheinlicher|nachhaltiger|hinfallig|ungultig)) machen(?= $)/g],
 };
 
 // The words Bobby's copy never uses, in any language, even negated: buy, sell, profit, guaranteed, returns,
@@ -352,7 +403,14 @@ const FORBIDDEN_RUNS: readonly RegExp[] = [
   / can (?:xassetx |it |this |that )?only /, / (?:cannot|can t|could not|couldn t) (?:lose|fail|miss) /, / (?:bound|certain|sure|going|about|set|poised|destined|likely) to /, / (?:no brainer|sure thing|risk free|no risk|one way) /,
   / only go(?:es|ing)? /, / go(?:es|ing)? only /, / x layer /,
   // What the asset "is going to" do, in the languages that say it with a helper: a next question presupposes no move.
-  / va[ns]? a /, / vai /, / vao /, / (?:va|vont) (?:xassetx )?[a-z]+(?:er|ir|re) /, / sta(?:nno)? per /, / wird /, / werden /,
+  / va[ns]? a /, / vai /, / vao /, / (?:va|vont) (?:xassetx )?[a-z]+(?:er|ir|re) /, / sta(?:nno)? per /,
+  // German "wird" is the future, except as "becomes" closing a condition: "…, damit der Trend wieder bullisch wird?",
+  // "…, wenn das Bild klarer wird?". Anywhere else, and after any other word, it is still what the asset will do.
+  // The other "wird" that is not the future is the passive, which closes on a participle, and "becomes" before a
+  // comparative, and only on one of these: "Warum wird der Trend … als neutral beschrieben?", "Warum werden die
+  // Tageskerzen … immer kleiner?".
+  / (?:wird|werden) (?!$)(?!(?:[a-z]+ ){1,10}(?:beschrieben|gesehen|angesehen|bewertet|eingestuft|genannt|getrieben|gestutzt|belastet|gebremst|bestatigt|beeinflusst|begrenzt|interpretiert|gewertet|gehandelt|verursacht|ausgelost|eingeschatzt|betrachtet|bezeichnet|gedeutet|kleiner|grosser|schwacher|starker|enger|breiter|klarer|flacher|steiler|ruhiger|unruhiger|volatiler|langsamer|schneller|kurzer|langer|dunner|schmaler|seltener|haufiger) $)/,
+  /(?<! (?:damit|wenn|falls|sobald|bevor)(?: [a-z]+){1,9} (?:bullisch|barisch|neutral|positiv|negativ|starker|schwacher|klarer|stabiler|stabil|klar)) wird $/, / werden $/,
   / solo (?:xassetx )?puede /, / puede solo /, / no puede (?:perder|fallar) /, / sin (?:ningun )?riesgo /,
   / ne (?:xassetx )?peut que /, / a coup sur /, / valeur sure /, / sans (?:aucun )?risque /,
   / so (?:xassetx )?pode /, / pode so /, / nao pode (?:perder|falhar) /, / sem (?:nenhum )?risco /,
@@ -420,7 +478,7 @@ const FUNCTION_WORDS: Record<AppLanguage, ReadonlySet<string>> = {
   fr: setOf(`le la les un une des de du d l au aux en dans sur sous avec pour par vers chez que qu qui quoi quel quelle quels quelles comment pourquoi si et ou mais ne pas n
     est sont ce cet cette ces c son sa ses se s il elle ils elles y a ont ete etre plus tres deja encore maintenant quand parce apres avant entre depuis sans leur leurs t derriere`),
   pt: setOf(`o a os as um uma uns umas de do da dos das em no na nos nas com para por pelo pela sobre entre ate desde sem que qual quais como se e ou mas nao sao esta estao este
-    isto isso esse essa seu sua seus suas ha tem foi ser mais muito ja ainda hoje agora quando onde porque apos ao aos tao cada todo toda num numa neste nesta`),
+    isto isso esse essa seu sua seus suas ha tem foi ser mais muito ja ainda hoje agora quando onde porque apos ao aos tao tanto tanta cada todo toda num numa neste nesta`),
   it: setOf(`il lo la i gli le un uno una di del della dello dei degli delle dell a al alla allo ai agli alle all da dal dalla dallo dai dagli dalle dall in nel nella nello nei negli nelle nell
     su sul sulla sullo sui sugli sulle sull con per tra fra che cosa cos quale quali qual come com perche se e ed o ma non sono questo questa questi queste quel quello quella
     suo sua suoi sue si ci ha hanno stato essere piu molto gia ancora oggi ora adesso quando dove dopo prima senza l d dietro`),
@@ -436,9 +494,60 @@ const foreignLetter = (text: string, language: AppLanguage) => [...text.normaliz
 
 // A word that is listed only in a fixed company: "what would it take", "the long term", "a time frame". Set
 // aside before the word list is read; alone, "take", "long" and "time" are not on it.
+// The second pass added the rest (the reasons are at the head of desk-next-question-lexicon.ts): "price action",
+// "best explains" and "better than", "good earnings", "what role do … play", "pick up" with no object, "range-bound",
+// a read that flips, and their like in the other five languages, where "open interest" and "funding rate" are
+// borrowed whole. Each sets the one word aside and leaves its company to be read against the list.
+const BORROWED: readonly RegExp[] = [/ open interest(?= )/g, /(?<= funding) rate(?= )/g];
 const LISTED_RUNS: Record<AppLanguage, readonly RegExp[]> = {
-  en: [/ (?<=it )takes?(?= )/g, / (?:long|longer|short|shorter|near|medium|mid)(?= term )/g, / time(?= frames? )/g],
-  es: [], fr: [], pt: [], it: [], de: [],
+  en: [/ (?<=it )takes?(?= )/g, / (?:long|longer|short|shorter|near|medium|mid)(?= term )/g, / time(?= frames? )/g,
+    /(?<= (?:price|sideways)) action(?= )/g, / best(?= (?:explains?|describes?|summari[sz]es?|reflects?|shows?) )/g,
+    /(?<= (?:up|out|held|holds|holding|performing|performed|performs|doing|faring|reacting|reacted|recovering|recovered|trading|traded)) better(?= than )/g,
+    / options(?= (?:market|markets|expiry|data|flow|flows|activity|volume) )/g,
+    / (?:good|bad)(?= (?:earnings|results|news|numbers|data) )/g,
+    /(?<= role(?: [a-z]+){0,6}) play(?:s|ed)?(?= )/g, / play(?:s|ed|ing)?(?= (?:a|an|the|its|their|any|no|some) (?:[a-z]+ ){0,2}role )/g,
+    / pick(?:s|ed|ing)?(?= up (?!xassetx |some |more |shares |the |a |an |any |this |that |these |those |its |their ))/g,
+    /(?<= range) bound(?= )/g,
+    // "this time", "over time": an occasion or a span. "The time for…" and "time to…" are timing and stay refused.
+    /(?<= (?:this|over|same|last|each|every|some|long|first)) time(?= )/g,
+    // "getting smaller": becoming. To get it, or to get in or out, is an act.
+    / getting(?= (?:smaller|larger|bigger|weaker|stronger|tighter|wider|narrower|closer|worse|more|less|harder|thinner|steeper|shorter|longer|flatter|quieter|calmer) )/g,
+    / reliable(?= (?:read|reading|picture|view|indicator|indication|evidence|data|timeframe|pattern|sign) )/g,
+    / flip(?:s|ped)?(?= (?:the |its |xassetx s )(?:xassetx )?(?:[a-z]+ )?(?:read|trend|bias|picture|outlook|view|verdict) )/g, /(?<= (?:read|trend|bias|momentum|sentiment|structure|outlook)(?: (?:would|could|might|to|has|have|did))?) flip(?:s|ped)?(?= )/g],
+  es: [...BORROWED, /(?<= (?:resiste|resisten|responde|responden|reacciona|reaccionan|funciona|funcionan|comporta|comportan|recupera|recuperan)) mejor(?= que )/g, /(?<= (?:explica|explican|resume|resumen|describe|describen|refleja|reflejan|muestra|muestran)) mejor(?= )/g,
+    / (?:buen[oa]s|mal[oa]s)(?= (?:resultados|noticias|cifras|datos|numeros) )/g,
+    // "va rezagada", "va detrás": is running behind. "Va a…" is the future and stays a forbidden run.
+    / van?(?= (?:rezagad[oa]s?|detras|atras|por detras|por delante) )/g, /(?<= les?) cuesta(?= )/g,
+    /(?<= papel) juegan?(?= )/g, / juegan?(?= (?:un|el|su|algun|ningun) papel )/g, /(?<= (?:esta|la)) manana(?= )/g,
+    / dan?(?= (?:la|una|otra) (?:lectura|imagen|vision|perspectiva) )/g, /(?<= (?:lectura|imagen|vision|evidencia|indicador|dato|temporalidad)(?: mas| menos| poco)?) (?:con)?fiable(?= )/g,
+    / interes(?= (?:abierto|renovado|creciente|institucional|por|en|del mercado|de los) )/g, /(?<= (?:renovado|creciente|nuevo|menor|mayor|poco|escaso|(?:tipos|tasas|tasa|falta|perdida|aumento|nivel|niveles) de)) interes(?= )/g],
+  fr: [...BORROWED, /(?<= (?:resiste|resistent|fait|font|tient|tiennent|reagit|reagissent|performe|performent|comporte|comportent)(?: t)?(?: (?:il|elle|ils|elles))?) mieux(?= que )/g, /(?<= (?:explique|expliquent|resume|resument|reflete|refletent|montre|montrent) le) mieux(?= )/g,
+    / (?:bons|bonnes|mauvais|mauvaises)(?= (?:resultats|nouvelles|chiffres|donnees) )/g,
+    /(?<= role) jou(?:e|ent)(?= )/g, / jou(?:e|ent)(?= (?:un|le|son|leur|aucun) role )/g,
+    / donn(?:e|ent)(?= (?:la|une) (?:lecture|image|vision|vue) )/g, /(?<= (?:lecture|image|vision|preuve|indicateur|donnee)(?: la plus| la moins| plus| moins| peu)?) fiables?(?= )/g,
+    / interets?(?= (?:pour|des investisseurs|du marche|institutionnel) )/g, /(?<= (?:regain|taux|manque|perte|peu|hausse|baisse|niveau) d) interets?(?= )/g,
+    // "ferait basculer la lecture": the read tips over. "Basculer sur BTC" moves money and stays refused.
+    / basculer(?= (?:la|le) (?:lecture|tendance|biais|sentiment|scenario|analyse) )/g],
+  pt: [...BORROWED, /(?<= (?:resiste|resistem|reage|reagem|responde|respondem|funciona|funcionam|comporta|comportam|recupera|recuperam)) melhor(?= (?:que|do que) )/g, /(?<= (?:explica|explicam|resume|resumem|reflete|refletem|mostra|mostram)) melhor(?= )/g,
+    / (?:bom|bons|boa|boas|mau|maus)(?= (?:balanco|balancos|resultado|resultados|noticias|numeros|dados) )/g,
+    /(?<= (?:leitura|imagem|visao|evidencia|indicador|dado)(?: mais| menos| pouco)?) confiavel(?= )/g,
+    / interesse(?= (?:renovado|crescente|institucional|por|em|do mercado|dos investidores) )/g, /(?<= (?:renovado|crescente|novo|maior|menor|pouco|(?:falta|perda|aumento) d[eo])) interesse(?= )/g],
+  it: [...BORROWED, /(?<= (?:tiene|tengono|fa|fanno|regge|reggono|resiste|resistono|reagisce|reagiscono|risponde|rispondono)) meglio(?= (?:di|del|dello|della|dei|degli|delle|dell) )/g, /(?<= (?:spiega|spiegano|riassume|riassumono|riflette|riflettono|mostra|mostrano)) meglio(?= )/g,
+    / (?:buon|buona|buoni|buone|cattiv[aeio])(?= (?:trimestrale|trimestrali|risultati|notizie|notizia|numeri|dati) )/g,
+    // "Cosa c’entra lo spread…": what it has to do with it. Nobody enters anything.
+    /(?<= c) entra(?:no)?(?= )/g,
+    / offr(?:e|ono)(?= (?:la|una) (?:lettura|visione|immagine) )/g, /(?<= (?:lettura|immagine|visione|evidenza|indicatore|dato)(?: piu| meno| poco)?) affidabile(?= )/g,
+    / interesse(?= (?:per|verso|rinnovato|crescente|istituzionale|del mercato|degli investitori) )/g, /(?<= (?:rinnovato|crescente|nuovo|maggiore|minore|poco|(?:tassi|tasso|mancanza|perdita|calo) di)) interesse(?= )/g,
+    // "Cosa spinge LINK a staccarsi da Bitcoin?": one asset parts from another. Bare, it is put to the reader.
+    /(?<= a) staccarsi(?= da )/g],
+  de: [...BORROWED, /(?<= (?:(?:halt|halten|hielt|entwickelt|entwickeln|entwickelte) sich|lauft|laufen|lief|reagiert|reagieren) (?:xassetx )?)besser(?= als )/g,
+    /(?<= (?:erklart|erklaren|beschreibt|beschreiben|zeigt|zeigen|fasst|fassen|lasst sich)(?: [a-z]+){0,10} am) besten(?= (?:zusammen |ablesen )?$)/g,
+    / (?:gute|guter|guten|schlechte|schlechter|schlechten)(?= (?:zahlen|quartalszahlen|nachrichten|ergebnisse|ergebnissen|daten) )/g,
+    /(?<= (?:heute|am)) morgen(?= )/g,
+    // "tut sich schwer" (struggles), "in letzter Zeit" (lately), "setzt … fort" (continues): "tun", "Zeit" and "setzen" alone act.
+    / tut(?= sich )/g, /(?<= in letzter) zeit(?= )/g, / setzt(?= (?:[a-z]+ ){1,8}fort $)/g,
+    / liefer[tn](?= (?:das|ein|den|die|eine|einen) (?:[a-z]+ )?(?:bild|hinweis|einschatzung|lesart|beleg) )/g,
+    / verlasslich(?:e|en|er|es|ste|sten|ster|stes|ere|eren|eres)?(?= (?:bild|einschatzung|lesart|indikator|hinweis|beleg|daten) )/g],
 };
 
 /** Whether the question proposes an act behind an allowed opener (SUGGESTION). */
@@ -461,6 +570,10 @@ function bareAct(run: string, words: readonly string[], language: AppLanguage): 
     }
   }
   else if (AMOUNT_OF_IT[language].test(run)) return true;
+  if (language === 'de') {
+    const toIt = TO_IT_DE.exec(run)?.[1];
+    if (BARE_DE.test(run) || (toIt !== undefined && !MOVES_IT_DE.has(toIt))) return true;
+  }
   if (PICK[language].test(run) || STAYS[language].test(run)) return true;
   const bare = BARE[language], lead = bare?.lead.exec(run)?.[1];
   if (bare && lead !== undefined && !bare.unless.has(lead)) return true;
@@ -519,14 +632,17 @@ export function nextQuestionViolation(raw: unknown, language: AppLanguage, symbo
   if (text.length < FOLLOW_UP_MIN || text.length > FOLLOW_UP_MAX) return 'shape';
   const root = symbol && symbol.indexOf('.') >= 2 ? symbol.slice(0, symbol.indexOf('.')) : null;
   const aside = [symbol, root, ...[...names].sort((a, b) => b.length - a.length).filter(name => name.trim().length >= 2 && !(fold(name).match(/[a-z]+/g) ?? []).some(refusedWord))];
-  const named = aside.reduce<string>((left, name) => (name ? setAside(left, name.trim()) : left), text);
-  const plain = fold(named.replace(TIMEFRAME_CODE, ' ')).replace(/\s+/g, ' ').trim();
+  // "US" and "U.S." in capitals, in a sentence that is not all capitals, are the country: "US tariffs", "US-Zölle".
+  const country = /\p{Ll}/u.test(text) ? text.replace(/(?<![\p{L}\p{N}.])U\.?S\.?(?:A\.?)?(?![\p{L}\p{N}])/gu, ' usa ') : text;
+  const named = aside.reduce<string>((left, name) => (name ? setAside(left, name.trim()) : left), country);
+  // "on-chain" is one word in all six languages ("on" alone is the French "one" and an English preposition).
+  const plain = fold(named.replace(TIMEFRAME_CODE, ' ')).replace(/\bon[-‐–]chain\b/g, 'onchain').replace(/\s+/g, ' ').trim();
   const words = plain.match(/[a-z]+/g) ?? [];
   const run = ` ${words.join(' ')} `;
   // The act lists read the question with its harmless uses set aside; every other rule reads all of it.
   const harmless = NEUTRAL[language].reduce((left, neutral) => left.replace(neutral, ' '), run);
   const actWords = harmless.trim().split(/ +/);
-  if (suggests(run, language) || bareAct(harmless, actWords, language) || asksWhen(actWords, language) || words.some(word => PERSONAL[language].has(word))
+  if (suggests(run, language) || bareAct(harmless, actWords, language) || asksWhen(actWords, language) || namesSomeone(words, language)
     || actWords.some(word => ACT_WORDS.has(word) || ACT_WORDS_IN[language].has(word) || INVESTS.test(word)
       || ACT_STEMS.some(stem => word.startsWith(stem)) || ACT_STEMS_IN[language].some(stem => word.startsWith(stem)))
     || ACT_PHRASES.some(phrase => run.includes(` ${phrase} `))) return 'act';
@@ -543,7 +659,7 @@ export function nextQuestionViolation(raw: unknown, language: AppLanguage, symbo
   const claimed = (by: AppLanguage) => words.filter(word => FUNCTION_WORDS[by].has(word)).length;
   if ((plain.startsWith('¿') && language !== 'es') || foreignLetter(named, language) || LANGUAGES.some(other => other !== language && claimed(other) > claimed(language))) return 'language';
   // Last, the list of what is allowed: every word left once the harmless uses are set aside.
-  const read = LISTED_RUNS[language].reduce((left, kept) => left.replace(kept, ' '), harmless).trim().split(/ +/);
+  const read = LISTED_RUNS[language].reduce((left, kept) => left.replace(kept, ' ').replace(/ +/g, ' '), harmless.replace(/ +/g, ' ')).trim().split(/ +/);
   if (read.some(word => word !== ASSET && !listedWord(word, language))) return 'unlisted';
   return null;
 }
