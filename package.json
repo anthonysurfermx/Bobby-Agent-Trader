@@ -55,6 +55,7 @@
     "test:desk-timeframe": "tsx scripts/test-desk-timeframe.mts",
     "test:desk-levels": "tsx scripts/test-desk-levels.mts && tsx scripts/test-invite-link.mts",
     "test:desk-thesis": "tsx scripts/test-desk-thesis.mts",
+    "test:desk-suggestions": "tsx scripts/test-desk-suggestions.mts",
     "test:invite-link": "tsx scripts/test-invite-link.mts",
     "test:levels-referrals-pg": "tsx scripts/test-levels-referrals-pg.mts",
     "test:coupons-pg": "tsx scripts/test-coupons-pg.mts",

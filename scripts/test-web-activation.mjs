@@ -95,7 +95,9 @@ const STUBS = {
   '@/components/companion/CompanionOverlays': marker('overlay', ['EvolutionOverlay', 'GearCatalog', 'ToolDetail', 'ToolUnlockOverlay']),
   '@/components/companion/LandSeedCard': marker('land'),
   '@/components/companion/DeskSwap': marker('swap', ['DeskSwapCard', 'SwapSheet']),
-  '@/components/companion/DeskWallet': marker('wallet', ['WalletBalancePill']),
+  // The pill is a marker; whether a wallet is connected and whether tokenized stocks are offered are the browser's to say.
+  '@/components/companion/DeskWallet': `export const WalletBalancePill = Object.assign(function () { return null; }, { stub: 'wallet:WalletBalancePill' }); export const useWalletConnected = () => globalThis.__wallet === true;`,
+  '@/lib/base-swap/stock-visibility': `export const STOCK_SWAPS_VISIBLE = globalThis.__stocks === true;`,
   '@/components/companion/ProgressSync': marker('progress-sync'),
   './ClientReadPresentation': marker('presentation'),
   './NucleoChart': marker('chart'),
@@ -127,11 +129,14 @@ const bundle = (await build({
 // A browser that records instead of sending.
 // ---------------------------------------------------------------------------------------------------------
 const UUID = '00000000-0000-4000-8000-0000000000aa';
+// The pause the desk holds between the last argument and the settled answer, read from its source.
+const REVEAL_MS = Number(/const REVEAL_MS = (\d+);/.exec(read('src/components/nucleo/NucleoDesk.tsx'))?.[1]);
+assert.ok(REVEAL_MS > 0, 'the desk declares its reveal pause');
 const CONSENT_KEY = 'bobby.companion.progress.v1';
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 /** How long a request stays in flight, and how soon after a subscribe the auth client reports the session it has. */
 const NETWORK_MS = 12, AUTH_MS = 2;
-function browser({ route = '/desk', language = 'en', locale = 'en-US', consent = false, session = null, stored = {}, kept = {}, historyState = null, access = {} } = {}) {
+function browser({ route = '/desk', language = 'en', locale = 'en-US', consent = false, session = null, stored = {}, kept = {}, historyState = null, access = {}, desktop = false, wallet = false, stocks = false, pulse = null, debate = null, fast = false } = {}) {
   const storage = new Map(Object.entries({ bobby_lang: language, bobby_locale: locale, bobby_geo: locale.split('-')[1], ...stored }));
   if (consent) storage.set(CONSENT_KEY, JSON.stringify({ aiConsentGranted: true, riskNoticeVersion: 7, onboarded: true }));
   const requests = [], replaced = [];
@@ -173,9 +178,9 @@ function browser({ route = '/desk', language = 'en', locale = 'en-US', consent =
     if (href.startsWith('/api/bobby-asset-search')) return json({ resolved: { baseSymbol: 'NVDA', symbol: 'NVDA', displayName: 'NVIDIA', assetClass: 'equity', aliases: ['NVDA'] } });
     if (href === '/api/bobby-access') return json({ access: { tier: signedIn ? 'free' : 'anon', used: 0, limit: 3, remaining: 3, resetsAt: null, paywall: true, ...access }, signedIn, subscription: null, payments: { stripe: false, apple: true } });
     // A read answers with the meter it left behind: one read fewer.
-    if (href === '/api/voice-tool') return json({ market: { price: 100, currency: 'USD' }, technicals: { price: 100, rsi14: 50, trend: 'bullish', support: 95, resistance: 105 }, technical_pulse: { signal: 'wait', direction: 'none' },
+    if (href === '/api/voice-tool') return json({ market: { price: 100, currency: 'USD' }, technicals: { price: 100, rsi14: 50, trend: 'bullish', support: 95, resistance: 105 }, technical_pulse: pulse ?? { signal: 'wait', direction: 'none' },
       access: { tier: signedIn ? 'free' : 'anon', used: 1, limit: 3, remaining: 2, resetsAt: null, paywall: true } });
-    if (href === '/api/desk-debate') return json({ agents: { alpha: 'Alpha line.', red: 'Red line.', cio: 'CIO line.', verdict: 'wait', direction: 'none' }, level: 'rapido' });
+    if (href === '/api/desk-debate') return json(debate ?? { agents: { alpha: 'Alpha line.', red: 'Red line.', cio: 'CIO line.', verdict: 'wait', direction: 'none' }, level: 'rapido' });
     return json({ candles: [] });
   };
   // The session history, as far as the desk uses it: entries with a state, and Back delivered as `popstate` a moment later.
@@ -191,13 +196,16 @@ function browser({ route = '/desk', language = 'en', locale = 'en-US', consent =
   const left = [], focused = [];
   const context = vm.createContext({
     console, URL, URLSearchParams, Response, Request, AbortController, AbortSignal, TextDecoder, DOMException, Intl, queueMicrotask,
-    setTimeout, clearTimeout, setInterval, clearInterval, performance,
+    // `fast` skips the desk's reveal pause before an answer settles (REVEAL_MS in NucleoDesk), and nothing else:
+    // every request timeout keeps its length.
+    setTimeout: fast ? (fn, ms, ...rest) => setTimeout(fn, ms === REVEAL_MS ? 5 : ms, ...rest) : setTimeout, clearTimeout, setInterval, clearInterval, performance,
     location, fetch, localStorage: store(storage), sessionStorage: store(session_),
     history,
     navigator: { language: locale, languages: [locale], userAgent: 'activation-test', platform: 'test', maxTouchPoints: 0 },
     document: { referrer: '', documentElement: { lang: locale }, body: { classList: { add() {}, remove() {} } }, activeElement: null, addEventListener() {}, removeEventListener() {} },
     crypto: { randomUUID: () => UUID },
-    matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+    matchMedia: () => ({ matches: desktop, addEventListener() {}, removeEventListener() {} }),
+    __wallet: wallet, __stocks: stocks,
     scrollTo() {},
     addEventListener(name, fn) { (windowListeners[name] ??= new Set()).add(fn); }, removeEventListener(name, fn) { windowListeners[name]?.delete(fn); },
     __navigated: [], __session: session, __auth: auth, __voice: { speak: async () => {}, stop() {}, speaking: false, level: 0 },
@@ -821,6 +829,79 @@ await asyncCheck('an invalid ?ask does nothing, and ?ref keeps working alongside
   assert.equal(noticeOf(b, desk.tree).props.question, 'How does NVDA look?');
   assert.ok(!b.requests.some((r) => r.raw.includes('ABCDEFGH')), 'the code is not claimed before consent');
 });
+
+// ---------------------------------------------------------------------------------------------------------
+// 3b. A question Bobby wrote never sits beside a transaction surface (the rule and its whole truth table:
+// scripts/test-desk-suggestions.mts). Here the shipping desk is rendered to its finished answer and the tree is
+// searched: the swap card, the wallet pill, the swap sheet and the profile drawer on one side, the CIO's next
+// question on the other.
+// ---------------------------------------------------------------------------------------------------------
+{
+  const NEXT = 'What would confirm the NVDA trend?';
+  const synthesis = { headline: 'Not yet: NVDA still needs a break.', why: 'The range has not resolved.', risk: 'A break can fail on thin volume.', watch: 'A close above the range high.', watchLevel: 0, followUp: NEXT };
+  const WAIT = { agents: { alpha: 'Alpha line.', red: 'Red line.', cio: 'CIO line.', verdict: 'wait', direction: 'none', synthesis }, level: 'rapido' };
+  const LONG = { agents: { alpha: 'Alpha line.', red: 'Red line.', cio: 'CIO line.', verdict: 'review', direction: 'long', synthesis }, level: 'rapido' };
+  // What the desk needs before it shows a direction: the engine's long with a plan, and the CIO's review in that direction.
+  const LONG_PULSE = { signal: 'long', direction: 'long', conviction_pct: 62, trade_plan: { entry: 100, stop: 95, target: 110, rewardRisk: 2 } };
+  /** A reader who agreed asks about NVDA and the answer settles on screen. */
+  async function finishedRead(options) {
+    const b = browser({ consent: true, fast: true, ...options });
+    const desk = b.mount(b.T.NucleoDesk);
+    await b.settle(desk);
+    typeAndSend(desk, QUESTION);
+    await b.settle(desk, 40);
+    assert.equal(working(desk.tree), null, 'the answer settled');
+    return { b, desk };
+  }
+  const labels = (tree) => chips(tree).map((e) => e.props.children);
+  const swapCard = (tree) => stubbed(tree, 'swap:DeskSwapCard');
+  const pill = (tree) => stubbed(tree, 'wallet:WalletBalancePill');
+  const another = (b) => b.T.t('Another question about NVDA', 'Otra pregunta sobre NVDA');
+
+  await asyncCheck('next question: with no transaction surface on screen it is the first chip', async () => {
+    const { b, desk } = await finishedRead({ debate: WAIT });
+    assert.equal(swapCard(desk.tree).length + pill(desk.tree).length, 0, 'no swap card, no wallet pill');
+    assert.deepEqual(labels(desk.tree).slice(0, 2), [NEXT, another(b)], 'the next question leads, then the reader\'s own');
+    assert.equal(labels(desk.tree).length, 4, 'next question, another question, one other asset, explore');
+  });
+  await asyncCheck('next question: a LONG on a tokenized stock with the swap flag off shows no card, so the question stays', async () => {
+    const { desk } = await finishedRead({ debate: LONG, pulse: LONG_PULSE, stocks: false });
+    assert.equal(swapCard(desk.tree).length, 0, 'nothing to swap: no card');
+    assert.equal(find(desk.tree, (e) => e.props?.className === 'n-swapwrap'), undefined, 'and no empty wrapper for one');
+    assert.equal(labels(desk.tree)[0], NEXT);
+  });
+  await asyncCheck('next question: a LONG with the swap flag on shows the swap card, and the question is not offered', async () => {
+    const { b, desk } = await finishedRead({ debate: LONG, pulse: LONG_PULSE, stocks: true });
+    assert.equal(swapCard(desk.tree).length, 1, 'the swap card is on screen');
+    assert.ok(!walk(desk.tree).some((e) => e.type === 'button' && e.props.children === NEXT), 'no button carries the CIO\'s question');
+    assert.equal(labels(desk.tree)[0], another(b), 'the reader\'s own chips stay');
+    assert.equal(labels(desk.tree).length, 4, 'another question, two other assets, explore');
+  });
+  await asyncCheck('next question: a connected wallet on the wide layout shows its balance, and the question is not offered', async () => {
+    const connected = await finishedRead({ debate: WAIT, desktop: true, wallet: true });
+    assert.equal(pill(connected.desk.tree).length, 1, 'the wallet pill is on screen');
+    assert.ok(!labels(connected.desk.tree).includes(NEXT));
+    const none = await finishedRead({ debate: WAIT, desktop: true, wallet: false });
+    assert.equal(pill(none.desk.tree).length, 0, 'no wallet, no pill');
+    assert.equal(labels(none.desk.tree)[0], NEXT, 'and the question is offered');
+    const narrow = await finishedRead({ debate: WAIT, desktop: false, wallet: true });
+    assert.equal(pill(narrow.desk.tree).length, 0, 'the narrow layout has no pill');
+    assert.equal(labels(narrow.desk.tree)[0], NEXT);
+  });
+  await asyncCheck('next question: it leaves while the profile drawer or the swap sheet is open, and returns when they close', async () => {
+    const { desk } = await finishedRead({ debate: WAIT });
+    assert.equal(labels(desk.tree)[0], NEXT);
+    find(desk.tree, (e) => e.type === 'button' && e.props.className === 'n-face-btn').props.onClick(); desk.render();
+    const profile = stubbed(desk.tree, 'profile')[0];
+    assert.ok(profile, 'the profile drawer (swap row, balance) is open');
+    assert.ok(!labels(desk.tree).includes(NEXT), 'no next question beside it');
+    profile.props.onSwap(); desk.render();
+    assert.equal(stubbed(desk.tree, 'swap:SwapSheet').length, 1, 'the swap sheet is open');
+    assert.ok(!labels(desk.tree).includes(NEXT), 'nor beside the swap sheet');
+    stubbed(desk.tree, 'swap:SwapSheet')[0].props.onClose(); desk.render();
+    assert.equal(labels(desk.tree)[0], NEXT, 'closed: the question is offered again');
+  });
+}
 
 // ---------------------------------------------------------------------------------------------------------
 // 4. The home page: hero, navigation copy, app id

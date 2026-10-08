@@ -10,6 +10,12 @@
 //                                                      desk is intended; say so in the commit)
 //
 // It uses nothing the 1.8 change added, so it also runs unchanged on the commit before it.
+// Rewritten once since, on purpose (2026-10-07, the next question): the CIO's prompt gained the next-question
+// rule, a next question that breaks it is replaced in the reply by the fixed one of the reply's language (this
+// world's CIO always answers in English, so the five non-English scenarios carry the fixed question), and a
+// remembered reader is handed the finished change since their last ask instead of the stored price.
+// And once more the same day, after the adversarial review: the next-question rule the CIO is told names the
+// ticker, other people, suggestions, forecasts and plain market words. Nothing else moved.
 // One key is left out of the compared reply on purpose: `memory` (the receipt of what memory kept), which
 // 1.8 adds for an account whose memory applies. Everything around it must stay identical.
 import assert from 'node:assert/strict';
@@ -89,7 +95,9 @@ function world(models: Captured['models'], tier: 'free' | 'pro') {
     if (url.includes('rpc/bobby_memory_summary')) return json({
       enabled: true, prefs: { horizon: 'month', experience: 'new', risk: 'high' },
       top: [{ symbol: 'NVDA', asks: 7, lastAskedAt: new Date(FROZEN_NOW - 3 * DAY).toISOString(), lastHorizon: 'week' }, { symbol: 'BTC', asks: 4, lastAskedAt: new Date(FROZEN_NOW - DAY).toISOString(), lastHorizon: 'unspecified' }],
-      thisAsset: { asks: 7, lastAskedAt: new Date(FROZEN_NOW - 3 * DAY).toISOString(), lastHorizon: 'week', asksThisWeek: 1, lastPrice: 180 },
+      // 250 then, 280 now: +12%, a move a stock makes. (The capture before 2026-10-07 stored 180, a +55.6% that the
+      // desk now refuses to quote: a move that size between two asks reads as a split.)
+      thisAsset: { asks: 7, lastAskedAt: new Date(FROZEN_NOW - 3 * DAY).toISOString(), lastHorizon: 'week', asksThisWeek: 1, lastPrice: 250 },
     });
     if (url.includes('rpc/bobby_memory_record')) return json(true);
     if (url.includes('rpc/bobby_consume_desk_quota')) return json(true);
