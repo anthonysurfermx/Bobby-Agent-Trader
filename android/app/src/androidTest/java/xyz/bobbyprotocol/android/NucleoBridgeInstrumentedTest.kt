@@ -118,6 +118,35 @@ class NucleoBridgeInstrumentedTest {
     }
 
     @Test
+    fun afterConsentTheRowSaysWhoseAssetsItHoldsAndAChipMarksOnlyAPlainQuestion() {
+        // The real session behind the real bridge (follow-ups slice 1). The transport refuses every
+        // processing request here, so nothing leaves the emulator.
+        val notice = promise("window.nucleoBridge.call('riskNotice', {})")
+        val accepted = promise("window.nucleoBridge.call('acceptRisk', {version:${notice.getInt("version")}})")
+        assertTrue(accepted.getBoolean("accepted"))
+        // A reader who never asked: the default tickers, and none of them is theirs.
+        val row = promise("window.nucleoBridge.call('suggestions', {})").getJSONArray("quickAccess")
+        assertEquals(listOf("BTC", "NVDA", "ETH"), (0 until row.length()).map { row.getJSONObject(it).getString("symbol") })
+        assertTrue(row.toString(), (0 until row.length()).all { row.getJSONObject(it).get("own") == false })
+        // No rule says the next read would be refused: the session carries no `oneTap` key.
+        assertFalse(promise("window.nucleoBridge.call('session', {})").has("oneTap"))
+        // `chip` is a boolean, and it marks a plain question only: never a token, never a follow-up of a read.
+        for (params in listOf("{token:'t',chip:true}", "{followUpOf:'11111111-1111-4111-8111-111111111111',question:'q',chip:true}", "{question:'BTC?',chip:'yes'}")) {
+            val refused = promise("window.nucleoBridge.raw({v:1,method:'ask',params:$params})")
+            assertFalse(params, refused.getBoolean("ok"))
+            assertEquals(params, "invalid_params", refused.getJSONObject("error").getString("code"))
+        }
+        // A chip's question is asked like any other: it reaches the desk's first request, which this transport refuses.
+        val checksBefore = processingChecks.get()
+        val chip = promise("window.nucleoBridge.call('ask', {question:'BTC?',chip:true})")
+        assertEquals(chip.toString(), "error", chip.getString("status"))
+        assertTrue("the question went as far as resolving its asset", processingChecks.get() > checksBefore)
+        // A read that was never delivered leaves the row as it was.
+        val after = promise("window.nucleoBridge.call('suggestions', {})").getJSONArray("quickAccess")
+        assertEquals(row.toString(), after.toString())
+    }
+
+    @Test
     fun malformedAndUnknownMethodsReturnProtocolFaultsAndOversizedMessagesNeverDispatch() {
         val unknown = promise("window.nucleoBridge.raw({v:1,method:'fetchAccountToken',params:{}})")
         assertFalse(unknown.getBoolean("ok"))

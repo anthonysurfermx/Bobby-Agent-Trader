@@ -69,7 +69,7 @@ The decision is a pure function with unit tests. On CI's emulator a due notice i
 
 ### The next question, and who wrote the words (follow-ups slice 1, step 1 of 3)
 
-Ported from the iPhone (`ios/Bobby/Nucleo/ARCHITECTURE.md` §3.5, commits `630e01b3`, `37155fe0` and the native half of `cb784a0d`). This step is the page and the bridge. The planner (one follow-up chain per question the person asked, then stop) and the surface (lock screen, Stop, the wall, the notes on Memory) are steps 2 and 3 and are **not in this step**. Nothing below was seen on a phone: the page cases run in Node over the Android transport, the Kotlin cases on the JVM.
+Ported from the iPhone (`ios/Bobby/Nucleo/ARCHITECTURE.md` §3.5, commits `630e01b3`, `37155fe0` and the native half of `cb784a0d`). This step is the page and the bridge. The planner (one follow-up chain per question the person asked, then stop) and the surface (lock screen, Stop, the wall, the notes on Memory) are steps 2 and 3 and are **not in this step**. Nothing below was seen on a phone: the page cases run in Node over the Android transport, the Kotlin cases on the JVM, and one case on CI's emulator asks the real session through the real bridge (`NucleoBridgeInstrumentedTest`: the row's `own` marks, no `oneTap` key, a misused `chip` refused, a chip's question asked like any other). The row itself was never drawn in a WebView under a test.
 
 **What a person sees.** One second after Bobby's voice ends, the last spoken line gives way to a row of at most three chips, with no save needed (before, chips came only after a save):
 
