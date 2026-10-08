@@ -50,11 +50,12 @@ import java.util.concurrent.atomic.AtomicReference
  * The question Bobby "wrote" after the read is this test's: the real one is whatever the server
  * sends in `synthesis.followUp`, checked by the page before it is shown (android/nucleo/tests).
  *
- * The line on the glass is photographed over the page's WebGL sphere. The two reads are played on
- * the page's own fallback for a phone without WebGL (the sphere drawn without it): an emulator with
- * no GPU draws the scene of a read in software, and the first run of this test took the emulator
- * offline half-way through one (run 37717370904). The row, its chips and their words are the same
- * page code either way; what a read looks like over the WebGL sphere is not seen here.
+ * The page is shown on its own fallback for a phone without WebGL (the sphere drawn without it):
+ * the test withholds WebGL before the page's first script runs. An emulator with no GPU draws the
+ * WebGL scene in software, and with the scene running without a pause this test took CI's emulator
+ * offline twice, half-way through (runs 37717370904 and 37719454131). The line, the row, its chips
+ * and their words are the same page code either way; what they look like over the WebGL sphere is
+ * not seen here.
  */
 @RunWith(Parameterized::class)
 class FollowUpPageInstrumentedTest(private val language: String) {
@@ -72,7 +73,6 @@ class FollowUpPageInstrumentedTest(private val language: String) {
     /** The question the read hands back (`synthesis.followUp`), or none. */
     @Volatile private var nextQuestion: String? = null
     @Volatile private var reads = 0
-    private var webGlOff = false
 
     private val spanish: Boolean get() = language == "es"
     private val locale: String get() = if (spanish) "es-MX" else "en-US"
@@ -97,6 +97,7 @@ class FollowUpPageInstrumentedTest(private val language: String) {
     @Test fun theLineOnTheGlassAndTheRowAfterARead() {
         open()
         await("the idle home", 300_000) { it.state == "IDLE" && it.chips.size >= 3 && it.settled }
+        assertTrue("The page found WebGL although the test withheld it", look().noGl)
         assertEquals("The home offers the reader's assets", listOf("NVIDIA", "BTC", "ETH"), look().words)
 
         // ---- The line on the glass when they come back: one line, one button ----
@@ -124,9 +125,10 @@ class FollowUpPageInstrumentedTest(private val language: String) {
 
         // ---- After a read: the question Bobby wrote is the first chip ----
         nudge = null
+        emitSession()
+        await("the home without a line", 60_000) { it.state == "IDLE" && it.words.firstOrNull() == "NVIDIA" && it.settled }
         val question = if (spanish) "¿Qué tendría que cambiar en NVDA para que cambie esta lectura?" else "What would have to change in NVDA for this read to change?"
         nextQuestion = question
-        reloadWithoutWebGl()
         readNvda()
         await("Bobby's question as the first chip", 120_000) { it.words.firstOrNull() == question && it.settled }
         val another = if (spanish) "Otra pregunta sobre NVDA" else "Another question about NVDA"
@@ -135,7 +137,7 @@ class FollowUpPageInstrumentedTest(private val language: String) {
 
         // ---- The same read without a question: the fixed row, as before ----
         nextQuestion = null
-        reloadWithoutWebGl()
+        reload()
         readNvda()
         await("the fixed row", 120_000) { it.words.firstOrNull() == another && it.chips.size >= 3 && it.settled }
         assertEquals(listOf(another, if (spanish) "¿Cómo se ve BTC?" else "How is BTC looking?", if (spanish) "¿Cómo se ve ETH?" else "How is ETH looking?"),
@@ -146,11 +148,14 @@ class FollowUpPageInstrumentedTest(private val language: String) {
 
     // ---- The page ----
 
-    /** An activity of this app with nothing in it but the page, as MainActivity hosts it. */
+    /** An activity of this app with nothing in it but the page, as MainActivity hosts it, on a WebView that has no WebGL to give. */
     private fun open() {
+        assumeTrue("This WebView cannot run a script before the page's own", WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT))
         scenario = ActivityScenario.launch(ComponentActivity::class.java).also { launched ->
             launched.onActivity { activity ->
-                val host = NucleoWebView(WebView(activity), scope, { method, params -> answer(method, params) }, unavailable::set)
+                val view = WebView(activity)
+                WebViewCompat.addDocumentStartJavaScript(view, NO_WEBGL, setOf("https://appassets.androidplatform.net"))
+                val host = NucleoWebView(view, scope, { method, params -> answer(method, params) }, unavailable::set)
                 activity.setContentView(host.view)
                 host.resume()
                 host.load("app")
@@ -159,22 +164,11 @@ class FollowUpPageInstrumentedTest(private val language: String) {
         }
     }
 
-    /**
-     * The page is loaded again, and from here on it finds no WebGL: it draws its own fallback (see
-     * the note on this class). The script runs before any of the page's own.
-     */
-    private fun reloadWithoutWebGl() {
-        assertTrue("This WebView cannot run a script before the page's own", WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT))
+    /** The page is loaded again, as after the app was closed and opened. */
+    private fun reload() {
         calls.clear()
-        instrumentation.runOnMainSync {
-            val host = checkNotNull(web)
-            if (!webGlOff) {
-                webGlOff = true
-                WebViewCompat.addDocumentStartJavaScript(host.view, NO_WEBGL, setOf("https://appassets.androidplatform.net"))
-            }
-            host.reload("app")
-        }
-        await("the idle home without WebGL", 300_000) { seen -> calls.any { it.first == "session" } && seen.state == "IDLE" && seen.chips.size >= 3 && seen.settled && seen.noGl }
+        instrumentation.runOnMainSync { checkNotNull(web).reload("app") }
+        await("the idle home again", 300_000) { seen -> calls.any { it.first == "session" } && seen.state == "IDLE" && seen.chips.size >= 3 && seen.settled && seen.noGl }
     }
 
     /** A chip of the home asks about NVDA, the way a person's tap does, and the read is handed back. */
