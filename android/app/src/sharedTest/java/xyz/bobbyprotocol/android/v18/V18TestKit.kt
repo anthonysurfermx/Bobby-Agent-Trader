@@ -173,7 +173,7 @@ class V18TestBench(scope: CoroutineScope, val store: MemoryKeyValueStore = Memor
 
     /** A read arrives on the glass. */
     fun deliver(requestId: String = "r1", symbol: String = "NVDA", name: String = "NVIDIA", isEquity: Boolean = true, verdict: String = "wait",
-                price: Double? = 120.5, memory: JSONObject? = null) = host.readDelivered(read(requestId, symbol, name, isEquity, verdict, price, memory))
+                price: Double? = 120.5, memory: JSONObject? = null) = host.readDelivered(read(requestId, symbol, name, isEquity, verdict, price, memory), ReadOrigin.PERSON)
 
     /** Another reader takes the phone (null signs out). */
     fun changeAccount(owner: String?) {

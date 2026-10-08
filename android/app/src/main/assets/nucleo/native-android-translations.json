@@ -1007,6 +1007,12 @@
     "it": "Aggiornamenti",
     "de": "Follow-ups"
   },
+  "Follow-ups are off in this phone's settings.": {
+    "fr": "Les suivis sont désactivés dans les réglages de ce téléphone.",
+    "pt": "O seguimento está desligado nas definições deste telemóvel.",
+    "it": "Gli aggiornamenti sono disattivati nelle impostazioni di questo telefono.",
+    "de": "Follow-ups sind in den Einstellungen dieses Geräts aus."
+  },
   "Follow-ups are off.": {
     "fr": "Les suivis sont désactivés.",
     "pt": "O seguimento está desligado.",

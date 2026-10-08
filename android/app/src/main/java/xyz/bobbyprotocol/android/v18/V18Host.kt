@@ -49,6 +49,13 @@ interface OneTapRule {
     fun afterRead(access: JSONObject?): Boolean
 
     /**
+     * The same, told the level that read ran at (`rapido`, `profundo`, `maximo`): a rule that keeps
+     * count of a level's own allowance needs it, because the read just answered is not yet in what
+     * the phone last heard about that level. A rule that does not care answers as for any level.
+     */
+    fun afterRead(access: JSONObject?, level: String): Boolean = afterRead(access)
+
+    /**
      * The idle home, from what the phone knows now. Not knowing is a yes: the home keeps its chips
      * on a first launch and without network. On a no the session says `oneTap: false`; call
      * `V18Host.sessionChanged()` when the answer flips, so the row is drawn again at once.
@@ -191,6 +198,13 @@ interface V18Host {
     fun onEraseEverything(listener: (String?) -> Unit): () -> Unit
     /** The Memory screen calls this after deleting the theses: every `onEraseEverything` listener runs for the current owner. */
     fun eraseEverything()
+    /**
+     * "Forget" on one asset in Memory, for the reader who is here now: what a feature keeps on this
+     * phone about that asset goes too (the follow-up notes, and the follow-up that was coming).
+     */
+    fun onAssetForgotten(listener: (String) -> Unit): () -> Unit
+    /** The Memory screen calls this when the person forgets one asset: every `onAssetForgotten` listener runs. */
+    fun assetForgotten(symbol: String)
 
     // ---- Notification taps and links ----
 

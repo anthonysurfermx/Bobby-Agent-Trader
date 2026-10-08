@@ -54,7 +54,9 @@ import xyz.bobbyprotocol.android.v18.theses.V18HostWords
 // (preferences, what this phone keeps, how it works). When this phone's questions are not in
 // memory, "Turn on" opens the consent (one consent path: the same screen the offer on the glass
 // opens). MemoryCenter owns account isolation and makes deletion complete (server, shortcuts,
-// theses, and what the other 1.8 features keep). What the phone keeps shows to everyone, signed in or not.
+// theses, and what the other 1.8 features keep). What the phone keeps is there for everyone, signed
+// in or not, behind the same row, "On this phone": signed out the screen is one sentence and that row.
+// (iOS draws that part unfolded for a signed-out reader, three paragraphs before the first note.)
 
 @Composable
 fun MemorySheet(host: V18Host, onClose: () -> Unit) {
@@ -105,12 +107,18 @@ private fun MemoryScreen(host: V18Host, center: MemoryCenter, onClose: () -> Uni
         val now = c()
         val snapshot = now.snapshot
         if (now.currentUser() == null) {
-            QuietNote(copy.error(MemoryError.SIGNED_OUT), Modifier.padding(top = 10.dp, bottom = 14.dp), tag = "memory-signed-out")
-            // Nobody signed in: the phone still keeps a shortcut row and theses of its own. No server call.
-            OnThisPhone(host, copy, center, c, mentionsDeletion = false)
+            QuietNote(copy.error(MemoryError.SIGNED_OUT), Modifier.padding(top = 10.dp, bottom = 6.dp), tag = "memory-signed-out")
+            // Nobody signed in: the phone still keeps a shortcut row, theses and follow-up notes of its
+            // own. No server call. One row that unfolds, as for an account: the face stays one line
+            // and one row (V18-DESIGN.md gives Memory about twenty words), and everything is a tap away.
+            QuietDisclosure(host, host.text("On this phone", "En este teléfono"), "memory-local") {
+                OnThisPhone(host, copy, center, c, mentionsDeletion = false)
+            }
         } else if (!host.riskAccepted) {
-            QuietNote(copy.riskRequired, Modifier.padding(top = 10.dp, bottom = 14.dp), tag = "memory-risk-required")
-            OnThisPhone(host, copy, center, c, mentionsDeletion = false)
+            QuietNote(copy.riskRequired, Modifier.padding(top = 10.dp, bottom = 6.dp), tag = "memory-risk-required")
+            QuietDisclosure(host, host.text("On this phone", "En este teléfono"), "memory-local") {
+                OnThisPhone(host, copy, center, c, mentionsDeletion = false)
+            }
         } else if (snapshot != null) {
             Loaded(host, copy, center, c, snapshot, onTurnOn)
         } else if (now.loading || !asked) {

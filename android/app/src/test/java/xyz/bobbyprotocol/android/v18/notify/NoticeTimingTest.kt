@@ -37,8 +37,8 @@ class NoticeTimingTest {
 
     // What a notice asks for
 
-    @Test fun aFollowUpAsksForTheDaysHoursAndAnExpiryAndAReminderForNeither() {
-        assertEquals(LocalNotice.Delivery(9, 21, 24 * hour), LocalNotice.Delivery.of(LocalNotice.CHANNEL_FOLLOW_UPS))
+    @Test fun aFollowUpAsksForTheDaysHoursAnExpiryAndRoomAndAReminderForNone() {
+        assertEquals(LocalNotice.Delivery(9, 21, 24 * hour, 18 * hour), LocalNotice.Delivery.of(LocalNotice.CHANNEL_FOLLOW_UPS))
         assertEquals(LocalNotice.Delivery(), LocalNotice.Delivery.of(LocalNotice.CHANNEL_THESIS_REMINDERS))
         val planned = LocalNotice("v18.follow.asset", "Bobby", "NVDA, a day later.", at(8, 10), LocalNotice.CHANNEL_FOLLOW_UPS)
         assertEquals("the channel's own unless the notice says otherwise", followUp, planned.delivery)
@@ -46,6 +46,62 @@ class NoticeTimingTest {
         val options = HarnessPlanner.Options()
         assertEquals("the hours the worker keeps are the hours the planner plans inside", options.earliestHour, followUp.fromHour)
         assertEquals(options.latestHour, followUp.untilHour)
+        assertEquals("and the room it keeps is the gap the planner keeps", options.minimumGapMs, followUp.apartMs)
+    }
+
+    // Room: never beside the last follow-up the phone really showed
+
+    /** `shown`: when the phone last really showed a follow-up. */
+    private fun decideAfter(shown: Long?, planned: Long, now: Long, delivery: LocalNotice.Delivery = followUp, zone: ZoneId = mexico) =
+        NoticeTiming.decide(planned, delivery, now, zone, shown)
+
+    @Test fun aFollowUpNeverLandsOnTheDayOfTheLastOneShown() {
+        // Sunday's ran late and was shown on Monday at 09:00 (the 12th); the week is planned for Monday 21:00.
+        assertEquals("it waits for Tuesday's first allowed hour", wait(at(13, 9)), decideAfter(at(12, 9), at(12, 21), at(12, 21)))
+        assertEquals("and is shown then", post, decideAfter(at(12, 9), at(12, 21), at(13, 9)))
+        // The phone was off: one shown at 13:00, the next one planned for 14:10 the same day.
+        assertEquals(wait(at(13, 9)), decideAfter(at(12, 13), at(12, 14, 10), at(12, 14, 10)))
+        // Another day, and far enough: nothing stands in the way.
+        assertEquals(post, decideAfter(at(11, 14), at(12, 14, 10), at(12, 14, 10)))
+        assertEquals("nothing was ever shown", post, decideAfter(null, at(12, 14, 10), at(12, 14, 10)))
+    }
+
+    @Test fun aFollowUpNeverLandsWithinEighteenHoursOfTheLastOneShown() {
+        // One shown on Monday at 20:00; the next was planned for Tuesday 09:30. Thirteen and a half hours is too close.
+        assertEquals("it waits until eighteen hours have passed", wait(at(13, 14)), decideAfter(at(12, 20), at(13, 9, 30), at(13, 9, 30)))
+        assertEquals(wait(at(13, 14)), decideAfter(at(12, 20), at(13, 9, 30), at(13, 13, 59)))
+        assertEquals(post, decideAfter(at(12, 20), at(13, 9, 30), at(13, 14)))
+        // One shown inside the grace, at 21:10: eighteen hours later is 15:10, inside the hours.
+        assertEquals(wait(at(13, 15, 10)), decideAfter(at(12, 21, 10), at(13, 10), at(13, 10)))
+    }
+
+    @Test fun waitingForRoomNeverCarriesAFollowUpPastItsExpiry() {
+        // Planned for Monday 09:30 and run at 20:30, right after another one was shown at 20:00: the
+        // first moment with room is Tuesday 14:00, more than a day after its own.
+        assertEquals("dropped now, so nothing stays listed that will never be shown", drop, decideAfter(at(12, 20), at(12, 9, 30), at(12, 20, 30)))
+        // Planned for Monday 14:10: Tuesday 09:00 is inside its day.
+        assertEquals(wait(at(13, 9)), decideAfter(at(12, 13), at(12, 14, 10), at(12, 20, 30)))
+        assertEquals("already too late, whatever was shown", drop, decideAfter(at(12, 13), at(11, 10), at(12, 14)))
+    }
+
+    @Test fun roomIsCountedOnThePhonesOwnDayAndOnlyForANoticeThatAsksForIt() {
+        // A thesis reminder asks for no room: it is shown beside anything.
+        assertEquals(post, decideAfter(at(12, 13), at(12, 14, 10), at(12, 14, 10), reminder))
+        assertEquals("a notice stored before follow-ups asked for room keeps its hours and expiry only", post,
+                     decideAfter(at(12, 13), at(12, 14, 10), at(12, 14, 10), LocalNotice.Delivery(9, 21, 24 * hour)))
+        // The day is the day where the phone is: 23:30 on the 11th in Mexico City is already the 12th in Madrid.
+        val madrid = ZoneId.of("Europe/Madrid")
+        val shown = at(11, 16)                       // 16:00 in Mexico City on the 11th, midnight on the 12th in Madrid
+        val planned = at(12, 12, 0, madrid)          // noon in Madrid on the 12th
+        assertEquals("the same day in Madrid, twelve hours apart: it waits for the 13th", wait(at(13, 9, 0, madrid)), decideAfter(shown, planned, planned, zone = madrid))
+        // A last showing dated after now (the clock was set back) says nothing.
+        assertEquals(post, decideAfter(at(12, 15), at(12, 14, 10), at(12, 14, 10)))
+        // A clock change does not move the next day: Berlin's clocks go back on Sunday 25 October 2026.
+        val berlin = ZoneId.of("Europe/Berlin")
+        fun there(day: Int, hourOfDay: Int): Long = ZonedDateTime.of(2026, 10, day, hourOfDay, 0, 0, 0, berlin).toInstant().toEpochMilli()
+        assertEquals("eighteen hours after Saturday 20:00 is Sunday 13:00 on the wall, one hour gained in the night",
+                     wait(there(24, 20) + 18 * hour), decideAfter(there(24, 20), there(25, 9), there(25, 9), zone = berlin))
+        assertEquals(13, java.time.Instant.ofEpochMilli(there(24, 20) + 18 * hour).atZone(berlin).hour)
     }
 
     // On time

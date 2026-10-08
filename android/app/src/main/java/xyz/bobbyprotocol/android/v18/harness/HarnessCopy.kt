@@ -118,6 +118,14 @@ class HarnessCopy(private val locale: () -> String, private val lookup: (String,
     val switchLabel: String get() = text("Follow-ups", "Seguimiento")
     val switchDetail: String get() = text("Bobby comes back to what you asked.", "Bobby vuelve a lo que preguntaste.")
 
+    /**
+     * Under the switch when the phone lets Bobby notify and follow-ups themselves were switched
+     * off in its settings ("Turn off notifications" on a follow-up): what stands in the way, and
+     * the way there. Android only: an iPhone has no switch per kind of notification.
+     */
+    val offInSettings: String get() = text("Follow-ups are off in this phone's settings.", "El seguimiento está apagado en los ajustes de este teléfono.")
+    val openSettings: String get() = text("Open Settings", "Abrir Configuración")
+
     // The sectors
 
     /** The sector's name in the app's language; an id nobody named is shown as it is. */

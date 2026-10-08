@@ -42,6 +42,7 @@ import xyz.bobbyprotocol.android.v18.harness.HarnessCenter
 import xyz.bobbyprotocol.android.v18.harness.HarnessCopy
 import xyz.bobbyprotocol.android.v18.harness.HarnessMode
 import xyz.bobbyprotocol.android.v18.harness.HarnessNotes
+import xyz.bobbyprotocol.android.v18.notify.LocalNotifier
 
 // The harness (1.8): where a sector or a week follow-up lands (route `followUp`). One list: the
 // assets, each with how far it moved, and a tap that asks Bobby about it. The numbers are read when
@@ -135,6 +136,15 @@ fun FollowUpsRows(host: V18Host, onConsentRequired: () -> Unit = {}) {
             host.scope.launch { if (center.accept() == HarnessCenter.Outcome.CONSENT_REQUIRED) onConsentRequired() }
         } else {
             center.turnOff()
+        }
+    }
+    // The phone lets Bobby notify, and follow-ups themselves were switched off in its settings (a long
+    // press on one, "Turn off notifications"): the switch says what stands in the way, with the way
+    // there. When all of Bobby's notifications are off, the Reminders sheet already says so for every row.
+    if (view.mode == HarnessMode.ON && view.permission == LocalNotifier.Permission.DENIED && host.notifier.status() == LocalNotifier.Permission.ALLOWED) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 4.dp).testTag("reminders-follow-ups-off-in-settings")) {
+            QuietNote(center.copy.offInSettings)
+            QuietLink(center.copy.openSettings, "reminders-follow-ups-settings") { host.openNotificationSettings() }
         }
     }
     // Only while follow-ups are on, as iOS (`showsWeekRow && followUps == .on`).

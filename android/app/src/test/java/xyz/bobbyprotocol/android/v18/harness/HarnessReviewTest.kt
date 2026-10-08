@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import xyz.bobbyprotocol.android.v18.NudgeCenter
@@ -17,6 +18,7 @@ import xyz.bobbyprotocol.android.v18.credits.FakeCreditsBackend
 import xyz.bobbyprotocol.android.v18.credits.HeldMeters
 import xyz.bobbyprotocol.android.v18.credits.LevelMeter
 import xyz.bobbyprotocol.android.v18.credits.ReadAccess
+import xyz.bobbyprotocol.android.v18.notify.LocalNotice
 import xyz.bobbyprotocol.android.v18.notify.LocalNotifier
 import xyz.bobbyprotocol.android.v18.notify.MemoryLocalNotifier
 
@@ -31,6 +33,7 @@ import xyz.bobbyprotocol.android.v18.notify.MemoryLocalNotifier
  *  - Bobby never leads into a wall: a chip runs at the level the person saved, so that level's own
  *    meter is asked too.
  *  - A yes that was erased is asked for again; a day is promised only when the phone will show it.
+ *  - Follow-ups switched off in the phone's own settings (the channel) are a no from the phone.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class HarnessReviewTest {
@@ -168,6 +171,47 @@ class HarnessReviewTest {
         assertTrue(said(center).any { it.startsWith("Your week arrives on ") })
     }
 
+    // Follow-ups switched off in the phone's settings
+
+    /**
+     * Android lets a person switch one kind of notice off by itself: a long press on a follow-up,
+     * "Turn off notifications". Bobby's notifications as a whole stay allowed, and the system
+     * silently discards every follow-up from then on.
+     */
+    @Test fun followUpsSwitchedOffInThePhonesSettingsAreANoFromThePhone() = runTest {
+        val center = make()
+        ask(center, "NVDA")
+        assertEquals(HarnessCenter.Outcome.ON, center.accept())
+        assertEquals(2, phone.pendingIds().size)
+        phone.memory.channelsOff.add(LocalNotice.CHANNEL_FOLLOW_UPS)
+        assertEquals("Bobby may still post its other notices", LocalNotifier.Permission.ALLOWED, phone.status())
+        center.appActive()
+        assertEquals("for follow-ups it is a no", LocalNotifier.Permission.DENIED, center.status)
+        assertEquals("and the switch is told, as for a denied permission", LocalNotifier.Permission.DENIED, center.view.value.permission)
+        assertFalse("no day is promised", said(center).any { it.startsWith("Bobby comes back") || it.startsWith("Your week arrives") })
+        // The day passes. The system discarded the notice: nothing was shown, and nothing is written as shown.
+        clock = at(9, 10)
+        assertTrue(shown().isEmpty())
+        center.appActive()
+        assertTrue(sent(center).isEmpty())
+        assertFalse(said(center).any { it.startsWith("Follow-ups:") })
+        // A new question while it is off is planned, for the glass, and nothing is handed to the phone.
+        val handed = phone.written.size
+        ask(center, "TSLA")
+        assertEquals(2, center.upcoming.size)
+        assertEquals(handed, phone.written.size)
+        // A second yes does not ask the system anything: the question was answered, and only the settings can change this.
+        val asks = phone.memory.asked
+        assertEquals(HarnessCenter.Outcome.DENIED, center.accept())
+        assertEquals(asks, phone.memory.asked)
+        // They switch it back on in the settings.
+        phone.memory.channelsOff.clear()
+        center.appActive()
+        assertEquals(LocalNotifier.Permission.ALLOWED, center.status)
+        assertEquals("what was planned is handed over now", setOf("v18.follow.asset", "v18.follow.week"), phone.pendingIds())
+        assertTrue(phone.written.size > handed)
+    }
+
     // A no stays a no, signed in or out
 
     /**
@@ -207,6 +251,31 @@ class HarnessReviewTest {
         assertEquals("off", raw.values[modeKey(null)])
         ask(center, "NVDA")
         assertTrue(center.ledger.isEmpty)
+    }
+
+    /** The no crosses because it is the later word. A yes said after it, in the account, is later still. */
+    @Test fun aYesSaidLaterInTheAccountIsNotUndoneByTheNoThePhoneKept() = runTest {
+        val center = make()
+        ask(center, "NVDA")
+        center.accept()
+        center.turnOff()
+        switchTo("u1")
+        center.accountChanged()
+        assertEquals("the no said signed out goes with them", HarnessMode.OFF, center.mode)
+        assertEquals("and stays on the phone", "off", raw.values[modeKey(null)])
+        // In the account they turn the switch on themselves.
+        assertEquals(HarnessCenter.Outcome.ON, center.accept())
+        assertNull("their latest word on this phone is a yes: the phone's no is lifted", raw.values[modeKey(null)])
+        switchTo(null)
+        center.accountChanged()
+        assertEquals("signed out they are undecided again, never on by themselves", HarnessMode.UNDECIDED, center.mode)
+        switchTo("u1")
+        center.accountChanged()
+        assertEquals("and the account keeps the yes they said last", HarnessMode.ON, center.mode)
+        // An account that had said yes and signs out leaves the signed-out reader as it was.
+        switchTo(null)
+        center.accountChanged()
+        assertNull(raw.values[modeKey(null)])
     }
 
     // A yes that was erased is asked for again
@@ -258,5 +327,57 @@ class HarnessReviewTest {
         bench.desk.analysisLevel = "rapido"
         assertTrue(bench.host.offersOneTapOnHome())
         assertTrue(bench.host.offersOneTapAfterRead(receipt(free(13))))
+    }
+
+    /** The read that spends the last one of a level: the phone has not heard the new balance when its row is drawn. */
+    @Test fun theLastReadOfALevelTakesTheChipsOffItsOwnRow() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        bench.changeAccount("u1")
+        val backend = FakeCreditsBackend()
+        fun balance(maxLeft: Int) = HeldMeters("u1", bench.desk.accountEpoch, free(15), mapOf(
+            CreditsLevel.PROFUNDO to LevelMeter(0, 6, 6, 0, 7, null), CreditsLevel.MAXIMO to LevelMeter(2 - maxLeft, 2, maxLeft, 0, 7, null)))
+        backend.held = balance(1)
+        CreditsCenter.of(bench.host, backend)
+        HarnessNudges.register(bench.host)
+        runCurrent()
+        bench.desk.analysisLevel = "maximo"
+        assertTrue("one Max read is left: the home keeps its chips", bench.host.offersOneTapOnHome())
+        // They type their last Max question, and it is answered.
+        assertFalse("a chip of its row would be one more Max read", bench.host.offersOneTapAfterRead(receipt(free(14)), "maximo"))
+        assertFalse("and so would a chip of the home", bench.host.offersOneTapOnHome())
+        // The balance arrives and says the same.
+        backend.held = balance(0)
+        assertFalse(bench.host.offersOneTapOnHome())
+        // A gifted Max read, or the week turning over, opens it again; a read Bobby started (Quick) takes nothing from Max.
+        backend.held = balance(1)
+        assertTrue(bench.host.offersOneTapOnHome())
+        assertTrue(bench.host.offersOneTapAfterRead(receipt(free(13)), "rapido"))
+        assertTrue(bench.host.offersOneTapOnHome())
+        // Not knowing a level's count is a no after a read and changes nothing on the home.
+        backend.held = HeldMeters("u1", bench.desk.accountEpoch, free(12), emptyMap())
+        assertFalse(bench.host.offersOneTapAfterRead(receipt(free(12)), "rapido"))
+        assertTrue(bench.host.offersOneTapOnHome())
+        // Bobby Pro: a level that ran out is a notice with "Continue with Quick", not a sign-in or a paywall.
+        backend.held = balance(0)
+        val pro = ReadAccess("pro", 40, null, null, null, false)
+        assertTrue(bench.host.offersOneTapAfterRead(receipt(pro), "maximo"))
+        assertTrue(bench.host.offersOneTapOnHome())
+    }
+
+    @Test fun theLevelsOwnAllowanceIsAskedOnlyWhereItIsAWall() {
+        val deep = LevelMeter(5, 6, 1, 0, 7, null)
+        val spentUp = LevelMeter(6, 6, 0, 0, 7, null)
+        assertEquals("Quick is the receipt's own meter", true, HarnessWall.levelOpen("rapido", free(0), null))
+        assertEquals(true, HarnessWall.levelOpen("profundo", free(5), deep))
+        assertEquals("the read just answered took the last one", false, HarnessWall.levelOpen("profundo", free(5), deep, spent = 1))
+        assertEquals(false, HarnessWall.levelOpen("profundo", free(5), spentUp))
+        assertEquals("a gifted read of that level", true, HarnessWall.levelOpen("profundo", free(5), LevelMeter(6, 6, 0, 1, 7, null)))
+        assertEquals("a guest's Deep allowance, with the sign-in behind it", false, HarnessWall.levelOpen("profundo", ReadAccess("anon", 2, 6, 4, null, true), spentUp))
+        assertEquals("Bobby Pro meets a notice, not a wall", true, HarnessWall.levelOpen("maximo", ReadAccess("pro", 40, null, null, null, false), spentUp))
+        assertNull("no count: the phone cannot tell", HarnessWall.levelOpen("maximo", free(5), null))
+        assertNull(HarnessWall.levelOpen("maximo", free(5), LevelMeter(null, 2, null, 0, 7, null)))
+        assertEquals("by what was used, when that is what the server sent", false, HarnessWall.levelOpen("maximo", free(5), LevelMeter(2, 2, null, 0, 7, null)))
+        assertNull("a receipt the phone does not have changes nothing about the level", HarnessWall.levelOpen("maximo", null, null))
+        assertEquals(false, HarnessWall.levelOpen("maximo", null, spentUp))
     }
 }

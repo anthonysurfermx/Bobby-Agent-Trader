@@ -56,10 +56,17 @@ import java.util.concurrent.TimeUnit
 //
 // Because the phone can run late, the worker asks `NoticeTiming` before it shows anything: a
 // follow-up that runs late and outside 09:00-21:00 waits for the next 09:00 (it stays pending and
-// the same work is queued again), one that is more than a day late is dropped unseen, and a thesis
-// reminder is shown however late. The decision is tested on the JVM. That WorkManager posts a due
-// notice, and that its tap reaches the activity, is checked on an emulator
+// the same work is queued again), one that is more than a day late is dropped unseen, one that
+// would land on the day of the last follow-up shown (or within 18 hours of it) waits for the next
+// day, and a thesis reminder is shown however late. The decision is tested on the JVM. That
+// WorkManager posts a due notice, and that its tap reaches the activity, is checked on an emulator
 // (V18DeviceInstrumentedTest); the wait and the drop were never seen on a device.
+//
+// What was really shown is written to `bobby.v18.shown` at the moment the notice goes up: for a
+// follow-up, its id (one per kind of follow-up, never an asset), the moment it was planned for and
+// the moment it was shown. The harness writes a follow-up as shown from that and from nothing
+// else (`LocalNotifier.shownAt`), and the worker reads the last showing from it. Cancelling an id
+// forgets its record, so turning follow-ups off leaves nothing there.
 //
 // A notice is private (`VISIBILITY_PRIVATE`). One that carries a `publicBody` also has a public
 // version: what a locked phone set to hide sensitive content shows instead, so a follow-up's asset
@@ -70,8 +77,15 @@ import java.util.concurrent.TimeUnit
 class AndroidLocalNotifier(context: Context, private val ask: suspend () -> Boolean) : LocalNotifier {
     private val app = context.applicationContext
     private val index = LocalNoticeIndex(app)
+    private val shown = LocalNoticeShown(app)
 
     override fun status(): LocalNotifier.Permission = LocalNotices.status(app)
+
+    /** A kind of notice the person switched off in the system's settings is a no for that kind. */
+    override fun status(channel: String): LocalNotifier.Permission = NoticePermission.status(
+        BriefingReminders.permissionGranted(app), LocalNotices.runtimeGranted(app), LocalNotices.asked(app), LocalNotices.channelOff(app, channel))
+
+    override fun shownAt(id: String, fireAtEpochMs: Long): Long? = shown.at(id, fireAtEpochMs)
 
     override suspend fun requestPermission(): Boolean {
         val on = BriefingReminders.permissionGranted(app)
@@ -95,6 +109,8 @@ class AndroidLocalNotifier(context: Context, private val ask: suspend () -> Bool
     override fun cancel(ids: Collection<String>) {
         if (ids.isEmpty()) return
         index.remove(ids)
+        // What was shown under these ids is not kept past them.
+        shown.remove(ids)
         val manager = WorkManager.getInstance(app)
         for (id in ids) manager.cancelUniqueWork(LocalNotices.workName(id))
     }
@@ -148,6 +164,49 @@ internal class LocalNoticeIndex(context: Context) {
     }
 }
 
+/**
+ * What the phone really showed, on disk (`bobby.v18.shown`): per notice id, its last showing. Only
+ * follow-ups are written: the moment the notice was planned for, the moment it went up, and its
+ * channel. An id names a kind of follow-up (`v18.follow.asset`), never an asset.
+ */
+internal class LocalNoticeShown(context: Context) {
+    private val prefs = context.applicationContext.getSharedPreferences("bobby.v18.shown", Context.MODE_PRIVATE)
+
+    private fun record(id: String): JSONObject? = prefs.getString(id, null)?.let { raw -> try { JSONObject(raw) } catch (_: Exception) { null } }
+
+    /** When the notice `id` planned for `fireAt` was shown, or null when the phone did not show it. */
+    fun at(id: String, fireAt: Long): Long? {
+        val record = record(id) ?: return null
+        if (record.optLong("fireAt", -1L) != fireAt) return null
+        return record.optLong("at", -1L).takeIf { it > 0 }
+    }
+
+    /** The latest showing of any notice of `channel`, or null. */
+    fun last(channel: String): Long? {
+        var latest: Long? = null
+        for (id in prefs.all.keys) {
+            val record = record(id) ?: continue
+            if (record.optString("channel") != channel) continue
+            val at = record.optLong("at", -1L)
+            if (at > 0 && (latest == null || at > latest)) latest = at
+        }
+        return latest
+    }
+
+    @SuppressLint("ApplySharedPref")
+    fun put(notice: LocalNotice, at: Long) {
+        val json = JSONObject().put("fireAt", notice.fireAtEpochMs).put("at", at).put("channel", notice.channel)
+        prefs.edit().putString(notice.id, json.toString()).commit()
+    }
+
+    @SuppressLint("ApplySharedPref")
+    fun remove(ids: Collection<String>) {
+        val editor = prefs.edit()
+        for (id in ids) editor.remove(id)
+        editor.commit()
+    }
+}
+
 object LocalNotices {
     /** The extra a tapped notice carries to MainActivity: its payload as a JSON object of strings. */
     const val EXTRA = "v18.notice"
@@ -183,7 +242,17 @@ object LocalNotices {
         ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
     private fun permissions(context: Context) = context.getSharedPreferences("bobby_permissions", Context.MODE_PRIVATE)
-    private fun asked(context: Context): Boolean = permissions(context).getBoolean("notificationsAsked", false)
+    internal fun asked(context: Context): Boolean = permissions(context).getBoolean("notificationsAsked", false)
+
+    /**
+     * The person switched this kind of notice off in the system's settings (long-press on a notice,
+     * "Turn off notifications"): the channel exists and its importance is none. A channel that was
+     * never created is not off: it is created with the first notice.
+     */
+    internal fun channelOff(context: Context, channel: String): Boolean {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        return manager.getNotificationChannel(channel)?.importance == NotificationManager.IMPORTANCE_NONE
+    }
     internal fun markAsked(context: Context) { permissions(context).edit().putBoolean("notificationsAsked", true).apply() }
 
     internal fun payloadJson(payload: Map<String, String>): JSONObject = JSONObject().also { json -> for ((key, value) in payload) json.put(key, value) }
@@ -216,19 +285,22 @@ object LocalNotices {
     }
 
     /**
-     * Shows the notice now, unless it should not be shown: notifications are off, it was planned
-     * for another reader of this phone, the risk notice was withdrawn, or the app is in front and
-     * its feature says the glass already tells it. Called from the worker, off the main thread.
+     * Shows the notice now, unless it should not be shown: notifications are off (Bobby's, or this
+     * kind's), it was planned for another reader of this phone, the risk notice was withdrawn, or
+     * the app is in front and its feature says the glass already tells it. True only when the
+     * notice went up. Called from the worker, off the main thread.
      */
-    internal suspend fun post(context: Context, notice: LocalNotice) {
-        if (!BriefingReminders.permissionGranted(context)) return
+    internal suspend fun post(context: Context, notice: LocalNotice): Boolean {
+        if (!BriefingReminders.permissionGranted(context)) return false
+        // This kind was switched off in the system's settings: the system would discard it unseen.
+        if (channelOff(context, notice.channel)) return false
         // Whoever uses the phone now, read from disk: the activity may not be alive.
         val owner = BobbyRepository(context).session.value?.userId
         val reader = notice.payload[LocalNotice.OWNER]
-        if (reader != null && reader != V18Reader.tag(owner)) return
-        if (context.getSharedPreferences("bobby.nucleo", Context.MODE_PRIVATE).getInt("profile." + (owner ?: "local") + ".riskVersion", 0) <= 0) return
+        if (reader != null && reader != V18Reader.tag(owner)) return false
+        if (context.getSharedPreferences("bobby.nucleo", Context.MODE_PRIVATE).getInt("profile." + (owner ?: "local") + ".riskVersion", 0) <= 0) return false
         val allowed = withContext(Dispatchers.Main) { V18Process.runtime?.allowsDueNotice(notice.payload) ?: true }
-        if (!allowed) return
+        if (!allowed) return false
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(NotificationChannel(notice.channel, channelName(notice.channel, language(context)), NotificationManager.IMPORTANCE_DEFAULT))
         // Android tells two PendingIntents apart by their intent without its extras: the data makes each notice its own.
@@ -266,6 +338,7 @@ object LocalNotices {
             builder.setPublicVersion(locked.build())
         }
         manager.notify(notice.id, NOTIFICATION_ID, builder.build())
+        return true
     }
 
     /**
@@ -326,7 +399,9 @@ class LocalNoticeWorker(context: Context, params: WorkerParameters) : CoroutineW
         val notice = index.get(id) ?: return Result.success()
         if (notice.fireAtEpochMs != inputData.getLong(LocalNotices.WORK_FIRE_AT, -1L)) return Result.success()
         val now = System.currentTimeMillis()
-        when (val decision = NoticeTiming.decide(notice, now, ZoneId.systemDefault())) {
+        val shown = LocalNoticeShown(applicationContext)
+        // The last notice of its kind this phone really showed: a follow-up keeps its distance from it.
+        when (val decision = NoticeTiming.decide(notice, now, ZoneId.systemDefault(), shown.last(notice.channel))) {
             is NoticeTiming.Decision.Wait -> {
                 // Still pending: the index keeps it, and the same work asks again at the next allowed hour.
                 // Queuing it replaces this run, so it is the last thing done here.
@@ -336,7 +411,9 @@ class LocalNoticeWorker(context: Context, params: WorkerParameters) : CoroutineW
             NoticeTiming.Decision.Post -> {
                 // From here it is no longer pending, shown or not.
                 index.remove(listOf(id))
-                try { LocalNotices.post(applicationContext, notice) } catch (_: Exception) { }
+                val posted = try { LocalNotices.post(applicationContext, notice) } catch (_: Exception) { false }
+                // Only what went up is written as shown, with the moment it did.
+                if (posted && notice.channel == LocalNotice.CHANNEL_FOLLOW_UPS) shown.put(notice, System.currentTimeMillis())
             }
         }
         return Result.success()

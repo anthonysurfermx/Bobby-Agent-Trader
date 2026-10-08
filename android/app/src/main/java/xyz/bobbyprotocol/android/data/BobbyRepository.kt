@@ -195,6 +195,19 @@ class BobbyRepository(context: Context) {
         return MarketSnapshot(symbol = symbol, price = json.numberOrNull("price"), changePct = json.numberOrNull("change_24h_pct"))
     }
 
+    /**
+     * One asset's price for a line Bobby draws without a tap (the number on the glass, a row of the
+     * week's board). The person did not ask for this request, so it says nothing about them: the
+     * symbol, and neither the account nor the installation (`AnonymousRequest`). Nothing is retried
+     * with a bearer, and the reply is plain market data.
+     */
+    suspend fun quote(symbol: String): MarketSnapshot {
+        val body = JSONObject().put("tool", "get_market").put("args", JSONObject().put("symbol", symbol))
+        val reply = network(AnonymousRequest.post(apiBase, "api/voice-tool", body)) { response -> decodeReply(response) }
+        requireSuccess(reply)
+        return MarketSnapshot(symbol = symbol, price = reply.json.numberOrNull("price"), changePct = reply.json.numberOrNull("change_24h_pct"))
+    }
+
     suspend fun candles(symbol: String, isEquity: Boolean = false, timeframe: MarketTimeframe = MarketTimeframe.ONE_HOUR): List<Candle> {
         require(!isEquity || timeframe != MarketTimeframe.FOUR_HOURS) { "The equity provider does not expose 4H candles" }
         val path = if (isEquity) queryPath("api/stock-candles", mapOf("symbol" to symbol,

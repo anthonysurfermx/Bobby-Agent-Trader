@@ -137,6 +137,7 @@ class V18Runtime(
     private val languageListeners = Listeners<() -> Unit>()
     private val deletedListeners = Listeners<(String) -> Unit>()
     private val eraseListeners = Listeners<(String?) -> Unit>()
+    private val forgottenListeners = Listeners<(String) -> Unit>()
     private val tapHandlers = HashMap<String, (Map<String, String>) -> Unit>()
     private val tapChecks = HashMap<String, (Map<String, String>) -> Boolean>()
     private val dueHandlers = HashMap<String, (Map<String, String>) -> Boolean>()
@@ -311,9 +312,11 @@ class V18Runtime(
 
     /**
      * A delivered read (`status: "ok"`): what the sources and the hooks may look at. Never the question.
-     * `origin` is who started it, as the session decided when it was asked.
+     * `origin` is who started it, as the session decided when it was asked. It has no default on
+     * purpose: a caller that forgot it would make every chip and every picked question the
+     * person's own, and each would start a chain of follow-ups.
      */
-    fun readDelivered(read: JSONObject, origin: ReadOrigin = ReadOrigin.PERSON) {
+    fun readDelivered(read: JSONObject, origin: ReadOrigin) {
         val summary = ReadSummary.from(read)?.copy(origin = origin) ?: return
         shelf.put(summary)
         nudges.noteRead(NudgeRead(summary.requestId, summary.symbol, summary.name, summary.isEquity, summary.verdict, false, clock(),
@@ -338,10 +341,11 @@ class V18Runtime(
     override var oneTap: OneTapRule = OneTapRule.ALWAYS
 
     /**
-     * After a read with this access receipt: may its row carry a question that asks by itself?
-     * A rule that fails is a no. Nothing is lost but a chip, and Bobby never leads into a wall.
+     * After a read with this access receipt, answered at `level`: may its row carry a question that
+     * asks by itself? A rule that fails is a no. Nothing is lost but a chip, and Bobby never leads into a wall.
      */
-    fun offersOneTapAfterRead(access: JSONObject?): Boolean = try { oneTap.afterRead(access) } catch (_: Exception) { false }
+    fun offersOneTapAfterRead(access: JSONObject?, level: String = "rapido"): Boolean =
+        try { oneTap.afterRead(access, level) } catch (_: Exception) { false }
 
     /** On the idle home. A rule that fails changes nothing, as not knowing changes nothing. */
     fun offersOneTapOnHome(): Boolean = try { oneTap.onHome() } catch (_: Exception) { true }
@@ -648,6 +652,13 @@ class V18Runtime(
     override fun eraseEverything() {
         val owner = desk.owner
         eraseListeners.each { it(owner) }
+        sessionChanged()
+    }
+
+    override fun onAssetForgotten(listener: (String) -> Unit): () -> Unit = forgottenListeners.add(listener)
+
+    override fun assetForgotten(symbol: String) {
+        forgottenListeners.each { it(symbol) }
         sessionChanged()
     }
 

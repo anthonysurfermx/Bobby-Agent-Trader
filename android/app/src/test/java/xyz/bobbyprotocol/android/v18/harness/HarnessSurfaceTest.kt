@@ -1061,8 +1061,17 @@ class HarnessSurfaceTest {
             }
         }
         assertEquals(reaches.toString(), 2, reaches.size)
-        assertTrue(reaches.toString(), reaches.any { it.startsWith("Harness.kt") && it.contains("host.repository.market(symbol)") })
+        assertTrue(reaches.toString(), reaches.any { it.startsWith("Harness.kt") && it.contains("host.repository.quote(symbol)") })
         assertTrue(reaches.toString(), reaches.any { it.startsWith("Harness.kt") && it.contains("CreditsCenter.of(host).load()") })
+        // The price is asked for without a tap, so that request names nobody: the repository builds it
+        // with `AnonymousRequest` (no bearer, no installation id; AnonymousRequestTest reads its headers),
+        // never with the builder every other request uses.
+        val repository = File("src/main/java/xyz/bobbyprotocol/android/data/BobbyRepository.kt").readText()
+        val quote = repository.substringAfter("suspend fun quote(symbol: String)").substringBefore("\n    }\n")
+        assertTrue(quote, quote.contains("AnonymousRequest.post(apiBase, \"api/voice-tool\", body)"))
+        for (identity in listOf("apiRequest(", "tokenForRequest(", "authorizedRetry(", "installationId", "request(")) {
+            assertFalse("the quote must not use $identity: $quote", quote.replace("AnonymousRequest.post(", "").contains(identity))
+        }
         // The two questions a tap sends name the asset and nothing else the phone keeps.
         inEveryLanguage { spoken, copy ->
             for (question in listOf(copy.changedQuestion("NVDA"), copy.lookQuestion("NVDA"))) {
@@ -1141,7 +1150,8 @@ class HarnessSurfaceTest {
         for (pct in listOf(null, 0.0, 3.2, -3.2)) for (days in listOf(1, 3)) said.add(copy.moveLine("NVDA", pct, days))
         said.addAll(listOf(copy.changedQuestion("NVDA"), copy.lookQuestion("NVDA")))
         // The board and the switch.
-        said.addAll(listOf(copy.weekTitle, copy.sinceAsked, copy.last24h, copy.boardEmpty, copy.boardFoot, copy.switchLabel, copy.switchDetail))
+        said.addAll(listOf(copy.weekTitle, copy.sinceAsked, copy.last24h, copy.boardEmpty, copy.boardFoot, copy.switchLabel, copy.switchDetail,
+                           copy.offInSettings, copy.openSettings))
         said.addAll(HarnessSectors.all.map { copy.sectorTitle(it.id) })
         // The Memory screen: the header, the quiet lines, the erase buttons and every sentence a ledger can produce.
         said.addAll(listOf(HarnessNotes.header(copy), HarnessNotes.eraseAll(copy), HarnessNotes.eraseOne(copy), HarnessNotes.eraseLabel(copy, "NVDA"),

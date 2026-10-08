@@ -15,9 +15,17 @@ internal object NextQuestion {
     /** The server bounds it at 160 characters. A longer one is not a question the page could show: it is dropped whole, never cut. */
     const val LIMIT = 160
 
+    /**
+     * U+FEFF, the byte-order mark a server may leave at the head of a string. The page reads it as
+     * white space (JavaScript's `\s` includes it): it shows the question without it and a tap sends
+     * the words without it. Java's `\s` and `\p{Z}` do not include it, and `trim` does not remove
+     * it, so native says so itself, or a tap on that question would be taken for the person's own words.
+     */
+    private const val MARK = '\uFEFF'
+
     /** The question as it may travel: text, trimmed, not empty, `LIMIT` code points at most. Anything else is null. */
     fun usable(value: Any?): String? {
-        val text = (value as? String)?.trim() ?: return null
+        val text = (value as? String)?.trim { it.isWhitespace() || it == MARK } ?: return null
         if (text.isEmpty() || text.codePointCount(0, text.length) > LIMIT) return null
         return text
     }
@@ -25,7 +33,7 @@ internal object NextQuestion {
     /** Two wordings of one question differ only in their spaces (the page collapses them before it shows or asks it). */
     fun same(a: String, b: String): Boolean = words(a) == words(b)
 
-    private fun words(text: String): List<String> = text.split(Regex("[\\s\\p{Z}]+")).filter { it.isNotEmpty() }
+    private fun words(text: String): List<String> = text.split(Regex("[\\s\\p{Z}\\uFEFF]+")).filter { it.isNotEmpty() }
 
     /** The question the page received with this read, if any. */
     fun offered(read: JSONObject): String? = read.optJSONObject("synthesis")?.opt("followUp") as? String

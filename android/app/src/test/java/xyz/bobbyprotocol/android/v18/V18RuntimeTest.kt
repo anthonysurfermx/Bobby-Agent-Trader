@@ -243,8 +243,8 @@ class V18RuntimeTest {
         assertEquals(true, bench.nudges.lastRead?.saved)
         assertEquals(listOf("other" to "BTC", "r1" to "NVDA"), saved)
 
-        bench.host.readDelivered(JSONObject().put("status", "quota"))
-        bench.host.readDelivered(bench.read(requestId = "r2").put("status", "error"))
+        bench.host.readDelivered(JSONObject().put("status", "quota"), ReadOrigin.PERSON)
+        bench.host.readDelivered(bench.read(requestId = "r2").put("status", "error"), ReadOrigin.PERSON)
         assertEquals("only a delivered read counts", 1, heard.size)
         bench.desk.riskNotice = RiskNotice.WITHDRAWN
         assertNull("no summary without consent", bench.host.readSummary("r1"))
@@ -254,7 +254,7 @@ class V18RuntimeTest {
         val bench = V18TestBench(backgroundScope)
         val evidenceOnly = bench.read(requestId = "r1", price = null)
         evidenceOnly.getJSONObject("technicals").put("price", 118.0)
-        bench.host.readDelivered(evidenceOnly)
+        bench.host.readDelivered(evidenceOnly, ReadOrigin.PERSON)
         assertEquals(118.0, bench.host.readSummary("r1")?.price ?: 0.0, 0.0)
         bench.deliver(requestId = "r2", price = null)
         assertNull("a value the app does not have is not shown", bench.host.readSummary("r2")?.price)
@@ -274,15 +274,15 @@ class V18RuntimeTest {
         bench.deliver(requestId = "r1")
         assertNull("a reply that names none says none", heard.last().horizon)
         for (horizon in listOf("intraday", "week", "month", "long", "unspecified")) {
-            bench.host.readDelivered(bench.read(requestId = "h-$horizon").put("sufficiency", JSONObject().put("horizon", horizon).put("level", "ok")))
+            bench.host.readDelivered(bench.read(requestId = "h-$horizon").put("sufficiency", JSONObject().put("horizon", horizon).put("level", "ok")), ReadOrigin.PERSON)
             assertEquals(horizon, heard.last().horizon)
             assertEquals("kept with the read", horizon, bench.host.readSummary("h-$horizon")?.horizon)
         }
         assertEquals(setOf("intraday", "week", "month", "long", "unspecified"), ReadSummary.HORIZONS)
         // One of the desk's five values or nothing: never a sentence, never the question.
-        bench.host.readDelivered(bench.read(requestId = "h-odd").put("sufficiency", JSONObject().put("horizon", "until the new chips ship")))
+        bench.host.readDelivered(bench.read(requestId = "h-odd").put("sufficiency", JSONObject().put("horizon", "until the new chips ship")), ReadOrigin.PERSON)
         assertNull(heard.last().horizon)
-        bench.host.readDelivered(bench.read(requestId = "h-number").put("sufficiency", JSONObject().put("horizon", 7)))
+        bench.host.readDelivered(bench.read(requestId = "h-number").put("sufficiency", JSONObject().put("horizon", 7)), ReadOrigin.PERSON)
         assertNull(heard.last().horizon)
         assertFalse(heard.joinToString().contains("own words"))
         // The review chosen on a save: the hours when there was a choice, nothing when there was none.

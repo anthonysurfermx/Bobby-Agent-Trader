@@ -802,6 +802,29 @@ class HarnessPlannerTest {
         assertEquals(1, steps[0].days)
     }
 
+    /**
+     * The cap loop is the one place a follow-up is moved by a day after its slot was computed (it
+     * would share a local day with one already shown). The other clock-change cases plan from one
+     * question with nothing shown, so none of them walks through it: replacing its `plusDays` with
+     * "24 hours later" left every one of them, the golden file and the cap property passing, and put
+     * this follow-up at 22:00, outside the allowed hours.
+     */
+    @Test fun aFollowUpMovedToTheNextDayKeepsItsHourAcrossAClockChange() {
+        val sydney = ZoneId.of("Australia/Sydney")
+        // Friday 2 October 2026, 22:30: the asset on Saturday at 21:00. The clocks go forward at two on Sunday morning.
+        val asked = clock(sydney, 10, 2, 22, 30)
+        ledger.note(HarnessEvent(HarnessEvent.Kind.ASK, asked, symbol = "NVDA", name = "NVDA", isEquity = true, price = 100.0))
+        // What the person was really shown on Saturday morning (the plan had moved since it was handed over).
+        ledger.note(HarnessEvent(HarnessEvent.Kind.SENT, clock(sydney, 10, 3, 9, 30), symbol = "NVDA", step = week))
+        val steps = HarnessPlanner.plan(ledger, clock(sydney, 10, 3, 10, 0), sydney)
+        assertEquals(listOf(asset), kinds(steps))
+        assertEquals("Saturday 21:00 would share its day with what was shown: Sunday, at 21:00 on the clock", clock(sydney, 10, 4, 21, 0), steps[0].fireAt)
+        val local = Instant.ofEpochMilli(steps[0].fireAt).atZone(sydney)
+        assertEquals("inside the allowed hours", "21:00", "%02d:%02d".format(local.hour, local.minute))
+        assertEquals("23 hours after Saturday 21:00, not 24: the night lost one", 23 * hour, steps[0].fireAt - clock(sydney, 10, 3, 21, 0))
+        assertEquals(2, steps[0].days)
+    }
+
     @Test fun aClockChangeMovesNothingToAnotherDayOrOutOfWakingHours() {
         val berlin = ZoneId.of("Europe/Berlin")
         // Friday 23 October 2026, 20:30 in Berlin; clocks go back on Sunday the 25th.

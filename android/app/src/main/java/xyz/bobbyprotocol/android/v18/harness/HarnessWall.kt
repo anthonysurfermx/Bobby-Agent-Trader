@@ -1,5 +1,6 @@
 package xyz.bobbyprotocol.android.v18.harness
 
+import xyz.bobbyprotocol.android.v18.credits.LevelMeter
 import xyz.bobbyprotocol.android.v18.credits.ReadAccess
 
 // The harness (1.8): Bobby never invites someone into a wall. A read Bobby starts (the button of
@@ -12,8 +13,14 @@ import xyz.bobbyprotocol.android.v18.credits.ReadAccess
 // On Android the wall behind the limit is the sign-in for a guest and, for a free account, the
 // paywall (Bobby Pro through Google Play, where this build can sell it). The phone does not ask
 // Google Play anything here: the server's `paywall` flag is the whole answer, as on iOS.
+//
+// Android goes one step further than iOS: a chip keeps the level the person saved (as on iOS), so
+// the saved level's own allowance is asked too before a chip is offered (`levelOpen`).
 
 object HarnessWall {
+    /** The level a read Bobby started runs at, and the one whose meter the receipt counts. */
+    const val QUICK = "rapido"
+
     /**
      * What is left of the plan's reads, when the receipt lets the phone tell: the server's own
      * count, else the limit less what was used. Null when neither is there (Android keeps a number
@@ -48,6 +55,29 @@ object HarnessWall {
         val limit = access.limit ?: return false
         val left = left(access, limit) ?: return false
         return left <= 0 && access.bonus <= 0 && access.paywall
+    }
+
+    /**
+     * Whether a read at `level` is answered as far as that level's own allowance goes. A chip Bobby
+     * wrote ("How is BTC looking?") runs at the level the person saved, and Deep and Max each have an
+     * allowance apart from the general reads the receipt counts: with it used up the server refuses
+     * the read before it looks at the general meter, and what stands there is the paywall for a
+     * free account and the sign-in for a guest. True when the phone knows the read is answered,
+     * false when it knows that wall is there, null when it cannot tell.
+     *  - Quick: yes. Its meter is the receipt's, and `open` and `closed` answer for it.
+     *  - Bobby Pro: yes. A level that ran out for the month is a notice with "Continue with Quick",
+     *    not a sign-in or a paywall.
+     *  - Deep or Max otherwise: what is left of the level (the plan's reads and gifted ones), less
+     *    `spent`, the reads at that level answered since the phone last heard the meter.
+     */
+    fun levelOpen(level: String, access: ReadAccess?, meter: LevelMeter?, spent: Int = 0): Boolean? {
+        if (level == QUICK) return true
+        if (access != null && access.isPro) return true
+        if (meter == null) return null
+        val limit = meter.limit
+        val used = meter.used
+        val plan = meter.remaining ?: (if (limit != null && used != null) maxOf(0, limit - used) else null) ?: return null
+        return plan + meter.bonus - spent > 0
     }
 
     /**

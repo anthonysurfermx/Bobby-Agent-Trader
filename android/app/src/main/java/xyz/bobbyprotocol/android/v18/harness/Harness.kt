@@ -13,6 +13,8 @@ import xyz.bobbyprotocol.android.v18.ThesisBook
 import xyz.bobbyprotocol.android.v18.V18Host
 import xyz.bobbyprotocol.android.v18.V18Routes
 import xyz.bobbyprotocol.android.v18.credits.CreditsCenter
+import xyz.bobbyprotocol.android.v18.credits.CreditsLevel
+import xyz.bobbyprotocol.android.v18.credits.LevelMeter
 import xyz.bobbyprotocol.android.v18.credits.ReadAccess
 
 // The harness (1.8): where the centre meets the app. One centre per host (the activity), shared by
@@ -54,6 +56,36 @@ internal class HarnessReceipts(private val host: V18Host, private val balance: (
     }
 }
 
+/**
+ * What the phone knows about the level a chip would run at (the one the person saved). The meters
+ * are the ones Credits holds; a read just answered at a level is not in them until the balance is
+ * read again, so it is counted here until the meters are heard to say something else.
+ */
+internal class HarnessLevels(private val host: V18Host, private val meters: () -> Map<CreditsLevel, LevelMeter>) {
+    /** The level of a read answered since the meters last changed, when it has an allowance of its own. */
+    private var spentLevel: String? = null
+    private var owner: String? = null
+    private var epoch = 0L
+    private var metersThen: Map<CreditsLevel, LevelMeter> = emptyMap()
+
+    /** A read was just answered at `level`. */
+    fun heard(level: String) {
+        spentLevel = level.takeIf { it != HarnessWall.QUICK }
+        owner = host.owner
+        epoch = host.accountEpoch
+        metersThen = meters()
+    }
+
+    /** `HarnessWall.levelOpen` for the level saved now: true, false, or null when the phone cannot tell. */
+    fun open(access: ReadAccess?): Boolean? {
+        val said = meters()
+        if (spentLevel != null && (owner != host.owner || epoch != host.accountEpoch || said != metersThen)) spentLevel = null
+        val level = host.analysisLevel
+        val meter = CreditsLevel.entries.firstOrNull { it.id == level }?.let { said[it] }
+        return HarnessWall.levelOpen(level, access, meter, if (spentLevel == level) 1 else 0)
+    }
+}
+
 object Harness {
     private const val SERVICE = "harness.center"
     private const val RECEIPTS = "harness.receipts"
@@ -90,6 +122,8 @@ object Harness {
         // briefing reminder checks it with the server): Pro with that switch on has its Monday.
         center.weeklyCovered = { host.signedIn && host.briefingNotifications && host.billing.value.isPro }
         center.market = { symbol -> quote(host, symbol) }
+        // "Forget" on an asset in Memory: its follow-up notes go with it, and the follow-up that was coming.
+        host.onAssetForgotten { symbol -> host.scope.launch(start = CoroutineStart.UNDISPATCHED) { center.forget(symbol) } }
         // The page is told once, after the turn that changed the line: several changes in one turn
         // are one redraw, and nothing is sent from inside a hook the session is still running.
         var redrawQueued = false
@@ -110,6 +144,11 @@ object Harness {
             if (reader == host.owner) host.nudges.forgetIds(prefixes) else NudgeCenter.forget(prefixes, reader, host.store)
         }
         center.linesKept = { reader -> NudgeCenter.count(HarnessNudges.movePrefix(), reader, host.store) }
+        // A yes that was erased is asked for again: the glass forgets it ever made the offer to that reader.
+        center.forgetOffer = { reader ->
+            val offer = listOf(HarnessNudges.OFFER_ID)
+            if (reader == host.owner) host.nudges.forgetIds(offer) else NudgeCenter.forget(offer, reader, host.store)
+        }
         center.pruneLines = { reader, before -> NudgeCenter.prune(HarnessNudges.movePrefix(), before, reader, host.store) }
         // Bobby never invites someone into a wall. What the phone knows about the reader's reads:
         val receipts = receiptsOf(host)
@@ -118,24 +157,37 @@ object Harness {
         // The session asks before it puts a question that asks by itself in front of the reader.
         // After a read: that read's own receipt must say the next one is answered. On the home: only
         // knowing the next one is refused takes the chips away (a first launch keeps them).
+        // Two meters are asked. The question Bobby's CIO wrote runs at Quick: the receipt counts
+        // those. A chip runs at the level the person saved: Deep and Max have an allowance of their
+        // own, and with it used up the paywall (or the sign-in) is what a chip would open. One
+        // answer covers the whole row, so both must hold.
+        val levels = HarnessLevels(host) { if (host.riskAccepted) CreditsCenter.of(host).snapshot().meters else emptyMap() }
         var homeClosed = false
+        fun closedNow(): Boolean {
+            val said = receipts.current()
+            return HarnessWall.closed(said) || levels.open(said) == false
+        }
         fun wallMoved() {
-            val closed = HarnessWall.closed(receipts.current())
+            val closed = closedNow()
             if (closed != homeClosed) {
                 homeClosed = closed
                 center.changed()
             }
         }
         host.oneTap = object : OneTapRule {
-            override fun afterRead(access: JSONObject?): Boolean {
+            override fun afterRead(access: JSONObject?): Boolean = afterRead(access, HarnessWall.QUICK)
+
+            override fun afterRead(access: JSONObject?, level: String): Boolean {
                 val receipt = ReadAccess.fromJson(access)
                 receipts.heard(receipt)
+                levels.heard(level)
                 // The session is sent again right after a delivered read: the home's row follows by itself.
-                homeClosed = HarnessWall.closed(receipts.current())
-                return HarnessWall.open(receipt)
+                homeClosed = closedNow()
+                // After a read not knowing is a no, for the level as for the receipt.
+                return HarnessWall.open(receipt) && levels.open(receipt) == true
             }
 
-            override fun onHome(): Boolean = !HarnessWall.closed(receipts.current())
+            override fun onHome(): Boolean = !closedNow()
         }
         // The reader's active theses as the planner reads them: the asset and the horizon set on it, never the words.
         center.theses = { owner ->
@@ -208,17 +260,21 @@ object Harness {
         // is the one the app (or a suite) registered.
         host.scope.launch {
             yield()
-            homeClosed = HarnessWall.closed(receipts.current())
+            homeClosed = closedNow()
             CreditsCenter.of(host).revision.collect { wallMoved() }
         }
         return center
     }
 
-    /** One price, without spending a read. Null before the risk notice, on any failure, and after eight seconds. */
+    /**
+     * One price, without spending a read. Null before the risk notice, on any failure, and after
+     * eight seconds. The person did not tap for it, so the request names nobody: the symbol, and
+     * neither the account nor the device.
+     */
     private suspend fun quote(host: V18Host, symbol: String): HarnessQuote? {
         if (!host.riskAccepted) return null
         return try {
-            withTimeoutOrNull(HarnessCenter.QUOTE_TIMEOUT_MS) { host.repository.market(symbol) }?.let { HarnessQuote(it.price, it.changePct) }
+            withTimeoutOrNull(HarnessCenter.QUOTE_TIMEOUT_MS) { host.repository.quote(symbol) }?.let { HarnessQuote(it.price, it.changePct) }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {

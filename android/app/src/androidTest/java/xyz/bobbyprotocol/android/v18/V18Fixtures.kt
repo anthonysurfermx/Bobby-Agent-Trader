@@ -208,7 +208,7 @@ object V18Fixtures {
             stage.bench.clock = at
             val delivered = read(language, id, symbol, name, isEquity, price, at)
             if (horizon != null) delivered.put("sufficiency", JSONObject().put("horizon", horizon))
-            host.readDelivered(delivered)
+            host.readDelivered(delivered, ReadOrigin.PERSON)
         }
         asked("b7c2f1a0-0000-4000-8000-000000000001", "TSLA", "Tesla", true, 238.0, day(9, 28, 18, 45))
         asked("b7c2f1a0-0000-4000-8000-000000000002", "TSLA", "Tesla", true, 241.5, day(9, 30, 18, 45))
@@ -233,11 +233,11 @@ object V18Fixtures {
     fun askedThisWeek(stage: V18Stage) {
         val language = stage.language
         stage.bench.clock = day(10, 5, 10)
-        stage.host.readDelivered(read(language, "a3d1e0c2-4b5f-4a67-8c90-1d2e3f4a5b01", "AAPL", "Apple", true, 229.1, day(10, 5, 10)))
+        stage.host.readDelivered(read(language, "a3d1e0c2-4b5f-4a67-8c90-1d2e3f4a5b01", "AAPL", "Apple", true, 229.1, day(10, 5, 10)), ReadOrigin.PERSON)
         stage.bench.clock = day(10, 6, 16)
-        stage.host.readDelivered(read(language, "a3d1e0c2-4b5f-4a67-8c90-1d2e3f4a5b02", "BTC", "Bitcoin", false, 61_250.0, day(10, 6, 16)))
+        stage.host.readDelivered(read(language, "a3d1e0c2-4b5f-4a67-8c90-1d2e3f4a5b02", "BTC", "Bitcoin", false, 61_250.0, day(10, 6, 16)), ReadOrigin.PERSON)
         stage.bench.clock = day(10, 6, 18)
-        stage.host.readDelivered(read(language, "a3d1e0c2-4b5f-4a67-8c90-1d2e3f4a5b03", "NVDA", "NVIDIA", true, 128.4, day(10, 6, 18)))
+        stage.host.readDelivered(read(language, "a3d1e0c2-4b5f-4a67-8c90-1d2e3f4a5b03", "NVDA", "NVIDIA", true, 128.4, day(10, 6, 18)), ReadOrigin.PERSON)
         stage.bench.clock = V18Stage.NOW
     }
 }

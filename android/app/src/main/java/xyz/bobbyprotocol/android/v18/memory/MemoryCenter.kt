@@ -27,9 +27,10 @@ import java.util.WeakHashMap
 //    account it was asked for and late answers are dropped.
 //  - Writes are explicit corrections, one at a time, shown only after the server answers.
 //  - "Delete everything" needs a confirmation: `requestForgetAll` only arms it; `confirmForgetAll` sends.
-//  - Deletion is complete. "Forget" also takes the asset out of this phone's shortcuts, and "Delete
-//    everything" also clears them, the theses written on this phone and what the follow-ups learned,
-//    for this account only. The phone's part runs first and needs no network; `notice` says
+//  - Deletion is complete. "Forget" also takes the asset out of this phone's shortcuts and out of
+//    what the follow-ups keep (its notes, the follow-up that was coming), and "Delete everything"
+//    also clears them, the theses written on this phone and what the follow-ups learned, for this
+//    account only. The phone's part runs first and needs no network; `notice` says
 //    honestly whether the server confirmed its part.
 //  - No network before the risk notice is accepted; signed out = no calls.
 //  - The server's text is never shown; failures map to the app's own copy.
@@ -373,8 +374,9 @@ class MemoryCenter(
     }
 
     /**
-     * Forget one remembered asset: first on this phone (its shortcut, no network needed), then on the
-     * server. True when the server confirmed; otherwise `notice` says its part is still there.
+     * Forget one remembered asset: first on this phone (its shortcut and what the follow-ups keep
+     * about it, no network needed), then on the server. True when the server confirmed; otherwise
+     * `notice` says its part is still there.
      */
     suspend fun forget(symbol: String): Boolean {
         if (!MemorySnapshot.SYMBOL_PATTERN.matches(symbol)) return false
@@ -389,6 +391,8 @@ class MemoryCenter(
         val epoch = host.accountEpoch
         notice = null
         host.forgetShortcut(symbol)
+        // What this phone keeps to come back to that asset goes with it: its follow-up notes, and the follow-up that was coming.
+        host.assetForgotten(symbol)
         erasedMarks()?.let { it.assets[symbol.uppercase(Locale.ROOT)] = host.now() }
         local = readLocal()
         changed()

@@ -97,7 +97,10 @@ data class HarnessEvent(
     val step: HarnessStep? = null,
     /** `SENT`, `OPENED`, `RETURNED` of a sector follow-up: the sector's id. */
     val sector: String? = null,
-    /** `OPENED`, `RETURNED`: the moment of the follow-up they answer (its `SENT` has that `at`). */
+    /**
+     * Which follow-up. `OPENED`: the moment it was planned for (what its notice carries).
+     * `RETURNED`: the moment it was shown (its `SENT` has that `at`). On a punctual phone they are the same.
+     */
     val ref: Long? = null,
     /** `ASK`: who started it, when it was not the person. */
     val origin: Origin? = null,
@@ -118,7 +121,7 @@ data class HarnessEvent(
          * and nothing read them, so the ledger refuses them and drops the ones it finds stored.
          */
         APP_OPEN("appOpen"),
-        /** A follow-up's moment passed with the notice handed to the phone. */
+        /** The phone showed a follow-up (or, with the app in front, the glass did): `at` is when. */
         SENT("sent"),
         /** They tapped a follow-up notification. Kept, and an answer to nothing. */
         OPENED("opened"),
@@ -525,7 +528,9 @@ class HarnessStore(private val store: KeyValueStore) {
     /**
      * What was kept and what was planned go; a no stays (the Memory screen's "Delete everything").
      * Erasing notes is not a way to be asked again: a reader who turned follow-ups off stays off.
-     * Any other answer goes with the notes, so a yes is asked for again before anything is kept.
+     * Any other answer goes with the notes: the reader is undecided again, the phone keeps only
+     * the question itself, and the yes is asked for anew (HarnessCenter.erasedEverything also
+     * clears the offer's history on the glass, or it would never be made again).
      */
     fun forgetNotes(owner: String?) {
         val refused = mode(owner) == HarnessMode.OFF

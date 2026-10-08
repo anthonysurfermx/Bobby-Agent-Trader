@@ -444,8 +444,9 @@ class NucleoSession(
                 assertCurrent(epoch, consent)
                 if (!NucleoReadModel.validDebate(debate)) return error("bad_response")
                 // The next question rides in the synthesis only when it is one the page could show, and only when
-                // Bobby may offer a one-tap question after this read (asked once, with this read's access receipt).
-                val result = NucleoReadModel.read(requestId, question, selected, market, candles, debate, language, locale, started, level) { access -> v18.offersOneTapAfterRead(access) }
+                // Bobby may offer a one-tap question after this read (asked once, with this read's access receipt
+                // and the level it ran at: a chip of its row would run at the saved level, which has a meter of its own).
+                val result = NucleoReadModel.read(requestId, question, selected, market, candles, debate, language, locale, started, level) { access -> v18.offersOneTapAfterRead(access, level) }
                 reads.add(Read(result, epoch, consent, System.currentTimeMillis(), origin)); while (reads.size > 5) reads.removeAt(0)
                 // 1.8: what a line on the glass may talk about (symbol and verdict, never the question), and who
                 // started the read: only the person's own question is followed up.

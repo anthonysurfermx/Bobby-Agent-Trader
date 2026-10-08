@@ -33,6 +33,10 @@ internal class HarnessPhone(val memory: MemoryLocalNotifier) : LocalNotifier by 
 
     override fun schedule(notice: LocalNotice): Boolean = memory.schedule(notice).also { if (it) written.add(notice) }
 
+    override fun status(channel: String): LocalNotifier.Permission = memory.status(channel)
+
+    override fun shownAt(id: String, fireAtEpochMs: Long): Long? = memory.shownAt(id, fireAtEpochMs)
+
     override fun cancel(ids: Collection<String>) {
         cancelled.addAll(ids)
         memory.cancel(ids)
@@ -231,7 +235,7 @@ class HarnessCenterTest {
         center.appActive()
         center.appActive()
         assertEquals("written once", listOf(HarnessStep.ASSET), events(center, HarnessEvent.Kind.SENT).map { it.step })
-        assertEquals("at the moment it was planned for, whenever the phone showed it", at(8, 16, 40), events(center, HarnessEvent.Kind.SENT).first().at)
+        assertEquals("at the moment the phone showed it, which a punctual phone does at the moment it was planned for", at(8, 16, 40), events(center, HarnessEvent.Kind.SENT).first().at)
         assertEquals("opening the app is not an answer", emptyList<HarnessEvent>(), events(center, HarnessEvent.Kind.RETURNED))
         assertEquals("ignored: the week on Monday is what is left", listOf(HarnessStep.WEEK), kinds(center.upcoming))
         assertEquals(at(12, 16, 40), notice(HarnessStep.WEEK)?.fireAtEpochMs)
@@ -897,17 +901,24 @@ class HarnessCenterTest {
         assertEquals(center.move, center.moveOnGlass())
     }
 
+    /**
+     * Until the reviews of slice 1 this was written as shown ("counting too many only makes Bobby
+     * quieter"). It also made the Memory screen count a notice nobody saw, and three of those are
+     * two weeks of quiet. A notice the phone did not show is not written.
+     */
     @Test fun openingTheAppBeforeThePhoneDeliversALateNoticeLeavesItToTheGlass() = runTest {
+        phone.memory.zone = HarnessDays.mexico          // a phone that runs late: shown is only what `deliverDue` showed
         val center = make()
         ask(center, "NVDA")
         center.accept()
         prices["NVDA"] = 101.0
         clock = at(8, 18)                               // its moment passed at 16:40; an idle phone still holds it
         center.appActive()
-        assertEquals("it counts as shown: counting too many only makes Bobby quieter", listOf(HarnessStep.ASSET), events(center, HarnessEvent.Kind.SENT).map { it.step })
+        assertTrue("nobody saw a notice: nothing is written as shown", events(center, HarnessEvent.Kind.SENT).isEmpty())
         assertFalse("the phone no longer holds it", pending().contains("v18.follow.asset"))
         assertTrue("so it is not shown after the fact", phone.memory.deliverDue().isEmpty())
         assertEquals("the glass says it", "NVDA", center.move?.symbol)
+        assertEquals("and the week is what is left", listOf(HarnessStep.WEEK), kinds(center.upcoming))
     }
 
     @Test fun aRelaunchKeepsThePlanAndWritesNothingTwice() = runTest {

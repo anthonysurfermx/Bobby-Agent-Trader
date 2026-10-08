@@ -46,6 +46,7 @@ import xyz.bobbyprotocol.android.v18.harness.HarnessCenter
 import xyz.bobbyprotocol.android.v18.harness.HarnessWall
 import xyz.bobbyprotocol.android.v18.memory.MemoryCenter
 import xyz.bobbyprotocol.android.v18.memory.MemoryConsentModel
+import xyz.bobbyprotocol.android.v18.notify.LocalNotice
 import xyz.bobbyprotocol.android.v18.reminders.ReminderCenter
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -173,7 +174,7 @@ class V18ScreensInstrumentedTest(private val language: String) {
     @Test fun thesisEditorWithNothingWritten() {
         val stage = open()
         compose.runOnUiThread {
-            stage.host.readDelivered(V18Fixtures.read(language, V18Fixtures.READ_AAPL, "AAPL", "Apple", true, 229.1, V18Stage.NOW, withSynthesis = false))
+            stage.host.readDelivered(V18Fixtures.read(language, V18Fixtures.READ_AAPL, "AAPL", "Apple", true, 229.1, V18Stage.NOW, withSynthesis = false), ReadOrigin.PERSON)
             stage.host.readSaved(V18Fixtures.READ_AAPL, "AAPL")
             stage.host.focus.draftRequestId = V18Fixtures.READ_AAPL
             stage.present(V18Routes.THESIS_EDITOR)
@@ -188,7 +189,7 @@ class V18ScreensInstrumentedTest(private val language: String) {
     @Test fun thesisEditorWithBobbysDraft() {
         val stage = open()
         compose.runOnUiThread {
-            stage.host.readDelivered(V18Fixtures.read(language, V18Fixtures.READ_AAPL, "AAPL", "Apple", true, 229.1, V18Stage.NOW))
+            stage.host.readDelivered(V18Fixtures.read(language, V18Fixtures.READ_AAPL, "AAPL", "Apple", true, 229.1, V18Stage.NOW), ReadOrigin.PERSON)
             stage.host.readSaved(V18Fixtures.READ_AAPL, "AAPL")
             stage.host.focus.draftRequestId = V18Fixtures.READ_AAPL
             stage.present(V18Routes.THESIS_EDITOR)
@@ -263,6 +264,12 @@ class V18ScreensInstrumentedTest(private val language: String) {
         val stage = open(owner = null) { desk.shortcuts = listOf("NVDA", "BTC") }
         onStage(stage) { V18Fixtures.followUpNotes(stage) }
         present(stage, "memory", "memory-signed-out")
+        // The face: one sentence and one row. What the phone keeps is one tap away, as for an account.
+        assertShown("memory-local")
+        assertAbsent("memory-notes-header")
+        assertAbsent("memory-local-note")
+        shot("memory-signed-out")
+        tap("memory-local")
         await("memory-note-NVDA")
         expandSheet()
         compose.onNodeWithTag("memory-notes-erase", useUnmergedTree = true).performScrollTo()
@@ -285,6 +292,7 @@ class V18ScreensInstrumentedTest(private val language: String) {
     @Test fun memoryNotesWithNothingKept() {
         val stage = open(owner = null)
         present(stage, "memory", "memory-signed-out")
+        tap("memory-local")
         await("memory-notes-empty")
         expandSheet()
         compose.onNodeWithTag("memory-notes-empty", useUnmergedTree = true).performScrollTo()
@@ -301,12 +309,37 @@ class V18ScreensInstrumentedTest(private val language: String) {
         assertEquals(HarnessCenter.Outcome.ON, onStage(stage) { Harness.center(stage.host).accept() })
         compose.runOnUiThread { Harness.center(stage.host).turnOff() }
         present(stage, "memory", "memory-signed-out")
+        tap("memory-local")
         await("memory-notes-empty")
         expandSheet()
         compose.onNodeWithTag("memory-notes-empty", useUnmergedTree = true).performScrollTo()
         assertWritten(if (language == "es") "El seguimiento está apagado." else "Follow-ups are off.")
         assertAbsent("memory-note-NVDA")
         shot("memory-notes-off")
+    }
+
+    // ---- Reminders: follow-ups switched off in the phone's own settings ----
+
+    @Test fun remindersWhenFollowUpsAreSwitchedOffInThePhonesSettings() {
+        val stage = weekStage()
+        // "Turn off notifications" on a follow-up, in the system's settings: Bobby may still notify, follow-ups may not.
+        compose.runOnUiThread { stage.bench.notifier.channelsOff.add(LocalNotice.CHANNEL_FOLLOW_UPS) }
+        onStage(stage) { Harness.center(stage.host).appActive() }
+        present(stage, V18Routes.REMINDERS, "reminders-follow-ups")
+        await("reminders-follow-ups-off-in-settings")
+        assertShown("reminders-follow-ups-settings")
+        assertAbsent("reminders-denied")
+        assertWritten(if (language == "es") "El seguimiento está apagado en los ajustes de este teléfono." else "Follow-ups are off in this phone's settings.")
+        compose.onNodeWithTag("reminders-follow-ups-settings", useUnmergedTree = true).performScrollTo()
+        shot("reminders-follow-ups-off-in-settings")
+        tap("reminders-follow-ups-settings")
+        assertEquals("The link opens Bobby's notification settings", 1, compose.runOnUiThread<Int> { stage.bench.shell.notificationSettingsOpened })
+        // Nothing is promised on Memory either while nothing can arrive.
+        val promised = listOf("Bobby comes back", "Bobby vuelve", "Your week arrives", "Tu semana llega")
+        assertTrue(compose.runOnUiThread<Boolean> {
+            val notes = Harness.center(stage.host).notes
+            (notes.assets.flatMap { it.lines } + notes.general).none { line -> promised.any { line.startsWith(it) } }
+        })
     }
 
     @Test fun memoryConsent() {
