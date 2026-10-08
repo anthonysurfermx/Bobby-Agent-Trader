@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import vm from 'node:vm';
+import { askStartCases } from '../../../ios/Bobby/Nucleo/tests/ask-start.cases.mjs';
 
 const source = await readFile(new URL('../src/shared/10-bridge.js', import.meta.url), 'utf8');
 
@@ -167,7 +168,8 @@ class Element {
   blur() {}
 }
 
-function android({ language = 'en', suggestions = { v: 1, quickAccess: [] }, holdAsks = false, measure = null } = {}) {
+function android({ language = 'en', suggestions = { v: 1, quickAccess: [] }, holdAsks = false, measure = null,
+  theses = { v: 1, items: [] }, saved = null, speak = 'muted' } = {}) {
   const nodes = new Map(), calls = [], errors = [], pending = [];
   const made = () => Object.assign(new Element(), { measure });
   for (const match of template.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)) {
@@ -207,8 +209,8 @@ function android({ language = 'en', suggestions = { v: 1, quickAccess: [] }, hol
       calls.push({ method: envelope.method, params: envelope.params });
       // A read the test answers itself (answer()), read silently so the page's own clock runs it.
       if (holdAsks && envelope.method === 'ask') { pending.push((result) => reply(envelope.id, result)); return; }
-      if (holdAsks && envelope.method === 'speak') { reply(envelope.id, { status: 'muted' }); return; }
-      reply(envelope.id, { session, roster: rosterFor(language), theses: { v: 1, items: [] }, island: { v: 1, available: false }, suggestions,
+      if (holdAsks && envelope.method === 'speak') { reply(envelope.id, { status: speak }); return; }
+      reply(envelope.id, { session, roster: rosterFor(language), theses, island: { v: 1, available: false }, suggestions, saveThesis: saved,
         'nudge.seen': { count: 1, active: true }, 'nudge.act': { status: 'done' }, 'read.rendered': { accepted: false } }[envelope.method] || { v: 1, opened: true });
     } },
   });
@@ -234,8 +236,10 @@ const OWN = { v: 1, quickAccess: [{ symbol: 'NVDA', own: true }, { symbol: 'BTC'
 const rowOf = (app) => chipsOf(app).map((node) => node.textContent);
 const asksOf = (app) => app.calls.filter((call) => call.method === 'ask').map((call) => call.params);
 const tap = (app, node) => app.nodes.get('stage').listeners.click({ target: node, detail: 0 });
-async function idle(options) {
-  const app = android({ holdAsks: true, suggestions: OWN, ...options });
+async function idle(options = {}) {
+  const { seed, ...rest } = options;
+  const app = android({ holdAsks: true, suggestions: OWN, ...rest });
+  if (seed) seed(app.session);
   app.boot(); await flush(); app.advance(1.2); await flush();
   assert.equal(app.context.nucleo.state(), 'IDLE');
   return app;
@@ -470,4 +474,26 @@ test('the onboarding page marks a first question picked on a chip the same way, 
   assert.equal(sources.length, 3);
   assert.deepEqual(sources.filter((src) => src === 'chip'), ['chip']);
   assert.ok(sources.includes('voice'));
+});
+
+// ---- A read native starts, state by state, and what is drawn under a native sheet: the iPhone's cases, run against
+// this copy of the page over the Android transport (ios/Bobby/Nucleo/ARCHITECTURE.md §9.5 has the table). ----
+askStartCases({ test, assert, flush, Element, idle, handBack, personRead, tap, chipsOf, rowOf, asksOf, okRead, synthesis,
+  source: (file) => read('../src/' + file), architecture: read('../../../ios/Bobby/Nucleo/ARCHITECTURE.md') });
+
+test('what decides where a read native starts is the iPhone’s, character for character', () => {
+  const ios = (file) => read('../../../ios/Bobby/Nucleo/src/app/' + file), here = (file) => read('../src/app/' + file);
+  // askStart and its table of states (with the nudge code it sits beside).
+  const cut = (text) => text.slice(text.indexOf('/* ---- the nudge:'), text.indexOf('function receiveSuggestions'));
+  assert.ok(cut(here('55-read.js')).includes('var ASK_FROM = {') && cut(here('55-read.js')).includes('function askStart(p){'));
+  assert.equal(cut(here('55-read.js')), cut(ios('55-read.js')));
+  // The turn back to the Desk face it leans on, and how a row of chips is born and taken away.
+  const face = (text) => text.slice(text.indexOf('/* the sphere turns back to its Desk face'), text.indexOf('STATES.FACES = {'));
+  assert.ok(face(here('60-fsm.js')).includes('function deskFace(){'));
+  assert.equal(face(here('60-fsm.js')), face(ios('60-fsm.js')));
+  const row = (text) => text.slice(text.indexOf('/* ---- chips: born from the pill'), text.indexOf('function oneTapOff'))
+    + text.slice(text.indexOf('function chipsHide('), text.indexOf('/* ---- the live transcript'));
+  assert.ok(row(here('55-read.js')).includes('op(c.el, 0)'));
+  assert.equal(row(here('55-read.js')), row(ios('55-read.js')));
+  assert.equal(here('30-dom.js'), ios('30-dom.js'), 'the DOM helpers and the belt are one file');
 });

@@ -347,7 +347,12 @@ function setHorizon(hrs){
   [].slice.call(el.card1.hz.querySelectorAll('button')).forEach(function(b){ var on = +b.getAttribute('data-h') === hrs; b.className = on ? 'on' : ''; b.setAttribute('aria-checked', on ? 'true' : 'false'); });
 }
 
-/* ---- chips: born from the pill, one row from x=20 bleeding off the right edge ---- */
+/* ---- chips: born from the pill, one row from x=20 bleeding off the right edge ----
+   A chip is a node at the stage's corner until the loop gives it its place and its opacity (renderChipList), and
+   the loop stands still under a native sheet and while the app is behind (canRun). So a chip is born hidden, and
+   a row taken away at once is hidden at once: a row rebuilt where the loop does not run (the nudge that opened a
+   sheet was just retired, so the session came again) shows nothing out of place, and is born when the loop is back.
+   The line above the row waits with it. */
 var DYING = [];
 function oneTapOff(){ return !!SES && SES.oneTap === false; }
 function showIdleSuggestions(){
@@ -405,12 +410,29 @@ function nudgeSync(){
 }
 /* ---- a read native starts on the person's tap outside the page (a follow-up's button, a row of a native
    board). Native names the asset inside a single-use token and writes the question; the page runs it exactly
-   like a chip that carries a token, and only from the idle home or a finished read. ---- */
+   like a chip that carries a token, from every state in which a new read is what the person expects: as if they
+   had closed what was on the glass and asked. ARCHITECTURE.md §9.5 has the table, state by state.
+   1: nothing of a read is on the glass. 2: a read is (it leaves as it does for one of its own chips).
+   A state that is not listed takes nothing and says nothing. It ends by itself (waking, coming home, a save
+   being written, a finger pulling the cards), or the person is in the middle of a question of their own (the
+   mic is open, a read is on its way, a gate waits for them), and native offers the same token again. ---- */
+var ASK_FROM = { IDLE: 1, PRE_PERMISSION: 1, TYPING: 1, FACES: 1, THESIS_VIEW: 1, ERROR: 1, CONFIRM_ASSET: 1, UNKNOWN_ASSET: 1,
+  THINK_RESOLVE: 2, TALK_EVIDENCE: 2, TALK_CHART: 2, VERDICT: 2, HANDBACK: 2, CARDS: 2, FOLLOWUPS: 2 };
 function askStart(p){
-  if (!p || typeof p.token !== 'string' || !p.token || SHEET || !ST) return;
-  if (ST.name !== 'IDLE' && ST.name !== 'FOLLOWUPS') return;
-  var q = typeof p.question === 'string' ? p.question.slice(0, 300) : '';
-  go('SENDING', { params: { token: p.token }, question: q, origin: 'chip', cx: 195, cy: 660 });
+  if (!p || typeof p.token !== 'string' || !p.token || SHEET || !ST || !ASK_FROM[ST.name]) return;
+  cancelInput();   /* a finger still on the glass lets go: its release will not act on what is leaving */
+  var from = ASK_FROM[ST.name]; if (!from) return;
+  var q = typeof p.question === 'string' ? p.question.slice(0, 300) : '', fromRead = from === 2;
+  if (ST.name === 'TYPING'){
+    fromRead = !!STATES.TYPING.d.fromRead;
+    /* words they had typed are theirs: they are there again the next time the keyboard opens */
+    if (el.ta.value.trim()) SPEECH.draft = el.ta.value;
+  }
+  /* the sphere shows another face (or a thesis opened from one): it turns back to the Desk, as under the pill, and
+     the greeting that comes back with the Desk stays out of sight, since a question is on its way */
+  if (ST.name === 'FACES' || (ST.name === 'THESIS_VIEW' && STATES.THESIS_VIEW.back === 'FACES')){ deskFace(); U.faceOn.to(0); U.presence.to(0); A.greet.o.set(0); }
+  if (fromRead) pillMode(idleMode());   /* a read that was still being said leaves no stop button behind */
+  go('SENDING', { params: { token: p.token }, question: q, origin: 'chip', cx: 195, cy: 660, fromRead: fromRead });
 }
 function receiveSuggestions(reply){
   SUGG = reply;
@@ -452,7 +474,7 @@ function chipsShow(list, eyebrow, ofRead){
     b.type = 'button'; b.setAttribute('data-hit', 'chip'); b.setAttribute('data-i', String(i));
     if (c.style === 'apple'){ var lg = mk('span', 'lg', '◉'); lg.setAttribute('aria-hidden', 'true'); b.appendChild(lg); b.appendChild(D.createTextNode(c.label)); b.setAttribute('aria-label', c.label); }
     else if (c.ariaLabel) b.setAttribute('aria-label', c.ariaLabel);
-    el.chipRow.appendChild(b);
+    op(b, 0); el.chipRow.appendChild(b);
     if (c.style === 'ask') askShrink(b);
     var w = b.offsetWidth || 160, h = b.offsetHeight || 40;
     var ch = { el: b, x: x, y: CHIP_TOP, w: w, h: h, p: new V(0, 'emit'), o: new V(0, 'soft'), press: new V(1, 'snap'), action: c.action, label: c.label };
@@ -463,6 +485,7 @@ function chipsShow(list, eyebrow, ofRead){
   var top = ofRead ? CHIP_READ_MID - tall / 2 : CHIP_TOP;
   A.chips.forEach(function(ch){ ch.y = top + (tall - ch.h) / 2; });
   A.chipMax = Math.max(0, x - 8 - 370);
+  if (!canRun()){ A.eyebrowO.set(0); op(el.eyebrow, 0); }
   /* `eyebrow` true: the usual line; a string: the nudge's own line (native-localized) */
   if (eyebrow){ el.eyebrow.textContent = typeof eyebrow === 'string' ? eyebrow : tt('chips.eyebrow'); A.eyebrowO.tween(1, 0.24, E.fade); A.eyebrowY.set(6); A.eyebrowY.to(0, 'emit'); }
 }
@@ -472,7 +495,7 @@ function chipsHide(instant){
   if (!n) return;
   dead.forEach(function(c, i){
     var k = n - 1 - i;
-    if (instant){ c.p.set(0); c.o.set(0); } else { c.p.tween(0, 0.24, E.inhale, k * 0.04); c.o.tween(0, 0.24, function(u){ return sstep(0.5, 1, u); }, k * 0.04); }
+    if (instant){ c.p.set(0); c.o.set(0); op(c.el, 0); } else { c.p.tween(0, 0.24, E.inhale, k * 0.04); c.o.tween(0, 0.24, function(u){ return sstep(0.5, 1, u); }, k * 0.04); }
   });
   DYING = DYING.concat(dead);
   at(instant ? 0 : 0.5, function(){

@@ -1193,29 +1193,55 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     /* alert */ /alert|allert|allarm|alarm|warn/,
     /* watched, monitored, noticed, detected */ /^watch/, /monitor/, /^notic/, /detect|detet/, /observ|osserv/,
     /^vigi/, /surveill/, /remarqu/, /sorvegli/, /rilev/, /beobacht/, /uberwach/, /bemerk/, /entdeck/, /auff[ae]ll|aufgefall/,
-    /^not(?:o|ou|ei|aste|aron|aram|ado|ato|ata|ando|amos|ar|are|ava|avo)$/
+    /^not(?:o|ou|ei|aste|aron|aram|ado|ato|ata|ando|amos|ar|are|ava|avo)$/,
+    /* What a person does with their money, which Bobby's own question never puts to them (2026-10-08).
+       invest: the act and its noun in the six languages (investing, investir, investimento, investieren, Investition),
+       not the people who do it (investors, investisseurs, investidores, investitori) and not an investigation */
+    /^(?:re|dis|des)?invest(?!or|isseu|idor|itor|ig)/,
+    /* bet */ /^bet(?:s|ting)?$/, /^wager/, /^apost/, /^apuest/, /^scommett/, /^scommess/, /^wett(?:e|en|et|est|ete|eten)$/, /^gewettet$/,
+    /* leverage */ /^leverag/, /apalanc/, /alavanc/, /hebel/,
+    /* savings */ /^savings$/, /^ahorr/, /^epargn/, /^poupanc/, /^risparmi/, /erspar/, /^sparbuch/,
+    /* to short, as a verb in any of them */ /^short(?:ed|ing|en|et|are|ear)$/, /^geshortet$/, /^yolo/
   ];
   /* Whether or when to act, dressed as a what or a why ("Why not get in now?", "What is the best moment to…?").
      Phrases, so each is tried on the folded text of the reply's language, not word by word. A verb that also means
      "to expect" (esperar, attendre, aspettare) only counts in the turns that mean waiting, "moment" does not count
      where it only means "now" (NEXT_NOW is taken out first: "en ce moment", "at the moment"), and in English a verb
      the market itself does ("NVDA entered a correction", "the market is waiting for…") counts only as the reader's. */
+  /* Also taken out first: "long" and "short" where they only measure time or the shape of a candle ("long-term",
+     "as long as", "a long wick", "a corto plazo"). What is left of them is a position, and NEXT_ACTS refuses it. */
   var NEXT_NOW = {
-    en: /(?:^| )(?:at|for) the moment(?![a-z])/g,
-    es: /(?:^| )(?:en este|en ese|por el|de) momento(?![a-z])/g,
+    en: /(?:^| )(?:(?:at|for) the moment|(?:as|so|how|too) long(?= (?:as|to|for|it|the|this|that|before|after|until|will|would|can|could|does|did|is|has|have|and)(?![a-z])|$)|(?:for|before) long|(?:long|short)(?: (?:and|or|to) (?:long|short|medium|mid))? (?:term|run|dated|lived|time|way|while|ago|enough|since|period|stretch|history|wicks?|tails?|candles?|shadows?|body|bodies|base|consolidation|range|pause|lower|upper))(?![a-z])/g,
+    es: /(?:^| )(?:(?:en este|en ese|por el|de) momento|(?:(?:a|de|en el|al|del|en) )?(?:corto|largo|mediano|medio)(?: (?:y|o|u) (?:corto|largo|mediano|medio))? plazo|plazos? (?:mas |muy )?(?:cortos?|largos?)|a lo largo)(?![a-z])/g,
     fr: /(?:^| )(?:en ce|pour le|a ce) moment(?![a-z])/g,
     pt: /(?:^| )(?:neste|nesse|no|de|por) momento(?![a-z])/g,
     it: /(?:^| )(?:in questo|in quel|al|per il) momento(?![a-z])/g,
     de: /(?:^| )im moment(?![a-z])/g
   };
   var NEXT_ACTS = {
-    en: /(?:^| )(?:(?:to|not|i|we|you|should|could|would|can) (?:get into|enter|exit|wait)|(?:get|gets|getting|got) (?:in|out)|jump(?:s|ing)? in|(?:enter|exit)(?:ing)? (?:now|today|here|early|late)|entry|entries|why wait|wait (?:on|until|before|longer|and see)|moment|time to|too (?:late|early|soon))(?![a-z])/,
-    es: /(?:^| )(?:entrar|entrada|entradas|salir|momento|momentos|hora de|por que (?:no )?esperar|esperar (?:a|para|antes|mas|todavia|un poco|con)|demasiado (?:tarde|pronto))(?![a-z])/,
-    fr: /(?:^| )(?:entrer|entree|entrees|sortir|moment|moments|temps de|heure de|pourquoi (?:ne pas )?attendre|attendre (?:avant|encore|plus|un peu|davantage)|patienter|trop (?:tard|tot))(?![a-z])/,
-    pt: /(?:^| )(?:entrar|entrada|entradas|sair|momento|momentos|hora de|altura de|por ?que (?:nao )?esperar|esperar (?:a|para|antes|mais|ainda|um pouco|pela|pelo)|demasiado (?:tarde|cedo)|tarde demais|cedo demais)(?![a-z])/,
-    it: /(?:^| )(?:entrare|entrata|entrate|ingresso|ingressi|uscire|momento|momenti|ora di|tempo di|perche (?:non )?(?:aspettare|attendere)|(?:aspettare|attendere) (?:ancora|prima|a|di piu|un po)|troppo (?:tardi|presto))(?![a-z])/,
-    de: /(?:^| )(?:[a-z]*einst(?:ieg|eig)[a-z]*|einzusteigen|aussteigen|auszusteigen|ausstieg|moment|moments|momente|zeitpunkt|zeitpunkte|zeit (?:zu|fur)|warten|abwarten|abzuwarten|zu (?:spat|fruh))(?![a-z])/
+    en: /(?:^| )(?:(?:to|not|i|we|you|should|could|would|can) (?:get into|enter|exit|wait)|(?:get|gets|getting|got) (?:in|out)|jump(?:s|ing)? in|(?:enter|exit)(?:ing)? (?:now|today|here|early|late)|entry|entries|why wait|wait (?:on|until|before|longer|and see)|moment|time to|too (?:late|early|soon)|all in(?! (?:the|a|an|all|one|this|that|these|those|its|their|agreement|favor|favour|line|sync|play)(?![a-z]))|longs?|shorts?|nest egg)(?![a-z])/,
+    es: /(?:^| )(?:entrar|entrada|entradas|salir|momento|momentos|hora de|por que (?:no )?esperar|esperar (?:a|para|antes|mas|todavia|un poco|con)|demasiado (?:tarde|pronto)|all in|todo adentro|longs?|shorts?|(?:en|ir|irse|ponerse|ponerte|ponerme|ponernos|estar|quedarse|abrir|cerrar|cubrir|los|sus) (?:largos?|cortos?)|posicion(?:es)? (?:largas?|cortas?)|invert(?:ir|irlo|irla|ido|ida|idos|idas|iria|irian|ira|iran|imos|ia|ian|iste|i)|inviert[a-z]{1,4}|invirt[a-z]{2,6})(?![a-z])/,
+    fr: /(?:^| )(?:entrer|entree|entrees|sortir|moment|moments|temps de|heure de|pourquoi (?:ne pas )?attendre|attendre (?:avant|encore|plus|un peu|davantage)|patienter|trop (?:tard|tot)|all in|tapis|shorts?|shorte[a-z]*|(?:etre|rester|passer|se mettre) long|long sur|positions? (?:longues?|courtes?)|pari(?:er|e|es|ent|ez|ons)?|mis(?:er|ent|ons|ez)|mises? sur|effets? de levier|levier financier|avec (?:du |un |le )?levier)(?![a-z])/,
+    pt: /(?:^| )(?:entrar|entrada|entradas|sair|momento|momentos|hora de|altura de|por ?que (?:nao )?esperar|esperar (?:a|para|antes|mais|ainda|um pouco|pela|pelo)|demasiado (?:tarde|cedo)|tarde demais|cedo demais|all in|shorts?|longs?|posic(?:ao|oes) (?:longas?|curtas?|compradas?|vendidas?))(?![a-z])/,
+    it: /(?:^| )(?:entrare|entrata|entrate|ingresso|ingressi|uscire|momento|momenti|ora di|tempo di|perche (?:non )?(?:aspettare|attendere)|(?:aspettare|attendere) (?:ancora|prima|a|di piu|un po)|troppo (?:tardi|presto)|all in|shorts?|longs?|allo scoperto|posizion[ei] (?:lung|cort)[aehi]{1,2}|puntare|puntando|punt(?:a|ano|i|iamo|ate) su(?:l|lla|llo|i|gli|lle)?|puntat[ae]|leva finanziaria|effetto leva|(?:a|in|con|con la) leva)(?![a-z])/,
+    de: /(?:^| )(?:[a-z]*einst(?:ieg|eig)[a-z]*|einzusteigen|aussteigen|auszusteigen|ausstieg|moment|moments|momente|zeitpunkt|zeitpunkte|zeit (?:zu|fur)|warten|abwarten|abzuwarten|zu (?:spat|fruh)|all in|alles auf eine karte|shorts?|longs?|auf (?:[^ ]+ ){1,3}setzen|setz(?:en|t|e) auf|wetten auf)(?![a-z])/
   };
+  /* What Bobby never says about itself, as a phrase: that it saw, caught, tracked or followed something, in the
+     first person and in any tense, that it did so for the reader, or while they were away. Tried on the folded
+     text of the reply's language; the reason is `word`, as for the verbs NEXT_FORBIDDEN refuses wherever they stand
+     (watched, noticed, detected). Bobby's own question does not name Bobby either. */
+  var NEXT_SAW = {
+    en: /(?:^| )(?:(?:i|we)(?: (?:have|ve|had|d|did|do|was|were|am|m|are|re|just|already|also|still|ever|never|not|been|kept|keep))* (?:saw|see|seen|seeing|caught|catch|catching|track|tracked|tracking|follow|followed|following|flag|flagged|flagging|spot|spotted|spotting|found|pick(?:ed|ing)? up|an eye|tabs)|(?:did|have|had|do|am|was|were) (?:i|we)(?: (?:been|just|already|ever|not|kept|keep))* (?:see|seen|saw|seeing|catch|caught|catching|track|tracked|tracking|follow|followed|following|flag|flagged|flagging|spot|spotted|spotting|find|found|pick(?:ed|ing)? up|keeping|kept)|bobby|for you|on your behalf|while you|(?:in|during) your absence)(?![a-z])/,
+    es: /(?:^| )(?:vi|vimos|(?:he|hemos|habia) visto|(?:he|hemos|habia|estuve|estuvimos|estoy|estamos|estaba) (?:estado )?(?:viendo|siguiendo|rastreando|revisando)|(?:he|hemos|habia) (?:seguido|rastreado|captado|encontrado|pillado|revisado)|segui|rastree|capte|encontre|pille|bobby|por ti|para ti|por usted|para usted|por vos|para vos|en tu (?:lugar|ausencia|nombre)|mientras (?:no )?(?:estabas|estaba|dormias|dormia|tu|usted))(?![a-z])/,
+    fr: /(?:^| )(?:(?:j ai|ai je|j avais|nous avons|avons nous|on a)(?: (?:deja|bien|aussi|pu|tout))? (?:vu|suivi|repere|capte|trouve|releve|scrute|garde)|je (?:vois|scrute)|bobby|pour toi|pour vous|a ta place|a votre place|en ton absence|en votre absence|pendant (?:ton|votre) absence|pendant que (?:tu|vous))(?![a-z])/,
+    pt: /(?:^| )(?:vi|vimos|(?:tenho|temos|tinha|estive|estou|estamos|estava) (?:estado )?(?:visto|acompanhado|seguido|a ver|a acompanhar|a seguir|vendo|acompanhando|seguindo|de olho)|acompanhei|acompanhamos|segui|encontrei|reparei|apanhei|captei|bobby|por ti|para ti|por voce|para voce|no teu lugar|no seu lugar|na tua ausencia|na sua ausencia|enquanto (?:nao )?(?:estavas|estava|dormias|dormia|tu|voce))(?![a-z])/,
+    it: /(?:^| )(?:(?:ho|abbiamo|avevo|avevamo)(?: (?:gia|appena|anche|sempre))? (?:visto|seguito|trovato|colto|tenuto|tracciato|controllato|guardato|individuato|scovato)|(?:sto|stavo|stiamo|stavamo) (?:seguendo|guardando|tenendo|tracciando|controllando|vedendo)|bobby|per te|per voi|al posto tuo|al tuo posto|in tua assenza|in vostra assenza|mentre (?:non c eri|eri|dormivi|tu|eravate))(?![a-z])/,
+    de: /(?:^| )(?:(?:ich|wir) (?:[^ ]+ ){0,8}(?:gesehen|verfolgt|gefunden|erfasst|getrackt|aufgespurt|angesehen|angeschaut|im blick|im auge)|(?:sehe|verfolge|tracke|finde) ich|bobby|fur dich|fur euch|an deiner stelle|in deiner abwesenheit|wahrend du|wahrend ihr)(?![a-z])/
+  };
+  /* The capitals a question about a chart may carry besides the asset's own ticker: the indicators and the few market
+     words written in capitals of the server's lexicon (api/_lib/desk-next-question-lexicon.ts). Any other word of two
+     to five capitals, or one with an exchange suffix, is another asset's ticker. */
+  var NEXT_CAPS = { EMA: 1, SMA: 1, RSI: 1, MACD: 1, ATR: 1, VWAP: 1, IFR: 1, ETF: 1, AI: 1, IA: 1, KI: 1, FED: 1, DOW: 1, DAX: 1 };
   /* A price said in words is still a price: a number word right before a money or percent word ("two hundred
      dollars", "diez por ciento", "zehn Prozent"). One table for the six languages. Articles that double as "one"
      (a, un, ein) are left out, so the dollar or a point can still be the subject of a question. */
@@ -1230,9 +1256,10 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
   var NEXT_SPELLED = new RegExp('(?:^| )(?:' + NEXT_NUMBER_WORDS + ')(?: (?:of|de|di|d))? (?:' + NEXT_UNIT_WORDS + ')(?![a-zß])');
   function escapeRx(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
   function fold(s) { return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
-  /** The checked question, or why it is not shown: missing · long · number · shape · opener · act · word · same.
-   *  `asked` is the question this read answered: Bobby never offers the same one again (a tap would loop). */
-  function nextQuestion(raw, symbol, lang, asked) {
+  /** The checked question, or why it is not shown: missing · long · number · shape · asset · opener · act · word · same.
+   *  `asked` is the question this read answered: Bobby never offers the same one again (a tap would loop).
+   *  `name` is the asset's own name, when the reply has one: a word of it written in capitals (LVMH) is this asset. */
+  function nextQuestion(raw, symbol, lang, asked, name) {
     if (typeof raw !== 'string') return { text: null, reason: 'missing' };
     var text = raw.replace(/\s+/g, ' ').trim();
     if (!text) return { text: null, reason: 'missing' };
@@ -1251,6 +1278,15 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     var folded = fold(text.replace(/^¿\s*/, ''));
     var spoken = folded.replace(/[^a-zßœæ0-9]+/g, ' ').trim();
     if (NEXT_SPELLED.test(spoken)) return { text: null, reason: 'number' };
+    /* It is about the asset that was read, and no other. A tap asks the question about THIS read's asset (native
+       reuses it), so a question that names TSLA after a read of NVDA would be answered about NVDA. */
+    var own = {};
+    [sym, base].concat(sym.split(/[^A-Z0-9]+/), String(name || '').toUpperCase().split(/[^A-Z0-9]+/)).forEach(function (s) { if (s) own[s] = 1; });
+    var named = text.split(/[^A-Za-z0-9.]+/);
+    for (var j = 0; j < named.length; j++) {
+      var w = named[j].replace(/^\.+|\.+$/g, '');
+      if ((/^[A-Z]{2,5}$/.test(w) || /^[A-Z][A-Z0-9]*\.[A-Z]{1,3}$/.test(w)) && !own[w] && !NEXT_CAPS[w]) return { text: null, reason: 'asset' };
+    }
     var opens = NEXT_OPENS[lang2(lang)];
     if (!opens || !opens.test(folded)) return { text: null, reason: 'opener' };
     var acts = NEXT_ACTS[lang2(lang)], now = NEXT_NOW[lang2(lang)];
@@ -1259,6 +1295,8 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     for (var i = 0; i < words.length; i++) {
       for (var k = 0; k < NEXT_FORBIDDEN.length; k++) if (NEXT_FORBIDDEN[k].test(words[i])) return { text: null, reason: 'word' };
     }
+    var saw = NEXT_SAW[lang2(lang)];
+    if (saw && saw.test(spoken)) return { text: null, reason: 'word' };
     if (typeof asked === 'string' && fold(asked.replace(/\s+/g, ' ').trim().replace(/^¿\s*/, '')) === folded) return { text: null, reason: 'same' };
     return { text: text, reason: null };
   }
@@ -1490,7 +1528,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     return {
       requestId: r.requestId, symbol: sym, name: r.asset.name, isEquity: !!r.asset.isEquity, question: r.question, lang: lang,
       /* the CIO's next question when it passed every check (in the reply's own language), else null */
-      next: nextQuestion(syn && syn.followUp, sym, r.language || lang, r.question).text,
+      next: nextQuestion(syn && syn.followUp, sym, r.language || lang, r.question, r.asset.name).text,
       /* who started this read: 'person' (they asked), 'followUp' (native started it from a follow-up), 'restored' */
       origin: typeof opts.origin === 'string' && opts.origin ? opts.origin : 'person',
       /* false only when native says the next read would be refused: then no one-tap question is shown (§3.5) */
@@ -1701,7 +1739,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     sentences: sentences, firstSentence: firstSentence, clipWords: clipWords,
     syllables: syllables, wordTimes: wordTimes,
     build: build, failure: failure, resetDay: resetDay, xpChip: xpChip, followUps: followUps, thesisView: thesisView,
-    nextQuestion: nextQuestion, NEXT: { min: NEXT_MIN, max: NEXT_MAX, opens: NEXT_OPENS, forbidden: NEXT_FORBIDDEN, acts: NEXT_ACTS, spelled: NEXT_SPELLED },
+    nextQuestion: nextQuestion, NEXT: { min: NEXT_MIN, max: NEXT_MAX, opens: NEXT_OPENS, forbidden: NEXT_FORBIDDEN, acts: NEXT_ACTS, spelled: NEXT_SPELLED, saw: NEXT_SAW, caps: NEXT_CAPS },
     _internal: { pulseAgrees: pulseAgrees, planOf: planOf, closedVolumeRatio: closedVolumeRatio, niceStep: niceStep }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

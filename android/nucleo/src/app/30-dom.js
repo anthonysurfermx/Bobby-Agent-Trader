@@ -187,7 +187,9 @@ function buildBelt(roster){
     var on = c.id === ME.id, art = artFor(c.webId);
     var d = mk('div', 'bd' + (on ? ' on' : '') + (c.unlocked ? '' : ' lk'));
     if (art && art.dataUri){ var im = D.createElement('img'); im.alt = ''; im.src = art.dataUri; d.appendChild(im); }
-    el.belt.appendChild(d); BELT.push({ el: d, on: on });
+    /* born hidden, like a chip: only the loop places an avatar on the belt, and the loop stands still under a sheet
+       (the Squad sheet is where a companion is changed, and the belt is rebuilt under it) */
+    op(d, 0); el.belt.appendChild(d); BELT.push({ el: d, on: on });
   });
   BELT_SZ = BELT.map(function(b){ return b.on ? 32 : 20; }); BELT_TOT = BELT_SZ.reduce(function(a, b){ return a + b; }, 0);
 }

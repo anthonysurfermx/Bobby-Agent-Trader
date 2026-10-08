@@ -8,6 +8,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { nextQuestionCases } from '../../../ios/Bobby/Nucleo/tests/next-question.cases.mjs';
 
 const source = (file) => fs.readFileSync(new URL('../src/' + file, import.meta.url), 'utf8');
 const fixture = (name) => JSON.parse(fs.readFileSync(new URL('./fixtures/ask/' + name + '.json', import.meta.url), 'utf8'));
@@ -324,3 +325,7 @@ test('with no read left the row offers no one-tap question: only “another ques
     }
   }
 });
+
+// ---- The second pass (2026-10-08): what a review's 90 hostile strings found, the other-asset rule, and the show
+// rate, as cases both phones run (ios/Bobby/Nucleo/tests/next-question.cases.mjs). ----
+nextQuestionCases({ test, assert, RM, reply });

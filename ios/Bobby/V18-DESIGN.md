@@ -512,15 +512,16 @@ Rules that are not folded away:
   lock screen or in the app.
 - A tap lands on a glass that is there. From a closed app, the week's board opens once the page
   under it has had 1.6 s in front to wake (the asset's line, a briefing and a thesis reminder do
-  not wait). A row, or the button of the line, asks Bobby through the page, and the page only
-  listens from its home: the question is offered again every half second, eight times at the
-  most, and then dropped. One tap is one read at the most, and it never starts behind another
-  sheet, for another reader, after the app was left, or over a question of their own.
+  not wait). A row, or the button of the line, asks Bobby through the page, as if the person had
+  closed what was on the glass and asked: over a finished read, its cards, an open keyboard or
+  another face of the sphere the read starts at once. Where the page cannot take it (it is
+  still waking, or coming home) the question is offered again every half second, eight times
+  at the most, and then dropped. One tap is one read at the most, and it never starts behind
+  another sheet, for another reader, after the app was left, or over a question of their own
+  that is on its way (Nucleo/ARCHITECTURE.md §9.5 has the table, state by state).
 - A tap that asked nothing is not an act. The pick is written when Bobby is asked, with the
   moment of the tap; a row whose question never reached the page writes nothing and answers no
-  follow-up. Known gap, in the page: over a finished read still on the glass, or an open
-  keyboard, the page takes no question, so the board closes and nothing is asked
-  (Nucleo/ARCHITECTURE.md §9.5).
+  follow-up.
 
 #### What the person sees, and what stays on the phone (`HarnessCenter`, `HarnessCopy`, `HarnessNotes`)
 
