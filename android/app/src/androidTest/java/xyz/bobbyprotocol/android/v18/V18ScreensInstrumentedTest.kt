@@ -330,6 +330,8 @@ class V18ScreensInstrumentedTest(private val language: String) {
         assertShown("reminders-follow-ups-settings")
         assertAbsent("reminders-denied")
         assertWritten(if (language == "es") "El seguimiento está apagado en los ajustes de este teléfono." else "Follow-ups are off in this phone's settings.")
+        // The sentence and its way out are below the fold of a half-height sheet: the picture is of the whole sheet.
+        expandSheet()
         compose.onNodeWithTag("reminders-follow-ups-settings", useUnmergedTree = true).performScrollTo()
         shot("reminders-follow-ups-off-in-settings")
         tap("reminders-follow-ups-settings")

@@ -202,10 +202,10 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #chipRow{left:0;top:0;width:390px;height:844px;pointer-events:none;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 24px),transparent)}
 .chip{position:absolute;left:0;top:0;height:40px;padding:0 16px;border-radius:20px;border:.5px solid var(--line);background:rgba(242,237,228,.04);font:500 15px/39px var(--sans);color:var(--ink2);white-space:nowrap;cursor:pointer;pointer-events:auto;transform-origin:50% 50%}
 /* Android: 40 px to the eye, 48 dp to the finger. The stage is 390 x 844 px and is scaled to fit the screen: on a
-   360 x 800 dp phone, less its status and navigation bars, a 40 px chip is drawn about 34 dp tall. 9 px above and
-   below make its tap area 58 px, which is 48 dp there. The level pill does the same. The iPhone page has no such
+   360 x 800 dp phone, less its status and navigation bars, a 40 px chip is drawn about 34 dp tall. 10 px above and
+   below make its tap area 60 px, which is 50 dp there. The level pill does the same. The iPhone page has no such
    rule: its row is the size iOS asks for. */
-.chip::before{content:'';position:absolute;left:0;right:0;top:-9px;bottom:-9px}
+.chip::before{content:'';position:absolute;left:0;right:0;top:-10px;bottom:-10px}
 .chip.first{color:var(--ink)}
 .chip.apple{background:#FFFFFF;color:#000;border-color:transparent;font:500 15px/39px -apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif}
 .chip.apple .lg{font:500 17px/39px -apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;margin-right:5px}

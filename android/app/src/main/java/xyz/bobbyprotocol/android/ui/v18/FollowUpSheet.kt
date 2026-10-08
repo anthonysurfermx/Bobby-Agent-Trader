@@ -142,7 +142,7 @@ fun FollowUpsRows(host: V18Host, onConsentRequired: () -> Unit = {}) {
     // press on one, "Turn off notifications"): the switch says what stands in the way, with the way
     // there. When all of Bobby's notifications are off, the Reminders sheet already says so for every row.
     if (view.mode == HarnessMode.ON && view.permission == LocalNotifier.Permission.DENIED && host.notifier.status() == LocalNotifier.Permission.ALLOWED) {
-        Column(Modifier.fillMaxWidth().padding(bottom = 4.dp).testTag("reminders-follow-ups-off-in-settings")) {
+        Column(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp).testTag("reminders-follow-ups-off-in-settings")) {
             QuietNote(center.copy.offInSettings)
             QuietLink(center.copy.openSettings, "reminders-follow-ups-settings") { host.openNotificationSettings() }
         }
