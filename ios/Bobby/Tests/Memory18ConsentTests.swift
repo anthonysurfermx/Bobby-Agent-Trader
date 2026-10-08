@@ -324,6 +324,7 @@ final class Memory18ConsentTests: XCTestCase {
         }
         UserDefaults.standard.set("en", forKey: L.preferenceKey)
         XCTAssertTrue(MemoryView.deleteEverythingWarning.contains("the shortcuts on this iPhone and the theses you wrote here"))
+        XCTAssertTrue(MemoryView.deleteEverythingWarning.contains("follow-up notes"), "the confirmation names everything it removes")
         XCTAssertTrue(MemoryView.deleteEverythingWarning.hasSuffix("It cannot be undone."))
     }
 
@@ -336,7 +337,7 @@ final class Memory18ConsentTests: XCTestCase {
         XCTAssertFalse(note.lowercased().contains("never leave"))
         XCTAssertTrue(note.contains("AI providers"), "what reaches an AI provider is said where it happens")
         let deletion = MemoryView.onThisPhoneDeletionNote
-        XCTAssertEqual(deletion, "Forget removes an asset's shortcut. Delete everything clears the shortcuts and the theses you wrote.")
+        XCTAssertEqual(deletion, "Forget removes an asset's shortcut. Delete everything clears the shortcuts, the theses you wrote and the follow-up notes.")
         // What that sentence promises is what the code does: Memory18EraseTests covers both deletions end to end.
         for language in ["es", "fr", "pt", "it", "de"] {
             UserDefaults.standard.set(language, forKey: L.preferenceKey)

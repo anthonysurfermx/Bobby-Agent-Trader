@@ -324,6 +324,7 @@ final class Memory18EraseTests: XCTestCase {
 
     func testTheNoticesSayWhatHappenedInTheAppsOwnWords() {
         XCTAssertTrue(MemoryNotice.erasedEverything.message.contains("the shortcuts on this iPhone and the theses you wrote here"))
+        XCTAssertTrue(MemoryNotice.erasedEverything.message.contains("follow-up notes"), "what the phone kept for follow-ups goes too, and it says so")
         XCTAssertTrue(MemoryNotice.erasedOnPhoneOnly.message.contains("did not confirm"))
         XCTAssertTrue(MemoryNotice.forgotOnPhoneOnly(symbol: "BRK.B").message.contains("BRK.B"))
     }

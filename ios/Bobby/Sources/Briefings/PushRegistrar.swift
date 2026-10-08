@@ -521,6 +521,7 @@ final class BobbyAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                             withCompletionHandler completionHandler: @escaping () -> Void) {
+        let action = response.actionIdentifier
         let tapped = response.actionIdentifier == UNNotificationDefaultActionIdentifier
         let briefId = BriefingIntent.briefId(from: response.notification.request.content.userInfo)
         let reminder = ReminderIntent.tap(from: response.notification.request.content.userInfo)
@@ -533,8 +534,18 @@ final class BobbyAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
             if tapped, let reminder { ReminderIntent.shared.store(reminder) }
             if tapped, news != nil { NewsPushIntent.shared.store(response.notification.request.content.userInfo) }
             // 1.8: so does a tapped follow-up (Harness/HarnessIntent.swift).
-            if tapped, let followUp { HarnessIntent.shared.store(followUp) }
+            await Self.followUpResponse(action: action, tap: followUp)   // and its "Stop" has stopped before iOS is told it is done
             completionHandler()
         }
+    }
+
+    /// A follow-up notification was answered: its tap is stored like the others, and its "Stop"
+    /// action turns follow-ups off at once, with the app in the background (HarnessIntent.respond).
+    /// A notification that is not a follow-up of this app has no tap and does nothing here. The
+    /// centre and the store are parameters so the suite drives this with its own.
+    @MainActor
+    static func followUpResponse(action: String, tap: HarnessTap?, intent: HarnessIntent? = nil, harness: HarnessCenter? = nil) async {
+        guard let tap else { return }
+        await (intent ?? .shared).respond(action: action, tap: tap, center: harness ?? .shared)
     }
 }

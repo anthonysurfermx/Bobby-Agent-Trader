@@ -14,8 +14,8 @@
 //  - Writes are explicit corrections, one at a time, shown only after the server answers.
 //  - "Delete everything" needs a confirmation: `requestForgetAll` only arms it; `confirmForgetAll` sends.
 //  - 1.8: deletion is complete. "Forget" also takes the asset out of this phone's shortcut row, and
-//    "Delete everything" also clears that row and the theses written on this phone, for this account
-//    only. The phone's part runs first and needs no network; `notice` says honestly whether the
+//    "Delete everything" also clears that row, the theses written on this phone and the notes the
+//    phone keeps for follow-ups (V18/Harness), for this account only. The phone's part runs first and needs no network; `notice` says honestly whether the
 //    server confirmed its part.
 //  - R11: no network before the risk notice is accepted; signed out = no calls.
 //  - The server's text is never shown; failures map to the app's own copy.
@@ -111,8 +111,8 @@ enum MemoryNotice: Equatable, Sendable {
     var message: String {
         switch self {
         case .erasedEverything:
-            return L.t("Deleted: what Bobby's servers remembered, the shortcuts on this iPhone and the theses you wrote here.",
-                       "Borrado: lo que recordaban los servidores de Bobby, los accesos rápidos de este iPhone y las tesis que escribiste aquí.")
+            return L.t("Deleted: what Bobby's servers remembered, the shortcuts on this iPhone and the theses you wrote here, with Bobby's follow-up notes.",
+                       "Borrado: lo que recordaban los servidores de Bobby, los accesos rápidos de este iPhone y las tesis que escribiste aquí, con las notas de seguimiento de Bobby.")
         case .erasedOnPhoneOnly:
             return L.t("Deleted on this iPhone. Bobby's servers did not confirm, so what they remember is still there. Try again.",
                        "Borrado en este iPhone. Los servidores de Bobby no confirmaron, así que lo que recuerdan sigue ahí. Inténtalo de nuevo.")
@@ -346,8 +346,9 @@ final class MemoryCenter: ObservableObject {
 
     func cancelForgetAll() { confirmingForgetAll = false }
 
-    /// The confirmed "Delete everything": this account's shortcuts and theses on this phone, then every
-    /// asset and preference on the server (a paused memory stays paused). True when the server confirmed.
+    /// The confirmed "Delete everything": this account's shortcuts, theses and follow-up notes on this
+    /// phone, then every asset and preference on the server (a paused memory stays paused). True when
+    /// the server confirmed.
     @discardableResult
     func confirmForgetAll() async -> Bool {
         accountChanged()
@@ -358,8 +359,9 @@ final class MemoryCenter: ObservableObject {
         notice = nil
         DeskMemory.forgetWatchlist(owner: user, defaults: defaults)
         ThesisBook(defaults: defaults).deleteAll(owner: user)
-        // 1.8: what the harness learned on this phone goes too, with the follow-ups it planned.
-        HarnessStore(defaults: defaults).forget(owner: user)
+        // 1.8: what the harness learned on this phone goes too, with the follow-ups it planned. A no
+        // to follow-ups is not a note: it stays, so erasing never brings the offer back.
+        HarnessStore(defaults: defaults).forgetNotes(owner: user)
         NotificationCenter.default.post(name: HarnessCenter.erased, object: nil)
         forgotAllAt = now()
         local = readLocal()

@@ -4,7 +4,9 @@
 //    it is the one place (with the Follow-ups switch) where iOS may be asked for permission;
 //  - the move, when they come back (on their own or through a follow-up) to an asset they asked
 //    about at least a day ago: "NVDA +2.3% since you asked" · "What changed?". The number costs
-//    nothing; the button asks Bobby, which is a read like any other.
+//    nothing; the button asks Bobby, which is a read. So the button is only there when the phone
+//    knows that read is answered (HarnessWall): otherwise the same line carries "Got it", which
+//    asks nothing, and Bobby never walks anyone into a sign-in or a paywall.
 import Foundation
 
 @MainActor
@@ -42,23 +44,34 @@ enum HarnessNudges {
 
     static func moveSource(_ harness: HarnessCenter) -> NudgeSource {
         NudgeSource(key: moveKey, priority: NudgePriority.followUp,
-                    candidate: { _ in harness.move.map(nudge) },
+                    candidate: { _ in harness.move.map { nudge($0, asks: harness.readsOpen) } },
                     act: { nudge, session in
-                        guard let move = harness.move, moveId(move) == nudge.id else { return }
-                        harness.notePicked(symbol: move.symbol)
+                        // Decided again at the tap: what was drawn may be older than the last receipt.
+                        guard let move = harness.move, moveId(move) == nudge.id, harness.readsOpen else { return }
+                        // The line leaves the glass at the tap; the tap is written when the page asks the question.
+                        let tapped = harness.noteTapped(symbol: move.symbol)
                         session.startRead(symbol: move.symbol, name: move.name, isEquity: move.isEquity,
-                                          question: HarnessCopy.changedQuestion(symbol: move.symbol))
+                                          question: HarnessCopy.changedQuestion(symbol: move.symbol),
+                                          taken: { harness.notePicked(symbol: move.symbol, at: tapped) })
                     })
     }
 
-    static func nudge(_ move: HarnessMove) -> NucleoNudge {
-        NucleoNudge(id: moveId(move), text: HarnessCopy.moveLine(symbol: move.symbol, pct: move.pct, days: move.days), cta: HarnessCopy.moveButton)
+    /// `asks`: the next read would be answered. Without it the line is the same and its button asks nothing.
+    static func nudge(_ move: HarnessMove, asks: Bool = true) -> NucleoNudge {
+        NucleoNudge(id: moveId(move), text: HarnessCopy.moveLine(symbol: move.symbol, pct: move.pct, days: move.days),
+                    cta: asks ? HarnessCopy.moveButton : HarnessCopy.moveSeen)
     }
 
     /// `harness.move.<symbol>.<day asked>`: one line per asset per question, however often it is drawn.
     static func moveId(_ move: HarnessMove) -> String {
-        let symbol = move.symbol.lowercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "-") }
-        return "harness.move.\(symbol).\(dayStamp(move.askedAt))"
+        movePrefix(move.symbol) + dayStamp(move.askedAt)
+    }
+
+    /// `harness.move.` for every line, `harness.move.<symbol>.` for one asset's.
+    static func movePrefix(_ symbol: String? = nil) -> String {
+        guard let symbol else { return "harness.move." }
+        let safe = symbol.lowercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "." || $0 == "-") }
+        return "harness.move.\(safe)."
     }
 
     private static func dayStamp(_ date: Date) -> String {

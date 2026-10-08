@@ -5,8 +5,8 @@
 //   Theses/     write your thesis, come back to it, see what changed (three active at most)
 //   Reminders/  a review reminder you asked for, scheduled on this phone
 //   Invite/     a link that opens the app and credits the friend who sent it
-//   Harness/    from the first question: what you asked about, a follow-up the next day, and
-//               what Bobby learns from whether you open it (all of it on this phone)
+//   Harness/    from the first question: what you asked about, a follow-up when you said you
+//               would look again, and what Bobby learns from what you do with it (all on this phone)
 import Foundation
 
 @MainActor

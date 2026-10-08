@@ -4,6 +4,8 @@
 // (one consent path, MemoryConsentSheet). Corrections, remembered assets, the on-phone section and
 // confirmed deletion follow; MemoryCenter owns account isolation and makes deletion complete
 // (server, shortcuts, theses). What the phone keeps shows to everyone, signed in or not.
+// "On this iPhone" also says, in sentences, what the phone keeps to plan follow-ups (HarnessNotes):
+// every asset's notes can be erased there, and so can all of them. There is no second screen.
 import SwiftUI
 
 struct MemoryView: View {
@@ -14,6 +16,10 @@ struct MemoryView: View {
     var onClose: (() -> Void)? = nil
     /// Observed so a sign-in or sign-out redraws the screen; the center names the account.
     @ObservedObject private var account = AccountSession.shared
+    /// The follow-up notes of whoever uses this phone (V18/Harness). Never read from a server.
+    @ObservedObject var harness: HarnessCenter = .shared
+    /// The review fixtures show fixed notes: nothing is read and nothing can be erased.
+    var fixedNotes: HarnessNotes? = nil
     @State private var showingConsent = false
 
     private var signedIn: Bool { center.currentUser() != nil }
@@ -66,10 +72,10 @@ struct MemoryView: View {
         }
     }
 
-    /// The confirmation says exactly what goes: the server's memory and the two things kept on this phone.
+    /// The confirmation says exactly what goes: the server's memory and the three things kept on this phone.
     static var deleteEverythingWarning: String {
-        L.t("This deletes what Bobby's servers remember about your account, the shortcuts on this iPhone and the theses you wrote here. It cannot be undone.",
-            "Esto borra lo que los servidores de Bobby recuerdan de tu cuenta, los accesos rápidos de este iPhone y las tesis que escribiste aquí. No se puede deshacer.")
+        L.t("This deletes what Bobby's servers remember about your account, the shortcuts on this iPhone and the theses you wrote here, with Bobby's follow-up notes. It cannot be undone.",
+            "Esto borra lo que los servidores de Bobby recuerdan de tu cuenta, los accesos rápidos de este iPhone y las tesis que escribiste aquí, con las notas de seguimiento de Bobby. No se puede deshacer.")
     }
 
     static var deliveredBriefingsNote: String {
@@ -187,8 +193,8 @@ struct MemoryView: View {
 
     /// What each deletion on this screen removes from the phone, no more than the code does.
     static var onThisPhoneDeletionNote: String {
-        L.t("Forget removes an asset's shortcut. Delete everything clears the shortcuts and the theses you wrote.",
-            "Olvidar quita el acceso rápido de un activo. Borrar todo quita los accesos rápidos y las tesis que escribiste.")
+        L.t("Forget removes an asset's shortcut. Delete everything clears the shortcuts, the theses you wrote and the follow-up notes.",
+            "Olvidar quita el acceso rápido de un activo. Borrar todo quita los accesos rápidos, las tesis que escribiste y las notas de seguimiento.")
     }
 
     /// What the phone keeps with no copy on Bobby's servers: the shortcut row and the theses written
@@ -233,6 +239,84 @@ struct MemoryView: View {
         .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
         .overlay(alignment: .top) { Rectangle().fill(Theme.warmHair).frame(height: 1) }
         .accessibilityElement(children: .combine)
+        followUpNotes
+    }
+
+    /// What the phone keeps to plan follow-ups, as HarnessNotes says it: a header that states how
+    /// the app is built, one row per asset with its own erase, what Bobby does with them, and one
+    /// erase for all of it. With nothing kept it is one quiet line.
+    @ViewBuilder private var followUpNotes: some View {
+        let notes = fixedNotes ?? harness.notes
+        VStack(alignment: .leading, spacing: 0) {
+            if notes.isEmpty {
+                QuietNote(text: notes.quietLine, id: "memory-notes-empty").frame(minHeight: 52)
+            } else {
+                Text(HarnessNotes.header)
+                    .font(.system(size: 12)).foregroundStyle(Theme.warmDim).fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 14).padding(.bottom, 4)
+                    .accessibilityIdentifier("memory-notes-header")
+                ForEach(notes.assets) { asset in noteRow(asset) }
+                if !notes.general.isEmpty {
+                    sentences(notes.general)
+                        .padding(.top, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .overlay(alignment: .top) { Rectangle().fill(Theme.warmHair).frame(height: 1) }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("memory-notes-general")
+                }
+                QuietLink(title: HarnessNotes.eraseAll, id: "memory-notes-erase") {
+                    guard fixedNotes == nil else { return }
+                    Task { await harness.forgetLedger() }
+                }
+                .padding(.top, 2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .top) { Rectangle().fill(Theme.warmHair).frame(height: 1) }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("memory-notes")
+    }
+
+    /// The asset and its Erase on one line, then one sentence per line: each is short enough to be
+    /// read whole, in every language, without the row turning into a paragraph.
+    private func noteRow(_ asset: HarnessNotes.Asset) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                Text(asset.symbol).font(.mono(13, .medium)).foregroundStyle(Theme.cream)
+                Spacer(minLength: 8)
+                if asset.erasable {
+                    Button {
+                        guard fixedNotes == nil else { return }
+                        Task { await harness.forget(symbol: asset.symbol) }
+                    } label: {
+                        // "Erase", not "Forget": Forget is the button of what Bobby's servers remember, above.
+                        Text(HarnessNotes.eraseOne).font(.system(size: 12.5, weight: .medium)).foregroundStyle(Theme.warmMuted)
+                            .padding(.horizontal, 12).frame(minHeight: 32)
+                            .background(Capsule().fill(Theme.warmFill))
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(HarnessNotes.eraseLabel(symbol: asset.symbol))
+                    .accessibilityIdentifier("memory-note-forget-\(asset.symbol)")
+                }
+            }
+            .frame(minHeight: asset.erasable ? 44 : 30)
+            sentences(asset.lines)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(asset.symbol + ". " + asset.text)
+                .accessibilityIdentifier("memory-note-\(asset.symbol)")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, 8)
+    }
+
+    private func sentences(_ lines: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                Text(line).font(.system(size: 13)).foregroundStyle(Theme.warmMuted).fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     @ViewBuilder private func deleteEverything(showsError: Bool) -> some View {

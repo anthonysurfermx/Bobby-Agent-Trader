@@ -98,7 +98,30 @@ enum NucleoDeskIO {
     /// Levels (Profundo / Máximo): the CIO's short synthesis, shown first.
     struct Synthesis: Sendable {
         let headline: String, why: String?, risk: String?, watch: String?
-        var json: [String: Any] { ["headline": headline, "why": orNull(why), "risk": orNull(risk), "watch": orNull(watch)] }
+        /// The CIO's next question (ARCHITECTURE.md §3.5). The page decides whether it is shown; native only carries it.
+        var followUp: String? = nil
+        /// Without a next question the object is exactly what it was before the key existed.
+        var json: [String: Any] {
+            var json: [String: Any] = ["headline": headline, "why": orNull(why), "risk": orNull(risk), "watch": orNull(watch)]
+            if let followUp { json["followUp"] = followUp }
+            return json
+        }
+    }
+
+    /// The server bounds the next question at 160 characters. A longer one is not a question the page could show:
+    /// it is dropped whole, never cut.
+    static let nextQuestionLimit = 160
+
+    static func nextQuestion(_ value: Any?) -> String? {
+        guard let text = (value as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty,
+              text.count <= nextQuestionLimit else { return nil }
+        return text
+    }
+
+    /// Two wordings of one question differ only in their spaces (the page collapses them before it shows or asks it).
+    static func sameQuestion(_ a: String, _ b: String) -> Bool {
+        func words(_ s: String) -> [Substring] { s.split(whereSeparator: \.isWhitespace) }
+        return words(a) == words(b)
     }
 
     struct Sufficiency: Sendable {
@@ -378,7 +401,8 @@ enum NucleoDeskIO {
             debate.confirm = c; debate.invalidate = i
         }
         if let sy = (agents["synthesis"] ?? body["synthesis"]) as? [String: Any], let headline = text(sy["headline"]) {
-            debate.synthesis = Synthesis(headline: headline, why: text(sy["why"]), risk: text(sy["risk"]), watch: text(sy["watch"]))
+            debate.synthesis = Synthesis(headline: headline, why: text(sy["why"]), risk: text(sy["risk"]), watch: text(sy["watch"]),
+                                         followUp: nextQuestion(sy["followUp"]))
         }
         if let su = body["sufficiency"] as? [String: Any] {
             debate.sufficiency = Sufficiency(horizon: text(su["horizon"]),
@@ -477,6 +501,21 @@ extension CompanionStore {
     }
 }
 
+/// Who started a read. Follow-ups belong to a question the person asked by themselves (V18/Harness):
+/// typed or spoken, in their own words.
+enum NucleoReadOrigin: Equatable, Sendable {
+    /// The person, in their own words: typed or spoken.
+    case person
+    /// The person again: their own second question about the read on screen.
+    case thread
+    /// Bobby: the question it wrote after a read, the button of a follow-up, a row of a board.
+    case followUp
+    /// The person picked an asset on a chip and Bobby wrote the question it asks: an asset of the
+    /// idle home, an asset or a mover of the row after a read. One tap, not their words: the harness
+    /// never starts a chain of follow-ups from it (the page marks it: `ask {question, chip: true}`).
+    case chip
+}
+
 @MainActor
 final class NucleoDesk {
     /// Fixture mode reads the capture's clock; live mode reads the wall clock.
@@ -511,6 +550,17 @@ final class NucleoDesk {
     var askFinished: ([String: Any]) -> Void = { _ in }
     var debateEvent: ([String: Any]) -> Void = { _ in }
     var sessionChanged: () -> Void = {}
+    /// The person tapped the question Bobby's CIO wrote for a read (the symbol of that read; never the words).
+    var nextQuestionPicked: (_ symbol: String) -> Void = { _ in }
+    /// A read begins: the page's `ask` passed every check. `token` is the single-use token it asked
+    /// with, spent by now, or nil for a question in words. This is how native learns that the page
+    /// took a question it was offered (`NucleoSession.offerRead`): the page says nothing else.
+    var askStarted: (_ token: String?) -> Void = { _ in }
+    /// Whether Bobby may put a one-tap question after a read whose access receipt is this one (§3.5):
+    /// the CIO's, and the chips that ask about another asset. Asked once per read. On a no the CIO's
+    /// question never reaches the page and the reply says `oneTap: false`, so the row keeps only
+    /// "Another question", which the person types. Always, until a rule says otherwise.
+    var offersNextQuestion: (BobbyReadAccess?) -> Bool = { _ in true }
     var recordQuery: (_ symbol: String, _ isEquity: Bool) -> Void = { DeskMemory().recordQuery(symbol: $0, isEquity: $1) }
     /// Whose bearer the metered read carries (fixture mode: nobody).
     var meterAuth: BobbyMeterAuth = .account
@@ -533,6 +583,7 @@ final class NucleoDesk {
         var anonymousSignInRetry: Bool
         var level: NucleoAnalysisLevel? = nil
         var persistLevel = false
+        var origin: NucleoReadOrigin = .person
     }
     private final class Read {
         let requestId: String
@@ -548,12 +599,17 @@ final class NucleoDesk {
         let asOf: String
         let provider: String
         var saved: [String: Any]?
+        let origin: NucleoReadOrigin
+        /// The next question the page received with this read (§3.5), if any.
+        var nextQuestion: String? { (result["synthesis"] as? [String: Any])?["followUp"] as? String }
 
-        init(requestId: String, result: [String: Any], asset: NucleoAsset, generation: UUID, debate: NucleoDeskIO.Debate, price: Double?) {
+        init(requestId: String, result: [String: Any], asset: NucleoAsset, generation: UUID, debate: NucleoDeskIO.Debate, price: Double?,
+             origin: NucleoReadOrigin) {
             self.requestId = requestId
             self.result = result
             self.asset = asset
             self.generation = generation
+            self.origin = origin
             self.storedAt = Date()
             self.verdict = debate.verdict
             self.direction = debate.direction
@@ -576,6 +632,7 @@ final class NucleoDesk {
         let generation: UUID
         let startedAt: Date
         var level: NucleoAnalysisLevel = .rapido
+        var origin: NucleoReadOrigin = .person
     }
 
     private var tokens: [String: TokenEntry] = [:]
@@ -608,7 +665,7 @@ final class NucleoDesk {
     /// the same asset once the user has signed in or subscribed (single use, 10 min, like a confirm token).
     private func gated(_ status: String, message: String?, access: BobbyReadAccess?, job: Job, asset: NucleoAsset) -> [String: Any] {
         if let access { accessChanged(access) }
-        return ["v": 1, "status": status, "token": issueToken(asset, question: job.question, level: job.level, signInRetry: status == "signin_required"),
+        return ["v": 1, "status": status, "token": issueToken(asset, question: job.question, level: job.level, signInRetry: status == "signin_required", origin: job.origin),
                 "message": NucleoDeskIO.orNull(message), "access": access.map { $0.json as Any } ?? NSNull()]
     }
 
@@ -616,7 +673,7 @@ final class NucleoDesk {
     private func levelNotice(caption: String, sub: String?, cta: String, level: NucleoAnalysisLevel, persist: Bool,
                              job: Job, asset: NucleoAsset) -> [String: Any] {
         ["v": 1, "status": "level_notice", "caption": caption, "sub": NucleoDeskIO.orNull(sub), "cta": cta,
-         "token": issueToken(asset, question: job.question, level: level, persist: persist), "level": level.rawValue]
+         "token": issueToken(asset, question: job.question, level: level, persist: persist, origin: job.origin), "level": level.rawValue]
     }
 
     /// A read that failed after its asset was known (network, timeout, analysis_failed, desk_unavailable):
@@ -624,7 +681,7 @@ final class NucleoDesk {
     /// offers "Try again" in one tap. The server refunds a read that failed (api/desk-debate.ts).
     private func retryable(_ result: [String: Any], job: Job, asset: NucleoAsset) -> [String: Any] {
         var out = result
-        out["retry"] = issueToken(asset, question: job.question, level: job.level)
+        out["retry"] = issueToken(asset, question: job.question, level: job.level, origin: job.origin)
         return out
     }
 
@@ -634,7 +691,7 @@ final class NucleoDesk {
         switch code {
         case "signin_required":
             inviteGate = nil
-            return ["v": 1, "status": "signin_required", "token": issueToken(asset, question: job.question, level: level, signInRetry: true),
+            return ["v": 1, "status": "signin_required", "token": issueToken(asset, question: job.question, level: level, signInRetry: true, origin: job.origin),
                     "message": NSNull(), "caption": L.t("\(level.name) needs a free account. Your question runs as soon as you’re in.",
                                    "\(level.name) necesita tu cuenta gratis. Tu pregunta corre en cuanto entres."),
                     "access": NSNull()]
@@ -642,11 +699,11 @@ final class NucleoDesk {
             let caption = L.t("You used this week’s \(level.name).", "Ya usaste tu \(level.name) de esta semana.")
             inviteGate = caption
             let lower = level.lower
-            return ["v": 1, "status": "subscription_required", "token": issueToken(asset, question: job.question, level: level),
+            return ["v": 1, "status": "subscription_required", "token": issueToken(asset, question: job.question, level: level, origin: job.origin),
                     "caption": caption, "sub": L.t("Invite a friend to unlock more.", "Invita a un amigo para tener más."),
                     "cta": L.t("Invite a friend", "Invita a un amigo"),
                     "fallback": ["label": L.t("Continue with \(lower.name)", "Seguir con \(lower.name)"),
-                                 "token": issueToken(asset, question: job.question, level: lower, persist: true)],
+                                 "token": issueToken(asset, question: job.question, level: lower, persist: true, origin: job.origin)],
                     "message": NSNull(), "access": NSNull()]
         default:
             let day = meter?.resetsDate.map { BobbyAccessAPI.day($0) }
@@ -667,14 +724,18 @@ final class NucleoDesk {
             guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw NucleoFault.invalid("question is empty") }
             return raw
         }
-        // 1. Params: exactly one of {question} · {token} · {followUpOf, question}.
+        // 1. Params: exactly one of {question} · {token} · {followUpOf, question}. A plain question may
+        //    say it came from a chip whose words Bobby wrote (`chip: true`); nothing else may.
+        let chip = try p.bool("chip", required: false) ?? false
         let source: Source
         if p.has("token") {
             guard !p.has("question"), !p.has("followUpOf") else { throw NucleoFault.invalid("token takes no question") }
+            guard !p.has("chip") else { throw NucleoFault.invalid("chip marks a plain question") }
             let token = try p.string("token", maxLength: 128)!
             guard !token.isEmpty else { throw NucleoFault.invalid("token is empty") }
             source = .token(token)
         } else if p.has("followUpOf") {
+            guard !p.has("chip") else { throw NucleoFault.invalid("chip marks a plain question") }
             let previous = try p.string("followUpOf", maxLength: 36, pattern: Self.uuidPattern)!
             source = .followUp(previous, try question())
         } else {
@@ -695,25 +756,35 @@ final class NucleoDesk {
         let requestId = UUID().uuidString.lowercased()
         let generation = generation()
         let job: Job
+        var spent: String?
         switch source {
         case let .token(token):
             purgeTokens()
             guard let entry = tokens.removeValue(forKey: token), entry.expires > Date(), entry.generation == generation
             else { throw NucleoFault.invalid("unknown or expired token") }
+            spent = token
             // A fallback chip ("Continue with Quick") is the user's own choice of level: keep it.
             if let level = entry.level, entry.persistLevel { setLevel(level) }
             job = Job(requestId: requestId, question: entry.question, asset: entry.asset, generation: generation, startedAt: Date(),
-                      level: entry.level ?? currentLevel())
+                      level: entry.level ?? currentLevel(), origin: entry.origin)
         case let .followUp(previous, q):
             guard let read = reads.first(where: { $0.requestId == previous && $0.generation == generation })
             else { throw NucleoFault.invalid("unknown followUpOf") }
+            // The question is the one Bobby's CIO wrote for that read: the person picked it instead of typing their own.
+            // Only the asset is passed on; the words are compared here and kept nowhere.
+            let picked = read.nextQuestion.map { NucleoDeskIO.sameQuestion($0, q) } ?? false
+            if picked { nextQuestionPicked(read.asset.symbol) }
+            // A read Bobby started runs at Quick whatever level is saved (`token(for:question:)`): the
+            // question was Bobby's, so it never spends, or runs out of, a level the person rations.
             job = Job(requestId: requestId, question: q.trimmingCharacters(in: .whitespacesAndNewlines), asset: read.asset,
-                      generation: generation, startedAt: Date(), level: currentLevel())
+                      generation: generation, startedAt: Date(), level: picked ? .rapido : currentLevel(), origin: picked ? .followUp : .thread)
         case let .question(q):
+            // A chip keeps the level the person saved (they picked the asset); only who wrote the words differs.
             job = Job(requestId: requestId, question: q.trimmingCharacters(in: .whitespacesAndNewlines), asset: nil,
-                      generation: generation, startedAt: Date(), level: currentLevel())
+                      generation: generation, startedAt: Date(), level: currentLevel(), origin: chip ? .chip : .person)
         }
         // 4.
+        askStarted(spent)
         emit("ask.stage", ["requestId": requestId, "stage": "resolving"])
         return await withCheckedContinuation { (continuation: CheckedContinuation<[String: Any], Never>) in
             let task = Task { [weak self] in
@@ -749,19 +820,35 @@ final class NucleoDesk {
         current.continuation.resume(returning: result)
     }
 
-    private func issueToken(_ asset: NucleoAsset, question: String, level: NucleoAnalysisLevel? = nil, persist: Bool = false, signInRetry: Bool = false) -> String {
+    /// `origin`: a token that carries a read on (a retry, a confirmation, a sign-in) keeps who started it.
+    private func issueToken(_ asset: NucleoAsset, question: String, level: NucleoAnalysisLevel? = nil, persist: Bool = false, signInRetry: Bool = false,
+                            origin: NucleoReadOrigin = .person) -> String {
         purgeTokens()
         let token = UUID().uuidString.lowercased()
         tokens[token] = TokenEntry(asset: asset, question: question, expires: Date().addingTimeInterval(Self.tokenLifetime),
                                    generation: generation(), owner: userID(), anonymousSignInRetry: signInRetry && userID() == nil,
-                                   level: level, persistLevel: persist)
+                                   level: level, persistLevel: persist, origin: origin)
         return token
     }
 
     /// 1.8: a single-use token for a question native writes on the person's tap about an asset it
     /// already knows (a follow-up, a board row). Same lifetime and owner rules as every other token.
+    /// It runs at the Quick level whatever level is saved, and does not change the saved one: Bobby
+    /// started this read, so only the general read meter can stand in its way, and HarnessWall
+    /// looks at that meter before the read is offered.
     func token(for asset: NucleoAsset, question: String) -> String {
-        issueToken(asset, question: question)
+        issueToken(asset, question: question, level: .rapido, origin: .followUp)
+    }
+
+    /// The page has not asked with this token yet and it is still good: not expired, same reader.
+    func holds(_ token: String) -> Bool {
+        guard let entry = tokens[token] else { return false }
+        return entry.expires > Date() && entry.generation == generation()
+    }
+
+    /// A question native offered and gave up on: nothing can be asked with its token any more.
+    func discard(token: String) {
+        tokens[token] = nil
     }
 
     private func purgeTokens(now: Date = Date()) {
@@ -789,13 +876,13 @@ final class NucleoDesk {
                 guard isCurrent(job) else { return Self.cancelledResult }
                 let suggestions: [[String: Any]] = hits.map { hit in
                     let a = NucleoAsset(symbol: hit.symbol, name: hit.name, isEquity: hit.assetClass == "equity", assetClass: hit.assetClass)
-                    return ["symbol": hit.symbol, "name": hit.name, "assetClass": hit.assetClass, "token": issueToken(a, question: job.question, level: job.level)]
+                    return ["symbol": hit.symbol, "name": hit.name, "assetClass": hit.assetClass, "token": issueToken(a, question: job.question, level: job.level, origin: job.origin)]
                 }
                 return ["v": 1, "status": "unknown_asset", "query": job.question, "suggestions": suggestions]
             case let .resolved(resolved, needsConfirmation, matchKind, proxyNote):
                 if needsConfirmation {
                     // Never analyze an unconfirmed guess: the human confirms with this token.
-                    return ["v": 1, "status": "confirm", "token": issueToken(resolved, question: job.question, level: job.level),
+                    return ["v": 1, "status": "confirm", "token": issueToken(resolved, question: job.question, level: job.level, origin: job.origin),
                             "asset": resolved.jsonWithClass, "matchKind": NucleoDeskIO.orNull(matchKind),
                             "proxyNote": NucleoDeskIO.orNull(proxyNote)]
                 }
@@ -953,7 +1040,14 @@ final class NucleoDesk {
             if let access { result["access"] = access.json }
             // Levels: the synthesis goes first; the rest of the debate sits behind it.
             result["level"] = debate.level ?? level.rawValue
-            if let synthesis = debate.synthesis { result["synthesis"] = synthesis.json }
+            // Bobby never invites someone into a wall: when the next read would be refused, this read
+            // hands back no question that asks by itself. Without the key the reply is what it always was.
+            let offers = offersNextQuestion(access)
+            if !offers { result["oneTap"] = false }
+            if var synthesis = debate.synthesis {
+                if !offers { synthesis.followUp = nil }
+                result["synthesis"] = synthesis.json
+            }
             if let sufficiency = debate.sufficiency { result["sufficiency"] = sufficiency.json }
             if let evidence = debate.evidence { result["evidenceUsed"] = evidence.json }
             // 1.8: the memory receipt rides the reply for native (the page ignores keys it does not know).
@@ -966,7 +1060,7 @@ final class NucleoDesk {
             // 9. Remember it (the last 5); it becomes `pendingRead` until saved. No XP here (R4).
             recordQuery(symbol, isEquity)
             reads.append(Read(requestId: job.requestId, result: result, asset: asset, generation: job.generation,
-                              debate: debate, price: market.price ?? debate.technicals.price))
+                              debate: debate, price: market.price ?? debate.technicals.price, origin: job.origin))
             if reads.count > Self.readsKept { reads.removeFirst(reads.count - Self.readsKept) }
             return result
         }
@@ -1101,6 +1195,11 @@ final class NucleoDesk {
         return NucleoReadSummary(requestId: requestId, symbol: read.asset.symbol, name: read.asset.name, isEquity: read.asset.isEquity,
                                  verdict: read.verdict, price: read.price, asOf: read.asOf,
                                  headline: text("headline"), why: text("why"), risk: text("risk"), watch: text("watch"))
+    }
+
+    /// 1.8: who started a recent read of the CURRENT account (the harness follows up only the person's own questions).
+    func readOrigin(requestId: String) -> NucleoReadOrigin? {
+        reads.last { $0.requestId == requestId && $0.generation == generation() }?.origin
     }
 
     func theses() -> [String: Any] {
