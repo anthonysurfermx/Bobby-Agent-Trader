@@ -1,16 +1,19 @@
 // ============================================================
 // POST /api/bobby-router — Hybrid intent classifier
 // Layer 1: deterministic regex (free, instant)
-// Layer 2: Haiku classifier (cheap, only for ambiguous)
+// Layer 2: plan-selected classifier (only for ambiguous)
 // Returns: { intent, confidence, language, reason }
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
+import { callLlm } from './_lib/llm.js';
+import { hasAppTextBackend } from './_lib/app-model.js';
+import { resolveAppRequestTier } from './_lib/app-model-access.js';
 
-export const config = { maxDuration: 10 };
+// Allow plan verification before the separately bounded classifier call.
+export const config = { maxDuration: 30 };
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
 const VALID_INTENTS = [
   'greeting', 'identity', 'portfolio', 'price', 'chart',
@@ -46,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(413).json({ error: 'Request is too large' });
   }
 
-  if (!OPENAI_API_KEY) {
+  if (!hasAppTextBackend()) {
     return res.status(200).json({
       intent: 'ambiguous',
       confidence: 0,
@@ -57,6 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const tier = await resolveAppRequestTier(req);
     const systemPrompt = `You are a trading platform intent classifier. Classify the user's message into exactly ONE intent.
 
 INTENTS:
@@ -103,40 +107,24 @@ RULES:
 Respond ONLY with JSON, no markdown:
 {"intent":"trade_chat","confidence":0.95,"language":"es","reason":"market outlook question"}`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        max_tokens: 100,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: context
-              ? `Previous Bobby response: "${context.slice(0, 200)}"\n\nUser message: "${message}"`
-              : `User message: "${message}"`,
+    const { toolInput } = await callLlm({
+      endpoint: 'bobby-router', tier, system: systemPrompt, maxTokens: 256, timeoutMs: 8_000,
+      user: context
+        ? `Previous Bobby response: "${context.slice(0, 200)}"\n\nUser message: "${message}"`
+        : `User message: "${message}"`,
+      tool: {
+        name: 'classify_intent', description: 'Classify the message into one trading-platform intent.',
+        parameters: {
+          type: 'object', additionalProperties: false,
+          properties: {
+            intent: { type: 'string', enum: [...VALID_INTENTS, 'ambiguous'] },
+            confidence: { type: 'number' }, language: { type: 'string' }, reason: { type: 'string' },
           },
-        ],
-      }),
+          required: ['intent', 'confidence', 'language', 'reason'],
+        },
+      },
     });
-
-    if (!response.ok) {
-      return res.status(200).json({
-        intent: 'ambiguous' as Intent,
-        confidence: 0,
-        language: 'en',
-        reason: 'OpenAI API error — cannot classify',
-        source: 'regex',
-      });
-    }
-
-    const data = await response.json() as { choices: Array<{ message: { content: string } }> };
-    const text = data.choices[0]?.message?.content || '';
+    const text = JSON.stringify(toolInput);
 
     // Parse JSON response
     try {

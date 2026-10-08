@@ -1,4 +1,4 @@
-// Web activation (1.8): the first screen leads to a question, and the desk shows its value before it asks for consent.
+// Web activation (1.8): the desk shows its value before it asks for consent.
 //
 // What runs here is the shipping source: the desk component (NucleoDesk), the notice (NucleoRisk), the progress
 // store, the tracker, the access client, the desk's data layer and the link parser are bundled as they are.
@@ -95,7 +95,9 @@ const STUBS = {
   '@/components/companion/CompanionOverlays': marker('overlay', ['EvolutionOverlay', 'GearCatalog', 'ToolDetail', 'ToolUnlockOverlay']),
   '@/components/companion/LandSeedCard': marker('land'),
   '@/components/companion/DeskSwap': marker('swap', ['DeskSwapCard', 'SwapSheet']),
-  '@/components/companion/DeskWallet': marker('wallet', ['WalletBalancePill']),
+  // The pill is a marker; whether a wallet is connected and whether tokenized stocks are offered are the browser's to say.
+  '@/components/companion/DeskWallet': `export const WalletBalancePill = Object.assign(function () { return null; }, { stub: 'wallet:WalletBalancePill' }); export const useWalletConnected = () => globalThis.__wallet === true;`,
+  '@/lib/base-swap/stock-visibility': `export const STOCK_SWAPS_VISIBLE = globalThis.__stocks === true;`,
   '@/components/companion/ProgressSync': marker('progress-sync'),
   './ClientReadPresentation': marker('presentation'),
   './NucleoChart': marker('chart'),
@@ -127,11 +129,14 @@ const bundle = (await build({
 // A browser that records instead of sending.
 // ---------------------------------------------------------------------------------------------------------
 const UUID = '00000000-0000-4000-8000-0000000000aa';
+// The pause the desk holds between the last argument and the settled answer, read from its source.
+const REVEAL_MS = Number(/const REVEAL_MS = (\d+);/.exec(read('src/components/nucleo/NucleoDesk.tsx'))?.[1]);
+assert.ok(REVEAL_MS > 0, 'the desk declares its reveal pause');
 const CONSENT_KEY = 'bobby.companion.progress.v1';
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 /** How long a request stays in flight, and how soon after a subscribe the auth client reports the session it has. */
 const NETWORK_MS = 12, AUTH_MS = 2;
-function browser({ route = '/desk', language = 'en', locale = 'en-US', consent = false, session = null, stored = {}, kept = {}, historyState = null, access = {} } = {}) {
+function browser({ route = '/desk', language = 'en', locale = 'en-US', consent = false, session = null, stored = {}, kept = {}, historyState = null, access = {}, desktop = false, wallet = false, stocks = false, pulse = null, debate = null, fast = false } = {}) {
   const storage = new Map(Object.entries({ bobby_lang: language, bobby_locale: locale, bobby_geo: locale.split('-')[1], ...stored }));
   if (consent) storage.set(CONSENT_KEY, JSON.stringify({ aiConsentGranted: true, riskNoticeVersion: 7, onboarded: true }));
   const requests = [], replaced = [];
@@ -173,9 +178,9 @@ function browser({ route = '/desk', language = 'en', locale = 'en-US', consent =
     if (href.startsWith('/api/bobby-asset-search')) return json({ resolved: { baseSymbol: 'NVDA', symbol: 'NVDA', displayName: 'NVIDIA', assetClass: 'equity', aliases: ['NVDA'] } });
     if (href === '/api/bobby-access') return json({ access: { tier: signedIn ? 'free' : 'anon', used: 0, limit: 3, remaining: 3, resetsAt: null, paywall: true, ...access }, signedIn, subscription: null, payments: { stripe: false, apple: true } });
     // A read answers with the meter it left behind: one read fewer.
-    if (href === '/api/voice-tool') return json({ market: { price: 100, currency: 'USD' }, technicals: { price: 100, rsi14: 50, trend: 'bullish', support: 95, resistance: 105 }, technical_pulse: { signal: 'wait', direction: 'none' },
+    if (href === '/api/voice-tool') return json({ market: { price: 100, currency: 'USD' }, technicals: { price: 100, rsi14: 50, trend: 'bullish', support: 95, resistance: 105 }, technical_pulse: pulse ?? { signal: 'wait', direction: 'none' },
       access: { tier: signedIn ? 'free' : 'anon', used: 1, limit: 3, remaining: 2, resetsAt: null, paywall: true } });
-    if (href === '/api/desk-debate') return json({ agents: { alpha: 'Alpha line.', red: 'Red line.', cio: 'CIO line.', verdict: 'wait', direction: 'none' }, level: 'rapido' });
+    if (href === '/api/desk-debate') return json(debate ?? { agents: { alpha: 'Alpha line.', red: 'Red line.', cio: 'CIO line.', verdict: 'wait', direction: 'none' }, level: 'rapido' });
     return json({ candles: [] });
   };
   // The session history, as far as the desk uses it: entries with a state, and Back delivered as `popstate` a moment later.
@@ -191,13 +196,16 @@ function browser({ route = '/desk', language = 'en', locale = 'en-US', consent =
   const left = [], focused = [];
   const context = vm.createContext({
     console, URL, URLSearchParams, Response, Request, AbortController, AbortSignal, TextDecoder, DOMException, Intl, queueMicrotask,
-    setTimeout, clearTimeout, setInterval, clearInterval, performance,
+    // `fast` skips the desk's reveal pause before an answer settles (REVEAL_MS in NucleoDesk), and nothing else:
+    // every request timeout keeps its length.
+    setTimeout: fast ? (fn, ms, ...rest) => setTimeout(fn, ms === REVEAL_MS ? 5 : ms, ...rest) : setTimeout, clearTimeout, setInterval, clearInterval, performance,
     location, fetch, localStorage: store(storage), sessionStorage: store(session_),
     history,
     navigator: { language: locale, languages: [locale], userAgent: 'activation-test', platform: 'test', maxTouchPoints: 0 },
     document: { referrer: '', documentElement: { lang: locale }, body: { classList: { add() {}, remove() {} } }, activeElement: null, addEventListener() {}, removeEventListener() {} },
     crypto: { randomUUID: () => UUID },
-    matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+    matchMedia: () => ({ matches: desktop, addEventListener() {}, removeEventListener() {} }),
+    __wallet: wallet, __stocks: stocks,
     scrollTo() {},
     addEventListener(name, fn) { (windowListeners[name] ??= new Set()).add(fn); }, removeEventListener(name, fn) { windowListeners[name]?.delete(fn); },
     __navigated: [], __session: session, __auth: auth, __voice: { speak: async () => {}, stop() {}, speaking: false, level: 0 },
@@ -823,112 +831,101 @@ await asyncCheck('an invalid ?ask does nothing, and ?ref keeps working alongside
 });
 
 // ---------------------------------------------------------------------------------------------------------
-// 4. The home page: examples, copy, app id
+// 3b. A question Bobby wrote never sits beside a transaction surface (the rule and its whole truth table:
+// scripts/test-desk-suggestions.mts). Here the shipping desk is rendered to its finished answer and the tree is
+// searched: the swap card, the wallet pill, the swap sheet and the profile drawer on one side, the CIO's next
+// question on the other.
+// ---------------------------------------------------------------------------------------------------------
+{
+  const NEXT = 'What would confirm the NVDA trend?';
+  const synthesis = { headline: 'Not yet: NVDA still needs a break.', why: 'The range has not resolved.', risk: 'A break can fail on thin volume.', watch: 'A close above the range high.', watchLevel: 0, followUp: NEXT };
+  const WAIT = { agents: { alpha: 'Alpha line.', red: 'Red line.', cio: 'CIO line.', verdict: 'wait', direction: 'none', synthesis }, level: 'rapido' };
+  const LONG = { agents: { alpha: 'Alpha line.', red: 'Red line.', cio: 'CIO line.', verdict: 'review', direction: 'long', synthesis }, level: 'rapido' };
+  // What the desk needs before it shows a direction: the engine's long with a plan, and the CIO's review in that direction.
+  const LONG_PULSE = { signal: 'long', direction: 'long', conviction_pct: 62, trade_plan: { entry: 100, stop: 95, target: 110, rewardRisk: 2 } };
+  /** A reader who agreed asks about NVDA and the answer settles on screen. */
+  async function finishedRead(options) {
+    const b = browser({ consent: true, fast: true, ...options });
+    const desk = b.mount(b.T.NucleoDesk);
+    await b.settle(desk);
+    typeAndSend(desk, QUESTION);
+    await b.settle(desk, 40);
+    assert.equal(working(desk.tree), null, 'the answer settled');
+    return { b, desk };
+  }
+  const labels = (tree) => chips(tree).map((e) => e.props.children);
+  const swapCard = (tree) => stubbed(tree, 'swap:DeskSwapCard');
+  const pill = (tree) => stubbed(tree, 'wallet:WalletBalancePill');
+  const another = (b) => b.T.t('Another question about NVDA', 'Otra pregunta sobre NVDA');
+
+  await asyncCheck('next question: with no transaction surface on screen it is the first chip', async () => {
+    const { b, desk } = await finishedRead({ debate: WAIT });
+    assert.equal(swapCard(desk.tree).length + pill(desk.tree).length, 0, 'no swap card, no wallet pill');
+    assert.deepEqual(labels(desk.tree).slice(0, 2), [NEXT, another(b)], 'the next question leads, then the reader\'s own');
+    assert.equal(labels(desk.tree).length, 4, 'next question, another question, one other asset, explore');
+  });
+  await asyncCheck('next question: a LONG on a tokenized stock with the swap flag off shows no card, so the question stays', async () => {
+    const { desk } = await finishedRead({ debate: LONG, pulse: LONG_PULSE, stocks: false });
+    assert.equal(swapCard(desk.tree).length, 0, 'nothing to swap: no card');
+    assert.equal(find(desk.tree, (e) => e.props?.className === 'n-swapwrap'), undefined, 'and no empty wrapper for one');
+    assert.equal(labels(desk.tree)[0], NEXT);
+  });
+  await asyncCheck('next question: a LONG with the swap flag on shows the swap card, and the question is not offered', async () => {
+    const { b, desk } = await finishedRead({ debate: LONG, pulse: LONG_PULSE, stocks: true });
+    assert.equal(swapCard(desk.tree).length, 1, 'the swap card is on screen');
+    assert.ok(!walk(desk.tree).some((e) => e.type === 'button' && e.props.children === NEXT), 'no button carries the CIO\'s question');
+    assert.equal(labels(desk.tree)[0], another(b), 'the reader\'s own chips stay');
+    assert.equal(labels(desk.tree).length, 4, 'another question, two other assets, explore');
+  });
+  await asyncCheck('next question: a connected wallet on the wide layout shows its balance, and the question is not offered', async () => {
+    const connected = await finishedRead({ debate: WAIT, desktop: true, wallet: true });
+    assert.equal(pill(connected.desk.tree).length, 1, 'the wallet pill is on screen');
+    assert.ok(!labels(connected.desk.tree).includes(NEXT));
+    const none = await finishedRead({ debate: WAIT, desktop: true, wallet: false });
+    assert.equal(pill(none.desk.tree).length, 0, 'no wallet, no pill');
+    assert.equal(labels(none.desk.tree)[0], NEXT, 'and the question is offered');
+    const narrow = await finishedRead({ debate: WAIT, desktop: false, wallet: true });
+    assert.equal(pill(narrow.desk.tree).length, 0, 'the narrow layout has no pill');
+    assert.equal(labels(narrow.desk.tree)[0], NEXT);
+  });
+  await asyncCheck('next question: it leaves while the profile drawer or the swap sheet is open, and returns when they close', async () => {
+    const { desk } = await finishedRead({ debate: WAIT });
+    assert.equal(labels(desk.tree)[0], NEXT);
+    find(desk.tree, (e) => e.type === 'button' && e.props.className === 'n-face-btn').props.onClick(); desk.render();
+    const profile = stubbed(desk.tree, 'profile')[0];
+    assert.ok(profile, 'the profile drawer (swap row, balance) is open');
+    assert.ok(!labels(desk.tree).includes(NEXT), 'no next question beside it');
+    profile.props.onSwap(); desk.render();
+    assert.equal(stubbed(desk.tree, 'swap:SwapSheet').length, 1, 'the swap sheet is open');
+    assert.ok(!labels(desk.tree).includes(NEXT), 'nor beside the swap sheet');
+    stubbed(desk.tree, 'swap:SwapSheet')[0].props.onClose(); desk.render();
+    assert.equal(labels(desk.tree)[0], NEXT, 'closed: the question is offered again');
+  });
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// 4. The home page: hero, navigation copy, app id
 // ---------------------------------------------------------------------------------------------------------
 const home = read('public/home/index.html');
 const LOCALES = [['en', 'en-US'], ['es', 'es-MX'], ['fr', 'fr-FR'], ['pt', 'pt-PT'], ['pt', 'pt-BR'], ['it', 'it-IT'], ['de', 'de-DE']];
-const EXAMPLES = (() => {
-  const a = home.indexOf('/* examples:start */'), z = home.indexOf('/* examples:end */');
-  assert.ok(a > 0 && z > a, 'the home example table is marked');
-  return vm.runInNewContext(home.slice(a, z) + '; EXAMPLES');
-})();
-const heroScript = (() => { const at = home.indexOf('/* examples:start */'), a = home.lastIndexOf('<script>', at), z = home.indexOf('</script>', at); return home.slice(a + '<script>'.length, z); })();
-const anchors = [...home.matchAll(/<a\b[^>]*class="eg-chip[^"]*"[^>]*>/g)].map(([tag]) => ({ tag, href: /href="([^"]*)"/.exec(tag)[1].replaceAll('&amp;', '&'), id: /id="([^"]*)"/.exec(tag)?.[1] ?? null }));
-/** Run the home's own script against the elements it uses. */
-function heroIn(language, locale) {
-  const el = (attributes = {}) => ({ attributes, textContent: '', value: '', listeners: {}, setAttribute(k, v) { this.attributes[k] = String(v); }, getAttribute(k) { return this.attributes[k] ?? null; }, addEventListener(name, fn) { this.listeners[name] = fn; } });
-  const els = { ask: el(), 'ask-q': el(), 'eg-local': el() }, assigned = [], listeners = [];
-  const state = { language, locale };
-  const context = vm.createContext({ URL, URLSearchParams, document: { getElementById: (id) => els[id] },
-    location: { origin: 'https://bobbyprotocol.xyz', assign: (url) => assigned.push(url) },
-    window: { BobbyI18n: { t: (k) => `${state.language}:${k}`, lang: () => state.language, locale: () => state.locale, onChange: (fn) => listeners.push(fn) } } });
-  vm.runInContext(heroScript, context, { filename: 'public/home/index.html#hero' });
-  return { els, assigned, switchTo(l, loc) { state.language = l; state.locale = loc; listeners.forEach((fn) => fn(l)); } };
-}
-check('home: the first screen has the ask pill, three examples, the iPhone link and "Try Bobby"', () => {
+check('home: the hero keeps its orb and headline without the quick-entry row', () => {
   const hero = home.slice(home.indexOf('id="s0"'), home.indexOf('id="s1"'));
-  assert.ok(home.indexOf('data-i18n="hero.h1"') < home.indexOf('id="start"') && home.indexOf('id="start"') < home.indexOf('id="s1"'), 'in the hero scene, after the headline in reading order');
-  assert.match(hero, /<form class="ask ask-type" id="ask" action="\/desk" method="get"/);
-  assert.match(hero, /<input id="ask-q" name="q" type="text"[^>]*placeholder="Ask about a stock or a crypto asset"/);
-  assert.match(hero, /<a class="ask ask-tap" id="ask-tap" href="\/desk\?utm_source=home_ask">/);
-  assert.deepEqual(anchors.map((a) => a.href), ['/desk?ask=NVDA&utm_source=home_example', '/desk?ask=BTC&utm_source=home_example', '/desk?ask=ETH&utm_source=home_example'], 'three examples, and nothing else looks like one');
-  // The iPhone app: words at every width, in a place of its own after the examples (the Apple glyph alone reads as a
-  // fourth example: the same glyph orbits the glass as AAPL).
-  const examples = /<div class="eg"[^>]*>([\s\S]*?)<\/div>/.exec(hero);
-  const exampleLinks = examples ? [...examples[1].matchAll(/href="([^"]*)"/g)].map((match) => match[1]) : [];
-  assert.ok(examples && exampleLinks.length === 3 && exampleLinks.every((href) => href.startsWith('/desk?')),
-    'every link in the example row asks the desk: the App Store link is not among them');
-  assert.match(hero.slice(hero.indexOf(examples[0]) + examples[0].length), /^\s*<!--[^>]*-->\s*<div class="start-more"><a class="start-ios" id="start-ios" href="https:\/\/apps\.apple\.com\/app\/bobby-the-market-argues-back\/id6804460489"><span class="ico" aria-hidden="true"[^>]*><\/span><span data-i18n="t\.ios">Get the iPhone app<\/span><\/a><\/div>/);
-  const css = home.slice(home.indexOf('<style'), home.indexOf('</style>'));
-  assert.ok(!/eg-ios/.test(home), 'the icon-only chip is gone');
-  for (const rule of css.matchAll(/([^{}]*start-ios[^{}]*)\{([^}]*)\}/g)) assert.doesNotMatch(rule[2], /clip:|width:\s*1px|font-size:\s*0|text-indent|opacity:\s*0/, 'no rule hides the words: ' + rule[1].trim());
-  // It leaves only where three lines cannot fit above the glass (a very short phone), never down to a bare glyph.
-  assert.deepEqual([...css.matchAll(/@media ([^{]+)\{\s*\.start-more\{display:none\}/g)].map((m) => m[1].trim()), ['(max-width: 760px) and (max-height: 610px)']);
+  assert.doesNotMatch(hero, /<form|<input|<button|<a\b/, 'the first scene contains no quick-entry controls');
+  assert.doesNotMatch(home, /id="(?:start|ask|ask-q|ask-tap|eg-local|start-ios)"|START\.style|hero\.(?:ask|send|eg)/, 'no dangling row nodes, animation references or translations');
+  assert.match(home, /<canvas id="glass" aria-hidden="true"><\/canvas>/);
+  assert.match(home, /<div class="orbit" id="orbit" aria-hidden="true"><\/div>/);
+  assert.match(hero, /Asking an AI about your asset is <em>no longer an edge\.<\/em>/);
   assert.match(home, /<a class="tb-app" href="\/desk" data-i18n="t\.try">Try Bobby<\/a>/);
-  assert.match(hero, /Asking an AI about your asset is <em>no longer an edge\.<\/em>/, 'the headline is the approved one');
-  // The App Store link in the hero is tracked by the page's own listener (a[href*="apps.apple.com"] → appstore_click).
+  assert.match(home, /<a class="btn b-ios" href="https:\/\/apps\.apple\.com\/app\/bobby-the-market-argues-back\/id6804460489">/, 'the closing App Store link remains available');
   assert.match(home, /closest\('a\[href\*="apps\.apple\.com"\]'\)[\s\S]{0,80}send\('appstore_click'\)/);
 });
-for (const [language, locale] of LOCALES) {
-  const b = browser({ language, locale });
-  const row = [...b.T.quickAccessRow({ quickAccess: [], quickAccessCustomized: false })];
-  const [symbol, name] = EXAMPLES.local[locale] ?? EXAMPLES.fallback;
-  check(`home ${locale}: the three examples are the desk's own starters, and the local one is a listed company`, () => {
-    assert.deepEqual(['NVDA', 'BTC', symbol].sort(), [...row].sort(), 'same three symbols as the desk row ' + row.join(' '));
-    const region = b.T.marketRegion(language, locale);
-    if (region) {
-      const listing = b.T.regionalStock(symbol);
-      assert.ok(listing, symbol + ' exists in src/lib/regional-stocks.ts');
-      assert.equal(listing.region, region, 'in the visitor home market');
-      assert.equal(name, b.T.quickAccessName(symbol), 'shown with the name the desk chip uses');
-    } else {
-      assert.equal(EXAMPLES.local[locale], undefined);
-      assert.deepEqual([symbol, name], ['ETH', 'Ethereum']);
-    }
-    for (const s of ['NVDA', 'BTC', symbol]) assert.equal(b.T.parseDeskLink('?ask=' + encodeURIComponent(s)).ask, s, s + ' passes the desk link rule');
-    // the page's own script points the third chip there, in the page language
-    const hero = heroIn(language, locale);
-    assert.equal(hero.els['eg-local'].textContent, name);
-    const href = new URL(hero.els['eg-local'].attributes.href, 'https://bobbyprotocol.xyz');
-    assert.equal(href.pathname, '/desk');
-    assert.deepEqual(Object.fromEntries(href.searchParams), { ask: symbol, utm_source: 'home_example', lang: language, locale });
-    assert.equal(hero.els['ask-q'].attributes.placeholder, language + ':hero.ask');
-  });
-}
-check('home: every local example is a listing the desk knows, one per market', () => {
-  const b = browser();
-  assert.deepEqual(Object.keys(EXAMPLES.local).sort(), ['de-DE', 'fr-FR', 'it-IT', 'pt-BR', 'pt-PT']);
-  for (const [locale, [symbol]] of Object.entries(EXAMPLES.local)) assert.ok(b.T.REGIONAL_STOCKS.some((s) => s.symbol === symbol && s.region === locale.split('-')[1]), symbol);
-});
-check('home: a typed question goes to /desk?q=…, encoded, and an empty one just opens the desk', () => {
-  const hero = heroIn('es', 'es-MX');
-  hero.els['ask-q'].value = '  ¿cómo  ves a NVDA & AMD?  ';
-  let prevented = false;
-  hero.els.ask.listeners.submit({ preventDefault() { prevented = true; } });
-  assert.equal(prevented, true);
-  assert.equal(hero.assigned[0], '/desk?q=%C2%BFc%C3%B3mo+ves+a+NVDA+%26+AMD%3F&utm_source=home_ask&lang=es&locale=es-MX');
-  const b = browser();
-  assert.equal(b.T.parseDeskLink(new URL(hero.assigned[0], 'https://x').search).q, '¿cómo ves a NVDA & AMD?', 'and the desk reads back the same words');
-  hero.els['ask-q'].value = '   ';
-  hero.els.ask.listeners.submit({ preventDefault() {} });
-  assert.equal(hero.assigned[1], '/desk?utm_source=home_ask&lang=es&locale=es-MX');
-  hero.switchTo('de', 'de-DE');
-  assert.equal(hero.els['eg-local'].textContent, 'SAP', 'a language switch moves the local example');
-});
-check('home: the new copy exists in the six languages (and the Portugal variant)', () => {
+check('home: navigation copy remains in the six languages and the Portugal variant', () => {
   const block = (name, quoted) => { const a = home.indexOf(quoted ? `"${name}": {` : `    ${name}: {`); assert.ok(a > 0, name); return home.slice(a, home.indexOf('\n  }', a)); };
-  const en = { 'hero.ask': 'Ask about a stock or a crypto asset', 'hero.send': 'Ask', 'hero.eg': 'Examples' };
   for (const [name, quoted] of [['es', false], ['pt', false], ['fr', true], ['it', true], ['de', true], ['ptPT', true]]) {
     const text = block(name, quoted);
-    for (const key of Object.keys(en)) {
-      const value = new RegExp(`['"]${key.replace('.', '\\.')}['"]: ['"]([^'"\\n]+)['"]`).exec(text)?.[1];
-      assert.ok(value && value.length > 2, `${name} ${key}`);
-      assert.notEqual(value, en[key], `${name} ${key} is translated`);
-      assert.doesNotMatch(value, /!|\b(buy|sell|comprar|vender|acheter|vendre|kaufen|verkaufen|compra|vendi)\b/i);
-    }
-    assert.match(text, /['"]t\.try['"]:/, name + ' has the "Try Bobby" label the top bar now uses');
+    assert.match(text, /['"]t\.try['"]:/, name + ' retains the top-bar entry');
+    assert.match(text, /['"]t\.ios['"]:/, name + ' retains the closing App Store link');
   }
-  for (const key of Object.keys(en)) assert.ok(home.includes(`data-i18n-aria="${key}"`) || home.includes(`data-i18n="${key}"`), key + ' is wired to an element');
 });
 check('desk: the notice introduction exists in the six languages', () => {
   const expected = { en: 'Before I answer, one thing.', es: 'Antes de responder, una cosa.', fr: 'Avant de répondre, une précision.', pt: 'Antes de responder, uma coisa.', it: 'Prima di rispondere, una cosa.', de: 'Vor meiner Antwort noch eines.' };
@@ -975,7 +972,7 @@ check('the App Store id in every HTML file is the one in src/lib/app-store.ts', 
     if (ids.length) found[file] = ids;
     for (const other of ids) assert.equal(other, id, `${file} names App Store id ${other}, app-store.ts says ${id}`);
   }
-  assert.ok(found['public/home/index.html']?.length >= 3, 'the home has the banner and its App Store links');
+  assert.ok(found['public/home/index.html']?.length >= 2, 'the home keeps the banner and closing App Store link');
   assert.ok(found['index.html']?.length >= 1, 'the app shell has the banner');
   // The banner itself: on the home in the markup, on /desk from the shell (and nowhere else in the shell), on /app from the page.
   assert.match(home, new RegExp(`<meta name="apple-itunes-app" content="app-id=${id}">`));

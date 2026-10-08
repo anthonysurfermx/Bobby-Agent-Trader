@@ -10,7 +10,7 @@
 //
 // Notes:
 //   - Reuses the global market snapshot from /api/bobby-intel
-//   - Uses one Claude Haiku call to generate Alpha + Red Team + CIO
+//   - Uses the profile owner's account model to generate Alpha + Red Team + CIO
 //   - Writes private threads into forum_threads/forum_posts
 //   - Never executes real trades
 // ============================================================
@@ -22,13 +22,14 @@ import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 import { getBobbyControl, requireWritesOpen } from './_lib/control.js';
 import { externalEffectsAllowed, noteSuppressedEffect } from './_lib/effects.js';
+import { callLlm } from './_lib/llm.js';
+import { hasAppTextBackend, type AppTextTier } from './_lib/app-model.js';
+import { resolveAppWalletTier } from './_lib/app-model-access.js';
 
 export const config = { maxDuration: 120 };
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const SB_URL = bobbyDbUrl();
 const SB_SERVICE_KEY = bobbyServiceKey();
-const HAIKU_MODEL = 'gpt-4o-mini';
 
 const PERSONALITY_INSTRUCTIONS: Record<string, string> = {
   direct: 'Be concise, aggressive, no BS. Go straight to action.',
@@ -235,30 +236,9 @@ async function fetchIntel(): Promise<IntelSnapshot | null> {
   return null;
 }
 
-async function callHaiku(system: string, userMsg: string, maxTokens = 1200): Promise<string> {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: HAIKU_MODEL,
-      max_tokens: maxTokens,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: userMsg },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => '');
-    throw new Error(`OpenAI ${response.status}: ${errorBody.slice(0, 240)}`);
-  }
-
-  const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-  return data.choices?.[0]?.message?.content || '';
+async function callProfileText(system: string, userMsg: string, maxTokens = 1200, tier: AppTextTier = 'free'): Promise<string> {
+  const { text } = await callLlm({ endpoint: 'user-cycle', system, user: userMsg, maxTokens, tier });
+  return text;
 }
 
 function extractJsonPayload(raw: string): Record<string, unknown> {
@@ -569,7 +549,8 @@ async function runSingleProfile(
   const now = new Date();
 
   const prompts = buildDebatePrompts(profile, intel);
-  const raw = await callHaiku(prompts.system, prompts.user, 1200);
+  const tier = await resolveAppWalletTier(profile.wallet_address);
+  const raw = await callProfileText(prompts.system, prompts.user, 1200, tier);
   const parsed = extractJsonPayload(raw);
   const debate = normalizeDebate(parsed, profile);
   const thread = await persistDebate(supabase, profile, intel, debate);
@@ -678,8 +659,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY' });
   }
 
-  if (!OPENAI_API_KEY) {
-    return res.status(500).json({ error: 'Missing OPENAI_API_KEY' });
+  if (!hasAppTextBackend()) {
+    return res.status(500).json({ error: 'App text provider not configured' });
   }
 
   if (!requireInternalAuth(req, res)) return;

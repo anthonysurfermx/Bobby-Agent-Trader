@@ -35,6 +35,7 @@ import { deskPrice } from '@/lib/desk-price';
 import { marketContext } from '@/components/nucleo/deskData';
 import { progressStore, RISK_NOTICE_VERSION } from '@/lib/companions/progress';
 import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
+import { accessHeaders } from '@/lib/access-client';
 
 // ---- Supabase ----
 
@@ -1563,7 +1564,7 @@ Para señales de grandes actores, prueba «Analizar mercado».`),
         const routerRes = await fetch('/api/bobby-router', {
           signal: routerAbort.signal,
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) },
           body: JSON.stringify({ message: msg, context: lastBobby, ...marketContext() }),
         });
         if (routerRes.ok) {

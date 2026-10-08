@@ -29,7 +29,9 @@ import {
   type PolyPosition,
   type PolyLeaderboardEntry,
 } from './_lib/polymarket.js';
-import { callLlm } from './_lib/llm.js';
+import { callLlm, type LlmResult } from './_lib/llm.js';
+import { appTextModel, hasAppTextBackend, type AppTextTier } from './_lib/app-model.js';
+import { resolveAppRequestTier } from './_lib/app-model-access.js';
 import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 import { getClientIpKey } from './_lib/rate-limit.js';
 import { isInternalRequest, requireInternalAuth } from './_lib/request-security.js';
@@ -50,7 +52,7 @@ const POLY_GAMMA = 'https://gamma-api.polymarket.com';
 // ---- DEX execution helpers + TOKEN_REGISTRY extracted to ./_lib/dex-execution.ts ----
 // ---- Signal ingest + filter extracted to ./_lib/signals.ts ----
 
-// ---- OpenAI call helper (shared by all agents) ----
+// ---- App text call helper (shared by all agents) ----
 // Thin adapter over _lib/llm.ts (retry/backoff/abort live there).
 // Keeps the historical non-throwing contract: downstream debate code
 // expects errors as text, not exceptions.
@@ -58,15 +60,17 @@ async function callClaude(
   systemPrompt: string,
   userMsg: string,
   toolSchema?: { name: string; description: string; input_schema: Record<string, unknown> },
-): Promise<{ text: string; toolInput: Record<string, unknown> | null }> {
-  if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY missing — agent cannot run debate');
+  tier: AppTextTier = 'free',
+): Promise<LlmResult> {
+  if (!hasAppTextBackend()) throw new Error('App text provider missing — agent cannot run debate');
 
   try {
     return await callLlm({
       endpoint: 'agent-run',
       system: systemPrompt,
       user: userMsg,
-      model: 'gpt-4o',
+      model: appTextModel(process.env, tier),
+      tier,
       maxTokens: 1024,
       tool: toolSchema
         ? { name: toolSchema.name, description: toolSchema.description, parameters: toolSchema.input_schema }
@@ -186,16 +190,16 @@ interface DebateResult {
   alphaView: string;
   redTeamView: string;
   judgeVerdict: string;
+  llmModel: string | null;
 }
 
-async function multiAgentDebate(
+export async function multiAgentDebate(
   signals: FilteredSignal[],
   polyConsensusData?: SmartMoneyConsensus[],
   selfOptimizedPrompt?: string,
-  opts?: { signalAgeMs?: number; performanceCtx?: string },
+  opts?: { signalAgeMs?: number; performanceCtx?: string; tier?: AppTextTier },
 ): Promise<DebateResult> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return { decisions: [], reasoning: 'No API key', alphaView: '', redTeamView: '', judgeVerdict: '' };
+  if (!hasAppTextBackend()) return { decisions: [], reasoning: 'No API key', alphaView: '', redTeamView: '', judgeVerdict: '', llmModel: null };
 
   const signalCtx = buildSignalContext(signals, polyConsensusData, opts?.signalAgeMs, opts?.performanceCtx);
 
@@ -210,6 +214,7 @@ Be BULLISH and find alpha. Max 3 trades. Call execute_decisions.`;
     alphaPrompt,
     `${signalCtx}\n\nFind the best alpha opportunities and call execute_decisions.`,
     tradeToolSchema,
+    opts?.tier,
   );
 
   // ── AGENT 2: Red Team (parallel with Alpha) ──
@@ -220,6 +225,8 @@ whale manipulation, front-running exposure, smart money exit signals (high sold 
 For Polymarket, check if consensus is just herd behavior vs informed positioning.
 Be SKEPTICAL and adversarial. Output a risk assessment for each signal.`,
     `${signalCtx}\n\nFor each signal, explain WHY this trade could fail. Be specific and adversarial.`,
+    undefined,
+    opts?.tier,
   );
 
   // Run Alpha + Red Team in parallel
@@ -260,6 +267,7 @@ VOICE: Write your reasoning like Bobby Axelrod talks — direct, cynical, confid
 OUTPUT: Call execute_decisions. Set confidence as conviction_score (0.0-1.0). Max 3 trades.`,
     `ALPHA HUNTER THESIS:\n${alphaView}\n\nAlpha proposed trades:\n${JSON.stringify(alphaTrades, null, 1)}\n\nRED TEAM RISKS:\n${redTeamView}\n\nMake your final judgment. Call execute_decisions.`,
     tradeToolSchema,
+    opts?.tier,
   );
 
   const judgeVerdict = judgeResult.toolInput
@@ -293,6 +301,7 @@ OUTPUT: Call execute_decisions. Set confidence as conviction_score (0.0-1.0). Ma
     alphaView,
     redTeamView,
     judgeVerdict,
+    llmModel: judgeResult.model ?? null,
   };
 }
 
@@ -335,14 +344,13 @@ async function persistOptimizedPrompt(prompt: string): Promise<void> {
   }
 }
 
-async function selfOptimizePrompt(recentCycles: Array<{ llm_reasoning: string; trades_executed: number; trades_successful: number; status: string }>): Promise<string | null> {
+async function selfOptimizePrompt(recentCycles: Array<{ llm_reasoning: string; trades_executed: number; trades_successful: number; status: string }>, tier: AppTextTier = 'free'): Promise<string | null> {
   if (recentCycles.length < 3) return null;
 
   // First check if we have a stored prompt from a previous cycle
   const storedPrompt = await fetchStoredPrompt();
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return storedPrompt; // Return stored even if no API key
+  if (!hasAppTextBackend()) return storedPrompt; // Return stored even if no API key
 
   const cyclesSummary = recentCycles.slice(0, 10).map((c, i) =>
     `Cycle ${i + 1}: ${c.status} | ${c.trades_executed} trades (${c.trades_successful || 0} profitable) | Reasoning: "${(c.llm_reasoning || '').slice(0, 150)}"`
@@ -364,6 +372,8 @@ RULES:
 - Add lessons learned from the cycle reasoning below
 - Output ONLY the new system prompt (1-3 paragraphs). No explanations.`,
       `Recent cycle history:\n${cyclesSummary}\n\nGenerate the next evolution of the Alpha Hunter prompt.`,
+      undefined,
+      tier,
     );
 
     const newPrompt = result.text?.trim();
@@ -963,6 +973,11 @@ async function logToSupabase(provenance: CycleProvenance, data: Record<string, u
 // ============================================================
 // HANDLER
 // ============================================================
+/** Shared cron analysis stays Free; manual model access comes only from the authenticated account. */
+export async function resolveAgentRunTier(req: VercelRequest, isManual: boolean): Promise<AppTextTier> {
+  return isManual ? resolveAppRequestTier(req) : 'free';
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!(await requireWritesOpen(res))) return;
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -1128,9 +1143,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Phase 3: Self-optimization + Safe Mode analysis
     console.log('[Agent] Self-optimizing prompt + analyzing performance...');
+    const tier = await resolveAgentRunTier(req, isManual);
     const recentCycles = await fetchRecentCycles(10);
     const selfPrompt = recentCycles.length >= 3
-      ? await selfOptimizePrompt(recentCycles)
+      ? await selfOptimizePrompt(recentCycles, tier)
       : null;
     if (selfPrompt) console.log('[Agent] Using self-optimized Alpha prompt');
 
@@ -1150,6 +1166,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const debate = await multiAgentDebate(filtered, polyConsensus, selfPrompt || undefined, {
       signalAgeMs,
       performanceCtx,
+      tier,
     });
     console.log(`[Agent] Debate complete: ${debate.decisions.length} decisions`);
 
@@ -1243,7 +1260,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       trades_blocked: blocked,
       total_usd_deployed: totalDeployed,
       latency_ms: Date.now() - startMs,
-      llm_model: 'gpt-4o',
+      // Record the actual CIO model, including provider fallback; a failed call stays unknown.
+      llm_model: debate.llmModel,
       llm_reasoning: debate.reasoning,
       status: 'completed',
     };

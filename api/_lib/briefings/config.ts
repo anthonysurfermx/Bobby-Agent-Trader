@@ -5,6 +5,7 @@
 // Spec: docs/product/pro-market-briefings-implementation.md §1.
 // ============================================================
 import type { BriefLanguage, Cadence, DeviceEnvironment } from './types.js';
+import { appTextModel } from '../app-model.js';
 
 type Env = NodeJS.ProcessEnv;
 
@@ -42,7 +43,7 @@ export function budgetCaps(env: Env = process.env): { dayUsd: number; monthUsd: 
 export interface LlmChoice { provider: 'anthropic' | 'openai'; model: string }
 /** Ordered provider:model list for the shared narrative; each entry is a separately reserved attempt. */
 export function llmChoices(env: Env = process.env): LlmChoice[] {
-  const raw = env.BOBBY_BRIEFINGS_LLM || 'anthropic:claude-sonnet-5-5,openai:gpt-4o-mini';
+  const raw = env.BOBBY_BRIEFINGS_LLM || `anthropic:${appTextModel(env)},openai:gpt-4o-mini`;
   const out: LlmChoice[] = [];
   for (const part of raw.split(',')) {
     const [provider, model] = part.trim().split(':');

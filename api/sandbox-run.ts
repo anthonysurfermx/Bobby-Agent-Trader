@@ -12,11 +12,13 @@ import { PLAYBOOKS, type Playbook } from '../src/data/playbooks.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 import { requireWritesOpen } from './_lib/control.js';
+import { callLlm, streamText } from './_lib/llm.js';
+import type { AppTextTier } from './_lib/app-model.js';
+import { resolveAppRequestTier } from './_lib/app-model-access.js';
+import { hasAppTextBackend } from './_lib/app-model.js';
 
 export const config = { maxDuration: 180 };
 
-const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
-const OPENAI_MODEL = 'gpt-4o-mini';
 const OKX_BASE = 'https://www.okx.com';
 const SB_URL = bobbyDbUrl();
 const SB_KEY = bobbyServiceKey();
@@ -290,7 +292,7 @@ Respond with ONLY valid JSON, no prose:
   return { alpha, red, cio, judge };
 }
 
-// ── Stream a single agent turn via OpenAI ──────────────────
+// ── Stream a single agent turn via the app text provider ──────────────────
 const PHASE_TIMEOUT_MS = 50_000;
 
 async function streamAgent(
@@ -298,6 +300,7 @@ async function streamAgent(
   phase: string,
   system: string,
   userPayload: string,
+  tier: AppTextTier,
 ): Promise<string> {
   send('phase_start', { phase });
   let full = '';
@@ -306,60 +309,16 @@ async function streamAgent(
   const timeout = setTimeout(() => controller.abort(), PHASE_TIMEOUT_MS);
 
   try {
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${OPENAI_KEY}`,
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        max_tokens: 400,
-        stream: true,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: userPayload },
-        ],
-      }),
-      signal: controller.signal,
+    await streamText({
+      endpoint: 'sandbox-run', tier, system, messages: [{ role: 'user', content: userPayload }],
+      maxTokens: 700, timeoutMs: PHASE_TIMEOUT_MS, signal: controller.signal,
+      onDelta(token) { full += token; send('phase_token', { phase, token }); },
     });
-
-    if (!resp.ok || !resp.body) {
-      const errText = await resp.text().catch(() => '');
-      throw new Error(`OpenAI ${resp.status}: ${errText.slice(0, 200)}`);
-    }
-
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const lines = buf.split('\n');
-      buf = lines.pop() ?? '';
-      for (const ln of lines) {
-        if (!ln.startsWith('data: ')) continue;
-        const json = ln.slice(6).trim();
-        if (json === '[DONE]') continue;
-        try {
-          const parsed = JSON.parse(json);
-          const token = parsed.choices?.[0]?.delta?.content;
-          if (token) {
-            full += token;
-            send('phase_token', { phase, token });
-          }
-        } catch {
-          // ignore malformed chunk
-        }
-      }
-    }
 
     send('phase_end', { phase, text: full });
     return full;
   } catch (err: any) {
-    if (err?.name === 'AbortError') {
+    if (controller.signal.aborted || err?.name === 'AbortError' || err?.name === 'TimeoutError') {
       throw new PhaseTimeoutError(phase, PHASE_TIMEOUT_MS, full);
     }
     // Re-throw with partial text attached if we got any
@@ -374,44 +333,15 @@ async function streamAgent(
   }
 }
 
-async function openaiOneShot(phase: string, system: string, user: string, maxTokens: number): Promise<string> {
-  const TIMEOUT_MS = 25_000;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+async function textOneShot(phase: string, system: string, user: string, maxTokens: number, tier: AppTextTier): Promise<string> {
+  const timeoutMs = 25_000;
   try {
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${OPENAI_KEY}`,
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        max_tokens: maxTokens,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-        response_format: { type: 'json_object' },
-      }),
-      signal: controller.signal,
-    });
-    if (!resp.ok) {
-      const errText = await resp.text().catch(() => '');
-      const wrapped = new PhaseTimeoutError(phase, 0);
-      wrapped.message = `OpenAI ${resp.status}: ${errText.slice(0, 200)}`;
-      throw wrapped;
-    }
-    const data: any = await resp.json();
-    return data.choices?.[0]?.message?.content || '';
-  } catch (err: any) {
-    if (err instanceof PhaseTimeoutError) throw err;
-    if (err?.name === 'AbortError') throw new PhaseTimeoutError(phase, TIMEOUT_MS);
+    const { text } = await callLlm({ endpoint: 'sandbox-run', tier, system, user, maxTokens, timeoutMs });
+    return text;
+  } catch (err) {
     const wrapped = new PhaseTimeoutError(phase, 0);
-    wrapped.message = err?.message || `Phase ${phase} failed`;
+    wrapped.message = err instanceof Error ? err.message : `Phase ${phase} failed`;
     throw wrapped;
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
@@ -539,8 +469,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const ticker = rawTicker || 'BTC';
   const playbook = PLAYBOOKS.find((p) => p.slug === playbookSlug) || null;
 
-  if (!OPENAI_KEY) {
-    return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
+  if (!hasAppTextBackend()) {
+    return res.status(500).json({ error: 'App text provider not configured' });
   }
 
   // Rate limit (soft)
@@ -558,6 +488,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       message: `Too many pressure-tests from your network (${count}/${RATE_LIMIT_MAX} in the last hour). Try again later.`,
     });
   }
+
+  const tier = await resolveAppRequestTier(req);
 
   // SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
@@ -625,11 +557,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ].filter(Boolean).join('\n');
 
     // 1) Alpha Hunter
-    const alphaText = await streamAgent(send, 'alpha_hunter', prompts.alpha, ctx);
+    const alphaText = await streamAgent(send, 'alpha_hunter', prompts.alpha, ctx, tier);
     record.alpha_text = alphaText;
 
     // 2) Red Team
-    const redText = await streamAgent(send, 'red_team', prompts.red, `${ctx}\n\nBULL THESIS:\n${alphaText}`);
+    const redText = await streamAgent(send, 'red_team', prompts.red, `${ctx}\n\nBULL THESIS:\n${alphaText}`, tier);
     record.red_text = redText;
 
     // 3) CIO
@@ -638,6 +570,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'cio',
       prompts.cio,
       `${ctx}\n\nBULL THESIS:\n${alphaText}\n\nRED TEAM REBUTTAL:\n${redText}`,
+      tier,
     );
     record.cio_text = cioText;
     const { action, conviction } = parseCio(cioText);
@@ -647,11 +580,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 4) Judge
     send('phase_start', { phase: 'judge' });
-    const judgeText = await openaiOneShot(
+    const judgeText = await textOneShot(
       'judge',
       prompts.judge,
       `DEBATE TRANSCRIPT:\n\n[ALPHA]\n${alphaText}\n\n[RED TEAM]\n${redText}\n\n[CIO]\n${cioText}`,
       200,
+      tier,
     );
     const judgeScores = parseJudge(judgeText);
     record.judge_scores = judgeScores;

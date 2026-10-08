@@ -14,10 +14,12 @@ import { z } from 'zod';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
 import { BOBBY_HARDNESS_REGISTRY } from './_lib/protocol-constants.js';
 import { rpcErrorMessage } from './_lib/rpc-redact.js';
+import { callLlm } from './_lib/llm.js';
+import { hasAppTextBackend, type AppTextTier } from './_lib/app-model.js';
+import { resolveAppWalletTier } from './_lib/app-model-access.js';
 
 export const config = { maxDuration: 120 };
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
 interface OrchestrateBody {
   agent?: string;
@@ -49,24 +51,9 @@ interface OrchestrateBody {
 }
 
 // Isolated LLM call — each agent role gets ONLY what it should see
-async function callRole(system: string, context: string, maxTokens = 500): Promise<string> {
-  if (!OPENAI_API_KEY) throw new Error('LLM not configured');
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      max_tokens: maxTokens,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: context },
-      ],
-    }),
-  });
-  if (!res.ok) throw new Error(`LLM ${res.status}`);
-  const data = await res.json() as { choices: Array<{ message: { content: string } }> };
-  return data.choices[0]?.message?.content || '{}';
+async function callRole(system: string, context: string, maxTokens = 500, tier: AppTextTier = 'free'): Promise<string> {
+  const { text } = await callLlm({ endpoint: 'orchestrate', system, user: context, maxTokens, tier });
+  return text;
 }
 
 type OrchestrateAction =
@@ -134,8 +121,8 @@ class ModelOutputError extends Error {
 }
 
 /** One role call whose JSON is validated against the schema the decision relies on. */
-async function callRoleValidated<T>(role: string, schema: z.ZodType<T, z.ZodTypeDef, unknown>, system: string, context: string, maxTokens?: number): Promise<T> {
-  const raw = await callRole(system, context, maxTokens);
+async function callRoleValidated<T>(role: string, schema: z.ZodType<T, z.ZodTypeDef, unknown>, system: string, context: string, maxTokens?: number, tier: AppTextTier = 'free'): Promise<T> {
+  const raw = await callRole(system, context, maxTokens, tier);
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -291,7 +278,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (sized.ok === false) return res.status(400).json({ error: sized.error });
   const sizing = sized.sizing;
 
-  if (!OPENAI_API_KEY) {
+  if (!hasAppTextBackend()) {
     return res.status(503).json({ error: 'LLM not configured' });
   }
 
@@ -338,6 +325,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!auth.ok) {
       return res.status(401).json({ error: auth.error });
     }
+    const tier = await resolveAppWalletTier(auth.signer);
 
     // Build the HardnessSpec packet (what enters the harness)
     const specPacket = `HARDNESS SPEC PACKET
@@ -382,7 +370,9 @@ Invalidation: ${p.invalidation || 'not specified'}`;
           'Alpha Hunter',
           AlphaSchema,
           'You are Alpha Hunter. Strengthen this trade thesis with verifiable evidence. Be specific: cite price levels, indicators, catalysts. Return JSON: {"thesis":string,"evidence":string[],"catalyst":string,"conviction":number}',
-          specPacket
+          specPacket,
+          undefined,
+          tier
         );
 
         // Red Team: sees spec packet + Alpha's CONCLUSION only (not reasoning)
@@ -392,7 +382,9 @@ Invalidation: ${p.invalidation || 'not specified'}`;
           'Red Team',
           RedSchema,
           'You are Red Team. Destroy this thesis with adversarial rigor. Find data gaps, selection bias, timing risks. Return JSON: {"counterpoints":string[],"biases_detected":string[],"failure_modes":string[]}',
-          redContext
+          redContext,
+          undefined,
+          tier
         );
 
         // CIO: sees FULL transcript (Alpha evidence + Red counterpoints)
@@ -401,7 +393,9 @@ Invalidation: ${p.invalidation || 'not specified'}`;
           'CIO',
           CioSchema,
           'You are Bobby CIO. Decide if this trade survives. Be decisive. Return JSON: {"recommendation":"execute"|"pass"|"reduce_size","conviction":number,"rationale":string,"adjusted_entry":number,"adjusted_stop":number}',
-          cioContext
+          cioContext,
+          undefined,
+          tier
         );
       }
 
@@ -413,7 +407,8 @@ Invalidation: ${p.invalidation || 'not specified'}`;
           JudgeSchema,
           'You are Judge Mode. Score debate QUALITY, not market direction. Return JSON: {"dimensions":{"data_integrity":1-5,"adversarial_quality":1-5,"decision_logic":1-5,"risk_management":1-5,"calibration_alignment":1-5,"novelty":1-5},"biases_detected":string[],"recommendation":"execute"|"pass"|"reduce_size","rationale":string,"red_flags":string[]}',
           judgeContext,
-          400
+          400,
+          tier
         );
       }
     } catch (error) {

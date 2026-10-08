@@ -1,7 +1,7 @@
 // ============================================================
 // POST /api/openclaw-chat
 // Bobby Agent Trader — Multi-Call Debate Engine (Audited v2)
-// Gemini+Codex: 3 separate LLM calls for real adversarial debate
+// Three separate LLM calls for real adversarial debate
 // Falls back to single-call for non-debate messages
 // ============================================================
 
@@ -14,16 +14,9 @@ import { enforcePublicRateLimit, isInternalRequest } from './_lib/request-securi
 import { requestOriginHost } from './_lib/origins.js';
 import { issueTranscriptReceipt } from './_lib/transcript-receipt.js';
 import { walletSessionFromRequest } from './_lib/wallet-session.js';
-
-const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || '';
-const OPENCLAW_TOKEN = process.env.OPENCLAW_TOKEN || '';
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-
-// Model mapping: Anthropic model id → OpenAI equivalent
-const OPENAI_MODEL_MAP: Record<string, string> = {
-  'claude-haiku-4-5-20251001': 'gpt-4o-mini',
-  'claude-sonnet-4-20250514': 'gpt-4o',
-};
+import { callLlm, streamText } from './_lib/llm.js';
+import { hasAppTextBackend, type AppTextTier } from './_lib/app-model.js';
+import { resolveAppRequestTier } from './_lib/app-model-access.js';
 
 /** Language-only contract shared by every chat/debate path; structured markers remain unchanged. */
 export function chatLanguageRule(language: unknown, locale?: unknown): string {
@@ -670,29 +663,20 @@ function extractTaggedJson<T>(contextXml: string, tag: string): T | null {
 //  MULTI-CALL DEBATE ENGINE (Gemini+Codex audit)
 // ============================================================
 
-async function callClaude(
+async function callAppText(
   systemPrompt: string,
   userMessage: string,
-  model: string = 'claude-sonnet-4-20250514',
   maxTokens: number = 800,
+  tier: AppTextTier = 'free',
 ): Promise<string> {
-  const openaiModel = OPENAI_MODEL_MAP[model] || 'gpt-4o-mini';
-  if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
-
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
-    body: JSON.stringify({
-      model: openaiModel,
-      max_tokens: maxTokens,
-      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }],
-    }),
+  const result = await callLlm({
+    endpoint: 'openclaw-chat',
+    system: systemPrompt,
+    user: userMessage,
+    maxTokens,
+    tier,
   });
-  if (!res.ok) {
-    throw new Error(`OpenAI ${openaiModel}: ${res.status} ${await res.text().catch(() => '')}`);
-  }
-  const data = await res.json() as { choices: Array<{ message: { content: string } }> };
-  return data.choices[0]?.message?.content || '';
+  return result.text;
 }
 
 async function runMultiCallDebate(
@@ -700,6 +684,7 @@ async function runMultiCallDebate(
   language: string,
   res: VercelResponse,
   sessionWallet: string | null = null,
+  tier: AppTextTier = 'free',
 ): Promise<void> {
   const startMs = Date.now();
 
@@ -726,33 +711,33 @@ async function runMultiCallDebate(
 
     sendChunk('**ALPHA HUNTER:** ');
 
-    // Fire Alpha (Haiku — cheap, fast, aggressive, SHORT)
-    const alphaResponse = await callClaude(
+    // Alpha pitches first so Red Team can challenge its actual thesis.
+    const alphaResponse = await callAppText(
       buildAlphaPrompt(language, debateMode),
       alphaPrompt,
-      'claude-haiku-4-5-20251001',
       150, // Max 2 sentences ~40 words
+      tier,
     );
 
     sendChunk(alphaResponse);
 
     const alphaMs = Date.now() - startMs;
 
-    // ── STEP 2: Red Team attacks Alpha's thesis (Sonnet — strong, adversarial)
+    // ── STEP 2: Red Team attacks Alpha's thesis.
     sendChunk('\n\n**RED TEAM:** ');
 
     const redTeamPrompt = `${redTeamBasePrompt}\n\nALPHA HUNTER just pitched this:\n"${alphaResponse}"\n\nDestroy this thesis. 2 sentences MAX.`;
 
-    const redTeamResponse = await callClaude(
+    const redTeamResponse = await callAppText(
       buildRedTeamPrompt(language, debateMode),
       redTeamPrompt,
-      'claude-sonnet-4-20250514',
       150, // Max 2 sentences ~40 words
+      tier,
     );
 
     sendChunk(redTeamResponse);
 
-    // ── STEP 3: Bobby CIO judges (Sonnet — decisive)
+    // ── STEP 3: Bobby CIO judges.
     sendChunk('\n\n**MY VERDICT:** ');
 
     // Extract BASE_CONVICTION from intel context
@@ -779,11 +764,11 @@ RED TEAM attacked:
 
 ${finalCallInstruction}`;
 
-    const cioResponse = await callClaude(
+    const cioResponse = await callAppText(
       buildCIOPrompt(language, debateMode),
       cioPrompt,
-      'claude-sonnet-4-20250514',
       debateMode === 'trade' ? 100 : 280,
+      tier,
     );
     const finalResponse = ensurePortfolioLine(cioResponse, detectedAdvice, userQuestion, debateMode, edgeCasePolicy, language);
     sendChunk(finalResponse);
@@ -816,6 +801,7 @@ async function runSimpleInvestDebate(
   language: string,
   res: VercelResponse,
   sessionWallet: string | null = null,
+  tier: AppTextTier = 'free',
 ): Promise<void> {
   const { contextXml, userQuestion, detectedAdvice, debateMode, edgeCasePolicy } = resolveDebateMode(message);
 
@@ -825,11 +811,11 @@ async function runSimpleInvestDebate(
 
   try {
     const userMessage = `${contextXml}\n\nThe user asks: "${userQuestion}"\n\nAnswer in INVEST mode only. Keep the portfolio JSON compact and valid.`;
-    const reply = await callClaude(
+    const reply = await callAppText(
       buildSimpleInvestPrompt(language),
       userMessage,
-      'claude-haiku-4-5-20251001',
       280,
+      tier,
     );
     const finalReply = ensurePortfolioLine(reply, detectedAdvice, userQuestion, debateMode, edgeCasePolicy, language);
 
@@ -839,7 +825,7 @@ async function runSimpleInvestDebate(
     res.end();
   } catch (err) {
     console.warn('[Chat] Simple invest path failed, falling back to multi-call debate:', err);
-    return await runMultiCallDebate(message, language, res, sessionWallet);
+    return await runMultiCallDebate(message, language, res, sessionWallet, tier);
   }
 }
 
@@ -888,154 +874,83 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const resolved = resolveDebateMode(message);
   // Wallet session (optional for chatting, REQUIRED to get a publishable receipt).
   const sessionWallet = walletSessionFromRequest(req)?.wallet ?? null;
+  const tier = await resolveAppRequestTier(req);
 
   if (
     hasXMLContext &&
     resolved.debateMode === 'invest' &&
-    OPENAI_API_KEY &&
+    hasAppTextBackend() &&
     shouldUseSimpleInvestPath(resolved.userQuestion, resolved.debateMode, resolved.edgeCasePolicy)
   ) {
     console.log('[Chat] Simple invest path activated from XML context');
-    return await runSimpleInvestDebate(message, userLang, res, sessionWallet);
+    return await runSimpleInvestDebate(message, userLang, res, sessionWallet, tier);
   }
 
   // ── MULTI-CALL DEBATE: When Trading Room is active
-  if (isDebateRequest(message) && OPENAI_API_KEY) {
+  if (isDebateRequest(message) && hasAppTextBackend()) {
     if (shouldUseSimpleInvestPath(resolved.userQuestion, resolved.debateMode, resolved.edgeCasePolicy)) {
       console.log('[Chat] Simple invest path activated');
-      return await runSimpleInvestDebate(message, userLang, res, sessionWallet);
+      return await runSimpleInvestDebate(message, userLang, res, sessionWallet, tier);
     }
     console.log('[Chat] Multi-call debate mode activated');
-    return await runMultiCallDebate(message, userLang, res, sessionWallet);
+    return await runMultiCallDebate(message, userLang, res, sessionWallet, tier);
   }
 
-  // ── SINGLE-CALL: Normal Bobby conversation
-  if (OPENCLAW_GATEWAY_URL && !hasXMLContext) {
+  // Normal text uses the shared app model and preserves the existing SSE shape.
+  if (hasAppTextBackend()) {
     try {
-      const result = await tryOpenClaw(sanitizedMessage, history, userLang, res);
-      if (result) return;
+      return await streamAppText(sanitizedMessage, history, userLang, res, tier);
     } catch (err) {
-      console.warn('[Chat] OpenClaw failed, falling back to OpenAI:', err);
+      console.error('[Chat] App model streaming failed:', err);
+      if (res.destroyed) return;
+      if (!res.headersSent) return res.status(502).json({ error: 'AI backend unavailable' });
+      res.write(`data: ${JSON.stringify({ error: 'AI backend unavailable', bobby_error: 'chat_failed' })}\n\n`);
+      res.end();
+      return;
     }
   }
 
-  // OpenAI streaming
-  if (OPENAI_API_KEY) {
-    try {
-      return await streamOpenAI(sanitizedMessage, history, userLang, res);
-    } catch (err) {
-      console.error('[Chat] OpenAI streaming failed:', err);
-      return res.status(502).json({ error: 'AI backend unavailable' });
-    }
-  }
-
-  return res.status(503).json({ error: 'No AI backend configured (need OPENAI_API_KEY)' });
+  return res.status(503).json({ error: 'No AI backend configured' });
 }
 
-// ---- OpenClaw Gateway ----
-async function tryOpenClaw(
+// ---- App Model Single-Call ----
+async function streamAppText(
   message: string,
   history: Array<{ role: string; content: string }> | undefined,
   language: string,
   res: VercelResponse,
-): Promise<boolean> {
-  const messages = [
-    { role: 'system' as const, content: buildBobbyBasePrompt(language) },
-    ...(history || []).slice(-10).map(m => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    })),
-    { role: 'user' as const, content: message },
-  ];
-
-  const gatewayUrl = OPENCLAW_GATEWAY_URL.replace(/\/$/, '');
-  const response = await fetch(`${gatewayUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(OPENCLAW_TOKEN ? { Authorization: `Bearer ${OPENCLAW_TOKEN}` } : {}),
-    },
-    body: JSON.stringify({ model: 'default', messages, stream: true, max_tokens: 2048 }),
-  });
-
-  if (!response.ok) {
-    console.error('[Chat] OpenClaw:', response.status, await response.text().catch(() => ''));
-    return false;
-  }
-
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-
-  const reader = response.body?.getReader();
-  if (!reader) return false;
-
-  const decoder = new TextDecoder();
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      res.write(decoder.decode(value, { stream: true }));
-    }
-  } finally {
-    reader.releaseLock();
-    res.end();
-  }
-  return true;
-}
-
-// ---- Claude API Single-Call ----
-async function streamOpenAI(
-  message: string,
-  history: Array<{ role: string; content: string }> | undefined,
-  language: string,
-  res: VercelResponse,
+  tier: AppTextTier = 'free',
 ): Promise<void> {
   const messages = [
-    { role: 'system' as const, content: buildBobbyBasePrompt(language) },
-    ...(history || []).slice(-10).map(m => ({
+    ...(history || []).slice(-10).filter(m => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').map(m => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
     })),
     { role: 'user' as const, content: message },
   ];
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
-    body: JSON.stringify({ model: 'gpt-4o', max_tokens: 2048, stream: true, messages }),
-  });
-
-  if (!response.ok) throw new Error(`OpenAI streaming ${response.status}`);
-
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('No response body');
-  const decoder = new TextDecoder();
-
+  const controller = new AbortController();
+  const onClose = () => { if (!res.writableEnded) controller.abort(); };
+  res.once?.('close', onClose);
   try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
-      for (const line of lines) {
-        const json = line.slice(6);
-        if (json === '[DONE]') { res.write('data: [DONE]\n\n'); continue; }
-        try {
-          const parsed = JSON.parse(json);
-          const text = parsed.choices?.[0]?.delta?.content;
-          if (text) res.write(`data: ${JSON.stringify({ text })}\n\n`);
-        } catch {
-          // Ignore malformed SSE chunks and continue streaming.
-        }
-      }
-    }
-  } finally {
-    reader.releaseLock();
+    await streamText({
+      endpoint: 'openclaw-chat',
+      tier,
+      system: buildBobbyBasePrompt(language),
+      messages,
+      maxTokens: 2048,
+      signal: controller.signal,
+      onDelta: (text) => { res.write(`data: ${JSON.stringify({ text })}\n\n`); },
+    });
+    res.write('data: [DONE]\n\n');
     res.end();
+  } catch (error) {
+    if (!controller.signal.aborted) throw error;
+  } finally {
+    res.removeListener?.('close', onClose);
   }
 }

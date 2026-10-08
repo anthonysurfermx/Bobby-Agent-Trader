@@ -15,7 +15,7 @@ import type { Identity } from './_lib/user-identity.js';
 import { clientBinding, issueClientReadReceipt } from './_lib/client-telemetry.js';
 import { memoryDeskAllowed, MEMORY_RECORD_TIMEOUT_MS, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memoryReceipt, memorySummary, readerContext, recordAsk, type MemoryReceipt, type MemorySummary } from './_lib/user-memory.js';
 
-// Máximo runs four Sonnet calls inside a 160 s budget (api/_lib/desk-levels.ts).
+// Máximo runs four app-model calls inside a 160 s budget (api/_lib/desk-levels.ts).
 export const config = { maxDuration: 180 };
 
 /**
@@ -91,6 +91,17 @@ const copy = deskErrorCopy;
  * desk could not load (monthly; weekly or 4H for a stock), in which case the nearest timeframe leads and the answer
  * says so first. The level, the model calls and the meters are the same as without it. The question is the only
  * signal: no request field, and a question that names none answers on 1H exactly as before.
+ *
+ * Next question: `agents.synthesis.followUp` is always a string of 6 to 160 characters (shipped clients decode
+ * it). It is the CIO's own when that is a what-or-why question about the asset; when it breaks the output guard
+ * or the next-question rule (api/_lib/desk-next-question.ts: whether or when to act, a statement, a price, a word
+ * the copy never uses, another language than the reply's, a word outside the list such a question is written
+ * with), or is the very question this request asked, the reply carries a fixed question in the reply's language
+ * instead and the read is served: never an `analysis_failed`, never a refund. There are two fixed questions, so
+ * a reader who taps the first and is answered is offered the second, never the one just answered. The log line
+ * `{ route: 'desk-debate', event: 'follow_up_replaced', reason, language, level }` counts how often, by class
+ * (advice, guarantee, act, word, number, shape, opener, language, unlisted; 'repeat' for the question just
+ * asked) and without any text.
  *
  * Outcomes (bobby_events, the owner's funnel): every request that passes validation records exactly one, with the
  * caller resolved before any gate (a budget pause by a signed-in account carries that account). A 405, a foreign
@@ -251,11 +262,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // cannot show and delete memory yet (MEMORY_PLATFORMS), nor while the kill switch is off (BOBBY_MEMORY).
     const memoryOwner = memoryDeskAllowed(req, clientPlatform(req)) ? memoryIdentity(req, knownIdentity) : Promise.resolve(null);
     const summaryTask = memoryOwner.then((id) => (id ? memorySummary(id.id, symbol) : null));
-    const evidence = await loadDeskEvidenceFor(symbol, assetType, levelPlan(level).evidence, timeframeRequestOf(question, language));
+    // The database-confirmed account plan selects the model, never the requested analysis level or a client tier.
+    const tier = access.tier === 'pro' ? 'pro' : 'free';
+    const evidence = await loadDeskEvidenceFor(symbol, assetType, levelPlan(level, tier).evidence, timeframeRequestOf(question, language));
     const summary: MemorySummary | null = await within(summaryTask, MEMORY_SUMMARY_TIMEOUT_MS);
-    const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null, evidence.technicals.price, language, locale);
+    const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null, evidence.technicals.price, language, locale, evidence.provenance.assetType === 'crypto' ? 'crypto' : 'equity');
     const asked = horizonOf(question, language);
-    const result = await runDeskDebate(question, evidence, language, { locale, level, usage, signal: left.signal, onEvent: live ? send : undefined, reader, ...(thesis ? { thesis } : {}) });
+    const result = await runDeskDebate(question, evidence, language, { locale, level, tier, usage, signal: left.signal, onEvent: live ? send : undefined, reader, ...(thesis ? { thesis } : {}) });
     // The reader left while the last call was already in flight.
     if (left.signal.aborted) { await abandon(); return; }
     const telemetry = issueClientReadReceipt(clientBinding(req, knownIdentity), requestId);
