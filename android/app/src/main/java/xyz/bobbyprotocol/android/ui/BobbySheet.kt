@@ -73,7 +73,7 @@ import java.util.TimeZone
 fun BobbySheet(
     route: String, session: NucleoSession, repository: BobbyRepository, billing: BillingStore,
     onClose: () -> Unit, onOpen: (String) -> Unit, onSignIn: (String) -> Unit,
-    onExternal: (String) -> Unit, onShare: (String) -> Unit, onShareAvatar: (AvatarShareSpec) -> Unit,
+    onExternal: (String) -> Unit, onShareAvatar: (AvatarShareSpec) -> Unit,
     narrationStatus: String?, onNarrate: (JSONObject) -> Unit, onStopNarration: () -> Unit,
     onReminders: (Boolean) -> Unit,
     onPurchase: (String) -> Unit, onRestore: () -> Unit,
@@ -131,8 +131,7 @@ fun BobbySheet(
                 "locker" -> null
                 "riskNotice" -> session.riskNotice()
                 "isla" -> null
-                "levels", "invite", "coupon" -> repository.access()
-                "memory" -> if (account != null) repository.memory() else null
+                "levels", "coupon" -> repository.access()
                 "briefings" -> if (account != null) repository.briefings() else null
                 "briefingSettings" -> if (account != null) repository.briefingSettings() else null
                 "paywall", "account" -> {
@@ -163,11 +162,11 @@ fun BobbySheet(
                 Text(t("Accept the risk notice before using Bobby.", "Acepta el aviso de riesgo antes de usar Bobby."))
                 Action(t("Risk notice", "Aviso de riesgo")) { onOpen("riskNotice") }
             } else when (route) {
-                "account" -> AccountProfile(session, repository, billing, billingState, busy,
+                "account" -> AccountProfile(session, repository, busy,
                     onOpen, onSignIn, onExternal, onShareAvatar,
                     onSync = { task { session.syncProgress() } },
                     onDelete = { task { deletionRequirements = repository.accountDeletionRequirements(); confirmation = "account" } },
-                    onSignOut = { repository.signOut(); onClose() }, onRestore = onRestore)
+                    onSignOut = { repository.signOut(); onClose() })
                 "paywall" -> {
                     Text(t("Your three-agent market desk.", "Tu mesa de análisis con tres agentes."), style = MaterialTheme.typography.titleLarge)
                     Text(t("Read every plan, period and introductory offer below before subscribing.", "Revisa el plan, el periodo y la oferta introductoria antes de suscribirte."))
@@ -225,24 +224,6 @@ fun BobbySheet(
                     if (session.riskAccepted) TextButton(onClick = { confirmation = "consent" }) { Text(t("Stop AI questions on this Android", "Detener preguntas de IA en este Android")) }
                     Text(t("This Android's question and voice consent is separate from your account's scheduled briefing consent. Manage scheduled analysis and audio in Briefing settings.", "El consentimiento de preguntas y voz de este Android es independiente del consentimiento de informes programados de tu cuenta. Administra el análisis y audio programados en Configuración de informes."))
                     if (account != null) Action(t("Briefing settings", "Configuración de informes")) { onOpen("briefingSettings") }
-                }
-                "memory" -> if (account == null) SignedOut(t, onOpen) else data?.let { snapshot ->
-                    Toggle(t("Account memory", "Memoria de la cuenta"), snapshot.optBoolean("enabled"), !busy) { enabled -> task { data = repository.updateMemory(JSONObject().put("memoryEnabled", enabled)) } }
-                    Toggle(t("Remember questions from this device", "Recordar preguntas de este dispositivo"), repository.nativeMemoryOptIn(), !busy && snapshot.optBoolean("enabled")) { repository.setNativeMemoryOptIn(it); refresh++ }
-                    Text(t("This device only contributes questions when you enable it here.", "Este dispositivo sólo aporta preguntas cuando lo activas aquí."), style = MaterialTheme.typography.bodySmall)
-                    val prefs = snapshot.optJSONObject("prefs") ?: JSONObject()
-                    listOf("horizon" to listOf("intraday", "week", "month", "long"), "experience" to listOf("new", "some", "experienced"), "risk" to listOf("low", "medium", "high")).forEach { (field, options) ->
-                        Text(memoryLabel(field, t), style = MaterialTheme.typography.titleMedium)
-                        options.forEach { choice -> TextButton(onClick = { task { data = repository.updateMemory(JSONObject().put(field, choice)) } }, enabled = !busy) { Text((if (prefs.optString(field) == choice) "✓ " else "") + memoryLabel(choice, t)) } }
-                        TextButton(onClick = { task { data = repository.updateMemory(JSONObject().put(field, JSONObject.NULL)) } }, enabled = !busy) { Text(t("Clear preference", "Borrar preferencia")) }
-                    }
-                    objects(snapshot.optJSONArray("assets")).forEach { item ->
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(item.optString("symbol"))
-                            TextButton(onClick = { task { data = repository.forgetMemory(item.getString("symbol")) } }, enabled = !busy) { Text(t("Forget", "Olvidar")) }
-                        }
-                    }
-                    TextButton(onClick = { confirmation = "memory" }, enabled = !busy) { Text(t("Delete all memory", "Eliminar toda la memoria"), color = MaterialTheme.colorScheme.error) }
                 }
                 "briefings" -> if (account == null) SignedOut(t, onOpen) else {
                     selectedReport?.let { report ->
@@ -339,27 +320,6 @@ fun BobbySheet(
                     }
                     Action("Bobby Pro") { onOpen("paywall") }
                 }
-                "invite" -> {
-                    val referral = data?.optJSONObject("referral")
-                    val url = referral?.optString("url")?.takeIf { it.startsWith("https://bobbyprotocol.xyz/") }
-                    if (url != null) {
-                        Text("${referral.optInt("accepted")} / ${referral.optInt("max")} ${t("friends joined", "amigos se unieron")}")
-                        Text("${referral.optInt("rewardDays")} ${t("days of Pro per eligible invitation", "días de Pro por invitación válida")}")
-                        Action(t("Share invite", "Compartir invitación")) { onShare(url) }
-                        objects(referral.optJSONArray("friends")).forEach { Text("${t("Joined", "Se unió")}: ${it.optString("joinedAt")}") }
-                    } else Text(t("Invitations are currently unavailable.", "Las invitaciones no están disponibles en este momento."))
-                    if (account == null) SignedOut(t, onOpen) else {
-                        var code by remember(epoch) { mutableStateOf("") }
-                        var result by remember(epoch) { mutableStateOf<String?>(null) }
-                        OutlinedTextField(code, { code = it.take(8).uppercase() }, label = { Text(t("Friend's invitation code", "Código de invitación de un amigo")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        Action(t("Accept invitation", "Aceptar invitación"), !busy && code.matches(Regex("[A-HJ-NP-Z2-9]{8}"))) { task {
-                            val response = repository.request("api/bobby-access", "POST", JSONObject().put("action", "referral-claim").put("code", code), authenticated = true)
-                            result = response.optString("result")
-                            data = repository.access()
-                        } }
-                        result?.let { Text(benefitResult(it, t), color = MaterialTheme.colorScheme.primary) }
-                    }
-                }
             }
         }
     }
@@ -371,7 +331,6 @@ fun BobbySheet(
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(when (action) {
                         "account" -> t("Delete your Bobby account and synced personal data? Public blockchain records and your store subscription may remain. Manage your subscription separately.", "¿Eliminar tu cuenta y datos personales sincronizados? Los registros públicos de blockchain y tu suscripción pueden permanecer. Administra la suscripción por separado.")
-                        "memory" -> t("Delete all of Bobby's saved account memory?", "¿Eliminar toda la memoria de tu cuenta en Bobby?")
                         else -> t("Stop new questions and generated voice on this Android and return to the risk notice? Scheduled briefing analysis and audio have separate account consent. Turn those off in Briefing settings; this action does not change them.", "¿Detener preguntas nuevas y voz generada en este Android y volver al aviso de riesgo? El análisis y audio de informes programados tienen un consentimiento de cuenta separado. Desactívalos en Configuración de informes; esta acción no los modifica.")
                     })
                     if (action == "account" && deletionRequirements?.requiresManualAppleRevocation == true) {
@@ -394,7 +353,6 @@ fun BobbySheet(
                                 context.getSharedPreferences("bobby.traderLandHelp", 0).edit().remove(TraderLandFirstVisit.preferenceKey(request.ownerUserId)).apply()
                                 if (response.optString("appleRevocation") == "manual") manualAppleSteps = true else onClose()
                             }
-                            "memory" -> { data = repository.forgetAllMemory() }
                             else -> {
                                 session.revokeRiskConsent()
                                 repository.setNativeMemoryOptIn(false)
@@ -424,18 +382,6 @@ fun BobbySheet(
 @Composable private fun SignedOut(t: (String, String) -> String, onOpen: (String) -> Unit) { Text(t("Sign in to open this feature.", "Inicia sesión para abrir esta función.")); Action(t("Sign in", "Iniciar sesión")) { onOpen("account") } }
 private fun objects(array: JSONArray?): List<JSONObject> = (0 until (array?.length() ?: 0)).mapNotNull { array?.optJSONObject(it) }
 private fun strings(array: JSONArray?): List<String> = (0 until (array?.length() ?: 0)).mapNotNull { array?.optString(it)?.takeIf(String::isNotBlank) }
-private fun title(route: String, t: (String, String) -> String): String = when (route) { "account" -> t("Profile", "Perfil"); "memory" -> t("Memory", "Memoria"); "briefings" -> t("Market briefings", "Informes de mercado"); "briefingSettings" -> t("Briefing settings", "Configuración de informes"); "squad" -> t("Squad", "Equipo"); "locker" -> t("Locker", "Equipamiento"); "isla" -> "Trader Land"; "riskNotice" -> t("Risk notice", "Aviso de riesgo"); "levels" -> t("Analysis level", "Nivel de análisis"); "invite" -> t("Invite a friend", "Invitar a un amigo"); "coupon" -> t("Redeem a code", "Canjear un código"); else -> "Bobby Pro" }
+private fun title(route: String, t: (String, String) -> String): String = when (route) { "account" -> t("Profile", "Perfil"); "briefings" -> t("Market briefings", "Informes de mercado"); "briefingSettings" -> t("Briefing settings", "Configuración de informes"); "squad" -> t("Squad", "Equipo"); "locker" -> t("Locker", "Equipamiento"); "isla" -> "Trader Land"; "riskNotice" -> t("Risk notice", "Aviso de riesgo"); "levels" -> t("Analysis level", "Nivel de análisis"); "coupon" -> t("Redeem a code", "Canjear un código"); else -> "Bobby Pro" }
 private fun period(count: Int?, unit: String?, t: (String, String) -> String): String = "${count ?: ""} " + when (unit) { "DAY" -> t("day", "día"); "WEEK" -> t("week", "semana"); "MONTH" -> t("month", "mes"); "YEAR" -> t("year", "año"); else -> t("period shown by your store", "periodo indicado por la tienda") }
-private fun memoryLabel(value: String, t: (String, String) -> String): String = when (value) { "horizon" -> t("Time horizon", "Horizonte"); "experience" -> t("Experience", "Experiencia"); "risk" -> t("Risk tolerance", "Tolerancia al riesgo"); "intraday" -> t("Intraday", "Intradía"); "week" -> t("Week", "Semana"); "month" -> t("Month", "Mes"); "long" -> t("Long term", "Largo plazo"); "new" -> t("New", "Principiante"); "some" -> t("Some experience", "Algo de experiencia"); "experienced" -> t("Experienced", "Con experiencia"); "low" -> t("Low", "Baja"); "medium" -> t("Medium", "Media"); "high" -> t("High", "Alta"); else -> value }
 private fun billingMessage(message: BillingMessage, t: (String, String) -> String): String = when (message) { BillingMessage.CONFIGURATION_MISSING, BillingMessage.GOOGLE_PAYMENTS_NOT_READY -> t("Google Play subscriptions are not available yet.", "Las suscripciones de Google Play aún no están disponibles."); BillingMessage.SIGN_IN_FIRST -> t("Sign in before subscribing.", "Inicia sesión antes de suscribirte."); BillingMessage.ALREADY_SUBSCRIBED -> t("Check your existing Pro access before starting another purchase.", "Revisa tu acceso Pro antes de iniciar otra compra."); BillingMessage.PURCHASE_PENDING, BillingMessage.SERVER_CONFIRMATION_PENDING -> t("Your purchase is awaiting confirmation.", "Tu compra está pendiente de confirmación."); BillingMessage.NOTHING_TO_RESTORE -> t("No purchases were found to restore.", "No se encontraron compras para restaurar."); BillingMessage.SUBSCRIBED -> t("Bobby Pro is active.", "Bobby Pro está activo."); else -> t("The purchase could not complete. Try again.", "No se pudo completar la compra. Intenta de nuevo.") }
-
-
-private fun benefitResult(result: String, t: (String, String) -> String): String = when (result) {
-    "claimed", "redeemed" -> t("Your account confirmed the benefit.", "Tu cuenta confirmó el beneficio.")
-    "already_claimed", "already_redeemed" -> t("This account already redeemed a benefit from this code.", "Esta cuenta ya canjeó un beneficio con este código.")
-    "self" -> t("Use an invitation from a different account.", "Usa una invitación de otra cuenta.")
-    "not_new" -> t("This invitation is available to eligible new accounts.", "Esta invitación está disponible para cuentas nuevas que cumplan los requisitos.")
-    "inviter_full", "exhausted" -> t("This code reached its redemption limit.", "Este código llegó al límite de canjes.")
-    "expired" -> t("This code expired.", "Este código venció.")
-    else -> t("This code did not grant a benefit. Check it and try again.", "Este código no concedió un beneficio. Revísalo e intenta de nuevo.")
-}

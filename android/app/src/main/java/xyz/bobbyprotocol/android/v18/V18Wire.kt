@@ -113,6 +113,53 @@ object MemoryReceipts {
         if (!number.isFinite() || number < 0 || number >= 1e9) return null
         return Math.round(number).toInt()
     }
+
+    /** The receipt as it rides a delivered read for native (the page ignores keys it does not know). */
+    fun toJson(receipt: MemoryReceipt): JSONObject = JSONObject()
+        .put("recorded", receipt.recorded).put("asks", receipt.asks)
+        .put("lastAskedDaysAgo", receipt.lastAskedDaysAgo ?: JSONObject.NULL)
+        .put("changeSinceLastAskPct", receipt.changeSinceLastAskPct ?: JSONObject.NULL)
+}
+
+/**
+ * A desk reply (the `final` body of POST /api/desk-debate) as 1.8 reads it: the reply itself,
+ * untouched, and the additive parts parsed. `BobbyRepository.streamDebate` already refused a
+ * reply without the three agents and a `wait` | `review` verdict before this is built.
+ */
+class DeskAnswer(val json: JSONObject) {
+    private val agents: JSONObject? = json.optJSONObject("agents")
+    private val synthesis: JSONObject? = agents?.optJSONObject("synthesis") ?: json.optJSONObject("synthesis")
+
+    /** `wait` | `review`. */
+    val verdict: String = agents?.optString("verdict", "wait") ?: "wait"
+    /** What the server says its memory holds about this asset; null when memory did not apply. */
+    val memory: MemoryReceipt? = MemoryReceipts.fromJson(json.optJSONObject("memory"))
+    /** Only for a request that carried a thesis, and only when the server sorted the evidence against it. */
+    val review: ThesisReviewNotes? = ThesisReviewNotes.fromJson(json.optJSONObject("review"))
+    /** The price the evidence carried, and when that evidence was dated. Never invented: null when absent. */
+    val price: Double? = V18Json.number(json.optJSONObject("technicals"), "price")?.takeIf { it > 0 }
+    val asOf: String? = V18Json.text(json.optJSONObject("provenance"), "asOf")
+    val headline: String? = V18Json.text(synthesis, "headline")
+    val why: String? = V18Json.text(synthesis, "why")
+    val risk: String? = V18Json.text(synthesis, "risk")
+    val watch: String? = V18Json.text(synthesis, "watch")
+    /** The level the server answered with (`rapido` | `profundo` | `maximo`), when it says. */
+    val level: String? = V18Json.text(json, "level")
+    /** The server's read meter after this request, as it sent it. */
+    val access: JSONObject? = json.optJSONObject("access")
+}
+
+/** Reading JSON the same way on the phone and in JVM tests (`optString` on a JSON null differs between them). */
+internal object V18Json {
+    fun text(json: JSONObject?, key: String): String? {
+        if (json == null || json.isNull(key)) return null
+        return (json.opt(key) as? String)?.takeIf { it.isNotEmpty() }
+    }
+
+    fun number(json: JSONObject?, key: String): Double? {
+        if (json == null || json.isNull(key)) return null
+        return (json.opt(key) as? Number)?.toDouble()?.takeIf { it.isFinite() }
+    }
 }
 
 /** What a 1.8 screen may know about a recent read (the editor drafts a thesis from it). No question text. */
@@ -128,7 +175,69 @@ data class ReadSummary(
     val why: String?,
     val risk: String?,
     val watch: String?,
-)
+) {
+    companion object {
+        /**
+         * From a delivered read as the session hands it to the page (`status: "ok"`). The price is
+         * the market's when it answered, else the one the desk's evidence carried. The question the
+         * read also holds is never copied.
+         */
+        fun from(read: JSONObject): ReadSummary? {
+            if (V18Json.text(read, "status") != "ok") return null
+            val requestId = V18Json.text(read, "requestId") ?: return null
+            val asset = read.optJSONObject("asset") ?: return null
+            val symbol = V18Json.text(asset, "symbol") ?: return null
+            val synthesis = read.optJSONObject("synthesis")
+            val price = V18Json.number(read.optJSONObject("market"), "price") ?: V18Json.number(read.optJSONObject("technicals"), "price")
+            return ReadSummary(
+                requestId = requestId, symbol = symbol, name = V18Json.text(asset, "name") ?: symbol,
+                isEquity = asset.optBoolean("isEquity", false),
+                verdict = V18Json.text(read.optJSONObject("agents"), "verdict") ?: "wait",
+                price = price?.takeIf { it > 0 }, asOf = V18Json.text(read.optJSONObject("provenance"), "asOf") ?: "",
+                headline = V18Json.text(synthesis, "headline"), why = V18Json.text(synthesis, "why"),
+                risk = V18Json.text(synthesis, "risk"), watch = V18Json.text(synthesis, "watch"),
+            )
+        }
+    }
+}
+
+/**
+ * The last delivered reads of one reader, for `V18Host.readSummary`. In memory only. It is bound to
+ * one account moment: a different one empties it, so a summary never crosses accounts.
+ */
+class ReadShelf(private val limit: Int = 5) {
+    private var key: String? = null
+    private val items = ArrayList<ReadSummary>()
+
+    /** True when what is kept already belongs to `key`; otherwise it is emptied and bound to it. */
+    fun bind(key: String): Boolean {
+        if (this.key == key) return true
+        items.clear()
+        this.key = key
+        return false
+    }
+
+    fun put(summary: ReadSummary) {
+        items.removeAll { it.requestId == summary.requestId }
+        items.add(summary)
+        while (items.size > limit) items.removeAt(0)
+    }
+
+    fun get(requestId: String): ReadSummary? = items.lastOrNull { it.requestId == requestId }
+    fun clear() { items.clear() }
+}
+
+/** Whose a notification or a follow-up is, as it may travel in a payload: never the account id. */
+object V18Reader {
+    /** `local` signed out, else the first eight bytes of the SHA-256 of the account id, in hex (the iOS `ownerTag`). */
+    fun tag(owner: String?): String {
+        if (owner == null) return "local"
+        val digest = java.security.MessageDigest.getInstance("SHA-256").digest(owner.toByteArray(Charsets.UTF_8))
+        val hex = StringBuilder()
+        for (i in 0 until 8) hex.append(String.format(java.util.Locale.ROOT, "%02x", digest[i].toInt() and 0xff))
+        return hex.toString()
+    }
+}
 
 /** Hand-offs between a nudge or a notification tap and the screen it opens. Consumed once. Main thread only. */
 class V18Focus {

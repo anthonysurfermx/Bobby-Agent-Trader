@@ -1,8 +1,122 @@
 # Bobby for Android
 
+The native Android app (`xyz.bobbyprotocol.bobby`). Kotlin owns accounts, consent, market data, billing, voice and persistence; the bundled HTML/WebGL Núcleo page and native Compose sheets present the product. Authentication tokens never enter the web page.
+
+The source is at **1.2.0 (code 10)**, Bobby 1.8, described in the next section. Everything from "Earlier candidate: 1.1.1" down is the record of earlier candidates, kept as it was written (only two headings were renamed so that none of them says "latest").
+
+## Bobby 1.8 for Android: version 1.2.0 (code 10)
+
+`app/build.gradle.kts` is at **1.2.0 (10)**. Phones have **1.1.4 (9)**. 1.2.0 is Bobby 1.8 for Android, a port of iOS 1.8 (`ios/Bobby/Sources/V18/`, design law `ios/Bobby/V18-DESIGN.md`): the same rules, limits, ids and words, in six languages. **Nothing of 1.2.0 has been built for release, installed on a real phone, or published.** A debug build runs on CI's emulator (see "What is verified, and what is not").
+
+### What a person gets
+
+- **One line on the glass.** The main screen can show one native-written line and one button. A line shows twice, rests seven days, shows four times at most and is gone for good once tapped; after any tap nothing else speaks for fifteen minutes; nothing shows before the risk notice, under a sheet, or while Bobby listens, thinks or speaks. Each feature below speaks through it, one at a time, by priority.
+- **Credits** (profile row, which says the balance in one line, for example "7 of 10 reads · 3 gifted"). Quick, Deep and Max with what is left and when it comes back, gifted reads, Bobby Pro with its real state, Restore purchases with a sentence for every outcome, Manage subscription where a store bills the plan, and the doors to invitations and codes. A number the app does not have is not shown.
+- **Invitations.** A person's own code and link to share, a field for a friend's code, and what the server answered. A link that opens the app is kept for 30 days and claimed once there is an account and an accepted risk notice (see "What the owner still owes").
+- **My theses.** Write why you are looking at an asset (three active at most, 280 characters, saved on this phone only), come back to it, and ask Bobby to review it against dated price evidence. A review costs one read and says so before it starts; the line that says where the words go sits directly above the button.
+- **Memory.** One consent screen ("Remember this?") that says what is kept, what is sent and for how long, then two answers of equal weight. The Memory screen shows what the account remembers and what this phone keeps, with Forget per asset and Delete everything.
+- **Reminders.** "On that day, remind me to review this thesis": three presets or a chosen day and time. The phone is asked for notification permission only when a reminder button is tapped. The notification says "Your reminder to review a thesis." and nothing about the asset.
+- **Follow-ups.** After a read Bobby may offer to come back to it. On a yes it plans, on this phone only, the asset the next day, its sector the day after and the week on the next Monday, then goes quiet. The switch is in Reminders.
+
+### What changes for people who update from 1.1.4
+
+- The profile loses six rows that now live behind **Credits**: reads left, gifted reads, Bobby Pro, Restore purchases, Invite friends, Redeem a code. Every other row is where it was.
+- The old Memory switch "Remember questions from this device" had no consent text. A switch that is on without an accepted consent is **turned off** at first launch of 1.2.0, and the account is offered memory again, exactly as iOS 1.8 did with its 1.7 switch.
+- "Clear" in Memory removes the stored shortcuts and the glass goes back to its default tickers (BTC, NVDA, ETH). The default row is never listed as something the person kept.
+- The shortcut row stays on the phone. 1.1.4 put it in the profile it posts to `/api/progress` and took the server's row back; 1.2.0 does neither, as iOS never did, because Memory tells the person the shortcuts are kept "on this phone, not on its servers". Nothing is lost by it: the server has refused every Android profile sync since 1.1.4 (see "What the server still owes Android").
+- The activity is one instance (`singleTask`) and is no longer rebuilt for a rotation, a fold, split screen, the system's font size or its dark theme (`configChanges`). Before, any of those closed the open sheet, dropped a thesis being typed without asking and cancelled a review that had already been sent.
+- No stored key changed its meaning. New data lives in the preferences file `bobby.v18` (theses, nudge history, consent record, reminders, follow-ups, a waiting invitation) and in `bobby.v18.notices` (what the phone will still show). Deleting the account **on this phone** removes that account's part of it. An account deleted from another device is only signed out here: its theses, follow-up notes and nudge history stay on this phone, out of reach, until the app's storage is cleared (the phone cannot tell a deleted account from a revoked session; iOS has the same limit). A waiting invitation code belongs to the phone, not to an account, and expires after 30 days.
+
+### What the phone keeps, and what it sends
+
+Kept on the phone only, per reader (the account, or the signed-out phone):
+
+- The theses a person wrote, and the shortcut row. Listed under Memory › On this phone.
+- **What the follow-ups noted.** From the first delivered read, before any yes to follow-ups, the phone notes each asset asked about: its symbol, its name, the price at that moment and when (never the question), plus when the app was opened. Up to 300 events, 60 days. This is the iOS rule, and it is what lets "Shall I keep you posted on NVDA?" start from the question just asked. On Android it is listed under Memory › On this phone ("Assets you asked about, kept for follow-ups") with its own **Clear**, which works signed out and without having decided anything. Turning follow-ups off, "Delete everything" and withdrawing the risk notice erase it too.
+- The history of what the glass said (so that "never again" holds). The ids of a memory receipt and of a "since you asked" line carry the asset; they are removed when the memory or the follow-up notes they were about are erased.
+
+Sent by 1.8, all after the risk notice is accepted (nothing before it):
+
+| When | Request |
+|---|---|
+| The activity starts | `GET /api/bobby-access` (a guest too); `GET /api/briefing-settings` for an account; `POST /api/voice-tool` `get_market` for one asset, when the person asked about it at least 20 hours ago and follow-ups are not off (they need not be on); `POST /api/bobby-access` `referral-claim` when an invitation code is waiting and an account is signed in |
+| A read is delivered | `GET /api/bobby-access` |
+| A thesis review ends, finished or refused | `GET /api/bobby-access` |
+| The app comes back to the front | `bobby-access` when the last answer is older than 15 minutes; `briefing-settings` when older than 5; `get_market` when an asset is due and its price is older than 10 minutes; the invitation claim again, one minute after an attempt that could not be settled |
+| A follow-up board opens | One `get_market` per row (five or six), none of them a read |
+| A thesis review, on the person's tap | `POST /api/desk-debate` with the thesis text, for that one request |
+
+Nothing polls. A rotation no longer repeats the first row (the activity is not rebuilt).
+
+### Where it lives
+
+- `v18/V18Host.kt` is the one interface a feature uses to reach the app; `v18/V18Runtime.kt` implements it over the session (`V18Desk`) and the activity (`V18Shell`), with no Android classes. Unit tests build the same runtime over the fakes in `app/src/sharedTest/java/…/v18/V18TestKit.kt`, and the instrumented tests draw the real screens over them.
+- One package per feature under `v18/`: `credits`, `invite`, `theses`, `memory`, `reminders`, `harness` (the follow-ups). `v18/V18.kt` registers them and holds the few lines where one feature tells another something.
+- The page's side: `session.nudge` in every session state, the bridge methods `nudge.seen` and `nudge.act`, and the event `ask.start`. The page may open exactly what 1.1.4 could (`V18Routes.PAGE_OPENABLE`); the seven 1.8 routes are native-only.
+- Screens: `ui/v18/V18Sheets.kt` draws each route from its own file, built with `ui/v18/QuietKit.kt` (nothing green: a colour means a verdict only). The 1.1.4 routes `memory` and `invite` are drawn by the 1.8 screens; `ui/BobbySheet.kt` no longer has them.
+- Local notices: `v18/notify/LocalNotifier.kt` and `platform/AndroidLocalNotifier.kt`. WorkManager one-time work, two channels (`thesis-reminders`, `follow-ups`), no exact alarms, no boot receiver, no new permission.
+- Words: `python3 android/tools/build-v18-translations.py` merges every iOS 1.8 translation row into `assets/nucleo/native-android-translations.json`, sorted (`--check` verifies). Rows that name an iPhone, an Apple Account or the App Store are replaced by the Android wording in `android/tools/v18-android-wording.json`. To add a string iOS does not have, add its row to the JSON and run the script.
+
+### Notifications on a phone that runs late
+
+WorkManager is inexact. An idle phone can run planned work hours after its moment, and a phone that was off runs what it missed when it comes back. So a notice says what it asks of a late phone (`LocalNotice.Delivery`), and the worker asks `NoticeTiming` before showing anything:
+
+- A **follow-up** is shown only between 09:00 and 21:00 on the phone's clock. Outside those hours it stays pending and the same work is queued again for the next 09:00. One exception: a follow-up that runs on time (within 15 minutes of its own moment) is shown even if the clock has just passed 21:00, because 21:00 sharp is itself a moment follow-ups are planned for and no phone runs work on the dot. More than 24 hours late it is dropped unseen; the same line already waits on the glass.
+- A **thesis reminder** is shown whenever the phone gets to it, however late: the person chose the day.
+- A notice is shown only to the reader it was planned for, only while the risk notice stands, and not at all while the app is in front and the glass already says it.
+
+The decision is a pure function with unit tests. On CI's emulator a due notice is posted by WorkManager and its tap opens the right sheet (`V18DeviceInstrumentedTest`); the wait, the re-queue and the drop were never seen on a device. No copy promises a minute.
+
+### What the owner still owes: App Links
+
+The manifest declares an App Links filter (`autoVerify`) for `https://bobbyprotocol.xyz/i/*` and `www.bobbyprotocol.xyz/i/*`. Android 12 and later hand those links to the app by themselves only once the site vouches for it, and today it does not: `public/.well-known/assetlinks.json` names the old TWA package `xyz.bobbyprotocol.app` with the placeholder `REPLACE_WITH_PLAY_APP_SIGNING_SHA256`.
+
+**The path is live from the first release all the same.** The filter does not wait for the verification: Android 8 to 11 (the app's minimum is 8) list Bobby under "Open with" for these links, on Android 12 and later a person can turn them on under "Open by default", and any app on the phone can start the activity with such a link. So link → app → claim can run on real phones before it was ever run against the server. Two consequences to know:
+
+- A code that arrives this way is claimed without a tap as soon as there is an account and an accepted risk notice (the iOS rule). Another app on the phone could therefore make a new account accept the invitation of its choosing, once (an account accepts one invitation, ever). Asking for a tap first would be a change of the invitation's rule on both platforms: the owner's call.
+- Only `/i/CODE` is forwarded. The activity ignores any other page of the site it is started with.
+
+1. In Play Console, App integrity, copy the **app signing key certificate** SHA-256 (and the upload key's, if internal or sideloaded builds should verify too).
+2. Add an entry to `public/.well-known/assetlinks.json` for the package `xyz.bobbyprotocol.bobby` with that fingerprint, and deploy the site. The repository's secret scanner has taken SHA-256 digests for keys before: expect to allow-list it.
+3. On a phone with the Play build: `adb shell pm get-app-links xyz.bobbyprotocol.bobby` should say `verified` for both hosts; then tap an invitation link.
+
+Until then, on Android 12 and later, an invitation link opens the browser unless the person turned the links on; the page shows the code, and the invite screen has a field to type it into.
+
+Also open and the owner's call: `GET /api/bobby-access` reports no Google payments yet, so the app cannot sell Bobby Pro on Android. Following the iOS rule (promise Pro only where it can be bought in this build), the invite screen shows no reward sentence, the Bobby Pro row of Credits says the plan's state and leads nowhere, and a thesis review refused for used-up free reads offers Credits (an invitation, a code) instead of a paywall whose button is switched off. All three follow `payments.google` and change by themselves the day the server reports it. The server still grants the inviter their Pro days. The page's own paywall chip (1.1.4) still opens that paywall.
+
+### What the server still owes Android
+
+`POST /api/progress` accepts `platform: 'ios' | 'web'` only (`api/progress.ts`, and the database function `bobby_apply_progress` behind it). Android sends `"android"`, so **every profile sync from Android is answered 400 "Invalid payload" and dropped, in 1.1.4 and in 1.2.0** (checked against production on 2026-10-07: 400 for `android`, 401 for `ios` without a session). On an Android phone a saved read therefore never plants its piece (it stays "pending"), and XP, the streak and the accepted risk-notice version never reach the account from Android. Reading (`GET /api/progress`, which restores a returning account) works. Nothing in the app can fix this: the server has to accept `android` in `api/progress.ts`, in `bobby_apply_progress` (a migration) and in `api/trader-land.ts` (`close`), with a contract test that posts the body `NucleoSession.syncProgress` builds.
+
+### What is verified, and what is not
+
+**Verified by CI on every push** (GitHub Actions `Android`, the two `native` jobs: Firebase messaging off and on): the pages build from source, 105 Node tests, `:app:assembleDebug`, `:app:testDebugUnitTest`, `:app:assembleDebugAndroidTest` and `:app:lintDebug`. The JVM unit tests port the iOS 1.8 suites case by case, except the cases that need an iOS review fixture or a running Android device, and add the Android-only ones (inexact delivery, the reader tag, sign-in in a browser tab). The page tests also check that every native string resolves in six languages and that every iOS 1.8 translation row is in the Android catalog.
+
+**Run on an emulator by CI** (GitHub Actions `Android emulator`: API 34 with Google APIs, a 360x800 dp screen, animations off, no GPU). `android/tools/run-emulator-tests.sh` runs `:app:connectedDebugAndroidTest` in three parts and keeps each part's report, logcat and every screenshot (the `android-emulator` artifact):
+
+- `screens`: `V18ScreensInstrumentedTest` draws every 1.8 screen in English and in Spanish through the real composables, sheet, host, centres, repository and catalogs: Credits (a free account mid-week, a guest, an unknown balance) and its details, Invite (as the server answers today, and once Google Play sells Bobby Pro), My theses, the thesis editor (empty, with Bobby's draft, with a word selected and the keyboard up), the thesis review (before and after), Memory (and what the follow-ups keep, with its Clear) and its consent, Reminders with the follow-up rows, its choices and Material's day and time pickers, and the follow-up board; the review and the consent also at the system's 200% font size. The account, the clock and the network's answers are staged (`V18Stage`, `V18Fixtures`); nothing leaves the emulator. Each case also measures that every control answers to 48 dp.
+- `device`: `V18DeviceInstrumentedTest` runs the real `MainActivity` with its page for a guest, in airplane mode: the profile shows the 1.8 rows and opens Credits, its details and closes; the system's notification question appears only after the person sets a reminder (and is answered through UiAutomator); a due notice is posted by WorkManager on the `thesis-reminders` channel with the fixed text and private visibility, and tapping it in the shade opens the review of its thesis; a notice planned for another reader is not shown and its tap opens nothing; a rotation keeps the same activity, the thesis editor and the words being typed in it; Back over unsaved words asks first, and "Keep writing" leaves the editor on screen with them; an invitation link that opened the app is not handled again when the activity is rebuilt, and a page of the site that is not an invitation is not forwarded.
+- `others`: every older instrumented test. `MainActivityAcceptanceInstrumentedTest` (8 cases) is skipped there: it drives the page by script while the page draws its WebGL scene, which a runner without a GPU draws too slowly, and the emulator itself stopped under it once. One Trader Land case is skipped because it needs the system's animations on.
+
+**Still not exercised, even on the emulator**, so unverified:
+
+- Google Play: a purchase, and restore against the real RevenueCat SDK and Play. The emulator has no store account and the debug build no store key.
+- App Links verification, and the claim of an invitation against the server. (That a link started with the activity is kept once, and not again on a rebuild, is checked on the emulator.)
+- The system restoring the activity after it killed the process (the emulator case rebuilds it in the same process, which takes the same path in `onCreate`), a second copy of the activity (the manifest allows one), and what a browser tab left on top does when a notice or the sign-in callback arrives.
+- Anything with a real account: sign-in from a 1.8 sheet and the sheet coming back (`SignInReturn`), the memory opt-in header on a real request, a review against the real desk. The staged network answers with bodies shaped like production's.
+- A phone that runs late: a follow-up that waits for 09:00 or is dropped after a day, Doze overnight, a restart, a force-stopped app. The notice the test posts is due in two seconds on an awake emulator.
+- The follow-up notices themselves (their channel, their tap landing on the glass), "Open Settings", a denied permission.
+- TalkBack order and speech; French, Portuguese, Italian and German on a screen; a tablet; any real phone's own fonts and system skin.
+
+**Never built:** a release. CI builds debug only, so R8 and resource shrinking never ran on the 1.8 classes. No signed APK or AAB of 1.2.0 exists, and nothing was uploaded to Play.
+
+**Not reviewed by a native speaker:** the Android wording of the 18 rows that named Apple hardware or stores on iOS, and three Memory rows, in French, Portuguese, Italian and German.
+
+## Earlier candidate: 1.1.1 (code 6)
+
 The Android candidate is **1.1.1 (version code 6)**, on `codex/bobby-android-parity-ios17`, with [draft Android PR #141](https://github.com/anthonysurfermx/Bobby-Agent-Trader/pull/141), stacked on `claude/feedback-build61` and based on canonical iOS **1.7 (61)** source / [PR #140](https://github.com/anthonysurfermx/Bobby-Agent-Trader/pull/140), commit `bfdc16dfe9ce947f11bbcbd4f447ffc62d0f1e92`. PR #140 is still open; this is a source reference, not proof of an iOS release. Kotlin owns accounts, consent, market data, billing, voice and persistence; the approved bundled HTML/WebGL Núcleo and native Compose sheets present the product. Authentication tokens never enter the web page. Application ID: `xyz.bobbyprotocol.bobby`.
 
-## Latest candidate: Trader Land correction, code 6
+## Earlier candidate: Trader Land correction, code 6
 
 A physical Seeker user reported that Trader Land in code 5 looked like coordinates and many dots, with the island dimension missing. The cause was native `LandMap`: a Cartesian table of 48 dp boxes, with each sprite drawn only in its first cell and `·` in the remaining footprint. Canonical iOS 1.7 (61) uses an isometric Canvas and sprites; this is a rendering defect, not a different 3D library.
 

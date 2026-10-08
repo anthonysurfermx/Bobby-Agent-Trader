@@ -2,6 +2,7 @@ package xyz.bobbyprotocol.android
 
 import android.Manifest
 import android.content.ClipData
+import android.content.ClipboardManager
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -45,9 +46,11 @@ import androidx.lifecycle.lifecycleScope
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import xyz.bobbyprotocol.android.billing.BillingOutcome
+import xyz.bobbyprotocol.android.billing.BillingState
 import xyz.bobbyprotocol.android.billing.BillingStore
 import xyz.bobbyprotocol.android.data.BobbyRepository
 import xyz.bobbyprotocol.android.nucleo.NucleoFault
@@ -56,12 +59,18 @@ import xyz.bobbyprotocol.android.platform.AndroidVoice
 import xyz.bobbyprotocol.android.platform.NucleoWebView
 import xyz.bobbyprotocol.android.platform.BriefingNarrator
 import xyz.bobbyprotocol.android.platform.BriefingReminders
+import xyz.bobbyprotocol.android.platform.LocalNotices
 import xyz.bobbyprotocol.android.push.PushConfiguration
 import xyz.bobbyprotocol.android.push.PushDependencies
 import xyz.bobbyprotocol.android.push.PushRuntime
 import xyz.bobbyprotocol.android.push.PushRuntimeFactory
 import xyz.bobbyprotocol.android.ui.BobbySheet
 import xyz.bobbyprotocol.android.ui.ReportContentSheet
+import xyz.bobbyprotocol.android.ui.v18.V18Sheets
+import xyz.bobbyprotocol.android.v18.LaunchIntent
+import xyz.bobbyprotocol.android.v18.V18
+import xyz.bobbyprotocol.android.v18.V18Process
+import xyz.bobbyprotocol.android.v18.V18Shell
 
 class MainActivity : ComponentActivity() {
     private lateinit var repository: BobbyRepository
@@ -83,6 +92,7 @@ class MainActivity : ComponentActivity() {
     private var paywallReply: CompletableDeferred<JSONObject>? = null
     private var lastHaptic = 0L
     private var active = false
+    private var notificationReply: CompletableDeferred<Boolean>? = null
 
     private val microphone = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         val state = voice.permission()
@@ -95,6 +105,59 @@ class MainActivity : ComponentActivity() {
         if (owner != null && owner == repository.session.value?.userId && notificationEpoch == repository.epoch.value) BriefingReminders.setEnabled(this, owner, granted)
         notificationOwner = null; notificationEpoch = null
         if (::push.isInitialized) push.refresh()
+    }
+
+    /** 1.8: the system's notification question, asked only from a person's own tap (a reminder, "Yes, tell me"). */
+    private val noticePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        notificationReply?.complete(granted)
+        notificationReply = null
+        if (::push.isInitialized) push.refresh()
+    }
+
+    /** 1.8: what only this activity can do for the features (v18/V18Runtime.kt). */
+    private val shell: V18Shell = object : V18Shell {
+        override val sheetRoute: String? get() = route
+        override val covered: Boolean get() = platformError != null || microphoneReply != null || notificationReply != null
+        override val active: Boolean get() = this@MainActivity.active
+        override val voiceBusy: Boolean get() = (this@MainActivity::voice.isInitialized && voice.isBusy) || narrationStatus in setOf("preparing", "playing")
+        override fun openSheet(route: String) = this@MainActivity.openSheet(route)
+        override fun dismissSheet() { if (route != null) closeSheet() }
+        override fun quietVoice() { if (this@MainActivity::voice.isInitialized) voice.background() }
+        override fun haptic(kind: String) { runCatching { this@MainActivity.haptic(kind) } }
+        override fun signIn(provider: String) = startSignIn(provider)
+        override fun share(text: String) { runCatching { this@MainActivity.share(text) } }
+        override fun copy(text: String) {
+            runCatching { (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Bobby", text)) }
+        }
+        override fun openExternal(url: String): Boolean = runCatching { this@MainActivity.openExternal(url) }.isSuccess
+        override fun openNotificationSettings() {
+            runCatching { startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)) }
+                .onFailure { runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null))) } }
+        }
+        override suspend fun requestNotificationPermission(): Boolean {
+            if (Build.VERSION.SDK_INT < 33) return BriefingReminders.permissionGranted(this@MainActivity)
+            // One question at a time, and only while this activity is in front to ask it.
+            if (notificationReply != null || !this@MainActivity.active) return false
+            val reply = CompletableDeferred<Boolean>()
+            notificationReply = reply
+            noticePermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            return reply.await()
+        }
+        override val billing: StateFlow<BillingState> get() = this@MainActivity.billing.state
+        override suspend fun restorePurchases(): BillingOutcome {
+            val owner = repository.session.value?.userId
+            val epoch = repository.epoch.value
+            val outcome = this@MainActivity.billing.restore(this@MainActivity)
+            // The sheet that asked stays open to show its result; the page learns about a confirmed plan.
+            if (outcome == BillingOutcome.SUBSCRIBED && owner != null && owner == repository.session.value?.userId && epoch == repository.epoch.value) {
+                runCatching { repository.access() }
+                if (owner == repository.session.value?.userId && epoch == repository.epoch.value) web?.emit("session.changed", session.snapshot())
+            }
+            return outcome
+        }
+        override fun manageSubscriptionUrl(): String? = this@MainActivity.billing.managementUri()?.toString()
+        override val briefingNotifications: Boolean get() = BriefingReminders.enabled(this@MainActivity, repository.session.value?.userId)
+        override fun switchBriefingNotifications(enabled: Boolean) = setReminders(enabled)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -110,7 +173,11 @@ class MainActivity : ComponentActivity() {
             onEvent = { name, payload -> web?.emit(name, payload) },
             onNative = { openSheet(it) })
         repository.allowsExternalProcessing = { session.riskAccepted }
-        voice = AndroidVoice(this, lifecycleScope, repository, { name, payload -> web?.emit(name, payload) },
+        voice = AndroidVoice(this, lifecycleScope, repository, { name, payload ->
+                web?.emit(name, payload)
+                // 1.8: a tapped notification waits for the mic to close and the voice to stop.
+                if (name == "voice.end" || (name == "speech.state" && payload.optString("state") == "stopped")) session.v18.voiceIdle()
+            },
             { session.locale }, { session.muted }, { session.voicePersona }, { session.voicePreference })
         session.onVoiceSettingsChanged = { voice.stopSpeaking(); narrator.stop(); narrationStatus = null }
         push = PushRuntimeFactory.create(PushDependencies(applicationContext, repository, lifecycleScope,
@@ -118,6 +185,10 @@ class MainActivity : ComponentActivity() {
                 applicationId = BuildConfig.FCM_APPLICATION_ID, senderId = BuildConfig.FCM_SENDER_ID,
                 apiKey = BuildConfig.FCM_API_KEY)))
         session.onPageChanged = { page -> web?.reload(page); push.refresh() }
+        // 1.8: the features reach the app through the session's host; each registers its nudge source and its listeners.
+        session.v18.attach(shell)
+        V18Process.runtime = session.v18
+        V18.registerNudges(session.v18)
         session.setReducedMotion(Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f)
         lifecycleScope.launch {
             repository.epoch.collect {
@@ -133,6 +204,7 @@ class MainActivity : ComponentActivity() {
                     web?.emit("native.sheet", JSONObject().put("route", route).put("state", "closed"))
                     route = null
                     session.setRendererForeground(active)
+                    session.v18.sheetClosed()
                 }
             }
         }
@@ -155,10 +227,12 @@ class MainActivity : ComponentActivity() {
                         }
                         route?.let { current ->
                             if (current == "reportContent") ReportContentSheet(session, repository, ::closeSheet)
+                            // 1.8: each of these screens has its own file under ui/v18.
+                            else if (V18Sheets.draws(current)) key(current) { V18Sheets.Sheet(current, session.v18, onClose = { closeSheet() }) }
                             else BobbySheet(current, session, repository, billing,
                                 onClose = { closeSheet() }, onOpen = { openSheet(it) },
                                 onSignIn = { provider -> startSignIn(provider) },
-                                onExternal = { url -> openExternal(url) }, onShare = { text -> share(text) },
+                                onExternal = { url -> openExternal(url) },
                                 onShareAvatar = { spec -> shareAvatar(spec) },
                                 narrationStatus = narrationStatus,
                                 onNarrate = { report -> narrator.play(report) { narrationStatus = it } },
@@ -172,8 +246,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        handleCallback(intent)
-        handleNotification(intent)
+        // Only the first time: an activity the system rebuilds is handed the intent that first started
+        // it, and the link, the sign-in callback or the tapped notice in it was honoured then.
+        if (LaunchIntent.isFirstDelivery(restored = savedInstanceState != null)) {
+            handleCallback(intent)
+            handleNotification(intent)
+        }
     }
 
     private suspend fun dispatch(method: String, params: JSONObject): Any = when (method) {
@@ -223,7 +301,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openSheet(name: String) {
-        require(name in NucleoSession.NATIVE_ROUTES)
+        require(name in NucleoSession.SHEET_ROUTES)
         voice.background()
         narrator.stop(); narrationStatus = null
         web?.view?.clearFocus()
@@ -244,6 +322,8 @@ class MainActivity : ComponentActivity() {
         web?.emit("session.changed", session.snapshot())
         web?.emit("native.sheet", JSONObject().put("route", closedRoute).put("state", "closed"))
         push.refresh()
+        // 1.8: a sheet handing over to another, a read started from a sheet, a waiting notification tap.
+        session.v18.sheetClosed()
     }
 
     private fun startSignIn(provider: String) {
@@ -259,6 +339,14 @@ class MainActivity : ComponentActivity() {
     private fun handleNotification(intent: Intent?) {
         if (intent?.getBooleanExtra("openBriefings", false) == true && repository.session.value != null && session.riskAccepted) openSheet("briefings")
         intent?.removeExtra("openBriefings")
+        // 1.8: a tapped reminder or follow-up. It is only stored: the host honours it once the glass is free,
+        // for the reader it was planned for. Consumed here, and never replayed: not when the task is rebuilt
+        // from recents, and not when the system restores the activity (onCreate does not come here then).
+        if (intent == null) return
+        val notice = intent.getStringExtra(LocalNotices.EXTRA) ?: return
+        intent.removeExtra(LocalNotices.EXTRA)
+        if (!LaunchIntent.isPersonsTap(fromHistory = (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0)) return
+        LocalNotices.payload(notice)?.let { session.v18.noteTap(it) }
     }
     private fun setReminders(enabled: Boolean) {
         val owner = repository.session.value?.userId ?: return
@@ -271,8 +359,20 @@ class MainActivity : ComponentActivity() {
         }
     }
     private fun handleCallback(intent: Intent?) {
-        val uri = intent?.data ?: return
+        if (intent == null) return
+        val uri = intent.data ?: return
+        // 1.8: a bobbyprotocol.xyz link that opened the app (an invitation) goes to whichever feature claims it.
+        // Only the path the manifest opens (/i/CODE): any app can start this activity with another one.
+        if (uri.scheme == "https" && uri.host in setOf("bobbyprotocol.xyz", "www.bobbyprotocol.xyz")) {
+            // Consumed in the intent itself, which is the object the system hands back if it rebuilds the activity.
+            intent.data = null
+            setIntent(Intent(this, MainActivity::class.java))
+            if (LaunchIntent.isInvitationPath(uri.path) &&
+                LaunchIntent.isPersonsTap(fromHistory = (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0)) session.v18.noteLink(uri.toString())
+            return
+        }
         if (uri.scheme != "bobby" || uri.host != "auth" || uri.path != "/callback") return
+        intent.data = null
         setIntent(Intent(this, MainActivity::class.java))
         lifecycleScope.launch {
             try {
@@ -281,6 +381,7 @@ class MainActivity : ComponentActivity() {
                     signInReply?.complete(JSONObject().put("status", "signedIn")); signInReply = null
                     web?.emit("native.sheet", JSONObject().put("route", route).put("state", "closed"))
                     route = null
+                    session.v18.sheetClosed()
                 } else platformError = session.text("Sign-in did not complete.", "No se completó el inicio de sesión.")
             } catch (_: Exception) { platformError = session.text("Sign-in did not complete.", "No se completó el inicio de sesión.") }
         }
@@ -299,6 +400,7 @@ class MainActivity : ComponentActivity() {
         route = null
         web?.emit("native.sheet", JSONObject().put("route", closedRoute).put("state", "closed"))
         web?.emit("session.changed", session.snapshot())
+        session.v18.sheetClosed()
     }
 
     private fun haptic(kind: String) {
@@ -346,18 +448,22 @@ class MainActivity : ComponentActivity() {
             val permission = voice.permission()
             session.setSpeechState(permission.getString("state"), permission.optBoolean("onDevice"))
             web?.emit("app.state", JSONObject().put("state", "active"))
+            session.v18.appBecameActive()
         }
         if (::push.isInitialized) push.refresh()
     }
     override fun onPause() { active = false; if (::session.isInitialized) session.setRendererForeground(false); if (::voice.isInitialized) { voice.background(); narrator.stop(); narrationStatus = null; web?.emit("app.state", JSONObject().put("state", "background")); web?.pause() }; super.onPause() }
     override fun onDestroy() {
         if (::voice.isInitialized) voice.close()
-        if (::session.isInitialized) session.close()
+        if (::session.isInitialized) { if (V18Process.runtime === session.v18) V18Process.runtime = null; session.close() }
+        // Closed for good (Back, not a rebuild): a tap or a link that never found its moment does not wait
+        // in the process for whatever activity comes next, however much later.
+        if (isFinishing) V18Process.taps.clear()
         if (::billing.isInitialized) billing.close()
         if (::narrator.isInitialized) narrator.stop()
         if (::push.isInitialized) push.close()
         web?.close(); web = null
-        microphoneReply?.cancel(); signInReply?.cancel(); paywallReply?.cancel()
+        microphoneReply?.cancel(); signInReply?.cancel(); paywallReply?.cancel(); notificationReply?.cancel()
         super.onDestroy()
     }
 }

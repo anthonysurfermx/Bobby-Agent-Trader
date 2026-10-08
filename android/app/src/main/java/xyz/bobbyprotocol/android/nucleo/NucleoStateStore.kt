@@ -64,8 +64,12 @@ internal class NucleoStateStore(context: Context) {
     }
     fun pending(owner: String?): JSONArray = state(owner).optJSONArray("pending") ?: JSONArray()
     fun setPending(owner: String?, pending: JSONArray) { val s = state(owner); s.put("pending", pending); write(owner, s) }
-    fun quickAccess(owner: String?): JSONArray = state(owner).optJSONArray("quickAccess") ?: JSONArray(listOf("BTC", "NVDA", "ETH"))
-    fun setQuickAccess(owner: String?, symbols: JSONArray) { val s = state(owner); s.put("quickAccess", symbols); write(owner, s) }
+    /** What the glass offers: the reader's row, or the default tickers when they keep none (QuickAccess.kt). It stays on this phone. */
+    fun quickAccess(owner: String?): JSONArray = JSONArray(QuickAccess.shown(state(owner)))
+    /** What the reader kept, newest first: never the default row standing in for nothing. */
+    fun keptQuickAccess(owner: String?): List<String> = QuickAccess.kept(state(owner))
+    /** Keeps these symbols. None removes the stored row (as iOS does), so the glass falls back to its default tickers. */
+    fun setQuickAccess(owner: String?, symbols: JSONArray) { val s = state(owner); QuickAccess.keep(s, QuickAccess.symbols(symbols)); write(owner, s) }
     fun ledger(owner: String?): JSONArray = state(owner).optJSONArray("theses") ?: JSONArray()
     fun saveThesis(owner: String?, thesis: JSONObject) {
         val list = ledger(owner)

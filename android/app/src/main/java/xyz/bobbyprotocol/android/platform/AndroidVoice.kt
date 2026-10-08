@@ -301,6 +301,8 @@ class AndroidVoice(
 
     private fun clearAudio() { progressJob?.cancel(); progressJob = null; player?.release(); player = null; audioFile?.delete(); audioFile = null }
     private fun destroyRecognizer() { holdTimeoutJob?.cancel(); holdTimeoutJob = null; finalizationJob?.cancel(); finalizationJob = null; recognizer?.destroy(); recognizer = null }
+    /** Bobby is listening or speaking (1.8: a tapped notification waits for both to end). */
+    val isBusy: Boolean get() = dictation.isActive || speakingId != null
     fun background() { stop(true); destroyRecognizer(); stopSpeaking() }
     fun close() { background(); deviceVoice.shutdown() }
 }

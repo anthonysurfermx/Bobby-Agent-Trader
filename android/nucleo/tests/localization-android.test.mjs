@@ -53,6 +53,51 @@ test('new Android entries preserve template placeholders and all translated fiel
   }
 });
 
+test('every iOS 1.8 translation row is in the Android catalog, in Android words', () => {
+  // android/tools/build-v18-translations.py writes them; this is the check that it ran and that
+  // nobody retyped a translation iOS already has.
+  const root = path.resolve(main, '../../../..');
+  const tables = path.join(root, 'ios/Bobby/Sources/V18/Translations');
+  const wording = JSON.parse(fs.readFileSync(path.join(root, 'android/tools/v18-android-wording.json'), 'utf8'));
+  const row = /^\s*result\["((?:[^"\\]|\\.)*)"\]\s*=\s*\[(.*)\]\s*$/;
+  const pair = /"(fr|pt|it|de)"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+  const placeholders = text => [...text.matchAll(/\{\d+\}/g)].map(match => match[0]).sort();
+  const apple = /iPhone|iPad|Apple|App Store/;
+  const seen = new Set();
+  for (const file of fs.readdirSync(tables).filter(name => name.endsWith('.swift')).sort()) {
+    for (const line of fs.readFileSync(path.join(tables, file), 'utf8').split('\n')) {
+      const match = row.exec(line);
+      if (!match) continue;
+      const iosKey = JSON.parse(`"${match[1]}"`);
+      const ios = Object.fromEntries([...match[2].matchAll(pair)].map(found => [found[1], JSON.parse(`"${found[2]}"`)]));
+      const reworded = wording[iosKey];
+      const key = reworded ? reworded.en : iosKey;
+      const expected = reworded ?? ios;
+      const entry = android[key];
+      assert.ok(entry, `Missing from the Android catalog (run android/tools/build-v18-translations.py): ${key}`);
+      assert.ok(!apple.test(key), `Android wording needed in android/tools/v18-android-wording.json: ${key}`);
+      for (const language of addedLanguages) {
+        assert.ok(entry[language]?.trim(), `${language}: ${key}`);
+        assert.equal(entry[language], expected[language], `${language} differs from its source: ${key}`);
+        assert.deepEqual(placeholders(entry[language]), placeholders(key), `${language}: ${key}`);
+        assert.ok(!apple.test(entry[language]), `${language} names Apple hardware or a store: ${key}`);
+      }
+      if (reworded) {
+        assert.equal(android[iosKey], undefined, `The iOS wording must not ship on Android: ${iosKey}`);
+        for (const language of languages) assert.ok(reworded[language]?.trim() && !apple.test(reworded[language]), `${language}: ${iosKey}`);
+        assert.deepEqual(placeholders(reworded.es), placeholders(reworded.en), `es: ${key}`);
+        assert.deepEqual(placeholders(reworded.en), placeholders(iosKey), `en: ${key}`);
+      }
+      seen.add(iosKey);
+    }
+  }
+  assert.ok(seen.size >= 328, `Expected every iOS 1.8 row, found ${seen.size}`);
+  for (const iosKey of Object.keys(wording)) assert.ok(seen.has(iosKey), `A rewording without its iOS row: ${iosKey}`);
+  // The generator writes the catalog sorted, so two branches adding rows merge cleanly.
+  const keys = Object.keys(android);
+  assert.deepEqual(keys, [...keys].sort(), 'Run android/tools/build-v18-translations.py to sort the catalog');
+});
+
 test('dynamic earned equipment names also resolve in the selected language', () => {
   const { items } = read('equipment/catalog.json');
   assert.equal(items.length, 72);

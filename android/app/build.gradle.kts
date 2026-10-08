@@ -22,8 +22,8 @@ android {
         applicationId = "xyz.bobbyprotocol.bobby"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "1.1.4"
+        versionCode = 10
+        versionName = "1.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "API_BASE_URL", quoted(config("BOBBY_API_BASE_URL", "https://bobbyprotocol.xyz")))
         buildConfigField("String", "SUPABASE_URL", quoted(config("BOBBY_SUPABASE_URL")))
@@ -59,6 +59,10 @@ android {
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     testOptions { unitTests.isReturnDefaultValues = true }
     sourceSets.getByName("main").java.srcDir(if (fcmEnabled) "src/fcm/java" else "src/noFcm/java")
+    // What the JVM tests and the instrumented tests both stand on (the 1.8 host over a desk and a
+    // screen in memory, the memory gateway): one copy, compiled into both, shipped in neither APK.
+    sourceSets.getByName("test").java.srcDir("src/sharedTest/java")
+    sourceSets.getByName("androidTest").java.srcDir("src/sharedTest/java")
     if (fcmEnabled) {
         // Build-type manifests merge with main; the OAuth Activity remains in the main manifest.
         sourceSets.getByName("debug").manifest.srcFile("src/fcm/AndroidManifest.xml")
@@ -93,6 +97,8 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    // The system's own windows (the permission question, the notification shade) for the emulator tests.
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
 }
 
 tasks.register("validateReleaseConfig") {

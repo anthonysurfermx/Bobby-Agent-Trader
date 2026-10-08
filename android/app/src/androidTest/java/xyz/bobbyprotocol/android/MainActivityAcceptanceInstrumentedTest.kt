@@ -79,6 +79,12 @@ class MainActivityAcceptanceInstrumentedTest {
         val emulator = Build.FINGERPRINT.startsWith("generic") || Build.FINGERPRINT.contains("emulator") ||
             Build.MODEL.contains("Emulator") || Build.MODEL.contains("sdk_gphone") || Build.HARDWARE in setOf("ranchu", "goldfish")
         assumeTrue("Only dedicated emulator test data may be altered", emulator)
+        // These cases drive the page by script while it draws its WebGL scene. An emulator without a GPU
+        // (a hosted CI runner) draws it in software: a script waits seconds for a frame, the states
+        // these cases look for pass unseen, and the emulator itself stopped under that load. The
+        // emulator workflow says so; on a workstation's emulator nothing changes.
+        assumeTrue("Needs an emulator with a GPU: this one draws the page's WebGL scene in software",
+            InstrumentationRegistry.getArguments().getString("bobbySoftwareGpu") != "true")
         assumeTrue(WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))
         assumeTrue("Acceptance must preserve an already initialized billing SDK", !com.revenuecat.purchases.Purchases.isConfigured)
         assumeTrue("Acceptance is guest-only; preserve any signed-in installation", BobbyRepository(context).session.value == null)

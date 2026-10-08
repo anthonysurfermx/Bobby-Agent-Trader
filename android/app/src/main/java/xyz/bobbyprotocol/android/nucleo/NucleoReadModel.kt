@@ -2,6 +2,7 @@ package xyz.bobbyprotocol.android.nucleo
 
 import org.json.JSONArray
 import org.json.JSONObject
+import xyz.bobbyprotocol.android.v18.MemoryReceipts
 
 /** Normalizes real API evidence for the renderer. Missing evidence remains null; errors never become Wait. */
 object NucleoReadModel {
@@ -46,6 +47,9 @@ object NucleoReadModel {
             "level" to debate.optString("level").takeIf { it in setOf("rapido", "profundo", "maximo") }.orEmpty().ifEmpty { requestedLevel })
         for (key in listOf("access", "sufficiency", "evidenceUsed")) debate.optJSONObject(key)?.let { out.put(key, it) }
         (agents.optJSONObject("synthesis") ?: debate.optJSONObject("synthesis"))?.let { out.put("synthesis", it) }
+        // 1.8: the memory receipt rides the read for native (the page ignores keys it does not know).
+        // Facts only, and only a complete receipt: an unknown count never becomes a zero.
+        MemoryReceipts.fromJson(debate.optJSONObject("memory"))?.let { out.put("memory", MemoryReceipts.toJson(it)) }
         return out
     }
 }

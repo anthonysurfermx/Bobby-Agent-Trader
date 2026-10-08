@@ -20,6 +20,13 @@ import org.json.JSONObject
 import xyz.bobbyprotocol.android.data.ApiException
 import xyz.bobbyprotocol.android.data.BobbyRepository
 import xyz.bobbyprotocol.android.data.VoicePreference
+import xyz.bobbyprotocol.android.platform.AndroidLocalNotifier
+import xyz.bobbyprotocol.android.v18.NucleoNudge
+import xyz.bobbyprotocol.android.v18.RiskNotice
+import xyz.bobbyprotocol.android.v18.V18Desk
+import xyz.bobbyprotocol.android.v18.V18Process
+import xyz.bobbyprotocol.android.v18.V18Routes
+import xyz.bobbyprotocol.android.v18.V18Runtime
 import java.time.Instant
 import java.util.Calendar
 import java.util.Locale
@@ -87,6 +94,50 @@ class NucleoSession(
     }
     val voicePersona: String get() = companion()?.optString("voicePersona", "ash") ?: "ash"
 
+    /**
+     * Bobby 1.8 (v18/V18Runtime.kt): the nudge on the glass, sheets handing over to one another,
+     * reads native starts, and the hooks the features listen to. This session is its desk; the
+     * activity attaches the screen.
+     */
+    private val desk: V18Desk = object : V18Desk {
+        override val owner: String? get() = this@NucleoSession.owner
+        override val signedIn: Boolean get() = this@NucleoSession.signedIn
+        override val accountEpoch: Long get() = this@NucleoSession.accountEpoch
+        override val riskNotice: RiskNotice get() = when {
+            riskAccepted -> RiskNotice.ACCEPTED
+            identityCurrent && store.riskVersion > 0 -> RiskNotice.OUTDATED
+            else -> RiskNotice.WITHDRAWN
+        }
+        override val onGlass: Boolean get() = pageReady && page == "app"
+        override val busy: Boolean get() = activeAsk != null
+        override val language: String get() = this@NucleoSession.language
+        override val locale: String get() = this@NucleoSession.locale
+        override val analysisLevel: String get() = this@NucleoSession.analysisLevel
+        override fun text(en: String, es: String): String = this@NucleoSession.text(en, es)
+        override fun emit(name: String, payload: JSONObject) = this@NucleoSession.emit(name, payload)
+        override fun sessionChanged() = this@NucleoSession.emit("session.changed", snapshot())
+        override fun readToken(symbol: String, name: String, isEquity: Boolean, question: String): String = issueToken(
+            json("symbol" to symbol, "name" to name, "isEquity" to isEquity, "assetClass" to if (isEquity) "equity" else "crypto", "currency" to null, "exchange" to null),
+            question, this@NucleoSession.analysisLevel)
+        override fun tokenWaiting(token: String): Boolean {
+            val waiting = tokens[token] ?: return false
+            return waiting.expiresAt > System.currentTimeMillis() && waiting.epoch == this@NucleoSession.accountEpoch && waiting.consent == consentEpoch
+        }
+        override fun deskBody(symbol: String, question: String, isEquity: Boolean, level: String): JSONObject =
+            this@NucleoSession.deskBody(symbol, question, if (isEquity) "equity" else "crypto", level)
+        override val shortcuts: List<String> get() = store.keptQuickAccess(this@NucleoSession.owner)
+        override fun keepShortcuts(symbols: List<String>) {
+            // None removes the stored row: the glass falls back to its default tickers, as on iOS.
+            // The row lives on this phone only (see `syncProgress`): nothing is sent when it changes.
+            store.setQuickAccess(this@NucleoSession.owner, JSONArray(symbols.take(QuickAccess.LIMIT)))
+        }
+        override val repository: BobbyRepository get() = this@NucleoSession.repository
+    }
+    val v18: V18Runtime = V18Runtime(desk, V18Process.store(context), V18Process.nudges(context),
+        AndroidLocalNotifier(context) { askForNotifications() }, scope, V18Process.shelf, V18Process.taps)
+    private suspend fun askForNotifications(): Boolean = v18.shell?.requestNotificationPermission() ?: false
+    private val accountDeleted: (String) -> Unit = { deleted -> v18.accountDeleted(deleted) }
+
     private data class ConfirmToken(val asset: JSONObject, val question: String, val level: String, var epoch: Long, val consent: Long, val expiresAt: Long, val guestSignInRetry: Boolean = false, val persistLevel: Boolean = false)
     private data class Read(val result: JSONObject, val epoch: Long, val consent: Long, val savedAt: Long, var saved: JSONObject? = null)
 
@@ -95,6 +146,9 @@ class NucleoSession(
         recoverCompletedOnboarding()
         repository.language = language
         repository.locale = locale
+        // The nudge centre is the process's: this host claims it, and the sources a previous activity registered go with that activity.
+        v18.start()
+        repository.addAccountDeletedListener(accountDeleted)
         scope.launch {
             repository.epoch.collect { epoch -> if (epoch != accountEpoch || repository.session.value?.userId != owner) onAccountChanged() }
         }
@@ -152,7 +206,9 @@ class NucleoSession(
             "syncedAt" to if (identityCurrent) store.syncedAt(owner) else null, "voicePreference" to voicePreference.value,
             "signedIn" to signedIn, "riskAccepted" to riskAccepted, "riskVersion" to riskCatalog.getInt("version"), "muted" to muted,
             "reducedMotion" to reducedMotion, "mic" to json("state" to speechState, "onDevice" to onDevice), "hints" to store.hints(),
-            "pendingRead" to if (riskAccepted) pending else null, "fixtures" to false, "platform" to "android", "appVersion" to appVersion(), "analysisLevel" to analysisLevelJSON())
+            "pendingRead" to if (riskAccepted) pending else null, "fixtures" to false, "platform" to "android", "appVersion" to appVersion(), "analysisLevel" to analysisLevelJSON(),
+            // 1.8: one native-written line and one button, or null. Every session carries it (the page keeps the whole object).
+            "nudge" to v18.nudgeJson())
     }
 
     @Suppress("DEPRECATION")
@@ -180,14 +236,14 @@ class NucleoSession(
         store.voicePreference = selected.value; onVoiceSettingsChanged?.invoke(); emit("session.changed", snapshot())
     }
     fun setAnalysisLevel(value: String) { if (value !in ANALYSIS_LEVELS) throw NucleoFault("invalid_params", "invalid level"); store.analysisLevel = value; emit("analysis.level", analysisLevelJSON()); emit("session.changed", snapshot()) }
-    fun setLanguage(value: String) { if (value != "system" && value !in SUPPORTED_LANGUAGES) throw NucleoFault("invalid_params", "invalid language"); cancel(); reads.clear(); tokens.clear(); store.language = value; repository.language = language; repository.locale = locale; emit("session.changed", snapshot()); onPageChanged?.invoke(page) }
+    fun setLanguage(value: String) { if (value != "system" && value !in SUPPORTED_LANGUAGES) throw NucleoFault("invalid_params", "invalid language"); cancel(); reads.clear(); tokens.clear(); store.language = value; repository.language = language; repository.locale = locale; v18.languageChanged(); emit("session.changed", snapshot()); onPageChanged?.invoke(page) }
     fun selectLanguage(value: String) = setLanguage(value)
     fun selectAnalysisLevel(value: String) = setAnalysisLevel(value)
 
     suspend fun dispatch(method: String, params: JSONObject): Any = withContext(Dispatchers.Main.immediate) {
         if (!identityCurrent) onAccountChanged()
         when (method) {
-            "session" -> { pageReady = true; if (riskAccepted && signedIn) scope.launch { syncProgress() }; snapshot() }
+            "session" -> { pageReady = true; if (riskAccepted && signedIn) scope.launch { syncProgress() }; v18.pageReady(); snapshot() }
             "roster" -> roster()
             "suggestions" -> suggestions()
             "ask" -> ask(params)
@@ -219,14 +275,16 @@ class NucleoSession(
             }
             "markHint" -> { val key = params.requiredString("key", 64); val count = (store.hints().optInt(key) + 1).coerceAtMost(10); store.markHint(key, count); json("count" to count) }
             "openNative" -> { val route = params.requiredString("route", 32); if (route !in NATIVE_ROUTES) throw NucleoFault("invalid_params", "invalid native route"); onNative(route); json("opened" to true) }
+            "nudge.seen" -> v18.nudgeSeen(params.nudgeId())
+            "nudge.act" -> v18.nudgeAct(params.nudgeId())
             "log" -> JSONObject()
             else -> throw NucleoFault("unknown_method", method)
         }
     }
 
     fun cancel(): Boolean { presentation.clear(); val current = activeAsk ?: return false; activeAsk = null; activeRequestId = null; current.cancel(); return true }
-    fun close() { cancel(); tokens.clear(); pageReady = false }
-    fun revokeRiskConsent() { cancel(); consentEpoch++; reads.clear(); tokens.clear(); syncReceipts.clear(); store.riskVersion = 0; emit("consent.withdrawn", JSONObject()); pageReady = false; onPageChanged?.invoke(page) }
+    fun close() { cancel(); tokens.clear(); pageReady = false; repository.removeAccountDeletedListener(accountDeleted); v18.close() }
+    fun revokeRiskConsent() { cancel(); consentEpoch++; reads.clear(); tokens.clear(); syncReceipts.clear(); store.riskVersion = 0; v18.consentWithdrawn(); emit("consent.withdrawn", JSONObject()); pageReady = false; onPageChanged?.invoke(page) }
     fun forgetDeletedAccount(userId: String) { store.forget(userId) }
 
     suspend fun onAccountChanged() = withContext(Dispatchers.Main.immediate) {
@@ -239,6 +297,8 @@ class NucleoSession(
         owner = newOwner; accountEpoch = newEpoch
         store.bindOwner(newOwner, inheritGuest = oldOwner == null && newOwner != null)
         recoverCompletedOnboarding()
+        // 1.8: before anything below suspends, showings, taps and reads belong to the new reader.
+        v18.accountChanged()
         if (oldOwner == null && newOwner != null) {
             tokens.entries.removeAll { !it.value.guestSignInRetry || it.value.expiresAt < System.currentTimeMillis() }
             tokens.values.forEach { it.epoch = newEpoch }
@@ -308,7 +368,7 @@ class NucleoSession(
         emit("ask.stage", json("requestId" to requestId, "stage" to "resolving"))
         job.start()
         return try { job.await() } catch (_: CancellationException) { json("v" to 1, "status" to "cancelled") }
-        finally { if (activeAsk === job) { activeAsk = null; activeRequestId = null } }
+        finally { if (activeAsk === job) { activeAsk = null; activeRequestId = null }; v18.readFinished() }
     }
 
     private suspend fun assertCurrent(epoch: Long, consent: Long) {
@@ -360,7 +420,7 @@ class NucleoSession(
                 val market = json("price" to NucleoPolicy.number(marketBody?.opt("price")), "changePct" to NucleoPolicy.number(marketBody?.opt("change_24h_pct")), "currency" to marketBody?.nullableString("currency"), "exchange" to marketBody?.nullableString("exchange"), "asOf" to marketBody?.nullableString("asOf"))
                 emit("ask.stage", json("requestId" to requestId, "stage" to "market", "market" to market))
                 emit("ask.stage", json("requestId" to requestId, "stage" to "candles", "candles" to candles, "provenance" to null))
-                val body = json("symbol" to symbol, "question" to question, "language" to language, "locale" to locale, "country" to Locale.getDefault().country.takeIf { it.matches(Regex("[A-Z]{2}")) }, "assetType" to assetClass, "level" to level)
+                val body = deskBody(symbol, question, assetClass, level)
                 val debate = repository.streamDebate(body) { live ->
                     assertCurrent(epoch, consent)
                     emit("ask.stage", json("requestId" to requestId, "stage" to live.optString("type"), "live" to live))
@@ -369,6 +429,8 @@ class NucleoSession(
                 if (!NucleoReadModel.validDebate(debate)) return error("bad_response")
                 val result = NucleoReadModel.read(requestId, question, selected, market, candles, debate, language, locale, started, level)
                 reads.add(Read(result, epoch, consent, System.currentTimeMillis())); while (reads.size > 5) reads.removeAt(0)
+                // 1.8: what a line on the glass may talk about (symbol and verdict, never the question).
+                v18.readDelivered(result)
                 val oldQuick = store.quickAccess(owner); val quick = JSONArray().put(symbol)
                 for (i in 0 until oldQuick.length()) if (oldQuick.optString(i) != symbol && quick.length() < 6) quick.put(oldQuick.optString(i))
                 store.setQuickAccess(owner, quick)
@@ -406,6 +468,10 @@ class NucleoSession(
         }
     }
 
+    /** The body of a desk read. A 1.8 thesis review sends the same one, plus the thesis (`BobbyRepository.streamDebate`). */
+    private fun deskBody(symbol: String, question: String, assetClass: String, level: String): JSONObject =
+        json("symbol" to symbol, "question" to question, "language" to language, "locale" to locale, "country" to Locale.getDefault().country.takeIf { it.matches(Regex("[A-Z]{2}")) }, "assetType" to assetClass, "level" to level)
+
     private suspend fun saveThesis(params: JSONObject): JSONObject {
         val id = params.requiredString("requestId", 64)
         val horizon = if (params.has("horizonHours")) params.requiredInt("horizonHours") else 24
@@ -441,6 +507,7 @@ class NucleoSession(
         }
         val result = json("status" to "saved", "awardedXP" to award.points, "capped" to (award.points == 0), "kind" to kind, "xp" to award.counters.xp, "level" to levelJSON(), "streak" to award.counters.streak,
             "evolution" to evolution, "unlocks" to unlocks, "planting" to if (!signedIn) "signed_out" else if (eventId == null) "capped" else "pending", "thesis" to thesis)
+        v18.readSaved(id, asset.getString("symbol"))
         read.saved = result; emit("session.changed", snapshot())
         if (signedIn && eventId != null) {
             val startedEpoch = accountEpoch
@@ -479,7 +546,9 @@ class NucleoSession(
                     val allPending = store.pending(startedOwner)
                     if (latest != null && allPending.length() == 0) break
                     val pending = JSONArray(); for (i in 0 until minOf(50, allPending.length())) pending.put(allPending.getJSONObject(i))
-                    val profile = json("companionId" to companionId, "vibeId" to "directo", "onboarded" to store.onboarded, "riskNoticeVersion" to store.riskVersion, "quickAccess" to store.quickAccess(startedOwner))
+                    // The shortcut row stays on this phone, as on iOS: Memory tells the person it is kept "on this
+                    // phone, not on its servers", so it is neither sent with the profile nor taken from the reply.
+                    val profile = json("companionId" to companionId, "vibeId" to "directo", "onboarded" to store.onboarded, "riskNoticeVersion" to store.riskVersion)
                     val response = repository.request("api/progress", "POST", json("platform" to "android", "events" to pending, "profile" to profile), true)
                     assertCurrent(epoch, consent)
                     val progress = response.optJSONObject("progress") ?: break
@@ -489,7 +558,7 @@ class NucleoSession(
                         receipt.nullableString("id")?.let { syncReceipts[it] = JSONObject(receipt.toString()) }
                     }
                     while (syncReceipts.size > 100) syncReceipts.remove(syncReceipts.keys.first())
-                    store.applySync(startedOwner, progress, results)
+                    store.applySync(startedOwner, QuickAccess.withoutRow(progress), results)
                     latest = response
                     emit("session.changed", snapshot())
                     // Drain durable offline events in the endpoint's supported batches. A missing ACK
@@ -530,7 +599,10 @@ class NucleoSession(
     companion object {
         val SUPPORTED_LANGUAGES = setOf("en", "es", "fr", "pt", "it", "de")
         val ANALYSIS_LEVELS = setOf("rapido", "profundo", "maximo")
-        val NATIVE_ROUTES = setOf("squad", "locker", "isla", "account", "riskNotice", "levels", "paywall", "memory", "briefings", "briefingSettings", "invite", "coupon", "reportContent")
+        /** What the page may open through `openNative`: exactly this, and never a 1.8 screen. */
+        val NATIVE_ROUTES = V18Routes.PAGE_OPENABLE
+        /** Every sheet native code may present: the page's routes and the native-only 1.8 screens. */
+        val SHEET_ROUTES = V18Routes.ALL
     }
 }
 
@@ -538,6 +610,11 @@ private fun JSONObject.requiredString(key: String, maxLength: Int): String {
     val s = opt(key) as? String ?: throw NucleoFault("invalid_params", "$key must be a string")
     if (s.length > maxLength) throw NucleoFault("invalid_params", "$key is too long")
     return s
+}
+private fun JSONObject.nudgeId(): String {
+    val id = requiredString("id", 48)
+    if (!NucleoNudge.ID_PATTERN.matches(id)) throw NucleoFault("invalid_params", "invalid nudge id")
+    return id
 }
 private fun JSONObject.requiredInt(key: String): Int {
     val number = opt(key) as? Number ?: throw NucleoFault("invalid_params", "$key must be integer")

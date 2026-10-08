@@ -68,19 +68,30 @@ data class NudgeMoment(
  * [act] is the tap; the nudge is already retired when it runs.
  */
 class NudgeSource(
-    /** `credits`, `memory`, `theses`, `reminders`, `invite`. One source per key; registering again replaces it. */
+    /** `credits`, `memory`, `theses`, `reminders`, `invite`, `harness.move`, `harness.offer`. One source per key; registering again replaces it. */
     val key: String,
     /** Higher speaks first. */
     val priority: Int,
     val candidate: (NudgeMoment) -> NucleoNudge?,
+    /** The tap. A source captures its `V18Host` when it registers; the nudge is already retired when this runs. */
     val act: suspend (NucleoNudge) -> Unit,
 )
 
+/** Priorities of the nudge sources, in one place so two features never fight over the glass. */
 object NudgePriority {
+    /** Coming back to an asset they asked about (a tapped follow-up lands here): it is why they opened the app. */
+    const val FOLLOW_UP = 95
+    /** An invitation that is waiting for an account: it expires, so it speaks first. */
     const val INVITE = 90
+    /** The offer to come back tomorrow, after a read, until the person decides. */
+    const val FOLLOW_UP_OFFER = 80
+    /** The thesis a person just saved or came back to. */
     const val THESES = 70
+    /** The offer to remember, once, after a useful read. */
     const val MEMORY = 60
+    /** A reminder offer after a thesis exists. */
     const val REMINDERS = 50
+    /** Credits running low. */
     const val CREDITS = 40
 }
 
@@ -133,6 +144,29 @@ class NudgeCenter(private val store: KeyValueStore, var now: () -> Long = { Syst
         sources.clear()
         served.clear()
         currentId = null
+    }
+
+    /** The host whose features registered the sources (the activity on screen). */
+    private var holder: Any? = null
+
+    /**
+     * A new host takes the glass. The centre is the process's and outlives an activity: the
+     * sources the host before it registered are bound to that host's screen, and go with it.
+     */
+    fun claim(by: Any) {
+        unregisterAll()
+        holder = by
+    }
+
+    /**
+     * A host is going away. While the sources are still its own, none of them may speak or be
+     * tapped again: a line written by a host without a screen would be retired by a tap that opens
+     * nothing. A host that already lost the glass to a newer one changes nothing.
+     */
+    fun release(by: Any) {
+        if (holder !== by) return
+        unregisterAll()
+        holder = null
     }
 
     val sourceKeys: List<String> get() = sources.map { it.key }
@@ -251,6 +285,23 @@ class NudgeCenter(private val store: KeyValueStore, var now: () -> Long = { Syst
         write(all)
         served.remove(id)
         if (currentId == id) currentId = null
+    }
+
+    /**
+     * What was erased is no longer named here either: the current owner's history of every nudge
+     * whose id starts with one of `prefixes` leaves the phone (an id carries the asset, and for a
+     * follow-up the day it was asked about). Retired offers that name nothing are not touched.
+     */
+    fun forgetIds(prefixes: Collection<String>) {
+        fun named(id: String): Boolean = prefixes.any { id.startsWith(it) }
+        val all = records()
+        val kept = all.filterKeys { !named(it) }
+        if (kept.size != all.size) {
+            if (kept.isEmpty()) store.remove(storeKey(owner)) else write(kept)
+        }
+        served.keys.removeAll { named(it) }
+        val current = currentId
+        if (current != null && named(current)) currentId = null
     }
 
     fun showings(id: String): Int = records()[id.lowercase(Locale.ROOT)]?.shown ?: 0
