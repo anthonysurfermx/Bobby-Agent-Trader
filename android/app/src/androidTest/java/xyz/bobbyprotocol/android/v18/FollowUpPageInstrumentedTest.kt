@@ -3,6 +3,7 @@ package xyz.bobbyprotocol.android.v18
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
+import android.view.View
 import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.test.core.app.ActivityScenario
@@ -50,12 +51,14 @@ import java.util.concurrent.atomic.AtomicReference
  * The question Bobby "wrote" after the read is this test's: the real one is whatever the server
  * sends in `synthesis.followUp`, checked by the page before it is shown (android/nucleo/tests).
  *
- * The page is shown on its own fallback for a phone without WebGL (the sphere drawn without it):
- * the test withholds WebGL before the page's first script runs. An emulator with no GPU draws the
- * WebGL scene in software, and with the scene running without a pause this test took CI's emulator
- * offline twice, half-way through (runs 37717370904 and 37719454131). The line, the row, its chips
- * and their words are the same page code either way; what they look like over the WebGL sphere is
- * not seen here.
+ * How it is drawn here is not how a phone draws it. CI's emulator has no GPU, and the page drawn
+ * through the emulator's graphics took the emulator itself offline three times while this test
+ * ran: with the WebGL scene, part-way through the read (run 37717370904); and on the page's own
+ * fallback for a phone without WebGL, seconds after it loaded (runs 37719454131 and 37721185476).
+ * So this test withholds WebGL before the page's first script runs, and has the WebView draw on
+ * the processor (a software layer), which sends the emulator's graphics one finished picture and
+ * nothing else. The line, the row, its chips and their words are the same page code either way;
+ * what they look like over the WebGL sphere is not seen here.
  */
 @RunWith(Parameterized::class)
 class FollowUpPageInstrumentedTest(private val language: String) {
@@ -148,12 +151,16 @@ class FollowUpPageInstrumentedTest(private val language: String) {
 
     // ---- The page ----
 
-    /** An activity of this app with nothing in it but the page, as MainActivity hosts it, on a WebView that has no WebGL to give. */
+    /**
+     * An activity of this app with nothing in it but the page, in the host MainActivity gives it
+     * (NucleoWebView), on a WebView that has no WebGL to give and draws on the processor.
+     */
     private fun open() {
         assumeTrue("This WebView cannot run a script before the page's own", WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT))
         scenario = ActivityScenario.launch(ComponentActivity::class.java).also { launched ->
             launched.onActivity { activity ->
                 val view = WebView(activity)
+                view.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
                 WebViewCompat.addDocumentStartJavaScript(view, NO_WEBGL, setOf("https://appassets.androidplatform.net"))
                 val host = NucleoWebView(view, scope, { method, params -> answer(method, params) }, unavailable::set)
                 activity.setContentView(host.view)

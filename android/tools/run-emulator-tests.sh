@@ -44,6 +44,12 @@ part() {
   adb pull "$device_shots/." "$out/shots" > /dev/null 2>&1 || true
   # A screen test sets the system's font size and puts it back; if it was cut short, the next part still starts at 100%.
   adb shell settings put system font_scale 1.0 > /dev/null 2>&1 || true
+  # An emulator that stopped says nothing itself: what the machine's kernel saw (it ran out of memory, it crashed) is printed.
+  if ! adb get-state > /dev/null 2>&1; then
+    echo "The emulator is gone after the part '$name'. What this machine's kernel says:"
+    { sudo -n dmesg 2>/dev/null || dmesg 2>/dev/null || true; } | grep -i -E 'out of memory|killed process|segfault|general protection' | tail -8 || true
+    free -m 2>/dev/null || true
+  fi
 }
 
 part screens "$argument.class=$screens" "$@"
