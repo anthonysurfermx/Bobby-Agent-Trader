@@ -15,7 +15,8 @@ import { requestOriginHost } from './_lib/origins.js';
 import { issueTranscriptReceipt } from './_lib/transcript-receipt.js';
 import { walletSessionFromRequest } from './_lib/wallet-session.js';
 import { callLlm, streamText } from './_lib/llm.js';
-import { hasAppTextBackend } from './_lib/app-model.js';
+import { hasAppTextBackend, type AppTextTier } from './_lib/app-model.js';
+import { resolveAppRequestTier } from './_lib/app-model-access.js';
 
 /** Language-only contract shared by every chat/debate path; structured markers remain unchanged. */
 export function chatLanguageRule(language: unknown, locale?: unknown): string {
@@ -666,12 +667,14 @@ async function callAppText(
   systemPrompt: string,
   userMessage: string,
   maxTokens: number = 800,
+  tier: AppTextTier = 'free',
 ): Promise<string> {
   const result = await callLlm({
     endpoint: 'openclaw-chat',
     system: systemPrompt,
     user: userMessage,
     maxTokens,
+    tier,
   });
   return result.text;
 }
@@ -681,6 +684,7 @@ async function runMultiCallDebate(
   language: string,
   res: VercelResponse,
   sessionWallet: string | null = null,
+  tier: AppTextTier = 'free',
 ): Promise<void> {
   const startMs = Date.now();
 
@@ -712,6 +716,7 @@ async function runMultiCallDebate(
       buildAlphaPrompt(language, debateMode),
       alphaPrompt,
       150, // Max 2 sentences ~40 words
+      tier,
     );
 
     sendChunk(alphaResponse);
@@ -727,6 +732,7 @@ async function runMultiCallDebate(
       buildRedTeamPrompt(language, debateMode),
       redTeamPrompt,
       150, // Max 2 sentences ~40 words
+      tier,
     );
 
     sendChunk(redTeamResponse);
@@ -762,6 +768,7 @@ ${finalCallInstruction}`;
       buildCIOPrompt(language, debateMode),
       cioPrompt,
       debateMode === 'trade' ? 100 : 280,
+      tier,
     );
     const finalResponse = ensurePortfolioLine(cioResponse, detectedAdvice, userQuestion, debateMode, edgeCasePolicy, language);
     sendChunk(finalResponse);
@@ -794,6 +801,7 @@ async function runSimpleInvestDebate(
   language: string,
   res: VercelResponse,
   sessionWallet: string | null = null,
+  tier: AppTextTier = 'free',
 ): Promise<void> {
   const { contextXml, userQuestion, detectedAdvice, debateMode, edgeCasePolicy } = resolveDebateMode(message);
 
@@ -807,6 +815,7 @@ async function runSimpleInvestDebate(
       buildSimpleInvestPrompt(language),
       userMessage,
       280,
+      tier,
     );
     const finalReply = ensurePortfolioLine(reply, detectedAdvice, userQuestion, debateMode, edgeCasePolicy, language);
 
@@ -816,7 +825,7 @@ async function runSimpleInvestDebate(
     res.end();
   } catch (err) {
     console.warn('[Chat] Simple invest path failed, falling back to multi-call debate:', err);
-    return await runMultiCallDebate(message, language, res, sessionWallet);
+    return await runMultiCallDebate(message, language, res, sessionWallet, tier);
   }
 }
 
@@ -865,6 +874,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const resolved = resolveDebateMode(message);
   // Wallet session (optional for chatting, REQUIRED to get a publishable receipt).
   const sessionWallet = walletSessionFromRequest(req)?.wallet ?? null;
+  const tier = await resolveAppRequestTier(req);
 
   if (
     hasXMLContext &&
@@ -873,23 +883,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     shouldUseSimpleInvestPath(resolved.userQuestion, resolved.debateMode, resolved.edgeCasePolicy)
   ) {
     console.log('[Chat] Simple invest path activated from XML context');
-    return await runSimpleInvestDebate(message, userLang, res, sessionWallet);
+    return await runSimpleInvestDebate(message, userLang, res, sessionWallet, tier);
   }
 
   // ── MULTI-CALL DEBATE: When Trading Room is active
   if (isDebateRequest(message) && hasAppTextBackend()) {
     if (shouldUseSimpleInvestPath(resolved.userQuestion, resolved.debateMode, resolved.edgeCasePolicy)) {
       console.log('[Chat] Simple invest path activated');
-      return await runSimpleInvestDebate(message, userLang, res, sessionWallet);
+      return await runSimpleInvestDebate(message, userLang, res, sessionWallet, tier);
     }
     console.log('[Chat] Multi-call debate mode activated');
-    return await runMultiCallDebate(message, userLang, res, sessionWallet);
+    return await runMultiCallDebate(message, userLang, res, sessionWallet, tier);
   }
 
   // Normal text uses the shared app model and preserves the existing SSE shape.
   if (hasAppTextBackend()) {
     try {
-      return await streamAppText(sanitizedMessage, history, userLang, res);
+      return await streamAppText(sanitizedMessage, history, userLang, res, tier);
     } catch (err) {
       console.error('[Chat] App model streaming failed:', err);
       if (res.destroyed) return;
@@ -909,6 +919,7 @@ async function streamAppText(
   history: Array<{ role: string; content: string }> | undefined,
   language: string,
   res: VercelResponse,
+  tier: AppTextTier = 'free',
 ): Promise<void> {
   const messages = [
     ...(history || []).slice(-10).filter(m => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string').map(m => ({
@@ -928,6 +939,7 @@ async function streamAppText(
   try {
     await streamText({
       endpoint: 'openclaw-chat',
+      tier,
       system: buildBobbyBasePrompt(language),
       messages,
       maxTokens: 2048,

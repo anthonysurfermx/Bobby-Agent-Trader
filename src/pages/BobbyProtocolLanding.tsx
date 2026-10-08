@@ -56,7 +56,7 @@ interface ProtocolStats {
     latestDebate?: LatestDebate;
   };
   pipeline?: {
-    desk?: { endpoint?: string; model?: string; calls?: number; timeframe?: string; levels?: DeskLevelInfo[] };
+    desk?: { endpoint?: string; model?: string; modelsByPlan?: { free?: string; pro?: string }; calls?: number; timeframe?: string; levels?: DeskLevelInfo[] };
     cycle?: { endpoint?: string; schedule?: string; models?: { alpha?: string; redTeam?: string; cio?: string }; commitConvictionFloor?: number; horizonHours?: number };
     resolver?: { endpoint?: string; schedule?: string; method?: string };
   };
@@ -694,8 +694,9 @@ export default function BobbyProtocolLanding() {
                     title: 'The desk',
                     rows: [
                       ['Endpoint', stats?.pipeline?.desk?.endpoint ?? '/api/desk-debate'],
-                      ['Agents', `Alpha Hunter → Red Team → (Max: rebuttal) → CIO, streamed as each clears the guard · Quick runs ${deskModel}`],
-                      ['Levels', deskLevels?.length ? deskLevels.map((l) => `${DESK_LEVEL_COPY.find((c) => c.level === l.level)?.name ?? l.level}: ${levelModels(l)}, evidence ${l.evidence ?? '—'}`).join(' · ') : '—'],
+                      ['Agents', 'Alpha Hunter → Red Team → (Max: rebuttal) → CIO, streamed as each clears the guard. The model follows the account plan.'],
+                      ['Plans', `Free: ${stats?.pipeline?.desk?.modelsByPlan?.free ?? deskModel} · Pro: ${stats?.pipeline?.desk?.modelsByPlan?.pro ?? '—'}`],
+                      ['Free levels', deskLevels?.length ? deskLevels.map((l) => `${DESK_LEVEL_COPY.find((c) => c.level === l.level)?.name ?? l.level}: ${levelModels(l)}, evidence ${l.evidence ?? '—'}`).join(' · ') : '—'],
                       ['Evidence', 'Public market data for one instrument (crypto and equities): 1H candles on Quick; more timeframes, crypto derivatives and Bobby\u2019s record on the asset on Deep and Max.'],
                       ['Engine', 'Deterministic indicators (trend, RSI, ATR, EMA, support and resistance). The server computes where the price sits against each level; the models only quote it.'],
                       ['Output', 'Synthesis first: headline, why, main risk, what to watch (drawn on the chart) and a follow-up question, then review or wait with the full debate.'],

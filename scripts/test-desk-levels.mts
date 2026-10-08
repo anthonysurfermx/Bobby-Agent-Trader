@@ -18,6 +18,7 @@ process.env.BOBBY_PROTOCOL_BASE_URL = 'https://bobby.test';
 process.env.RATE_LIMIT_SALT = 'test-salt';
 delete process.env.BOBBY_DESK_MODEL;
 delete process.env.BOBBY_APP_TEXT_MODEL;
+delete process.env.BOBBY_PRO_TEXT_MODEL;
 // The suite below pins the OpenAI-first plans; the Haiku-first default is checked in its own block at the end.
 process.env.BOBBY_LLM_PRIMARY = 'openai';
 
@@ -208,22 +209,27 @@ try {
   let spend = { day: 0, month: 0 };
   let level: { allowed: boolean; code: string | null; useId: number | null } = { allowed: false, code: 'upgrade_required', useId: null };
   let modelFails = false;
+  let serverTier: 'anon' | 'free' | 'pro' = 'anon';
+  let levelTier: 'anon' | 'free' | 'pro' | undefined;
   let providerRefusal: string | null = null;
   const endpointMock = () => mock((c) => {
     if (c.url.includes('rpc/bobby_consume_desk_quota')) return json(true);
-    if (c.url.includes('rpc/bobby_consume_read')) return json({ allowed: true, readId: 88, tier: 'anon', used: 1, limit: 3, remaining: 2 });
+    if (c.url.includes('rpc/bobby_consume_read')) return json({ allowed: true, readId: 88, tier: serverTier, used: 1, limit: 3, remaining: 2 });
     if (c.url.includes('bobby_reads?id=eq.') && c.method === 'DELETE') return json([]);
     if (c.url.includes('rpc/bobby_llm_spend')) return json(spend);
-    if (c.url.includes('rpc/bobby_consume_level')) return json({ ...level, tier: 'anon', used: 1, limit: 1, resetsAt: new Date(Date.now() + 86_400_000).toISOString() });
+    if (c.url.includes('rpc/bobby_record_outcome')) return json(null);
+    if (c.url.includes('rpc/bobby_consume_level')) return json({ ...level, tier: levelTier ?? serverTier, used: 1, limit: 1, resetsAt: new Date(Date.now() + 86_400_000).toISOString() });
     if (c.url.includes('bobby_level_uses?id=eq.') && c.method === 'DELETE') return json([]);
     if (c.url.includes('bobby_llm_usage')) return json(null, 201);
     if (c.url.includes('/api/okx-candles')) return json({ candles });
     if (c.url.includes('okx.com/api/v5/public')) return json({ data: [] });
     if (c.url.includes('forum_threads')) return json([]);
+    if (c.url.includes('/auth/v1/user')) return c.headers.authorization === 'Bearer good-apple-token' ? json({ id: 'a11ce000-0000-4000-8000-000000000001', app_metadata: { provider: 'apple' } }) : json({ msg: 'bad token' }, 401);
+    if (c.url.includes('bobby_identities?on_conflict=auth_user_id')) return json([{ id: '0b8f0a52-0000-4000-8000-00000000c0de', auth_user_id: 'a11ce000-0000-4000-8000-000000000001', wallet_address: null }]);
     if (hostOf(c.url) === 'api.openai.com' || hostOf(c.url) === 'api.anthropic.com') {
       if (providerRefusal) return json({ error: { code: providerRefusal, message: 'private question must never be logged' } }, 429);
       if (modelFails) return hostOf(c.url) === 'api.anthropic.com' ? claude({ analysis: 'x' }, 'max_tokens') : openai({ analysis: 'x' }, 'length');
-      const r = byRole(c); const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : CIO;
+      const r = byRole(c); const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : r === 'rebuttal' ? { analysis: REBUTTAL } : c.body.output_config?.format?.schema?.properties?.scenarios ? { ...CIO, scenarios: SCEN } : CIO;
       return hostOf(c.url) === 'api.anthropic.com' ? claude(content) : openai(content);
     }
     throw new Error(`Unexpected request ${c.url}`);
@@ -377,7 +383,11 @@ try {
       ['claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5-5'],
       ['claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5-5'], 'claude-sonnet-5-5',
     ], 'explicit app text-model rollback reaches every level and the second round');
+    eq([levelPlan('rapido', 'pro').alpha.model, levelPlan('profundo', 'pro').cio.model, levelPlan('maximo', 'pro').rebuttal?.model], ['claude-opus-5-5', 'claude-opus-5-5', 'claude-opus-5-5'], 'the legacy Free model override never changes the Pro family');
     delete process.env.BOBBY_APP_TEXT_MODEL;
+    process.env.BOBBY_PRO_TEXT_MODEL = 'claude-sonnet-5-5';
+    eq([levelPlan('rapido', 'pro').alpha.model, levelPlan('profundo', 'pro').cio.model, levelPlan('maximo', 'pro').rebuttal?.model, levelPlan('maximo').alpha.model], ['claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'], 'the Pro model override reaches only the Pro plans');
+    delete process.env.BOBBY_PRO_TEXT_MODEL;
     eq([levelPlan('rapido').cio.effort, levelPlan('profundo').alpha.effort, levelPlan('profundo').cio.effort, levelPlan('maximo').cio.effort], ['low', 'low', 'medium', 'high'], 'effort grows with the level');
     eq(levelPlan('rapido').fallback?.provider, 'openai', 'Rápido model-access fallback is on the other provider');
 
@@ -386,6 +396,45 @@ try {
     eq(calls.map((c) => [byRole(c), hostOf(c.url), c.body.model]), [['alpha', 'api.anthropic.com', 'claude-haiku-5-5'], ['red', 'api.anthropic.com', 'claude-haiku-5-5'], ['cio', 'api.anthropic.com', 'claude-haiku-5-5']], 'Rápido runs on Haiku');
     eq(calls.map((c) => c.body.output_config?.effort), ['low', 'low', 'low'], 'Rápido asks Haiku for low effort');
     eq(haikuFirst.agents.verdict, 'wait', 'Haiku-first returns a validated verdict');
+
+    // The account plan selects the family independently of the reader's analysis level.
+    for (const tier of ['free', 'pro'] as const) {
+      const family = tier === 'pro' ? 'claude-opus-5-5' : 'claude-haiku-5-5';
+      for (const deskLevel of ['rapido', 'profundo', 'maximo'] as const) {
+        const plan = levelPlan(deskLevel, tier);
+        const specs = [plan.alpha, plan.red, ...(plan.rebuttal ? [plan.rebuttal] : []), plan.cio];
+        eq(specs.map(s => s.model), specs.map(() => family), `${tier} ${deskLevel}: every planned role uses the account's family`);
+        const collected: any[] = [];
+        debateMock();
+        const direct = await runDeskDebate('Is BTC worth a look this week?', deskLevel === 'rapido' ? evidence : v2, 'en', { tier, level: deskLevel, usage: collected });
+        eq(calls.map(c => [hostOf(c.url), c.body.model]), specs.map(() => ['api.anthropic.com', family]), `${tier} ${deskLevel}: actual provider requests use the same family`);
+        eq(collected.map(u => [u.model, u.ok]), specs.map(() => [family, true]), `${tier} ${deskLevel}: the ledger records the selected model`);
+        eq([direct.agents.verdict, direct.level, plan.evidence, !!plan.rebuttal, plan.scenarios], ['wait', deskLevel, deskLevel === 'rapido' ? 'v1' : 'v2', deskLevel === 'maximo', deskLevel === 'maximo'], `${tier} ${deskLevel}: evidence, rounds and reply contract stay unchanged`);
+        eq(calls.map(c => c.body.max_tokens), specs.map(s => s.maxTokens), `${tier} ${deskLevel}: every role keeps its token ceiling`);
+      }
+    }
+
+    level = { allowed: true, code: null, useId: 77 };
+    for (const tier of ['free', 'pro'] as const) {
+      serverTier = tier;
+      for (const deskLevel of ['rapido', 'profundo', 'maximo'] as const) {
+        resetLlmSpendCache(); endpointMock();
+        const servedTier = response();
+        await deskHandler(request({ symbol: 'BTC', question: 'Is BTC worth a look this week?', level: deskLevel, tier: tier === 'free' ? 'pro' : 'free', model: 'claude-opus-5-5', subscription: { tier: 'pro' } }, { authorization: 'Bearer good-apple-token', 'x-bobby-tier': 'pro' }) as never, servedTier as never);
+        const modelCalls = calls.filter(c => ['api.anthropic.com', 'api.openai.com'].includes(hostOf(c.url)));
+        eq([servedTier.statusCode, servedTier.body.access.tier, modelCalls.map(c => c.body.model)], [200, tier, modelCalls.map(() => tier === 'pro' ? 'claude-opus-5-5' : 'claude-haiku-5-5')], `${tier} ${deskLevel}: trusted access wins over spoofed body and headers`);
+        eq(calls.filter(c => c.url.includes('rpc/bobby_consume_read')).length, 1, `${tier} ${deskLevel}: selecting the model never adds another read or access lookup`);
+        ok(calls.find(c => c.url.includes('rpc/bobby_consume_read'))!.body.p_identity !== null, `${tier} ${deskLevel}: the meter receives the validated account identity`);
+        ok(!calls.some(c => c.url.includes('rpc/bobby_read_access')), `${tier} ${deskLevel}: no extra entitlement RPC`);
+        eq(calls.filter(c => c.url.includes('rpc/bobby_consume_level')).length, deskLevel === 'rapido' ? 0 : 1, `${tier} ${deskLevel}: premium allowances keep their own meter`);
+      }
+    }
+    // A subscription that expires between meters must not retain the earlier Pro model choice.
+    serverTier = 'free'; levelTier = 'pro'; resetLlmSpendCache(); endpointMock();
+    const expiredBetweenMeters = response();
+    await deskHandler(request({ symbol: 'BTC', question: 'Is this real?', level: 'maximo' }, { authorization: 'Bearer good-apple-token' }) as never, expiredBetweenMeters as never);
+    eq([expiredBetweenMeters.statusCode, calls.filter(c => hostOf(c.url) === 'api.anthropic.com').map(c => c.body.model)], [200, ['claude-haiku-5-5', 'claude-haiku-5-5', 'claude-haiku-5-5', 'claude-haiku-5-5']], 'the final trusted read gate selects Free even when the earlier level gate reported Pro');
+    serverTier = 'anon'; levelTier = undefined;
     for (const stop of ['refusal', 'max_tokens']) {
       const rejectedUsage: any[] = [];
       mock(() => claude({ analysis: ALPHA }, stop));

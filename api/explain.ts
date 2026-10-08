@@ -3,6 +3,7 @@ import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 import { appLanguage, appLocale, languageName, type AppLanguage } from '../src/lib/app-language.js';
 import { explainError } from './_lib/explain-localization.js';
 import { streamText } from './_lib/llm.js';
+import { resolveAppRequestTier } from './_lib/app-model-access.js';
 
 // Persistent caps (api_cache-backed, survive cold starts): per-IP daily
 // quota plus a global daily ceiling that bounds worst-case model spend
@@ -688,6 +689,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const systemPrompt = buildExplainSystemPrompt(context, outputLanguage, outputLocale);
+  const tier = await resolveAppRequestTier(req);
   const controller = new AbortController();
   const onClose = () => { if (!res.writableEnded) controller.abort(); };
   res.once?.('close', onClose);
@@ -701,6 +703,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await streamText({
       endpoint: 'explain',
+      tier,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 800,

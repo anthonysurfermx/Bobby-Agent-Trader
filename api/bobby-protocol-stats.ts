@@ -518,6 +518,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     pipeline: {
       desk: {
         endpoint: '/api/desk-debate', model: levelPlan('rapido').alpha.model, calls: 3, timeframe: '1H',
+        modelsByPlan: { free: levelPlan('rapido', 'free').alpha.model, pro: levelPlan('rapido', 'pro').alpha.model },
         // The three analysis levels, straight from api/_lib/desk-levels.ts (the single source).
         levels: DESK_LEVELS.map((level) => {
           const p = levelPlan(level);
