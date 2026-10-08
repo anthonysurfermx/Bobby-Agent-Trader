@@ -16,6 +16,8 @@ import xyz.bobbyprotocol.android.v18.NudgeCenter
 import xyz.bobbyprotocol.android.v18.RiskNotice
 import xyz.bobbyprotocol.android.v18.ThesisDraft
 import xyz.bobbyprotocol.android.v18.V18TestBench
+import xyz.bobbyprotocol.android.v18.harness.Harness
+import xyz.bobbyprotocol.android.v18.harness.HarnessCenter
 import xyz.bobbyprotocol.android.v18.theses.CatalogWords
 import java.io.IOException
 
@@ -106,6 +108,34 @@ class Memory18EraseTest {
         phone.online()
         assertTrue("a symbol the server accepts travels safely in the query", center.forget("^GSPC"))
         assertEquals("api/memory?symbol=%5EGSPC", phone.gateway.calls.last().path)
+    }
+
+    /**
+     * "Forget" is the one button beside an asset on the face of the Memory screen. What the phone
+     * keeps to come back to that asset goes with it: its follow-up notes and the follow-up that was coming.
+     */
+    @Test fun forgetAlsoErasesTheFollowUpNotesOfThatAssetAndTheFollowUpThatWasComing() = runTest {
+        val phone = Phone(this)
+        val harness = Harness.center(phone.bench.host)
+        runCurrent()
+        phone.bench.deliver(symbol = "NVDA")
+        assertEquals(HarnessCenter.Outcome.ON, harness.accept())
+        assertEquals(listOf("NVDA"), harness.notes.assets.map { it.symbol })
+        assertEquals(setOf("v18.follow.asset", "v18.follow.week"), phone.bench.notifier.pendingIds())
+        val center = phone.center()
+        center.refresh()
+        assertTrue(center.forget("NVDA"))
+        runCurrent()
+        assertTrue("nothing about NVDA is kept to plan from", harness.notes.assets.isEmpty())
+        assertTrue(harness.ledger.isEmpty)
+        assertTrue("and no notice about it arrives", phone.bench.notifier.pendingIds().isEmpty())
+        // The server did not answer: the phone's part is done all the same.
+        phone.bench.deliver(requestId = "r2", symbol = "BTC", name = "Bitcoin", isEquity = false)
+        assertEquals(listOf("BTC"), harness.notes.assets.map { it.symbol })
+        phone.offline()
+        assertFalse(center.forget("BTC"))
+        runCurrent()
+        assertTrue(harness.notes.assets.isEmpty())
     }
 
     // Delete everything

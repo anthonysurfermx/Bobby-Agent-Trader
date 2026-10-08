@@ -53,6 +53,21 @@ class NucleoAskTest {
         assertFalse(NextQuestion.same(offered, ""))
     }
 
+    /**
+     * The page reads U+FEFF (a byte-order mark a server may leave in a string) as white space: it
+     * shows the question without it, and a tap sends the words without it. Native compares the same way.
+     */
+    @Test fun aByteOrderMarkLeftInTheQuestionIsWhiteSpaceAsItIsForThePage() {
+        assertEquals("at either end it goes with the spaces", offered, NextQuestion.usable("\uFEFF$offered \uFEFF"))
+        assertNull("alone it is no question", NextQuestion.usable("\uFEFF \uFEFF"))
+        assertTrue(NextQuestion.same("\uFEFF$offered", offered))
+        assertTrue("inside, it separates two words, as a space does", NextQuestion.same("What changed\uFEFFin NVDA?", "What changed in NVDA?"))
+        for (level in listOf("profundo", "maximo")) {
+            assertEquals("the tap on that question is still Bobby's read, at Quick",
+                         AskStart(ReadOrigin.FOLLOW_UP, "rapido", picked = true), AskStart.followUp("\uFEFF$offered", offered, level))
+        }
+    }
+
     @Test fun theQuestionAReadOfferedIsWhatItsSynthesisCarried() {
         assertEquals(offered, NextQuestion.offered(JSONObject().put("synthesis", JSONObject().put("headline", "H.").put("followUp", offered))))
         assertNull(NextQuestion.offered(JSONObject().put("synthesis", JSONObject().put("headline", "H."))))
