@@ -128,7 +128,9 @@ function clearRead(){
   A.sat.forEach(function(s, i){ satRetract(i, 0); }); A.orbO.tween(0, 0.24, E.fade); U.compOn.to(0);
   dissolveThink();
   if (A.note.o.t > 0) noteOut();
-  if (VOICE.started && !VOICE.ended) bcall('stopSpeaking').catch(noop);
+  /* a voice that is speaking, or that was asked for and has not begun (native is still fetching it): it must not
+     start over an empty glass, or over the read that takes this one's place */
+  if (VOICE.id != null && !VOICE.ended) bcall('stopSpeaking').catch(noop);
   VOICE.id = null; K.on = false; PREV.on = false; PREV.imp = false;
   hint('');
   return hadCards;
@@ -1021,6 +1023,12 @@ function faceText(k, dir){
   n.cp.to(1, 'emit', null, 0.16); n.co.tween(1, 0.2, E.fade, 0.16);
   A.ftxCur = slot;
 }
+/* the sphere turns back to its Desk face, whichever face it shows: before the pill listens or types, and before a
+   read native starts (askStart) */
+function deskFace(){
+  A.th.to(Math.round(A.th.x / TAU) * TAU, 'glide'); A.fDrag = false; A.fRel = false;
+  if (A.fIdx !== 0){ faceText(0, -1); A.fIdx = 0; }
+}
 STATES.FACES = {
   enter: function(){ U.faceOn.to(1); att(el.sphereA, 'aria-label', tt('aria.faces')); if (!HINTED.swipe) hint('', tt('hint.swipe')); },
   tick: function(){
@@ -1034,7 +1042,7 @@ STATES.FACES = {
     if (h === 'satT0' || h === 'satT1'){ var s = A.satT[h === 'satT0' ? 0 : 1]; return tapG(function(){ if (s.th) go('THESIS_VIEW', { thesis: s.th, back: 'FACES' }); }); }
     if (h === 'meri') return tapG(function(){ faceSwing(1, 0); });
     if (h === 'avatar') return avatarG();
-    if (h === 'pill'){ A.th.to(Math.round(A.th.x / TAU) * TAU, 'glide'); A.fDrag = false; A.fRel = false; if (A.fIdx !== 0){ faceText(0, -1); A.fIdx = 0; } return pillDown(p); }
+    if (h === 'pill'){ deskFace(); return pillDown(p); }
     return faceDragG();
   }
 };

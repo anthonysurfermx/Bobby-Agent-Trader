@@ -16,6 +16,9 @@ import xyz.bobbyprotocol.android.v18.NudgeCenter
 import xyz.bobbyprotocol.android.v18.RiskNotice
 import xyz.bobbyprotocol.android.v18.ThesisDraft
 import xyz.bobbyprotocol.android.v18.V18TestBench
+import xyz.bobbyprotocol.android.v18.harness.Harness
+import xyz.bobbyprotocol.android.v18.harness.HarnessCenter
+import xyz.bobbyprotocol.android.v18.harness.HarnessEvent
 import xyz.bobbyprotocol.android.v18.theses.CatalogWords
 import java.io.IOException
 
@@ -106,6 +109,43 @@ class Memory18EraseTest {
         phone.online()
         assertTrue("a symbol the server accepts travels safely in the query", center.forget("^GSPC"))
         assertEquals("api/memory?symbol=%5EGSPC", phone.gateway.calls.last().path)
+    }
+
+    /**
+     * "Forget" is the one button beside an asset on the face of the Memory screen. What the phone
+     * keeps to come back to that asset goes with it: what was asked about it and the follow-up that
+     * was coming. (This phone's reader also wrote a thesis about NVDA: its pointer is not a note of
+     * the follow-ups and goes with the thesis, in My theses.)
+     */
+    @Test fun forgetAlsoErasesTheFollowUpNotesOfThatAssetAndTheFollowUpThatWasComing() = runTest {
+        val phone = Phone(this)
+        val harness = Harness.center(phone.bench.host)
+        runCurrent()
+        phone.bench.deliver(symbol = "NVDA")
+        assertEquals(HarnessCenter.Outcome.ON, harness.accept())
+        val before = harness.notes.assets.single { it.symbol == "NVDA" }
+        assertTrue(before.lines.toString(), before.lines.any { it.startsWith("Asked once") } && before.lines.any { it.startsWith("Bobby comes back on") })
+        assertTrue(before.erasable)
+        assertEquals(setOf("v18.follow.asset", "v18.follow.week"), phone.bench.notifier.pendingIds())
+        val center = phone.center()
+        center.refresh()
+        assertTrue(center.forget("NVDA"))
+        runCurrent()
+        assertTrue("nothing asked about NVDA is kept to plan from", harness.ledger.events.none { it.symbol == "NVDA" && it.kind != HarnessEvent.Kind.THESIS })
+        assertTrue("and no notice about it arrives", phone.bench.notifier.pendingIds().isEmpty())
+        val after = harness.notes.assets.single { it.symbol == "NVDA" }
+        assertEquals("what is left to say is the thesis they wrote", listOf("You wrote a thesis about it."), after.lines)
+        assertFalse("which is erased where it was written", after.erasable)
+        // The server does not answer: the phone's part is done all the same.
+        phone.bench.deliver(requestId = "r2", symbol = "BTC", name = "Bitcoin", isEquity = false)
+        assertTrue(harness.notes.assets.any { it.symbol == "BTC" })
+        assertFalse(phone.bench.notifier.pendingIds().isEmpty())
+        phone.offline()
+        assertFalse(center.forget("BTC"))
+        runCurrent()
+        assertTrue(harness.notes.assets.none { it.symbol == "BTC" })
+        assertTrue(harness.ledger.events.none { it.symbol == "BTC" })
+        assertTrue(phone.bench.notifier.pendingIds().isEmpty())
     }
 
     // Delete everything

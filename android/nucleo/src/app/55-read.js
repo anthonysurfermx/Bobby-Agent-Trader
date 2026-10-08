@@ -36,9 +36,15 @@ function sylAmp(list, t, wdt){
    {question}, {token} or {followUpOf, question}, exactly as issued by native.
    ===================================================================== */
 var READ = null, READ_SEQ = 0, READS_DONE = 0, LEDGER = [], SAVED = null, ISLAND = null, ROSTER = null, SUGG = null;
+/* Who starts the next read. Native sets 'followUp' around its ask.start event (a follow-up's button, a board row);
+   everything the person asks themselves is 'person'. A read that continues the one on screen (a retry or confirm
+   token, a follow-up of it) keeps that read's origin, so a thread Bobby started stays one. The read model uses it:
+   a read the person did not start never ends on a market-movers chip (ARCHITECTURE.md §3.5). */
+var ASK_ORIGIN = null;
 function startRead(params, question){
+  var prev = READ, origin = ASK_ORIGIN || ((params.token || params.followUpOf) && prev && prev.origin) || 'person';
   var r = { id: ++READ_SEQ, params: params, question: question, stageId: null, accepted: false, asset: null, market: null, reply: null, model: null,
-            requestId: null, askT: clk, save: null, cancelling: false };
+            requestId: null, askT: clk, save: null, cancelling: false, origin: origin };
   READ = r;
   bcall('ask', params).then(function(res){ onAskReply(r, res); },
     function(err){ onAskReply(r, { v: 1, status: 'error', code: 'bad_response', message: null, fault: err && err.code }); });
@@ -49,7 +55,7 @@ function onAskReply(r, res){
   if (!res || typeof res.status !== 'string') res = { v: 1, status: 'error', code: 'bad_response', message: null };
   r.reply = res;
   if (res.status === 'ok'){
-    try { r.model = RMOD.build(res, { lang: LANG, locale: LOCALE, signedIn: !!(SES && SES.signedIn) }); r.requestId = res.requestId; }
+    try { r.model = RMOD.build(res, { lang: LANG, locale: LOCALE, signedIn: !!(SES && SES.signedIn), origin: r.origin }); r.requestId = res.requestId; }
     catch (e){ logErr('model', e); r.model = null; r.reply = { v: 1, status: 'error', code: 'bad_response', message: null }; }
   }
   fsmEvent('reply', r);
@@ -341,8 +347,14 @@ function setHorizon(hrs){
   [].slice.call(el.card1.hz.querySelectorAll('button')).forEach(function(b){ var on = +b.getAttribute('data-h') === hrs; b.className = on ? 'on' : ''; b.setAttribute('aria-checked', on ? 'true' : 'false'); });
 }
 
-/* ---- chips: born from the pill, one row from x=20 bleeding off the right edge ---- */
+/* ---- chips: born from the pill, one row from x=20 bleeding off the right edge ----
+   A chip is a node at the stage's corner until the loop gives it its place and its opacity (renderChipList), and
+   the loop stands still under a native sheet and while the app is behind (canRun). So a chip is born hidden, and
+   a row taken away at once is hidden at once: a row rebuilt where the loop does not run (the nudge that opened a
+   sheet was just retired, so the session came again) shows nothing out of place, and is born when the loop is back.
+   The line above the row waits with it. */
 var DYING = [];
+function oneTapOff(){ return !!SES && SES.oneTap === false; }
 function showIdleSuggestions(){
   if (ST.name !== 'IDLE') return;
   /* A starter chip reads as the company; its action keeps the exchange symbol the server resolves
@@ -350,7 +362,9 @@ function showIdleSuggestions(){
   var CHIP_NAMES = { 'NVDA':'NVIDIA', 'MC.PA':'LVMH', 'OR.PA':'L’Oréal', 'EDP.LS':'EDP', 'GALP.LS':'Galp',
     'PETR4.SA':'Petrobras', 'VALE3.SA':'Vale', 'ISP.MI':'Intesa Sanpaolo', 'ENEL.MI':'Enel', 'SAP.DE':'SAP', 'SIE.DE':'Siemens' };
   var list = [], seen = {};
-  ((SUGG && SUGG.quickAccess) || []).forEach(function(item){
+  /* Bobby never invites someone into a wall: when native says the next read would be refused (`oneTap: false` in the
+     session) the home offers no chip that asks by itself. The pill still takes their own question. */
+  ((oneTapOff() ? [] : (SUGG && SUGG.quickAccess)) || []).forEach(function(item){
     var sym = String(item && item.symbol || '').toUpperCase();
     if (list.length >= 3 || seen[sym] || !/^[A-Z0-9.^=-]{1,20}$/.test(sym)) return;
     seen[sym] = 1;
@@ -396,33 +410,82 @@ function nudgeSync(){
 }
 /* ---- a read native starts on the person's tap outside the page (a follow-up's button, a row of a native
    board). Native names the asset inside a single-use token and writes the question; the page runs it exactly
-   like a chip that carries a token, and only from the idle home or a finished read. ---- */
+   like a chip that carries a token, from every state in which a new read is what the person expects: as if they
+   had closed what was on the glass and asked. ARCHITECTURE.md §9.5 has the table, state by state.
+   1: nothing of a read is on the glass. 2: a read is (it leaves as it does for one of its own chips).
+   A state that is not listed takes nothing and says nothing. It ends by itself (waking, coming home, a save
+   being written, a finger pulling the cards), or the person is in the middle of a question of their own (the
+   mic is open, a read is on its way, a gate waits for them), and native offers the same token again. ---- */
+var ASK_FROM = { IDLE: 1, PRE_PERMISSION: 1, TYPING: 1, FACES: 1, THESIS_VIEW: 1, ERROR: 1, CONFIRM_ASSET: 1, UNKNOWN_ASSET: 1,
+  THINK_RESOLVE: 2, TALK_EVIDENCE: 2, TALK_CHART: 2, VERDICT: 2, HANDBACK: 2, CARDS: 2, FOLLOWUPS: 2 };
 function askStart(p){
-  if (!p || typeof p.token !== 'string' || !p.token || SHEET || !ST) return;
-  if (ST.name !== 'IDLE' && ST.name !== 'FOLLOWUPS') return;
-  var q = typeof p.question === 'string' ? p.question.slice(0, 300) : '';
-  go('SENDING', { params: { token: p.token }, question: q, origin: 'chip', cx: 195, cy: 660 });
+  if (!p || typeof p.token !== 'string' || !p.token || SHEET || !ST || !ASK_FROM[ST.name]) return;
+  cancelInput();   /* a finger still on the glass lets go: its release will not act on what is leaving */
+  var from = ASK_FROM[ST.name]; if (!from) return;
+  var q = typeof p.question === 'string' ? p.question.slice(0, 300) : '', fromRead = from === 2;
+  if (ST.name === 'TYPING'){
+    fromRead = !!STATES.TYPING.d.fromRead;
+    /* words they had typed are theirs: they are there again the next time the keyboard opens */
+    if (el.ta.value.trim()) SPEECH.draft = el.ta.value;
+  }
+  /* the sphere shows another face (or a thesis opened from one): it turns back to the Desk, as under the pill, and
+     the greeting that comes back with the Desk stays out of sight, since a question is on its way */
+  if (ST.name === 'FACES' || (ST.name === 'THESIS_VIEW' && STATES.THESIS_VIEW.back === 'FACES')){ deskFace(); U.faceOn.to(0); U.presence.to(0); A.greet.o.set(0); }
+  if (fromRead) pillMode(idleMode());   /* a read that was still being said leaves no stop button behind */
+  go('SENDING', { params: { token: p.token }, question: q, origin: 'chip', cx: 195, cy: 660, fromRead: fromRead });
 }
 function receiveSuggestions(reply){
   SUGG = reply;
   if (ST.name === 'IDLE') showIdleSuggestions();
 }
-function chipsShow(list, eyebrow){
+/* ---- the next question (§3.5): the one chip that may take two lines. The read model checked its words; only the
+   drawn chip can say whether it fits, so it is measured once per read and dropped when it would need a third line
+   (the row then falls back to its fixed chips, like every other failed check). ---- */
+var ASK_TWO_LINES = 2 * 19 + 20 + 1;   /* .chip.ask: two 19 px lines, 10 px above and below, the hairline */
+function askChip(text){ var b = mk('button', 'chip ask'), s = mk('span', null, text); b.type = 'button'; b.appendChild(s); return b; }
+function fitNext(m){
+  if (!m || !m.next) return;
+  var b = askChip(RMOD.followUps(m, {}, LANG)[0].label); b.style.visibility = 'hidden';
+  el.chipRow.appendChild(b);
+  var h = b.offsetHeight;
+  el.chipRow.removeChild(b);
+  if (h > ASK_TWO_LINES + 4) m.next = null;
+}
+/* a question on two balanced lines keeps the lines, not the empty room beside them */
+function askShrink(b){
+  try {
+    var rects = b.firstChild.getClientRects(), wide = 0;
+    if (!rects || rects.length < 2) return;
+    for (var i = 0; i < rects.length; i++) wide = Math.max(wide, rects[i].width);
+    if (wide > 0) b.style.width = (Math.ceil(wide / (fitS || 1)) + 34) + 'px';
+  } catch (e) {}
+}
+/* The row a read hands back sits where its last spoken line was; every other row keeps its place above the pill. */
+var CHIP_TOP = 640, CHIP_READ_MID = 616;
+function chipsShow(list, eyebrow, ofRead){
   chipsHide(true);
   A.chipX.set(0);
-  var x = 20;
+  var x = 20, tall = 40;
   list.forEach(function(c, i){
     /* `apple`: the Sign in chip (white, the Android neutral account mark); `pro`: the Bobby Pro chip */
     var style = c.style === 'apple' || c.style === 'pro' || c.style === 'nudge' ? ' ' + c.style : '';
-    var b = mk('button', 'chip' + (i === 0 ? ' first' : '') + style, c.style === 'apple' ? null : c.label); b.type = 'button'; b.setAttribute('data-hit', 'chip'); b.setAttribute('data-i', String(i));
+    var b = c.style === 'ask' ? askChip(c.label) : mk('button', 'chip' + style, c.style === 'apple' ? null : c.label);
+    if (i === 0) b.className += ' first';
+    b.type = 'button'; b.setAttribute('data-hit', 'chip'); b.setAttribute('data-i', String(i));
     if (c.style === 'apple'){ var lg = mk('span', 'lg', '◉'); lg.setAttribute('aria-hidden', 'true'); b.appendChild(lg); b.appendChild(D.createTextNode(c.label)); b.setAttribute('aria-label', c.label); }
     else if (c.ariaLabel) b.setAttribute('aria-label', c.ariaLabel);
-    el.chipRow.appendChild(b);
-    var w = b.offsetWidth || 160, ch = { el: b, x: x, w: w, p: new V(0, 'emit'), o: new V(0, 'soft'), press: new V(1, 'snap'), action: c.action, label: c.label };
-    x += w + 8; A.chips.push(ch);
+    op(b, 0); el.chipRow.appendChild(b);
+    if (c.style === 'ask') askShrink(b);
+    var w = b.offsetWidth || 160, h = b.offsetHeight || 40;
+    var ch = { el: b, x: x, y: CHIP_TOP, w: w, h: h, p: new V(0, 'emit'), o: new V(0, 'soft'), press: new V(1, 'snap'), action: c.action, label: c.label };
+    x += w + 8; tall = Math.max(tall, h); A.chips.push(ch);
     ch.p.to(1, 'emit', null, i * 0.07); ch.o.tween(1, 0.2, E.fade, i * 0.07);
   });
+  /* chips of two heights share one centre line */
+  var top = ofRead ? CHIP_READ_MID - tall / 2 : CHIP_TOP;
+  A.chips.forEach(function(ch){ ch.y = top + (tall - ch.h) / 2; });
   A.chipMax = Math.max(0, x - 8 - 370);
+  if (!canRun()){ A.eyebrowO.set(0); op(el.eyebrow, 0); }
   /* `eyebrow` true: the usual line; a string: the nudge's own line (native-localized) */
   if (eyebrow){ el.eyebrow.textContent = typeof eyebrow === 'string' ? eyebrow : tt('chips.eyebrow'); A.eyebrowO.tween(1, 0.24, E.fade); A.eyebrowY.set(6); A.eyebrowY.to(0, 'emit'); }
 }
@@ -432,7 +495,7 @@ function chipsHide(instant){
   if (!n) return;
   dead.forEach(function(c, i){
     var k = n - 1 - i;
-    if (instant){ c.p.set(0); c.o.set(0); } else { c.p.tween(0, 0.24, E.inhale, k * 0.04); c.o.tween(0, 0.24, function(u){ return sstep(0.5, 1, u); }, k * 0.04); }
+    if (instant){ c.p.set(0); c.o.set(0); op(c.el, 0); } else { c.p.tween(0, 0.24, E.inhale, k * 0.04); c.o.tween(0, 0.24, function(u){ return sstep(0.5, 1, u); }, k * 0.04); }
   });
   DYING = DYING.concat(dead);
   at(instant ? 0 : 0.5, function(){

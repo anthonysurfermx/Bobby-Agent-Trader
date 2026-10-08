@@ -769,11 +769,12 @@ final class HarnessSurfaceTests: XCTestCase {
                                     briefingIntent: BriefingIntent(observeAccount: false), reminderIntent: ReminderIntent(observeAccount: false),
                                     harnessIntent: HarnessIntent(observeAccount: false))
         defer { session.teardown() }
-        XCTAssertTrue(session.desk.offersNextQuestion(Self.free(left: 4)))
-        XCTAssertTrue(session.desk.offersNextQuestion(Self.pro))
-        XCTAssertFalse(session.desk.offersNextQuestion(Self.free(left: 0)), "this read was the last: the chip would lead to the paywall")
-        XCTAssertFalse(session.desk.offersNextQuestion(Self.guest(left: 0)), "or to the sign-in")
-        XCTAssertFalse(session.desk.offersNextQuestion(nil), "a reply without a receipt: not known, not offered")
+        session.desk.currentLevel = { .rapido }         // Quick is saved: the receipt's meter is the only one (HarnessReviewTests has the others)
+        XCTAssertTrue(session.desk.offersNextQuestion(Self.free(left: 4), .rapido))
+        XCTAssertTrue(session.desk.offersNextQuestion(Self.pro, .rapido))
+        XCTAssertFalse(session.desk.offersNextQuestion(Self.free(left: 0), .rapido), "this read was the last: the chip would lead to the paywall")
+        XCTAssertFalse(session.desk.offersNextQuestion(Self.guest(left: 0), .rapido), "or to the sign-in")
+        XCTAssertFalse(session.desk.offersNextQuestion(nil, .rapido), "a reply without a receipt: not known, not offered")
         // And a question that was withheld never reaches the page, so it cannot be tapped (NextQuestionTests
         // covers the page side). Here: the desk asked with the receipt of that very read.
         let (fixture, bridge, _) = makeSession(harness: make(), intent: HarnessIntent(observeAccount: false))
@@ -781,7 +782,7 @@ final class HarnessSurfaceTests: XCTestCase {
         fixture.desk.currentLevel = { .profundo }
         fixture.desk.setLevel = { _ in }
         var receipts: [BobbyReadAccess?] = []
-        fixture.desk.offersNextQuestion = { receipts.append($0); return HarnessWall.open(Self.free(left: 0)) }
+        fixture.desk.offersNextQuestion = { receipt, _ in receipts.append(receipt); return HarnessWall.open(Self.free(left: 0)) }
         _ = await call(bridge, "session", ["page": "app"])
         let read = await call(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
         XCTAssertEqual(read["status"] as? String, "ok", "the read itself is delivered")
@@ -908,7 +909,7 @@ final class HarnessSurfaceTests: XCTestCase {
         session.desk.setLevel = { _ in }
         // The app's own rule on the receipt of each read (a fixture reply carries none: this is what the server said).
         var receipt: BobbyReadAccess? = Self.free(left: 0)
-        session.desk.offersNextQuestion = { _ in HarnessWall.open(receipt) }
+        session.desk.offersNextQuestion = { _, _ in HarnessWall.open(receipt) }
         _ = await call(bridge, "session", ["page": "app"])
         XCTAssertNil(session.sessionJSON()["oneTap"], "one read left: the home is as it always was")
         clock = at(8, 17)
@@ -1183,7 +1184,7 @@ final class HarnessSurfaceTests: XCTestCase {
         XCTAssertEqual(notes.assets[1].lines, ["Preguntaste una vez, el \(HarnessCopy.day(at(3, 9, 30), calendar: calendar))."])
         XCTAssertEqual(notes.assets[2].lines.last, "Tu tesis mira a semanas.")
         XCTAssertEqual(notes.general[1], "El seguimiento llega hacia las \(HarnessCopy.hour(19, calendar: calendar)).")
-        XCTAssertEqual(notes.general[2], "Seguimientos: 3 mostrados, 3 tocados, 3 respondidos.")
+        XCTAssertEqual(notes.general[2], "Seguimientos mostrados: 3. Tocados: 3. Respondidos: 3.")
         XCTAssertEqual(notes.general.count, 3, "and nothing about opening the app: it is not kept")
         // Six languages: a sentence of its own in each, and no placeholder left in any.
         var firsts = Set<String>()
@@ -1390,7 +1391,9 @@ final class HarnessSurfaceTests: XCTestCase {
         let sources = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Sources")
             .resolvingSymlinksInPath()
         let marks = ["HarnessLedger", "HarnessStore", "HarnessProfile", "HarnessNotes", "harness.ledger", "harness?.ledger", "harness.profile",
-                     "harness.notes", "HarnessCenter.shared.ledger", "HarnessCenter.shared.profile", "HarnessCenter.shared.notes"]
+                     "harness.notes", "HarnessCenter.shared.ledger", "HarnessCenter.shared.profile", "HarnessCenter.shared.notes",
+                     // The two ways the Memory screen erases it: everything, and one asset.
+                     "HarnessCenter.erasedEverything", "HarnessCenter.assetForgotten"]
         // Everything in the app that can start a request, by the name it is called with.
         let network = ["NucleoDeskIO.", "BobbyAPI.", "BobbyAccessAPI.", "URLSession", "URLRequest", "NucleoLevelCenter.shared.refresh", "BobbyAccessCenter.shared.refresh"]
         var readers = Set<String>()

@@ -53,6 +53,20 @@ class LocalNotifierTest {
         assertEquals(setOf("v18.reminder.3fa85f64"), notifier.pendingIds())
     }
 
+    @Test fun aNoticeMayCarryWhatALockedPhoneShowsAndOneButton() {
+        notifier.permission = LocalNotifier.Permission.ALLOWED
+        val plain = notice(id = "v18.follow.asset", channel = LocalNotice.CHANNEL_FOLLOW_UPS, payload = mapOf(LocalNotice.KIND to "follow-up"))
+        assertNull("a notice has neither unless its feature says so", plain.publicBody)
+        assertNull(plain.action)
+        val whole = plain.copy(publicBody = "Back to your question.", action = LocalNotice.Action("stop", "Stop"))
+        assertTrue(notifier.schedule(whole))
+        assertEquals("what the phone keeps is what it was handed", whole, notifier.notice("v18.follow.asset"))
+        assertFalse("a public version says something", LocalNotice.valid(plain.copy(publicBody = " ")))
+        assertFalse("a button has a plain name", LocalNotice.valid(plain.copy(action = LocalNotice.Action("Stop now", "Stop"))))
+        assertFalse("and a label", LocalNotice.valid(plain.copy(action = LocalNotice.Action("stop", " "))))
+        assertFalse("that fits on a button", LocalNotice.valid(plain.copy(action = LocalNotice.Action("stop", "x".repeat(LocalNotice.ACTION_LABEL_LIMIT + 1)))))
+    }
+
     @Test fun whatIsListedIsWhatThePhoneWillDeliver() {
         notifier.permission = LocalNotifier.Permission.ALLOWED
         notifier.schedule(notice(id = "v18.follow.asset", inMs = hour, channel = LocalNotice.CHANNEL_FOLLOW_UPS, payload = mapOf(LocalNotice.KIND to "follow-up", LocalNotice.OWNER to "local")))
@@ -100,6 +114,36 @@ class LocalNotifierTest {
         assertEquals("the permission is there but Bobby's notifications are switched off in the system (always the case before Android 13)",
                      denied, NoticePermission.status(notificationsOn = false, runtimeGranted = true, asked = false))
         assertEquals(denied, NoticePermission.status(notificationsOn = false, runtimeGranted = true, asked = true))
+    }
+
+    /** Android only: one kind of notice (a channel) can be switched off by itself in the system's settings. */
+    @Test fun aKindSwitchedOffInTheSystemsSettingsIsANoForThatKindOnly() = runTest {
+        val allowed = LocalNotifier.Permission.ALLOWED
+        val denied = LocalNotifier.Permission.DENIED
+        val undetermined = LocalNotifier.Permission.NOT_DETERMINED
+        assertEquals(allowed, NoticePermission.status(notificationsOn = true, runtimeGranted = true, asked = true, channelOff = false))
+        assertEquals("the system would discard it unseen", denied, NoticePermission.status(notificationsOn = true, runtimeGranted = true, asked = true, channelOff = true))
+        assertEquals("a no that was already a no", denied, NoticePermission.status(notificationsOn = false, runtimeGranted = true, asked = true, channelOff = true))
+        assertEquals("never asked is still never asked: the channel says nothing about that", undetermined,
+                     NoticePermission.status(notificationsOn = false, runtimeGranted = false, asked = false, channelOff = true))
+        // The notifier a feature is handed says it per kind, and counts as shown only what was shown.
+        assertTrue(notifier.requestPermission())
+        notifier.channelsOff.add(LocalNotice.CHANNEL_FOLLOW_UPS)
+        assertEquals(allowed, notifier.status())
+        assertEquals(denied, notifier.status(LocalNotice.CHANNEL_FOLLOW_UPS))
+        assertEquals(allowed, notifier.status(LocalNotice.CHANNEL_THESIS_REMINDERS))
+        val followUp = notice(id = "v18.follow.asset", channel = LocalNotice.CHANNEL_FOLLOW_UPS)
+        val reminder = notice(id = "v18.reminder.a", inMs = 2 * hour)
+        assertTrue(notifier.schedule(followUp))
+        assertTrue(notifier.schedule(reminder))
+        clock += 3 * hour
+        assertNull("its moment passed with the kind switched off: it was not shown", notifier.shownAt(followUp.id, followUp.fireAtEpochMs))
+        assertEquals("the other kind was", reminder.fireAtEpochMs, notifier.shownAt(reminder.id, reminder.fireAtEpochMs))
+        assertEquals(listOf("v18.reminder.a"), notifier.deliverDue().map { it.id })
+        assertNull(notifier.shownAt(followUp.id, followUp.fireAtEpochMs))
+        assertNull("another notice under the same id is another notice", notifier.shownAt(reminder.id, reminder.fireAtEpochMs + 1))
+        notifier.cancel(listOf(reminder.id))
+        assertNull("cancelling an id forgets what was shown under it", notifier.shownAt(reminder.id, reminder.fireAtEpochMs))
     }
 
     @Test fun theSystemsQuestionIsOnlyPutWhenItCanStillChangeSomething() {

@@ -263,6 +263,7 @@ Cómo funciona                                ›
 - Deleted: the three explanation paragraphs, the sentence under each switch, fifteen preference chips, the local-storage text.
 - Preferences move to their own pane (one field at a time; `Sin definir` is a real value). `Cómo funciona` shows the two inventories of the consent screen. `En este iPhone`: Accesos rápidos, Tesis, `Quitar accesos`, and the notes the phone keeps for follow-ups ("Follow-ups", below). Asset `…`: `Olvidar activo`. Sheet `…`: `Borrar todo`, confirmed with the one sentence that names everything it removes.
 - Paused: `En pausa` + `Sin memoria nueva ni personalización en web o iPhone.` Capture off: `Las preguntas del iPhone no añaden memoria de cuenta.` The second switch, when there is no consent yet, is `Activar` and opens the consent screen.
+- Signed out, or before the risk notice: the title, one sentence (`Inicia sesión con Apple para que Bobby recuerde tus activos y preferencias.`) and the row `En este iPhone ⌄`, about 15 words. What the phone keeps (the paragraph about where it lives, the shortcuts, the theses, the follow-up notes) is inside that row, as it is for an account. Before the second pass of 2026-10-08 all of it stood on the face, about 66 words before the first note. Android draws the same face with "On this phone". Review fixtures `-qa-v18 memory-signed-out` and `memory-signed-out-open`; `HarnessReviewTests.testSignedOutTheMemoryScreenIsOneSentenceAndOneRow` counts the words in six languages.
 
 | EN | ES |
 |---|---|
@@ -334,7 +335,7 @@ Surfaces, each one line and one action:
 | Glass, when they come back | NVDA +2.3% since you asked | What changed? |
 | Glass, when the phone should say no number | NVDA, 2 days later | What changed? |
 | Glass, when the next read would be refused | the same line | Got it |
-| The row after a read, and the home, when the next read would be refused | no chip that asks by itself | "Another question about NVDA" (they type it) · the pill |
+| The row after a read, and the home, when the next read would be refused, or a chip would run at a level (Deep, Max) that is used up | no chip that asks by itself | "Another question about NVDA" (they type it) · the pill |
 | Board (the week) | title + "Since you asked" | a row asks Bobby (a plain row at the wall) |
 | Reminders | Follow-ups · Bobby comes back to what you asked. | switch |
 | Memory, "On this iPhone" | the notes, in sentences (below) | Erase · Erase notes |
@@ -493,11 +494,13 @@ drift from what the phone does.
 - A planned follow-up: `step`, `fireAt`, `symbol`, and `days` (asset), `sector` (sector), `others`
   (week). A field that is absent is not compared.
 - A port also checks its own defaults and constants against the file, as the iPhone suite does.
-- 95 cases. Each rule is pinned by itself: a planner without the local-day rule, without the
+- 96 cases. Each rule is pinned by itself: a planner without the local-day rule, without the
   18 hours after the last one shown, that plans a step twice, that sets the hour as seconds after
   local midnight (an hour off on the day the clocks change: Madrid, New York and Sydney are in the
-  file), that lets "today" mean the same day, that counts what is dated after now, or that does
-  not count the plan's own follow-ups as unanswered, fails at least one case.
+  file), that moves a follow-up to the next day by adding 24 hours (Sydney again: the case added
+  in the second pass, which Android had pinned by a test of its own only), that lets "today" mean
+  the same day, that counts what is dated after now, or that does not count the plan's own
+  follow-ups as unanswered, fails at least one case.
 
 Rules that are not folded away:
 
@@ -512,15 +515,21 @@ Rules that are not folded away:
   lock screen or in the app.
 - A tap lands on a glass that is there. From a closed app, the week's board opens once the page
   under it has had 1.6 s in front to wake (the asset's line, a briefing and a thesis reminder do
-  not wait). A row, or the button of the line, asks Bobby through the page, and the page only
-  listens from its home: the question is offered again every half second, eight times at the
-  most, and then dropped. One tap is one read at the most, and it never starts behind another
-  sheet, for another reader, after the app was left, or over a question of their own.
+  not wait). A row, or the button of the line, asks Bobby through the page, as if the person had
+  closed what was on the glass and asked: over a finished read, its cards, an open keyboard or
+  another face of the sphere the read starts at once. Where the page cannot take it (it is
+  still waking, or coming home) the question is offered again every half second, eight times
+  at the most, and then dropped. One tap is one read at the most, and it never starts behind
+  another sheet, for another reader, after the app was left, or over a question of their own
+  that is on its way (Nucleo/ARCHITECTURE.md §9.5 has the table, state by state).
 - A tap that asked nothing is not an act. The pick is written when Bobby is asked, with the
   moment of the tap; a row whose question never reached the page writes nothing and answers no
-  follow-up. Known gap, in the page: over a finished read still on the glass, or an open
-  keyboard, the page takes no question, so the board closes and nothing is asked
-  (Nucleo/ARCHITECTURE.md §9.5).
+  follow-up.
+- Whose words. A tap on the question Bobby's CIO wrote is recognised by native comparing the
+  tapped words with what it sent for that read, white space apart, and U+FEFF (a byte-order mark
+  a server may leave in a string) is white space there as it is for the page, which shows and
+  sends the question without it. Otherwise that tap would be taken for the person's own
+  question: it would run at the saved level and start a chain (`NucleoDeskIO.sameQuestion`).
 
 #### What the person sees, and what stays on the phone (`HarnessCenter`, `HarnessCopy`, `HarnessNotes`)
 
@@ -571,12 +580,28 @@ hides previews while locked (the default with Face ID) never shows the ticker on
 **Stopping is one tap.** "Stop" on the notification does what the Follow-ups switch does when it
 is turned off (the same call): follow-ups off, what iOS holds removed, the ledger erased. It runs
 without opening the app and without unlocking the phone, and the offer is not made again: only
-someone undecided is offered, and **a no stays a no**. Said signed out, it goes with the person
-into their account and also stays on the phone, so it is still a no when they sign out again.
-"Delete everything" on the Memory screen erases the notes and the plan and keeps the no. An
-account that said no takes nothing from a signed-out reader either: what that reader asked is
-dropped at sign-in, not merged. (Withdrawing the risk notice still starts over: it erases
-everything, the no included.)
+someone undecided is offered, and **a no stays a no**. It crosses both ways on the phone. Said
+signed out, it goes with the person into their account, whatever that account had said before
+(the no is the later word; off keeps nothing, so what that account had noted and planned goes
+too), and also stays on the phone, so it is still a no when they sign out again. Said in an
+account, it is still a no once signed out. Only their own later yes lifts it: turning the switch
+on in the account also lifts the no the phone kept, so the next sign-in does not undo it.
+"Delete everything" on the Memory screen erases the notes and the plan and keeps the no; a yes
+goes with the notes, the reader is undecided again (the phone keeps the question itself and
+nothing more), and the offer on the glass is made again after their next read: its own history
+is cleared with the yes, or it would never return. An account that said no takes nothing from a
+signed-out reader either: what that reader asked is dropped at sign-in, not merged. Withdrawing
+the risk notice still starts over: it erases everything, the no included, and a yes that went
+with it is asked for again. Turning follow-ups off keeps the offer retired for good.
+(`HarnessReviewTests`, the cases named "A no…" and "A yes…"; Android: `HarnessReviewTest`.)
+
+**What was kept signed out before any yes starts no chain in an account that had already said
+yes.** Before the yes the phone keeps one bare entry per read, and there a chip's read looks like
+a typed question. At that sign-in the entries arrive marked as reads Bobby started: they stay
+assets the person asked about (the glass, the week) and start nothing. A signed-out reader who
+had said yes brings their own questions with them, with who started each. Nothing of what was
+asked signed out stays under the signed-out reader, the history of its lines on the glass
+included.
 
 **Bobby never invites someone into a wall.** A read Bobby starts (the "What changed?" button, a
 row of the board, the question Bobby wrote after a read) is offered and launched only when the
@@ -585,6 +610,18 @@ Pro, reads or gifted reads left, or nothing behind the limit. Not knowing is a n
 asks, at no cost, when it has a line to draw). At the wall the person still sees the line, with
 "Got it" in place of the question, and the board, with plain rows. Such a read runs at the Quick
 level whatever level is saved, and does not change the saved one.
+**A chip never leads into a wall either, the level's own meter included.** A chip that asks about
+an asset ("How is BTC looking?") runs at the level the person saved, and Deep and Max each have
+an allowance apart from the reads the receipt counts: with it used up the server refuses the
+read before it looks at the general meter, and what stands there is the upgrade wall for a free
+account and the sign-in for a guest. So the one-tap rule asks two meters (`HarnessWall.open` and
+`HarnessWall.levelOpen`), and it is told the level the read just ran at: that read is not yet in
+what the phone last heard about the level, so the read that spends the last Deep takes the chips
+off its own row (`HarnessLevels`). One flag covers the row, so in that one state the CIO's
+question is withheld with the chips although it would have been answered. After a read, not
+knowing the level's count is a no; on the home it changes nothing. Bobby Pro is left alone:
+there a level that ran out is a notice with "Continue with Quick", not a wall. A read Bobby
+started (Quick) takes nothing from Deep or Max.
 The same holds one tap later. The read that spends the last one is delivered with `oneTap:
 false`, and its row keeps only "Another question about NVDA", which asks nothing until the
 person has typed it: no question of the CIO, no "How is BTC looking?". The home loses its asset
@@ -619,12 +656,32 @@ Borrar notas
 | The planner uses a learned hour | Follow-ups arrive around 7:00 PM. | El seguimiento llega hacia las 19:00. |
 | Three in a row unanswered | Quiet until Oct 21. | En silencio hasta el 21 oct. |
 | A kind is resting | Fewer follow-ups for now. | Menos seguimiento por ahora. |
-| Follow-ups were shown | Follow-ups: 3 shown, 2 tapped, 1 answered. | Seguimientos: 3 mostrados, 2 tocados, 1 respondidos. |
+| Follow-ups were shown | Follow-ups: 3 shown, 2 tapped, 1 answered. | Seguimientos mostrados: 3. Tocados: 2. Respondidos: 1. |
 | The glass drew lines about their assets | “Since you asked” lines shown: 2. | Líneas “desde que preguntaste” mostradas: 2. |
 | Nothing kept | No follow-up notes. | Sin notas de seguimiento. |
 | Follow-ups off | Follow-ups are off. | El seguimiento está apagado. |
 | Buttons | Erase · Erase notes | Borrar · Borrar notas |
 
+- "Bobby comes back on …" and "Your week arrives on …" are said only while the phone will show
+  the follow-up: with Bobby's notifications denied, or allowed with every place to show one
+  switched off in Settings (lock screen, notification centre and banners), the plan exists, the
+  glass still comes back to it, and no day is promised. Nothing is said in their place (Android
+  says nothing there either; its Reminders sheet has a line for a follow-up channel switched
+  off, a switch an iPhone does not have). In that state nothing is handed to iOS.
+- "Follow-ups: N shown" counts what the phone can take for shown. iOS shows a local notification
+  it accepted at its moment and tells the app nothing when it does: the app hears of a tap, and
+  of a delivery while it is in front (then the glass shows the line instead of a banner). So a
+  follow-up iOS accepted is written as shown once its moment has passed, with one exception the
+  phone can see: when it next looks, Bobby's notifications are off (or nowhere is left to show
+  one) and the notice is not in the notification centre (`getDeliveredNotifications`). Then
+  nobody can say it was shown, and it is not written: not in the count, not in the caps, not as
+  one that went unanswered. A tap proves its own notice was shown and writes it. What the iPhone
+  cannot see and still counts: a notice a Focus or the scheduled summary held back, one that
+  arrived while the phone was off, and one whose permission was switched off and on again around
+  its moment. (Android writes only what its own worker posted, at the moment it posted it.)
+- The count is a tally wherever a participle would have to agree with the number: "Seguimientos
+  mostrados: 1. Tocados: 1. Respondidos: 1." (es, and the same shape in fr, pt and it), never
+  "1 mostrados". English and German keep "1 shown" / "1 gezeigt", which are right for one.
 - The sentences are computed from the ledger the planner plans from and by the profile function it
   calls. Every kind of event, every field an event carries and every field of the profile goes
   through an exhaustive `switch`: a new one does not compile until it has a sentence or is marked
@@ -640,7 +697,9 @@ Borrar notas
 - Facts and what Bobby does, never what the person "is". What they said is said as theirs. The
   header states how the app is built; no sentence promises anything about a verdict.
 - Erase removes what was asked, saved and tapped about one asset, the follow-up that was coming
-  about it and what the glass kept about its line. Follow-ups already shown stay counted, without
+  about it and what the glass kept about its line. **Forget**, the button beside an asset
+  Bobby's servers remember, does the same on its way, with the shortcut
+  (`HarnessCenter.assetForgotten`). Follow-ups already shown stay counted, without
   the asset: erasing never makes Bobby come back more. A thesis is erased in My theses; an asset
   with nothing but a thesis has no Erase. Erase notes removes all of it and keeps the switch.
   "Delete everything" removes it too, and its confirmation says so.
@@ -655,8 +714,22 @@ every string above, in six languages, against the words of rule 5 and against cl
 watched, monitored, noticed or detected, and fails on any hit.
 
 Review fixtures: `-qa-v18 memory-notes-three | memory-notes-full | memory-notes-empty |
-memory-notes-off | follow-week-wall`, and `-nucleo-fixtures -qa-v18-nudge follow-move |
-follow-move-plain | follow-move-wall`.
+memory-notes-off | follow-week-wall` (the notes are drawn with "On this iPhone" unfolded, as one
+tap leaves it), and `-nucleo-fixtures -qa-v18-nudge follow-move | follow-move-plain |
+follow-move-wall`.
+
+**Where the iPhone is not Android** after the second pass of 2026-10-08 (everything else in this
+section is the same rule with the same words, "this iPhone" for "this phone"):
+
+- Shown. The iPhone delivers at the planned moment and cannot see a delivery; Android delivers
+  late and records each notice it posts. So the iPhone writes `sent` at the planned moment unless
+  it can see the notice was not shown (above), and Android writes it at the moment it was shown.
+- A switch per kind of notification is Android's (channels). The iPhone's nearest state is
+  "allowed, and nowhere to show one", which it treats as a no from the phone; it has no line for
+  it in Reminders, whose foot ("Bobby notifications are off.") follows the permission alone.
+- A count the server left out. The iPhone reads a missing count of used reads as none used
+  (`BobbyReadAccess`, `NucleoLevelMeter`); Android keeps it unknown. The server always sends it.
+- The price read without a tap already named nobody on the iPhone (`NucleoDeskIO.market`).
 
 ### Invite — about 20 words (was about 60)
 

@@ -35,6 +35,7 @@ import androidx.test.uiautomator.Until
 import androidx.webkit.WebViewFeature
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -53,6 +54,9 @@ import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
 import xyz.bobbyprotocol.android.data.BobbyRepository
 import xyz.bobbyprotocol.android.nucleo.NucleoStateStore
+import xyz.bobbyprotocol.android.platform.AndroidLocalNotifier
+import xyz.bobbyprotocol.android.platform.LocalNoticeActionReceiver
+import xyz.bobbyprotocol.android.platform.LocalNoticeIndex
 import xyz.bobbyprotocol.android.platform.LocalNotices
 import xyz.bobbyprotocol.android.v18.SavedThesis
 import xyz.bobbyprotocol.android.v18.StageNetwork
@@ -64,6 +68,15 @@ import xyz.bobbyprotocol.android.v18.V18Reader
 import xyz.bobbyprotocol.android.v18.V18Routes
 import xyz.bobbyprotocol.android.v18.V18Runtime
 import xyz.bobbyprotocol.android.v18.V18Shots
+import xyz.bobbyprotocol.android.v18.harness.Harness
+import xyz.bobbyprotocol.android.v18.harness.HarnessCenter
+import xyz.bobbyprotocol.android.v18.harness.HarnessEvent
+import xyz.bobbyprotocol.android.v18.harness.HarnessLedger
+import xyz.bobbyprotocol.android.v18.harness.HarnessMode
+import xyz.bobbyprotocol.android.v18.harness.HarnessPlanner
+import xyz.bobbyprotocol.android.v18.harness.HarnessStep
+import xyz.bobbyprotocol.android.v18.harness.HarnessStore
+import xyz.bobbyprotocol.android.v18.harness.HarnessTap
 import xyz.bobbyprotocol.android.v18.invite.InviteLinkCenter
 import xyz.bobbyprotocol.android.v18.notify.LocalNotice
 import xyz.bobbyprotocol.android.v18.notify.LocalNotifier
@@ -388,6 +401,128 @@ class V18DeviceInstrumentedTest {
         onMain { rebuilt.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://bobbyprotocol.xyz/desk?ref=WXYZ6789")).setClass(context, MainActivity::class.java)) }
         Thread.sleep(2_000)
         assertNull(preferences.getString(InviteLinkCenter.STORE_KEY, null))
+    }
+
+    // ---- A follow-up on the notification shade, and its one button ----
+
+    @Test fun case7_aFollowUpNoticeHidesItsAssetFromALockedPhoneAndItsStopTurnsFollowUpsOff_inEnglish() = followUpNoticeAndStop("en")
+
+    @Test fun case7_aFollowUpNoticeHidesItsAssetFromALockedPhoneAndItsStopTurnsFollowUpsOff_inSpanish() = followUpNoticeAndStop("es")
+
+    private fun followUpNoticeAndStop(language: String) {
+        val spanish = language == "es"
+        launch(language)
+        allowNotifications()
+        awaitTheGlass()
+        // The person asked about NVDA and said yes to follow-ups: the centre plans its notices on the real phone.
+        val center = onMain { Harness.center(host) }
+        onMain { center.noteAsk("NVDA", "NVIDIA", true, 128.4) }
+        onMain { host.scope.launch { center.accept() } }
+        waitUntil { onMain { center.mode } == HarnessMode.ON }
+        val assetId = HarnessPlanner.IDENTIFIER_PREFIX + HarnessStep.ASSET.raw
+        waitUntil { assetId in onMain { host.notifier.pendingIds() } }
+        // The notice exactly as the centre handed it to the phone, due in a few seconds instead of
+        // tomorrow, and shown whatever the hour is on this emulator (the 09:00 to 21:00 rule is a JVM test).
+        val planned = checkNotNull(LocalNoticeIndex(context).get(assetId)) { "The centre planned no asset follow-up" }
+        assertEquals(LocalNotice.Delivery.FOLLOW_UP, planned.delivery)
+        val soon = planned.copy(fireAtEpochMs = System.currentTimeMillis() + 5_000, delivery = LocalNotice.Delivery.ANY_TIME)
+        assertTrue("The phone refused to plan the notice", onMain { host.notifier.schedule(soon) })
+        // In front the glass would say it instead: the person leaves the app.
+        device.pressHome()
+        waitUntil(60_000) { resumed() == null }
+
+        val posted = awaitNotification(assetId)
+        val shown = posted.notification
+        assertEquals(LocalNotice.CHANNEL_FOLLOW_UPS, shown.channelId)
+        assertEquals("Bobby", shown.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString())
+        // Where it came from, and nothing else: the asset, no figure.
+        assertEquals(if (spanish) "NVDA: de vuelta a tu pregunta." else "NVDA: back to your question.", shown.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString())
+        assertEquals(Notification.VISIBILITY_PRIVATE, shown.visibility)
+        // What a locked phone that hides sensitive content shows instead: the same line without the asset.
+        val locked = checkNotNull(shown.publicVersion) { "The follow-up has no public version" }
+        assertEquals("Bobby", locked.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString())
+        val hidden = locked.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
+        assertEquals(if (spanish) "De vuelta a tu pregunta." else "Back to your question.", hidden)
+        assertFalse("The public version names the asset", hidden.contains("NVDA") || hidden.contains("NVIDIA") || locked.extras.toString().contains("NVDA"))
+        // One button, on both: Stop.
+        val stopLabel = if (spanish) "Ya no" else "Stop"
+        assertEquals(listOf(stopLabel), shown.actions.orEmpty().map { it.title.toString() })
+        assertEquals(listOf(stopLabel), locked.actions.orEmpty().map { it.title.toString() })
+        assertEquals(if (spanish) "Seguimiento" else "Follow-ups", notifications.getNotificationChannel(LocalNotice.CHANNEL_FOLLOW_UPS)?.name?.toString())
+
+        // The shade: the line and its button.
+        device.openNotification()
+        assertNotNull("The follow-up is not in the notification shade",
+                      device.wait(Until.findObject(By.text(if (spanish) "NVDA: de vuelta a tu pregunta." else "NVDA: back to your question.")), 20_000))
+        val stop = checkNotNull(device.wait(Until.findObject(By.text(Pattern.compile(Pattern.quote(stopLabel), Pattern.CASE_INSENSITIVE))), 20_000)) {
+            "The notice shows no $stopLabel button"
+        }
+        shot("follow-up-notice-shade-$language")
+
+        // Stop: follow-ups go off, and the app is not opened.
+        val before = activity
+        stop.click()
+        waitUntil(60_000) { onMain { center.mode } == HarnessMode.OFF }
+        val kept = context.getSharedPreferences("bobby.v18", Context.MODE_PRIVATE)
+        assertEquals("off", kept.getString(HarnessStore.key(HarnessStore.MODE_PREFIX, null), null))
+        assertNull("the ledger is erased", kept.getString(HarnessStore.key(HarnessStore.PREFIX, null), null))
+        assertNull(kept.getString(HarnessStore.key(HarnessStore.PLAN_PREFIX, null), null))
+        assertTrue("pending work is cancelled", onMain { host.notifier.pendingIds() }.none { it.startsWith(HarnessPlanner.IDENTIFIER_PREFIX) })
+        waitUntil { notifications.activeNotifications.none { it.tag?.startsWith(HarnessPlanner.IDENTIFIER_PREFIX) == true } }
+        Thread.sleep(1_500)
+        assertNull("Stop opened the app", resumed())
+        assertSame(before, activity)
+        assertFalse(before.isFinishing || before.isDestroyed)
+        shot("follow-up-after-stop-$language")
+        device.pressBack()
+    }
+
+    @Test fun case8_stopWithNoAppRunningTurnsFollowUpsOffFromWhatIsOnDisk() {
+        prepareGuest("en")
+        if (!notificationsGranted()) V18Shots.shell("pm grant ${context.packageName} ${Manifest.permission.POST_NOTIFICATIONS}")
+        waitUntil { notificationsGranted() }
+        assertNull("No activity of the app may be alive for this case", onMain { V18Process.runtime })
+        val kept = context.getSharedPreferences("bobby.v18", Context.MODE_PRIVATE)
+        val modeKey = HarnessStore.key(HarnessStore.MODE_PREFIX, null)
+        val ledgerKey = HarnessStore.key(HarnessStore.PREFIX, null)
+        val notifier = AndroidLocalNotifier(context) { false }
+        val tomorrow = System.currentTimeMillis() + 86_400_000L
+        fun payload(owner: String): Map<String, String> = mapOf(LocalNotice.KIND to HarnessCenter.KIND, HarnessTap.STEP to HarnessStep.ASSET.raw, HarnessTap.SYMBOL to "NVDA",
+                                                               LocalNotice.OWNER to owner, HarnessTap.AT to tomorrow.toString())
+        val assetId = HarnessPlanner.IDENTIFIER_PREFIX + HarnessStep.ASSET.raw
+        /** What a yes left on the phone: a question, the switch on, a notice waiting. */
+        fun leaveAYes() = onMain {
+            val store = HarnessStore(V18Process.store(context))
+            val ledger = HarnessLedger()
+            ledger.note(HarnessEvent(HarnessEvent.Kind.ASK, System.currentTimeMillis() - 3_600_000L, symbol = "NVDA", name = "NVIDIA", isEquity = true, price = 128.4))
+            store.write(ledger, null)
+            store.write(HarnessMode.ON, null)
+            assertTrue(notifier.schedule(LocalNotice(assetId, "Bobby", "NVDA: back to your question.", tomorrow, LocalNotice.CHANNEL_FOLLOW_UPS, payload("local"),
+                                                     publicBody = "Back to your question.", action = LocalNotice.Action(HarnessCenter.STOP_ACTION, "Stop"))))
+        }
+        /** The broadcast the notice's own button sends. */
+        fun press(owner: String) = context.sendBroadcast(Intent(context, LocalNoticeActionReceiver::class.java).setAction(LocalNotices.ACTION_BUTTON)
+            .putExtra(LocalNotices.EXTRA, JSONObject(payload(owner) as Map<*, *>).toString()).putExtra(LocalNotices.EXTRA_ID, assetId)
+            .putExtra(LocalNotices.EXTRA_BUTTON, HarnessCenter.STOP_ACTION))
+
+        leaveAYes()
+        assertEquals("on", kept.getString(modeKey, null))
+        assertTrue(assetId in notifier.pendingIds())
+        // A notice planned for another reader of this phone stops nothing.
+        press(V18Reader.tag("another-reader"))
+        Thread.sleep(2_500)
+        assertEquals("on", kept.getString(modeKey, null))
+        assertNotNull(kept.getString(ledgerKey, null))
+        assertTrue(assetId in notifier.pendingIds())
+        // The reader's own Stop: off, erased, cancelled, with no activity anywhere.
+        press("local")
+        waitUntil(60_000) { kept.getString(modeKey, null) == "off" }
+        assertNull(kept.getString(ledgerKey, null))
+        assertTrue(notifier.pendingIds().none { it.startsWith(HarnessPlanner.IDENTIFIER_PREFIX) })
+        assertTrue("the work that would have shown it is cancelled",
+                   WorkManager.getInstance(context).getWorkInfosForUniqueWork(LocalNotices.workName(assetId)).get(10, TimeUnit.SECONDS).all { it.state == WorkInfo.State.CANCELLED })
+        assertNull("Stop started the app", resumed())
+        assertNull(onMain { V18Process.runtime })
     }
 
     // ---- The app ----

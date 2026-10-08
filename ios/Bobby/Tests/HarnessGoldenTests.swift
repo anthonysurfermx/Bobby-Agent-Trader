@@ -125,7 +125,7 @@ final class HarnessGoldenTests: XCTestCase {
         let defaults = try XCTUnwrap(file["defaults"] as? [String: Any])
         let sectors = try XCTUnwrap(file["sectors"] as? [String: Any])
         let cases = try XCTUnwrap(file["cases"] as? [[String: Any]])
-        XCTAssertGreaterThanOrEqual(cases.count, 60, "the contract shrank")
+        XCTAssertGreaterThanOrEqual(cases.count, 96, "the contract shrank")
         var names = Set<String>()
         for raw in cases {
             let name = try XCTUnwrap(raw["name"] as? String)

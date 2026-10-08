@@ -27,9 +27,10 @@ import java.util.WeakHashMap
 //    account it was asked for and late answers are dropped.
 //  - Writes are explicit corrections, one at a time, shown only after the server answers.
 //  - "Delete everything" needs a confirmation: `requestForgetAll` only arms it; `confirmForgetAll` sends.
-//  - Deletion is complete. "Forget" also takes the asset out of this phone's shortcuts, and "Delete
-//    everything" also clears them, the theses written on this phone and what the follow-ups learned,
-//    for this account only. The phone's part runs first and needs no network; `notice` says
+//  - Deletion is complete. "Forget" also takes the asset out of this phone's shortcuts and out of
+//    what the follow-ups keep (its notes, the follow-up that was coming), and "Delete everything"
+//    also clears them, the theses written on this phone and what the follow-ups learned, for this
+//    account only. The phone's part runs first and needs no network; `notice` says
 //    honestly whether the server confirmed its part.
 //  - No network before the risk notice is accepted; signed out = no calls.
 //  - The server's text is never shown; failures map to the app's own copy.
@@ -373,8 +374,9 @@ class MemoryCenter(
     }
 
     /**
-     * Forget one remembered asset: first on this phone (its shortcut, no network needed), then on the
-     * server. True when the server confirmed; otherwise `notice` says its part is still there.
+     * Forget one remembered asset: first on this phone (its shortcut and what the follow-ups keep
+     * about it, no network needed), then on the server. True when the server confirmed; otherwise
+     * `notice` says its part is still there.
      */
     suspend fun forget(symbol: String): Boolean {
         if (!MemorySnapshot.SYMBOL_PATTERN.matches(symbol)) return false
@@ -389,6 +391,8 @@ class MemoryCenter(
         val epoch = host.accountEpoch
         notice = null
         host.forgetShortcut(symbol)
+        // What this phone keeps to come back to that asset goes with it: its follow-up notes, and the follow-up that was coming.
+        host.assetForgotten(symbol)
         erasedMarks()?.let { it.assets[symbol.uppercase(Locale.ROOT)] = host.now() }
         local = readLocal()
         changed()
@@ -435,7 +439,7 @@ class MemoryCenter(
         notice = null
         host.clearShortcuts()
         host.theses.deleteAll(user)
-        // What the follow-ups learned on this phone goes too, with what they planned.
+        // The follow-up notes on this phone go too, with what was planned from them. A no to follow-ups stays a no.
         host.eraseEverything()
         erasedMarks()?.all = host.now()
         local = readLocal()
@@ -586,8 +590,8 @@ class MemoryCopy(private val words: HostWords) {
 
     fun notice(notice: MemoryNotice): String = when (notice) {
         is MemoryNotice.ErasedEverything -> words.text(
-            "Deleted: what Bobby's servers remembered, the shortcuts on this phone and the theses you wrote here.",
-            "Borrado: lo que recordaban los servidores de Bobby, los accesos rápidos de este teléfono y las tesis que escribiste aquí.")
+            "Deleted: what Bobby's servers remembered, the shortcuts on this phone and the theses you wrote here, with Bobby's follow-up notes.",
+            "Borrado: lo que recordaban los servidores de Bobby, los accesos rápidos de este teléfono y las tesis que escribiste aquí, con las notas de seguimiento de Bobby.")
         is MemoryNotice.ErasedOnPhoneOnly -> words.text(
             "Deleted on this phone. Bobby's servers did not confirm, so what they remember is still there. Try again.",
             "Borrado en este teléfono. Los servidores de Bobby no confirmaron, así que lo que recuerdan sigue ahí. Inténtalo de nuevo.")
@@ -605,11 +609,11 @@ class MemoryCopy(private val words: HostWords) {
         get() = words.text("Paused across web and phone: no new asks are saved or personalized.",
                            "En pausa en web y teléfono: no se guardan ni personalizan consultas nuevas.")
 
-    /** The confirmation says exactly what goes: the server's memory and the two things kept on this phone. */
+    /** The confirmation says exactly what goes: the server's memory and the three things kept on this phone. */
     val deleteEverythingWarning: String
         get() = words.text(
-            "This deletes what Bobby's servers remember about your account, the shortcuts on this phone and the theses you wrote here. It cannot be undone.",
-            "Esto borra lo que los servidores de Bobby recuerdan de tu cuenta, los accesos rápidos de este teléfono y las tesis que escribiste aquí. No se puede deshacer.")
+            "This deletes what Bobby's servers remember about your account, the shortcuts on this phone and the theses you wrote here, with Bobby's follow-up notes. It cannot be undone.",
+            "Esto borra lo que los servidores de Bobby recuerdan de tu cuenta, los accesos rápidos de este teléfono y las tesis que escribiste aquí, con las notas de seguimiento de Bobby. No se puede deshacer.")
 
     val deliveredBriefingsNote: String
         get() = words.text("Memory-based briefings already delivered are removed too. A paused memory stays paused.",
@@ -623,8 +627,8 @@ class MemoryCopy(private val words: HostWords) {
 
     /** What each deletion on the memory screen removes from the phone, no more than the code does. */
     val onThisPhoneDeletionNote: String
-        get() = words.text("Forget removes an asset's shortcut. Delete everything clears the shortcuts and the theses you wrote.",
-                           "Olvidar quita el acceso rápido de un activo. Borrar todo quita los accesos rápidos y las tesis que escribiste.")
+        get() = words.text("Forget removes an asset's shortcut. Delete everything clears the shortcuts, the theses you wrote and the follow-up notes.",
+                           "Olvidar quita el acceso rápido de un activo. Borrar todo quita los accesos rápidos, las tesis que escribiste y las notas de seguimiento.")
 
     fun prefLabel(field: MemoryPref): String = when (field) {
         MemoryPref.HORIZON -> words.text("Horizon", "Horizonte")

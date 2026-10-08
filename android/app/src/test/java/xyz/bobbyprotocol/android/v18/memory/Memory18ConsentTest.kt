@@ -327,7 +327,7 @@ class Memory18ConsentTest {
         assertFalse(note.lowercase().contains("never leave"))
         assertTrue("what reaches an AI provider is said where it happens", note.contains("AI providers"))
         val deletion = copy.onThisPhoneDeletionNote
-        assertEquals("Forget removes an asset's shortcut. Delete everything clears the shortcuts and the theses you wrote.", deletion)
+        assertEquals("Forget removes an asset's shortcut. Delete everything clears the shortcuts, the theses you wrote and the follow-up notes.", deletion)
         for (language in listOf("es", "fr", "pt", "it", "de")) {
             words.language = language
             assertNotEquals(language, note, copy.onThisPhoneNote)

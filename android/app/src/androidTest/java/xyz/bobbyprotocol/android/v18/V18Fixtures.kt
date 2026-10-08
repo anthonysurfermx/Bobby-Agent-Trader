@@ -2,6 +2,8 @@ package xyz.bobbyprotocol.android.v18
 
 import org.json.JSONArray
 import org.json.JSONObject
+import xyz.bobbyprotocol.android.v18.harness.Harness
+import xyz.bobbyprotocol.android.v18.harness.HarnessCenter
 import xyz.bobbyprotocol.android.v18.memory.MemoryReply
 import java.time.Instant
 
@@ -51,6 +53,18 @@ object V18Fixtures {
             .put("rewardDays", 30).put("proUntil", JSONObject.NULL).put("proSource", JSONObject.NULL)
             .put("friends", JSONArray().put(JSONObject().put("joinedAt", iso(day(9, 28)))).put(JSONObject().put("joinedAt", iso(day(10, 2))))))
         .put("plans", plans()).put("signedIn", true).put("subscription", JSONObject.NULL), googlePlay)
+
+    /**
+     * The same free account with its week used up and no gifted read: the Bobby Pro screen stands
+     * behind the next read, so Bobby offers none of its own (HarnessWall).
+     */
+    fun freeAccountAtTheWall(): JSONObject = payments(JSONObject()
+        .put("access", JSONObject().put("tier", "free").put("used", 20).put("limit", 20).put("remaining", 0)
+            .put("resetsAt", iso(day(10, 10, 9))).put("paywall", true).put("bonus", 0))
+        .put("levels", JSONObject().put("tier", "free").put("levels", JSONObject()
+            .put("profundo", meter(used = 6, limit = 6, days = 7, back = day(10, 11, 9), bonus = 0))
+            .put("maximo", meter(used = 2, limit = 2, days = 7, back = day(10, 12, 9), bonus = 0))))
+        .put("referral", JSONObject.NULL).put("plans", plans()).put("signedIn", true).put("subscription", JSONObject.NULL), googlePlay = false)
 
     /** Nobody signed in: 4 of the 6 reads a phone gets, which do not come back. */
     fun guest(): JSONObject = payments(JSONObject()
@@ -180,15 +194,50 @@ object V18Fixtures {
         return read
     }
 
+    /**
+     * What ten days of questions leave in the follow-up notes, for the Memory screen (the iPhone's
+     * review fixture `memory-notes-three`): NVDA asked three times, the last one about this week and
+     * saved to review in a week; BTC once; TSLA twice, with a thesis that looks weeks ahead. Every
+     * read, the save and the thesis go through the host as they do in the app, and the yes is given
+     * right after the save, so what that read carried is written. Call it on the stage's own scope.
+     */
+    suspend fun followUpNotes(stage: V18Stage) {
+        val language = stage.language
+        val host = stage.host
+        fun asked(id: String, symbol: String, name: String, isEquity: Boolean, price: Double, at: Long, horizon: String? = null) {
+            stage.bench.clock = at
+            val delivered = read(language, id, symbol, name, isEquity, price, at)
+            if (horizon != null) delivered.put("sufficiency", JSONObject().put("horizon", horizon))
+            host.readDelivered(delivered, ReadOrigin.PERSON)
+        }
+        asked("b7c2f1a0-0000-4000-8000-000000000001", "TSLA", "Tesla", true, 238.0, day(9, 28, 18, 45))
+        asked("b7c2f1a0-0000-4000-8000-000000000002", "TSLA", "Tesla", true, 241.5, day(9, 30, 18, 45))
+        host.theses.create(ThesisDraft(
+            symbol = "TSLA", name = "Tesla", isEquity = true, horizon = ThesisHorizon.WEEKS,
+            hypothesis = if (language == "es") "Las entregas se recuperan este trimestre." else "Deliveries recover this quarter.",
+            price = 241.5, asOf = iso(day(9, 30, 18, 45)), verdict = "wait"), stage.desk.owner, day(9, 30, 18, 50))
+        asked("b7c2f1a0-0000-4000-8000-000000000003", "NVDA", "NVIDIA", true, 124.9, day(10, 1, 14, 10))
+        asked("b7c2f1a0-0000-4000-8000-000000000004", "BTC", "Bitcoin", false, 61_250.0, day(10, 3, 9, 30))
+        asked("b7c2f1a0-0000-4000-8000-000000000005", "NVDA", "NVIDIA", true, 126.2, day(10, 3, 14, 10))
+        asked("b7c2f1a0-0000-4000-8000-000000000006", "NVDA", "NVIDIA", true, 128.4, day(10, 5, 14, 10), horizon = "week")
+        stage.bench.clock = day(10, 5, 14, 12)
+        host.readSaved("b7c2f1a0-0000-4000-8000-000000000006", "NVDA", 168)
+        stage.bench.clock = day(10, 5, 14, 13)
+        val center = Harness.center(host)
+        check(center.accept() == HarnessCenter.Outcome.ON) { "The staged reader could not say yes to follow-ups" }
+        stage.bench.clock = V18Stage.NOW
+        center.replan()
+    }
+
     /** The week as the follow-ups know it: three assets asked about on three days, delivered through the host as a read is. */
     fun askedThisWeek(stage: V18Stage) {
         val language = stage.language
         stage.bench.clock = day(10, 5, 10)
-        stage.host.readDelivered(read(language, "a3d1e0c2-4b5f-4a67-8c90-1d2e3f4a5b01", "AAPL", "Apple", true, 229.1, day(10, 5, 10)))
+        stage.host.readDelivered(read(language, "a3d1e0c2-4b5f-4a67-8c90-1d2e3f4a5b01", "AAPL", "Apple", true, 229.1, day(10, 5, 10)), ReadOrigin.PERSON)
         stage.bench.clock = day(10, 6, 16)
-        stage.host.readDelivered(read(language, "a3d1e0c2-4b5f-4a67-8c90-1d2e3f4a5b02", "BTC", "Bitcoin", false, 61_250.0, day(10, 6, 16)))
+        stage.host.readDelivered(read(language, "a3d1e0c2-4b5f-4a67-8c90-1d2e3f4a5b02", "BTC", "Bitcoin", false, 61_250.0, day(10, 6, 16)), ReadOrigin.PERSON)
         stage.bench.clock = day(10, 6, 18)
-        stage.host.readDelivered(read(language, "a3d1e0c2-4b5f-4a67-8c90-1d2e3f4a5b03", "NVDA", "NVIDIA", true, 128.4, day(10, 6, 18)))
+        stage.host.readDelivered(read(language, "a3d1e0c2-4b5f-4a67-8c90-1d2e3f4a5b03", "NVDA", "NVIDIA", true, 128.4, day(10, 6, 18)), ReadOrigin.PERSON)
         stage.bench.clock = V18Stage.NOW
     }
 }

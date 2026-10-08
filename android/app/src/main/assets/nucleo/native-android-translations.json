@@ -261,6 +261,18 @@
     "it": "Chiedi prima di un asset.",
     "de": "Frag zuerst nach einem Wert."
   },
+  "Asked once, on {0}.": {
+    "fr": "Demandé une fois, le {0}.",
+    "pt": "Perguntaste uma vez, a {0}.",
+    "it": "Chiesto una volta, il {0}.",
+    "de": "Einmal gefragt, am {0}."
+  },
+  "Asked {0} times, last on {1}.": {
+    "fr": "Demandé {0} fois, la dernière le {1}.",
+    "pt": "Perguntaste {0} vezes, a última a {1}.",
+    "it": "Chiesto {0} volte, l’ultima il {1}.",
+    "de": "{0}-mal gefragt, zuletzt am {1}."
+  },
   "Asset · date · stated time frame · price that day": {
     "fr": "Actif · date · horizon indiqué · prix ce jour-là",
     "pt": "Ativo · data · prazo indicado · preço nesse dia",
@@ -337,6 +349,12 @@
     "it": "Torna ai vicini",
     "de": "Zurück zu den Nachbarn"
   },
+  "Back to your question.": {
+    "fr": "On revient à ta question.",
+    "pt": "De volta à tua pergunta.",
+    "it": "Torniamo alla tua domanda.",
+    "de": "Zurück zu deiner Frage."
+  },
   "Balance unavailable.": {
     "fr": "Solde indisponible.",
     "pt": "Saldo indisponível.",
@@ -397,6 +415,12 @@
     "it": "Account Bobby",
     "de": "Bobby-Konto"
   },
+  "Bobby comes back on {0}.": {
+    "fr": "Bobby revient le {0}.",
+    "pt": "O Bobby volta a {0}.",
+    "it": "Bobby torna il {0}.",
+    "de": "Bobby meldet sich am {0}."
+  },
   "Bobby comes back to what you asked.": {
     "fr": "Bobby revient sur ce que tu as demandé.",
     "pt": "O Bobby volta ao que perguntaste.",
@@ -435,7 +459,7 @@
   },
   "Bobby keeps these on this phone, not on its servers. The text of a thesis is sent, with that question, only when you start a review: to Bobby and to the AI providers that write the answer.": {
     "fr": "Bobby garde ces éléments sur ce téléphone, pas sur ses serveurs. Le texte d'une thèse est envoyé, avec cette question, seulement quand tu lances une révision : à Bobby et aux fournisseurs d'IA qui rédigent la réponse.",
-    "pt": "O Bobby guarda isto neste telemóvel, não nos seus servidores. O texto de uma tese é enviado, com essa pergunta, apenas quando inicias uma revisão: ao Bobby e aos fornecedores de IA que escrevem a resposta.",
+    "pt": "O Bobby guarda isto neste telefone, não nos seus servidores. O texto de uma tese é enviado, com essa pergunta, apenas quando inicias uma revisão: ao Bobby e aos fornecedores de IA que escrevem a resposta.",
     "it": "Bobby conserva questi dati su questo telefono, non sui suoi server. Il testo di una tesi viene inviato, con quella domanda, solo quando avvii una revisione: a Bobby e ai fornitori di IA che scrivono la risposta.",
     "de": "Bobby speichert das auf diesem Gerät, nicht auf seinen Servern. Der Text einer These wird nur gesendet, wenn du eine Überprüfung startest, zusammen mit dieser Frage: an Bobby und an die KI-Anbieter, die die Antwort schreiben."
   },
@@ -579,7 +603,7 @@
   },
   "Clear the shortcuts on this phone": {
     "fr": "Effacer les raccourcis de ce téléphone",
-    "pt": "Limpar os atalhos deste telemóvel",
+    "pt": "Limpar os atalhos deste telefone",
     "it": "Cancella le scorciatoie su questo telefono",
     "de": "Schnellzugriffe auf diesem Gerät leeren"
   },
@@ -769,7 +793,7 @@
   },
   "Delete this thesis? It is removed from this phone for good.": {
     "fr": "Supprimer cette thèse ? Elle est effacée de ce téléphone définitivement.",
-    "pt": "Eliminar esta tese? É apagada deste telemóvel de vez.",
+    "pt": "Eliminar esta tese? É apagada deste telefone de vez.",
     "it": "Eliminare questa tesi? Viene rimossa da questo telefono per sempre.",
     "de": "Diese These löschen? Sie wird endgültig von diesem Gerät entfernt."
   },
@@ -781,13 +805,19 @@
   },
   "Deleted on this phone. Bobby's servers did not confirm, so what they remember is still there. Try again.": {
     "fr": "Supprimé sur ce téléphone. Les serveurs de Bobby n'ont pas confirmé : ce qu'ils retiennent est toujours là. Réessaie.",
-    "pt": "Eliminado neste telemóvel. Os servidores do Bobby não confirmaram, por isso o que recordam continua lá. Tenta novamente.",
+    "pt": "Eliminado neste telefone. Os servidores do Bobby não confirmaram, por isso o que recordam continua lá. Tenta novamente.",
     "it": "Eliminato su questo telefono. I server di Bobby non hanno confermato, quindi ciò che ricordano è ancora lì. Riprova.",
     "de": "Auf diesem Gerät gelöscht. Bobbys Server haben nicht bestätigt, daher ist dort noch vorhanden, was sie gespeichert haben. Versuch es noch einmal."
   },
+  "Deleted: what Bobby's servers remembered, the shortcuts on this phone and the theses you wrote here, with Bobby's follow-up notes.": {
+    "fr": "Supprimé : ce que les serveurs de Bobby retenaient, les raccourcis de ce téléphone et les thèses que tu as écrites ici, avec les notes de suivi de Bobby.",
+    "pt": "Eliminado: o que os servidores do Bobby recordavam, os atalhos deste telefone e as teses que escreveste aqui, com as notas de seguimento do Bobby.",
+    "it": "Eliminato: ciò che i server di Bobby ricordavano, le scorciatoie su questo telefono e le tesi che hai scritto qui, con le note di Bobby sugli aggiornamenti.",
+    "de": "Gelöscht: was Bobbys Server gespeichert hatten, die Schnellzugriffe auf diesem Gerät und die Thesen, die du hier geschrieben hast, samt Bobbys Follow-up-Notizen."
+  },
   "Deleted: what Bobby's servers remembered, the shortcuts on this phone and the theses you wrote here.": {
     "fr": "Supprimé : ce que les serveurs de Bobby retenaient, les raccourcis de ce téléphone et les thèses que tu as écrites ici.",
-    "pt": "Eliminado: o que os servidores do Bobby recordavam, os atalhos deste telemóvel e as teses que escreveste aqui.",
+    "pt": "Eliminado: o que os servidores do Bobby recordavam, os atalhos deste telefone e as teses que escreveste aqui.",
     "it": "Eliminato: ciò che i server di Bobby ricordavano, le scorciatoie su questo telefono e le tesi che hai scritto qui.",
     "de": "Gelöscht: was Bobbys Server gespeichert hatten, die Schnellzugriffe auf diesem Gerät und die Thesen, die du hier geschrieben hast."
   },
@@ -887,6 +917,24 @@
     "it": "Equipaggiamento di questo compagno",
     "de": "Ausrüstung dieses Begleiters"
   },
+  "Erase": {
+    "fr": "Effacer",
+    "pt": "Apagar",
+    "it": "Cancella",
+    "de": "Löschen"
+  },
+  "Erase notes": {
+    "fr": "Effacer les notes",
+    "pt": "Apagar notas",
+    "it": "Cancella le note",
+    "de": "Notizen löschen"
+  },
+  "Erase the notes about {0}": {
+    "fr": "Effacer les notes sur {0}",
+    "pt": "Apagar as notas sobre {0}",
+    "it": "Cancella le note su {0}",
+    "de": "Notizen zu {0} löschen"
+  },
   "Every read plants something": {
     "en": "Every read plants something",
     "es": "Cada lectura planta algo",
@@ -947,11 +995,41 @@
     "it": "Femminile",
     "de": "Weiblich"
   },
+  "Fewer follow-ups for now.": {
+    "fr": "Moins de suivis pour l’instant.",
+    "pt": "Menos seguimento por agora.",
+    "it": "Meno aggiornamenti per ora.",
+    "de": "Vorerst weniger Follow-ups."
+  },
   "Follow-ups": {
     "fr": "Suivis",
     "pt": "Seguimento",
     "it": "Aggiornamenti",
     "de": "Follow-ups"
+  },
+  "Follow-ups are off in this phone's settings.": {
+    "fr": "Les suivis sont désactivés dans les réglages de ce téléphone.",
+    "pt": "O seguimento está desligado nas definições deste telefone.",
+    "it": "Gli aggiornamenti sono disattivati nelle impostazioni di questo telefono.",
+    "de": "Follow-ups sind in den Einstellungen dieses Geräts aus."
+  },
+  "Follow-ups are off.": {
+    "fr": "Les suivis sont désactivés.",
+    "pt": "O seguimento está desligado.",
+    "it": "Gli aggiornamenti sono disattivati.",
+    "de": "Follow-ups sind aus."
+  },
+  "Follow-ups arrive around {0}.": {
+    "fr": "Les suivis arrivent vers {0}.",
+    "pt": "O seguimento chega por volta das {0}.",
+    "it": "Gli aggiornamenti arrivano verso le {0}.",
+    "de": "Follow-ups kommen gegen {0}."
+  },
+  "Follow-ups: {0} shown, {1} tapped, {2} answered.": {
+    "fr": "Suivis affichés : {0}. Touchés : {1}. Avec réponse : {2}.",
+    "pt": "Seguimentos mostrados: {0}. Tocados: {1}. Respondidos: {2}.",
+    "it": "Aggiornamenti mostrati: {0}. Toccati: {1}. Con risposta: {2}.",
+    "de": "Follow-ups: {0} gezeigt, {1} angetippt, {2} beantwortet."
   },
   "Forget removes an asset's shortcut. Delete everything clears the shortcuts and the theses you wrote.": {
     "fr": "Oublier retire le raccourci d'un actif. Tout supprimer efface les raccourcis et les thèses que tu as écrites.",
@@ -959,9 +1037,15 @@
     "it": "Dimentica rimuove la scorciatoia di un asset. Elimina tutto cancella le scorciatoie e le tesi che hai scritto.",
     "de": "Vergessen entfernt den Schnellzugriff eines Werts. Alles löschen entfernt die Schnellzugriffe und die Thesen, die du geschrieben hast."
   },
+  "Forget removes an asset's shortcut. Delete everything clears the shortcuts, the theses you wrote and the follow-up notes.": {
+    "fr": "Oublier retire le raccourci d'un actif. Tout supprimer efface les raccourcis, les thèses que tu as écrites et les notes de suivi.",
+    "pt": "Esquecer remove o atalho de um ativo. Eliminar tudo apaga os atalhos, as teses que escreveste e as notas de seguimento.",
+    "it": "Dimentica rimuove la scorciatoia di un asset. Elimina tutto cancella le scorciatoie, le tesi che hai scritto e le note sugli aggiornamenti.",
+    "de": "Vergessen entfernt den Schnellzugriff eines Werts. Alles löschen entfernt die Schnellzugriffe, die Thesen, die du geschrieben hast, und die Follow-up-Notizen."
+  },
   "Forgotten on this phone. Bobby's servers did not confirm, so they still remember {0}. Try again.": {
     "fr": "Oublié sur ce téléphone. Les serveurs de Bobby n'ont pas confirmé : ils retiennent encore {0}. Réessaie.",
-    "pt": "Esquecido neste telemóvel. Os servidores do Bobby não confirmaram, por isso ainda recordam {0}. Tenta novamente.",
+    "pt": "Esquecido neste telefone. Os servidores do Bobby não confirmaram, por isso ainda recordam {0}. Tenta novamente.",
     "it": "Dimenticato su questo telefono. I server di Bobby non hanno confermato, quindi ricordano ancora {0}. Riprova.",
     "de": "Auf diesem Gerät vergessen. Bobbys Server haben nicht bestätigt, daher merken sie sich {0} noch. Versuch es noch einmal."
   },
@@ -1045,6 +1129,12 @@
     "it": "Termini di Google Play",
     "de": "Google Play-Nutzungsbedingungen"
   },
+  "Got it": {
+    "fr": "Compris",
+    "pt": "Entendido",
+    "it": "Capito",
+    "de": "Verstanden"
+  },
   "Growing": {
     "fr": "En croissance",
     "pt": "A crescer",
@@ -1123,7 +1213,7 @@
   },
   "Include questions from this phone": {
     "fr": "Inclure les questions de ce téléphone",
-    "pt": "Incluir perguntas deste telemóvel",
+    "pt": "Incluir perguntas deste telefone",
     "it": "Includi le domande di questo telefono",
     "de": "Fragen von diesem Gerät einbeziehen"
   },
@@ -1515,6 +1605,12 @@
     "it": "Nessun acquisto Bobby Pro su questo account Google Play.",
     "de": "Kein Bobby-Pro-Kauf in diesem Google Play-Konto."
   },
+  "No follow-up notes.": {
+    "fr": "Aucune note de suivi.",
+    "pt": "Sem notas de seguimento.",
+    "it": "Nessuna nota sugli aggiornamenti.",
+    "de": "Keine Follow-up-Notizen."
+  },
   "No lists were kept for this review.": {
     "fr": "Aucune liste n’a été conservée pour ce réexamen.",
     "pt": "Não ficaram listas guardadas desta revisão.",
@@ -1625,6 +1721,12 @@
     "it": "Non ancora sincronizzato",
     "de": "Noch nicht synchronisiert"
   },
+  "Notes Bobby keeps on this phone to choose when to come back. They are not sent to the AI.": {
+    "fr": "Notes que Bobby garde sur ce téléphone pour choisir quand revenir. Elles ne sont pas envoyées à l’IA.",
+    "pt": "Notas que o Bobby guarda neste telefone para escolher quando voltar. Não são enviadas à IA.",
+    "it": "Note che Bobby tiene su questo telefono per scegliere quando tornare. Non vengono inviate all’IA.",
+    "de": "Notizen, die Bobby auf diesem Gerät behält, um zu wählen, wann es sich meldet. Sie gehen nicht an die KI."
+  },
   "Notes to yourself to review a thesis": {
     "fr": "Des notes pour toi pour revoir une thèse",
     "pt": "Notas para ti para rever uma tese",
@@ -1659,7 +1761,7 @@
   },
   "On this phone": {
     "fr": "Sur ce téléphone",
-    "pt": "Neste telemóvel",
+    "pt": "Neste telefone",
     "it": "Su questo telefono",
     "de": "Auf diesem Gerät"
   },
@@ -1671,9 +1773,15 @@
     "it": "Attivata · Bobby narra le sue letture",
     "de": "An · Bobby spricht seine Analysen"
   },
+  "One read from a question Bobby wrote.": {
+    "fr": "Une analyse à partir d’une question écrite par Bobby.",
+    "pt": "Uma análise a partir de uma pergunta escrita pelo Bobby.",
+    "it": "Un’analisi da una domanda scritta da Bobby.",
+    "de": "Eine Analyse aus einer Frage, die Bobby geschrieben hat."
+  },
   "Only on this phone.": {
     "fr": "Uniquement sur ce téléphone.",
-    "pt": "Só neste telemóvel.",
+    "pt": "Só neste telefone.",
     "it": "Solo su questo telefono.",
     "de": "Nur auf diesem Gerät."
   },
@@ -1709,7 +1817,7 @@
   },
   "Paused across web and phone: no new asks are saved or personalized.": {
     "fr": "Suspendue sur le web et le téléphone : les nouvelles consultations ne sont ni enregistrées ni personnalisées.",
-    "pt": "Pausada na web e no telemóvel: novas consultas não são guardadas nem personalizadas.",
+    "pt": "Pausada na web e no telefone: novas consultas não são guardadas nem personalizadas.",
     "it": "Sospesa sul web e sul telefono: le nuove richieste non vengono salvate né personalizzate.",
     "de": "Im Web und auf dem Gerät pausiert: Neue Anfragen werden nicht gespeichert oder personalisiert."
   },
@@ -1789,7 +1897,7 @@
   },
   "Questions from this phone are not added to account memory.": {
     "fr": "Les questions de ce téléphone ne s'ajoutent pas à la mémoire du compte.",
-    "pt": "As perguntas deste telemóvel não entram na memória da conta.",
+    "pt": "As perguntas deste telefone não entram na memória da conta.",
     "it": "Le domande di questo telefono non entrano nella memoria dell'account.",
     "de": "Fragen von diesem Gerät kommen nicht ins Konto-Gedächtnis."
   },
@@ -1798,6 +1906,12 @@
     "pt": "Análises Rápidas",
     "it": "Analisi Rapide",
     "de": "Schnelle Analysen"
+  },
+  "Quiet until {0}.": {
+    "fr": "Silencieux jusqu’au {0}.",
+    "pt": "Em silêncio até {0}.",
+    "it": "In silenzio fino al {0}.",
+    "de": "Ruhe bis {0}."
   },
   "Read every plan, period and introductory offer below before subscribing.": {
     "fr": "Lis chaque formule, période et offre de découverte ci-dessous avant de t'abonner.",
@@ -2089,13 +2203,13 @@
   },
   "Saved on this phone only. When you ask for a review, your words are sent to Bobby and to the AI providers that write the review. They are not stored there.": {
     "fr": "Enregistrée sur ce téléphone uniquement. Quand tu demandes un réexamen, tes mots sont envoyés à Bobby et aux fournisseurs d’IA qui rédigent le réexamen. Ils n’y sont pas conservés.",
-    "pt": "Guardada apenas neste telemóvel. Quando pedes uma revisão, as tuas palavras são enviadas ao Bobby e aos fornecedores de IA que escrevem a revisão. Não ficam guardadas lá.",
+    "pt": "Guardada apenas neste telefone. Quando pedes uma revisão, as tuas palavras são enviadas ao Bobby e aos fornecedores de IA que escrevem a revisão. Não ficam guardadas lá.",
     "it": "Salvata solo su questo telefono. Quando chiedi un riesame, le tue parole vengono inviate a Bobby e ai fornitori di IA che scrivono il riesame. Lì non vengono conservate.",
     "de": "Nur auf diesem Gerät gespeichert. Wenn du eine Überprüfung anforderst, werden deine Worte an Bobby und an die KI-Anbieter gesendet, die die Überprüfung schreiben. Dort werden sie nicht gespeichert."
   },
   "Saved on this phone.": {
     "fr": "Enregistrée sur ce téléphone.",
-    "pt": "Guardado neste telemóvel.",
+    "pt": "Guardado neste telefone.",
     "it": "Salvato su questo telefono.",
     "de": "Auf diesem Gerät gespeichert."
   },
@@ -2659,9 +2773,15 @@
     "it": "Questo creatore è bloccato su questo dispositivo. Sbloccalo nella sicurezza della comunità.",
     "de": "Dieser Ersteller ist auf diesem Gerät blockiert. Hebe die Blockierung unter Community-Sicherheit auf."
   },
+  "This deletes what Bobby's servers remember about your account, the shortcuts on this phone and the theses you wrote here, with Bobby's follow-up notes. It cannot be undone.": {
+    "fr": "Cela supprime ce que les serveurs de Bobby retiennent sur ton compte, les raccourcis de ce téléphone et les thèses que tu as écrites ici, avec les notes de suivi de Bobby. C'est irréversible.",
+    "pt": "Isto elimina o que os servidores do Bobby recordam sobre a tua conta, os atalhos deste telefone e as teses que escreveste aqui, com as notas de seguimento do Bobby. Não pode ser anulado.",
+    "it": "Questo elimina ciò che i server di Bobby ricordano del tuo account, le scorciatoie su questo telefono e le tesi che hai scritto qui, con le note di Bobby sugli aggiornamenti. Non si può annullare.",
+    "de": "Das löscht, was Bobbys Server über dein Konto gespeichert haben, die Schnellzugriffe auf diesem Gerät und die Thesen, die du hier geschrieben hast, samt Bobbys Follow-up-Notizen. Das lässt sich nicht rückgängig machen."
+  },
   "This deletes what Bobby's servers remember about your account, the shortcuts on this phone and the theses you wrote here. It cannot be undone.": {
     "fr": "Cela supprime ce que les serveurs de Bobby retiennent sur ton compte, les raccourcis de ce téléphone et les thèses que tu as écrites ici. C'est irréversible.",
-    "pt": "Isto elimina o que os servidores do Bobby recordam sobre a tua conta, os atalhos deste telemóvel e as teses que escreveste aqui. Não pode ser anulado.",
+    "pt": "Isto elimina o que os servidores do Bobby recordam sobre a tua conta, os atalhos deste telefone e as teses que escreveste aqui. Não pode ser anulado.",
     "it": "Questo elimina ciò che i server di Bobby ricordano del tuo account, le scorciatoie su questo telefono e le tesi che hai scritto qui. Non si può annullare.",
     "de": "Das löscht, was Bobbys Server über dein Konto gespeichert haben, die Schnellzugriffe auf diesem Gerät und die Thesen, die du hier geschrieben hast. Das lässt sich nicht rückgängig machen."
   },
@@ -2813,13 +2933,13 @@
   },
   "Use that Google Play account on this phone; retry.": {
     "fr": "Utilise ce compte Google Play sur ce téléphone, puis réessaie.",
-    "pt": "Usa essa conta Google Play neste telemóvel e tenta outra vez.",
+    "pt": "Usa essa conta Google Play neste telefone e tenta outra vez.",
     "it": "Usa quell'account Google Play su questo telefono e riprova.",
     "de": "Nutze dieses Google Play-Konto auf diesem Gerät und versuch es erneut."
   },
   "Use this if you paid for Bobby Pro with your Google Play account on another phone or after reinstalling. Codes and gifts never need restoring.": {
     "fr": "À utiliser si tu as payé Bobby Pro avec ton compte Google Play sur un autre téléphone ou après une réinstallation. Les codes et les cadeaux n'ont jamais besoin d'être restaurés.",
-    "pt": "Usa isto se pagaste Bobby Pro com a tua conta Google Play noutro telemóvel ou depois de reinstalares. Códigos e ofertas nunca precisam de ser restaurados.",
+    "pt": "Usa isto se pagaste Bobby Pro com a tua conta Google Play noutro telefone ou depois de reinstalares. Códigos e ofertas nunca precisam de ser restaurados.",
     "it": "Usalo se hai pagato Bobby Pro con il tuo account Google Play su un altro telefono o dopo una reinstallazione. Codici e regali non vanno mai ripristinati.",
     "de": "Nutze das, wenn du Bobby Pro mit deinem Google Play-Konto auf einem anderen Gerät bezahlt hast oder nach einer Neuinstallation. Codes und Geschenke müssen nie wiederhergestellt werden."
   },
@@ -3039,6 +3159,30 @@
     "it": "Ricevi {0} giorni di Bobby Pro per ogni amico che si iscrive con il tuo link, fino a {1} amici.",
     "de": "Du bekommst {0} Tage Bobby Pro für jeden Freund, der über deinen Link beitritt, bis zu {1} Freunde."
   },
+  "You saved a read, to review in 3 days.": {
+    "fr": "Tu as enregistré une analyse, à revoir dans 3 jours.",
+    "pt": "Guardaste uma análise, para rever em 3 dias.",
+    "it": "Hai salvato un’analisi, da rivedere tra 3 giorni.",
+    "de": "Du hast eine Analyse gespeichert, zum Prüfen in 3 Tagen."
+  },
+  "You saved a read, to review in a day.": {
+    "fr": "Tu as enregistré une analyse, à revoir dans un jour.",
+    "pt": "Guardaste uma análise, para rever num dia.",
+    "it": "Hai salvato un’analisi, da rivedere tra un giorno.",
+    "de": "Du hast eine Analyse gespeichert, zum Prüfen in einem Tag."
+  },
+  "You saved a read, to review in a week.": {
+    "fr": "Tu as enregistré une analyse, à revoir dans une semaine.",
+    "pt": "Guardaste uma análise, para rever numa semana.",
+    "it": "Hai salvato un’analisi, da rivedere tra una settimana.",
+    "de": "Du hast eine Analyse gespeichert, zum Prüfen in einer Woche."
+  },
+  "You saved a read.": {
+    "fr": "Tu as enregistré une analyse.",
+    "pt": "Guardaste uma análise.",
+    "it": "Hai salvato un’analisi.",
+    "de": "Du hast eine Analyse gespeichert."
+  },
   "You used the reads available without an account, so this review did not run.": {
     "fr": "Tu as utilisé les analyses disponibles sans compte : ce réexamen n’a donc pas été lancé.",
     "pt": "Usaste as análises disponíveis sem conta, por isso esta revisão não foi feita.",
@@ -3062,6 +3206,12 @@
     "pt": "Escreveste 1 tese antes de iniciares sessão. Queres mantê-la nesta conta?",
     "it": "Hai scritto 1 tesi prima di accedere. Vuoi tenerla in questo account?",
     "de": "Du hast 1 These vor der Anmeldung geschrieben. In diesem Konto behalten?"
+  },
+  "You wrote a thesis about it.": {
+    "fr": "Tu as écrit une thèse à son sujet.",
+    "pt": "Escreveste uma tese sobre este ativo.",
+    "it": "Hai scritto una tesi su questo asset.",
+    "de": "Du hast eine These dazu geschrieben."
   },
   "You wrote this thesis before signing in.": {
     "fr": "Tu as écrit cette thèse avant de te connecter.",
@@ -3175,6 +3325,30 @@
     "it": "Il testo della tua domanda non viene conservato.",
     "de": "Der Text deiner Frage wird nicht gespeichert."
   },
+  "Your question was about months or years.": {
+    "fr": "Ta question portait sur des mois ou des années.",
+    "pt": "A tua pergunta era sobre meses ou anos.",
+    "it": "La tua domanda riguardava mesi o anni.",
+    "de": "Deine Frage ging um Monate oder Jahre."
+  },
+  "Your question was about this month.": {
+    "fr": "Ta question portait sur ce mois-ci.",
+    "pt": "A tua pergunta era sobre este mês.",
+    "it": "La tua domanda riguardava questo mese.",
+    "de": "Deine Frage ging um diesen Monat."
+  },
+  "Your question was about this week.": {
+    "fr": "Ta question portait sur cette semaine.",
+    "pt": "A tua pergunta era sobre esta semana.",
+    "it": "La tua domanda riguardava questa settimana.",
+    "de": "Deine Frage ging um diese Woche."
+  },
+  "Your question was about today.": {
+    "fr": "Ta question portait sur aujourd’hui.",
+    "pt": "A tua pergunta era sobre hoje.",
+    "it": "La tua domanda riguardava oggi.",
+    "de": "Deine Frage ging um heute."
+  },
   "Your reminder to review a thesis.": {
     "fr": "Ton rappel pour revoir une thèse.",
     "pt": "O teu lembrete para rever uma tese.",
@@ -3194,6 +3368,18 @@
     "pt": "A tua tese",
     "it": "La tua tesi",
     "de": "Deine These"
+  },
+  "Your thesis looks months or more ahead.": {
+    "fr": "Ta thèse porte sur des mois ou plus.",
+    "pt": "A tua tese olha para meses ou mais.",
+    "it": "La tua tesi guarda a mesi o più.",
+    "de": "Deine These reicht Monate oder länger voraus."
+  },
+  "Your thesis looks weeks ahead.": {
+    "fr": "Ta thèse porte sur des semaines.",
+    "pt": "A tua tese olha para semanas.",
+    "it": "La tua tesi guarda a settimane.",
+    "de": "Deine These reicht Wochen voraus."
   },
   "Your thesis text goes to Bobby’s AI providers. Only for this review.": {
     "fr": "Ton texte est envoyé aux fournisseurs d’IA de Bobby. Uniquement pour cette revue.",
@@ -3225,11 +3411,23 @@
     "it": "La tua settimana",
     "de": "Deine Woche"
   },
+  "Your week arrives on {0}.": {
+    "fr": "Ta semaine arrive le {0}.",
+    "pt": "A tua semana chega a {0}.",
+    "it": "La tua settimana arriva il {0}.",
+    "de": "Deine Woche kommt am {0}."
+  },
   "Your week with {0}.": {
     "fr": "Ta semaine avec {0}.",
     "pt": "A tua semana com {0}.",
     "it": "La tua settimana con {0}.",
     "de": "Deine Woche mit {0}."
+  },
+  "Your week.": {
+    "fr": "Ta semaine.",
+    "pt": "A tua semana.",
+    "it": "La tua settimana.",
+    "de": "Deine Woche."
   },
   "Your week: {0} and {1} more.": {
     "fr": "Ta semaine : {0} et {1} de plus.",
@@ -3435,6 +3633,12 @@
     "it": "{0} analisi su {1}",
     "de": "{0} von {1} Analysen"
   },
+  "{0} reads from questions Bobby wrote.": {
+    "fr": "{0} analyses à partir de questions écrites par Bobby.",
+    "pt": "{0} análises a partir de perguntas escritas pelo Bobby.",
+    "it": "{0} analisi da domande scritte da Bobby.",
+    "de": "{0} Analysen aus Fragen, die Bobby geschrieben hat."
+  },
   "{0} reads left this week": {
     "fr": "Il te reste {0} analyses cette semaine",
     "pt": "Restam-te {0} análises esta semana",
@@ -3489,6 +3693,12 @@
     "it": "{0}: {1} domande finora",
     "de": "{0}: bisher {1}-mal gefragt"
   },
+  "{0}: back to your question.": {
+    "fr": "{0} : on revient à ta question.",
+    "pt": "{0}: de volta à tua pergunta.",
+    "it": "{0}: torniamo alla tua domanda.",
+    "de": "{0}: zurück zu deiner Frage."
+  },
   "{0}: saved in memory": {
     "fr": "{0} : enregistré en mémoire",
     "pt": "{0}: guardado na memória",
@@ -3500,5 +3710,11 @@
     "pt": "{0}: {1}",
     "it": "{0}: {1}",
     "de": "{0}: {1}"
+  },
+  "“Since you asked” lines shown: {0}.": {
+    "fr": "Lignes « depuis ta question » affichées : {0}.",
+    "pt": "Linhas “desde que perguntaste” mostradas: {0}.",
+    "it": "Righe «da quando hai chiesto» mostrate: {0}.",
+    "de": "Gezeigte Zeilen „seit deiner Frage“: {0}."
   }
 }

@@ -56,10 +56,10 @@ enum HarnessQA {
         AnyView(HarnessBoardContent(board: board, onClose: {}, onPick: { _ in }))
     }
 
-    /// The Memory screen as a signed-out phone shows it: the on-phone section is on the face.
+    /// The Memory screen of a signed-out phone with "On this iPhone" unfolded, as one tap leaves it.
     private static func memory(_ notes: HarnessNotes) -> AnyView {
         AnyView(MemoryView(center: MemoryQA.center(suite: "qa.v18.harness.memory", signedIn: false), riskAccepted: true, onClose: {},
-                           fixedNotes: notes))
+                           fixedNotes: notes, localStartsOpen: true))
     }
 
     enum Sample { case three, full }

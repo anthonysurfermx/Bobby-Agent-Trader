@@ -58,5 +58,9 @@
                 <data android:pathPrefix="/i/" />
             </intent-filter>
         </activity>
+        <!-- 1.8: the one button of a follow-up notice ("Stop"). Not exported: only this app's own
+             PendingIntent reaches it. It turns follow-ups off for the reader the notice was planned for
+             and opens nothing (platform/AndroidLocalNotifier.kt). -->
+        <receiver android:name=".platform.LocalNoticeActionReceiver" android:exported="false" />
     </application>
 </manifest>

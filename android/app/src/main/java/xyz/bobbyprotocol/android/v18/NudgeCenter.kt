@@ -373,5 +373,63 @@ class NudgeCenter(private val store: KeyValueStore, var now: () -> Long = { Syst
         fun forgetOwner(userId: String, store: KeyValueStore) {
             store.remove(storeKey(userId))
         }
+
+        // What a feature may ask about the history of its own lines, for any reader of this phone and
+        // without a centre (a notice's button runs with no app on screen). iOS: `NudgeCenter.count`,
+        // `prune` and `forget(prefix:owner:)`.
+
+        private fun stored(owner: String?, store: KeyValueStore): JSONObject? {
+            val raw = store.getString(storeKey(owner)) ?: return null
+            return try { JSONObject(raw) } catch (_: Exception) { null }
+        }
+
+        private fun keep(all: JSONObject, gone: List<String>, owner: String?, store: KeyValueStore) {
+            if (gone.isEmpty()) return
+            for (id in gone) all.remove(id)
+            if (all.length() == 0) store.remove(storeKey(owner)) else store.putString(storeKey(owner), all.toString())
+        }
+
+        /**
+         * How many ids under `prefix` this reader has a history for (the Memory screen says so, so
+         * that what the glass keeps about a feature's lines can be seen and erased with its notes).
+         */
+        fun count(prefix: String, owner: String?, store: KeyValueStore): Int {
+            val wanted = prefix.lowercase(Locale.ROOT)
+            if (wanted.isEmpty()) return 0
+            val all = stored(owner, store) ?: return 0
+            var found = 0
+            for (id in all.keys()) if (id.startsWith(wanted)) found += 1
+            return found
+        }
+
+        /**
+         * A feature keeps the history of its lines no longer than what they were about: ids under
+         * `prefix` last touched before `before` go, retired or not (the general rule keeps a retired
+         * id much longer, so that "never again" survives; here the thing it was about is itself gone).
+         */
+        fun prune(prefix: String, before: Long, owner: String?, store: KeyValueStore) {
+            val wanted = prefix.lowercase(Locale.ROOT)
+            if (wanted.isEmpty()) return
+            val all = stored(owner, store) ?: return
+            val gone = ArrayList<String>()
+            for (id in all.keys()) {
+                if (id.startsWith(wanted) && (all.optJSONObject(id)?.optLong("at", 0L) ?: 0L) < before) gone.add(id)
+            }
+            keep(all, gone, owner, store)
+        }
+
+        /**
+         * The stored history of every id under one of `prefixes`, for `owner`, leaves the phone. For
+         * the reader a live centre is serving, call its own `forgetIds` instead: it also lets go of
+         * what is on the glass.
+         */
+        fun forget(prefixes: Collection<String>, owner: String?, store: KeyValueStore) {
+            val wanted = prefixes.map { it.lowercase(Locale.ROOT) }.filter { it.isNotEmpty() }
+            if (wanted.isEmpty()) return
+            val all = stored(owner, store) ?: return
+            val gone = ArrayList<String>()
+            for (id in all.keys()) if (wanted.any { id.startsWith(it) }) gone.add(id)
+            keep(all, gone, owner, store)
+        }
     }
 }

@@ -90,12 +90,19 @@ function consentWithdrawn(){
 }
 function wire(){
   if (!BR) return;
-  BR.on('session.changed', function(s){ applySession(s, false); if (ST.name === 'IDLE') pillMode(idleMode()); nudgeSync(); });
+  BR.on('session.changed', function(s){
+    var walled = oneTapOff();
+    applySession(s, false);
+    if (ST.name === 'IDLE') pillMode(idleMode());
+    /* the last read was spent, or reads came back: the idle row loses or regains its one-tap chips at once */
+    if (oneTapOff() !== walled && ST.name === 'IDLE') showIdleSuggestions(); else nudgeSync();
+  });
   BR.on('account.changed', accountChanged);
   BR.on('consent.withdrawn', consentWithdrawn);
   BR.on('app.state', function(p){ if (p && p.state === 'background'){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
-  BR.on('ask.start', askStart);
+  /* the read native starts is not the person's own question: startRead() notes it while askStart runs (§3.5) */
+  BR.on('ask.start', function(p){ ASK_ORIGIN = 'followUp'; try { askStart(p); } finally { ASK_ORIGIN = null; } });
   BR.on('analysis.level', lvlApply);
   BR.on('speech.state', function(p){ fsmEvent('speech.state', p); });
   BR.on('speech.level', function(p){ SPEECH.lvl = clamp(+(p && p.level) || 0, 0, 1); SPEECH.at = clk; });

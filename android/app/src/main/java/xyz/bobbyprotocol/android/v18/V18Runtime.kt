@@ -28,8 +28,8 @@ interface V18Desk {
     val riskNotice: RiskNotice
     /**
      * The app page (not onboarding) asked for its session: it can draw a nudge. It is not yet a page
-     * that takes `ask.start`: it asks for its session first and wakes up afterwards, and only its
-     * idle home or a finished read starts a question (the host waits for that, see `pageReady`).
+     * that takes `ask.start`: it asks for its session first and wakes up afterwards, and it starts
+     * no question while it wakes (the host waits for that, see `pageReady`).
      */
     val onGlass: Boolean
     /** A read is running. */
@@ -129,13 +129,15 @@ class V18Runtime(
     }
 
     private val deliveredListeners = Listeners<(ReadSummary) -> Unit>()
-    private val savedListeners = Listeners<(String, String) -> Unit>()
+    private val pickedListeners = Listeners<(String) -> Unit>()
+    private val savedListeners = Listeners<(String, String, Int?) -> Unit>()
     private val activeListeners = Listeners<() -> Unit>()
     private val accountListeners = Listeners<() -> Unit>()
     private val consentListeners = Listeners<() -> Unit>()
     private val languageListeners = Listeners<() -> Unit>()
     private val deletedListeners = Listeners<(String) -> Unit>()
     private val eraseListeners = Listeners<(String?) -> Unit>()
+    private val forgottenListeners = Listeners<(String) -> Unit>()
     private val tapHandlers = HashMap<String, (Map<String, String>) -> Unit>()
     private val tapChecks = HashMap<String, (Map<String, String>) -> Boolean>()
     private val dueHandlers = HashMap<String, (Map<String, String>) -> Boolean>()
@@ -269,8 +271,8 @@ class V18Runtime(
 
     /**
      * The page's first call after a load: it hears events from here on, and it is still waking up.
-     * It takes `ask.start` only from its idle home or a finished read, which it reaches about a
-     * second later on its own clock, and that clock stands still under a sheet. So a stored tap does
+     * It takes no `ask.start` until it is at its idle home, which it reaches about a second later
+     * on its own clock, and that clock stands still under a sheet. So a stored tap does
      * not open over it yet: a board opened now would sit over a glass that never drew, and the
      * question its row asks would be dropped by a page that is not listening. The tap opens once
      * the page has had `SETTLE_MS` in front with nothing over it.
@@ -308,9 +310,14 @@ class V18Runtime(
         }
     }
 
-    /** A delivered read (`status: "ok"`): what the sources and the hooks may look at. Never the question. */
-    fun readDelivered(read: JSONObject) {
-        val summary = ReadSummary.from(read) ?: return
+    /**
+     * A delivered read (`status: "ok"`): what the sources and the hooks may look at. Never the question.
+     * `origin` is who started it, as the session decided when it was asked. It has no default on
+     * purpose: a caller that forgot it would make every chip and every picked question the
+     * person's own, and each would start a chain of follow-ups.
+     */
+    fun readDelivered(read: JSONObject, origin: ReadOrigin) {
+        val summary = ReadSummary.from(read)?.copy(origin = origin) ?: return
         shelf.put(summary)
         nudges.noteRead(NudgeRead(summary.requestId, summary.symbol, summary.name, summary.isEquity, summary.verdict, false, clock(),
                                   MemoryReceipts.fromJson(read.optJSONObject("memory"))))
@@ -323,10 +330,33 @@ class V18Runtime(
         drainSoon()
     }
 
-    /** The person saved a read. The session tells the page afterwards. */
-    fun readSaved(requestId: String, symbol: String) {
+    /** The person tapped the question Bobby's CIO wrote for a read about `symbol`. Never the words. */
+    fun nextQuestionPicked(symbol: String) {
+        if (closed) return
+        pickedListeners.each { it(symbol) }
+    }
+
+    // ---- One-tap questions (what the session asks) ----
+
+    override var oneTap: OneTapRule = OneTapRule.ALWAYS
+
+    /**
+     * After a read with this access receipt, answered at `level`: may its row carry a question that
+     * asks by itself? A rule that fails is a no. Nothing is lost but a chip, and Bobby never leads into a wall.
+     */
+    fun offersOneTapAfterRead(access: JSONObject?, level: String = "rapido"): Boolean =
+        try { oneTap.afterRead(access, level) } catch (_: Exception) { false }
+
+    /** On the idle home. A rule that fails changes nothing, as not knowing changes nothing. */
+    fun offersOneTapOnHome(): Boolean = try { oneTap.onHome() } catch (_: Exception) { true }
+
+    /**
+     * The person saved a read. `reviewHours` is the review they chose on the save (24, 72 or 168),
+     * null when the save offered none. The session tells the page afterwards.
+     */
+    fun readSaved(requestId: String, symbol: String, reviewHours: Int? = null) {
         nudges.noteSaved(requestId)
-        savedListeners.each { it(requestId, symbol) }
+        savedListeners.each { it(requestId, symbol, reviewHours) }
     }
 
     /** Another reader. Called as soon as the session's owner and epoch are the new ones, before anything suspends. */
@@ -488,11 +518,13 @@ class V18Runtime(
     private fun keeps(handler: (String) -> Boolean, url: String): Boolean = try { handler(url) } catch (_: Exception) { false }
 
     /**
-     * Hands a question to the page. The page takes `ask.start` only from its idle home or a
-     * finished read, and says nothing when it does not (it is still waking up after a load, or a
-     * sheet has only just left). So the host checks: while the token is still unused it offers the
-     * same question again, a few times, and then lets it go. The token is single use, so a
-     * question is never asked twice.
+     * Hands a question to the page. The page takes `ask.start` wherever a new read is what the
+     * person expects: its idle home, a finished read, its cards, an open keyboard, another face of
+     * the sphere (the table of ios/Bobby/Nucleo/ARCHITECTURE.md §9.5, which the page tests run
+     * against this copy too). Where it does not, it says nothing: it is still waking up after a
+     * load, coming home from a read, writing a save, or a sheet has only just left. So the host
+     * checks: while the token is still unused it offers the same question again, a few times, and
+     * then lets it go. The token is single use, so a question is never asked twice.
      */
     private fun emitAskStart(symbol: String, name: String, isEquity: Boolean, question: String) {
         val token = desk.readToken(symbol, name, isEquity, question)
@@ -610,7 +642,8 @@ class V18Runtime(
     }
 
     override fun onReadDelivered(listener: (ReadSummary) -> Unit): () -> Unit = deliveredListeners.add(listener)
-    override fun onReadSaved(listener: (String, String) -> Unit): () -> Unit = savedListeners.add(listener)
+    override fun onNextQuestionPicked(listener: (String) -> Unit): () -> Unit = pickedListeners.add(listener)
+    override fun onReadSaved(listener: (String, String, Int?) -> Unit): () -> Unit = savedListeners.add(listener)
     override fun onAppActive(listener: () -> Unit): () -> Unit = activeListeners.add(listener)
     override fun onAccountChanged(listener: () -> Unit): () -> Unit = accountListeners.add(listener)
     override fun onConsentWithdrawn(listener: () -> Unit): () -> Unit = consentListeners.add(listener)
@@ -621,6 +654,13 @@ class V18Runtime(
     override fun eraseEverything() {
         val owner = desk.owner
         eraseListeners.each { it(owner) }
+        sessionChanged()
+    }
+
+    override fun onAssetForgotten(listener: (String) -> Unit): () -> Unit = forgottenListeners.add(listener)
+
+    override fun assetForgotten(symbol: String) {
+        forgottenListeners.each { it(symbol) }
         sessionChanged()
     }
 

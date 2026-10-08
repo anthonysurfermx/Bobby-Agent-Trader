@@ -2,7 +2,8 @@ name: Android
 
 on:
   pull_request:
-    paths: ['android/**', '.github/workflows/android.yml']
+    # shared/harness holds the golden file every platform's follow-up planner must pass.
+    paths: ['android/**', 'shared/harness/**', '.github/workflows/android.yml']
   workflow_dispatch:
 
 permissions:

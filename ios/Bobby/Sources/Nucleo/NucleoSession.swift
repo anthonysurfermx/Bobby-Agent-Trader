@@ -107,6 +107,8 @@ final class NucleoSession: ObservableObject {
     /// The harness this session feeds and draws from. Nil in fixture mode and in the unit-test host
     /// (suites that test it pass their own).
     let harness: HarnessCenter?
+    /// 1.8: what the phone knows about the level a chip would run at (the one the person saved).
+    let levels = HarnessLevels()
     /// Whose thesis book a reminder tap is read against; tests stand in for the signed-in account.
     var reminderOwner: (() -> String?)?
     var briefingGate: BriefingTapGate!
@@ -179,7 +181,8 @@ final class NucleoSession: ObservableObject {
         desk.askStarted = { [weak self] token in self?.readStarted(token: token) }
         // Bobby's own question is put after a read only when the receipt of that read says the next
         // one is answered: it never leads into the sign-in or the paywall. (Fixture replies carry no receipt.)
-        if !fixtures { desk.offersNextQuestion = { HarnessWall.open($0) } }
+        levels.saved = { [unowned desk = self.desk] in desk.currentLevel() }
+        if !fixtures { desk.offersNextQuestion = { [weak self] access, level in self?.offersOneTap(afterRead: access, at: level) ?? false } }
         desk.sessionChanged = { [weak self] in self?.sessionChanged() }
         speech.emit = { [weak self] name, payload in
             self?.emit(name, payload)
@@ -373,8 +376,29 @@ final class NucleoSession: ObservableObject {
         // Bobby never invites someone into a wall: when the phone KNOWS the next read is refused, the
         // home offers no chip that asks by itself. Not knowing (a first launch, no network) changes
         // nothing, and without the key the session is what it always was.
-        if let harness, HarnessWall.closed(harness.access()) { json["oneTap"] = false }
+        if homeIsAtTheWall { json["oneTap"] = false }
         return json
+    }
+
+    // MARK: - A question that asks by itself (1.8)
+
+    /// After a read with this access receipt, answered at `level`: may its row carry a question that
+    /// asks by itself? Two meters are asked. The question Bobby's CIO wrote runs at Quick: the receipt
+    /// counts those. A chip ("How is BTC looking?") runs at the level the person saved: Deep and Max
+    /// have an allowance of their own, and with it used up the upgrade wall (or the sign-in) is what a
+    /// chip would open. One answer covers the whole row, so both must hold, and after a read not
+    /// knowing is a no, for the level as for the receipt. Nothing is lost but a chip.
+    func offersOneTap(afterRead access: BobbyReadAccess?, at level: NucleoAnalysisLevel) -> Bool {
+        levels.heard(level)
+        return HarnessWall.open(access) && levels.open(access) == true
+    }
+
+    /// The idle home, from what the phone knows now: the next read is refused, or a chip would run
+    /// at a level that is used up. Not knowing is not the wall: the home keeps its chips.
+    var homeIsAtTheWall: Bool {
+        guard let harness else { return false }
+        let said = harness.access()
+        return HarnessWall.closed(said) || levels.open(said) == false
     }
 
     // MARK: - The nudge (1.8)
@@ -494,16 +518,18 @@ final class NucleoSession: ObservableObject {
     private var readOffer: ReadOffer?
 
     /// How often a question the page did not take is offered again, and how far apart.
-    /// The page takes `ask.start` only from its idle home (or a finished read's FOLLOWUPS) and says
-    /// nothing when it does not: it is still waking after a load, or coming home from a read it just
-    /// closed. Those are the states that end by themselves, in 1.4 s and 1.7 s of the page's clock at
-    /// the most (Nucleo/tests/bridge-boot.test.mjs pins both). Eight offers half a second apart
-    /// reach 4 s after the first one: more than twice the longest of them, for a phone that draws
-    /// slowly, and still close enough to the tap that the read is its answer and not a surprise.
-    /// Half a second apart, because that is the longest a page that has just come home is kept
-    /// waiting, and an offer costs one event the page ignores. A page that stays where it is (a
-    /// finished read still on the glass, an open keyboard) takes none of them: the question is
-    /// dropped and nothing is written, and only a change to the page can do better.
+    /// The page takes `ask.start` wherever a new read is what the person expects: its idle home, a
+    /// finished read, its cards, an open keyboard, another face of the sphere (the table of
+    /// Nucleo/ARCHITECTURE.md §9.5). Where it does not, it says nothing: it is still waking after
+    /// a load, coming home from a read it just closed, or writing a save. Those are the states
+    /// that end by themselves, in 1.4 s, 1.7 s and 1.8 s of the page's clock at the most
+    /// (Nucleo/tests/bridge-boot.test.mjs and ask-start.cases.mjs pin them). Eight offers half a
+    /// second apart reach 4 s after the first one: more than twice the longest of them, for a
+    /// phone that draws slowly, and still close enough to the tap that the read is its answer and
+    /// not a surprise. Half a second apart, because that is the longest a page that has just come
+    /// home is kept waiting, and an offer costs one event the page ignores. Where the page stays
+    /// and still says no (the person's own question waits at a sign-in or Bobby Pro gate, consent
+    /// is missing) the offers run out: the question is dropped and nothing is written.
     static let readOfferRepeats = 8
     var readOfferSpacing: TimeInterval = 0.5
 
@@ -1302,12 +1328,14 @@ final class NucleoSession: ObservableObject {
             .compactMap { $0 }
             .sink { [weak self] _ in self?.scheduleBriefingDrain() }
             .store(in: &cancellables)
-        // 1.8: the phone heard how many reads are left (a receipt, the meter read at launch, a purchase).
-        // When that flips whether the next read is refused, the home loses or regains its one-tap chips.
-        if let harness {
-            Publishers.Merge(BobbyAccessCenter.shared.$access.map { _ in () }, NucleoLevelCenter.shared.$quickAccess.map { _ in () })
+        // 1.8: the phone heard how many reads are left (a receipt, the meter read at launch, a purchase),
+        // what a level has left, or which level a chip would run at. When that flips whether the home
+        // is at the wall, it loses or regains its one-tap chips.
+        if harness != nil {
+            Publishers.Merge4(BobbyAccessCenter.shared.$access.map { _ in () }, NucleoLevelCenter.shared.$quickAccess.map { _ in () },
+                              NucleoLevelCenter.shared.$meters.map { _ in () }, NucleoLevelCenter.shared.$level.map { _ in () })
                 .receive(on: DispatchQueue.main)
-                .map { [weak harness] in HarnessWall.closed(harness?.access()) }
+                .map { [weak self] in self?.homeIsAtTheWall ?? false }
                 .removeDuplicates()
                 .dropFirst()
                 .sink { [weak self] _ in self?.sessionChanged() }

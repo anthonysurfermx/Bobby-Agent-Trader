@@ -113,3 +113,29 @@ test('builder rejects obsolete, incomplete or foreign-platform consent without g
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('a chip is 40 px to the eye and answers to 48 dp under a finger on the most common Android screen', () => {
+  // The stage is 390 x 844 px, scaled to fit the WebView (app/10-core.js: fitS = min(w / 390, h / 844)). The page is
+  // drawn between the status bar and the navigation bar: on a 360 x 800 dp phone that leaves about 707 dp of height
+  // (measured on the CI emulator, where a 40 px chip is 67 device pixels at 2 px per dp).
+  const css = read('src/app/template.html');
+  const chip = css.match(/\.chip\{([^}]*)\}/);
+  assert.ok(chip, 'the chip rule');
+  assert.match(chip[1], /position:absolute/, 'the tap area is laid out against the chip itself');
+  const tall = Number(chip[1].match(/(?:^|;)height:(\d+)px/)[1]);
+  assert.equal(tall, 40, 'what the eye sees is unchanged');
+  const area = css.match(/\.chip::before\{([^}]*)\}/);
+  assert.ok(area, 'a chip has a tap area of its own');
+  assert.match(area[1], /content:''/);
+  assert.match(area[1], /position:absolute;left:0;right:0/, 'as wide as the chip, no wider: it never reaches a neighbour');
+  const above = Number(area[1].match(/top:-(\d+)px/)[1]), below = Number(area[1].match(/bottom:-(\d+)px/)[1]);
+  const scale = Math.min(360 / 390, 707 / 844);
+  assert.ok((tall + above + below) * scale >= 48, `${tall + above + below} px at ${scale.toFixed(3)} is ${((tall + above + below) * scale).toFixed(1)} dp`);
+  // It stays clear of what is around the row: the pill below the idle row, and nothing a tap could miss above it.
+  const idleTop = Number(read('src/app/55-read.js').match(/var CHIP_TOP = (\d+)/)[1]);
+  const pillTop = Number(css.match(/#pill\{[^}]*top:(\d+)px/)[1]);
+  assert.ok(idleTop + tall + below < pillTop, 'the tap area ends above the pill');
+  // The two-line question chip is a chip too (min-height 40 px): the same rule covers it, and "Got it" on the nudge.
+  assert.match(css, /\.chip\.ask\{height:auto;min-height:40px/);
+  assert.match(css, /\.chip\.nudge\{/);
+});

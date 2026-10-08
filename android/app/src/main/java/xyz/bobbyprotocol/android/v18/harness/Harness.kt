@@ -5,16 +5,95 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
+import org.json.JSONObject
+import xyz.bobbyprotocol.android.v18.NudgeCenter
+import xyz.bobbyprotocol.android.v18.OneTapRule
+import xyz.bobbyprotocol.android.v18.ReadOrigin
+import xyz.bobbyprotocol.android.v18.ThesisBook
 import xyz.bobbyprotocol.android.v18.V18Host
 import xyz.bobbyprotocol.android.v18.V18Routes
+import xyz.bobbyprotocol.android.v18.credits.CreditsCenter
+import xyz.bobbyprotocol.android.v18.credits.CreditsLevel
+import xyz.bobbyprotocol.android.v18.credits.LevelMeter
+import xyz.bobbyprotocol.android.v18.credits.ReadAccess
 
 // The harness (1.8): where the centre meets the app. One centre per host (the activity), shared by
 // the two lines on the glass, the board and the Follow-ups switch, and fed by the host's hooks.
 // On iOS this is `HarnessCenter.start()`, `HarnessIntent` and the lines of NucleoSession that call
 // the harness; here the host already stores a tapped notification until the glass can honour it.
+//
+// Where the wall is read from (iOS: BobbyAccessCenter and NucleoLevelCenter): the receipt of the
+// latest reply, as the session hands it to the one-tap rule, and after it the balance the Credits
+// centre holds (it asks the server again after every read, at no cost). "The next read would be
+// refused" is the server's own word (`paywall` behind a limit with nothing left): on Android what
+// stands there is the sign-in for a guest and the Bobby Pro screen for a free account. Google Play
+// is not asked.
+
+/**
+ * What the phone last heard about the reader's reads, newest first. The receipt of a reply stands
+ * until the balance is heard to say something else (the read was counted, a code was redeemed,
+ * Bobby Pro was bought, the week turned over): from then on the balance is the later word.
+ */
+internal class HarnessReceipts(private val host: V18Host, private val balance: () -> ReadAccess?) {
+    private var receipt: ReadAccess? = null
+    private var owner: String? = null
+    private var epoch = 0L
+    /** What the balance said when the receipt was heard. */
+    private var balanceThen: ReadAccess? = null
+
+    /** A read was just answered with this receipt (null: the server sent none). */
+    fun heard(access: ReadAccess?) {
+        receipt = access
+        owner = host.owner
+        epoch = host.accountEpoch
+        balanceThen = balance()
+    }
+
+    fun current(): ReadAccess? {
+        val said = balance()
+        if (receipt != null && (owner != host.owner || epoch != host.accountEpoch || said != balanceThen)) receipt = null
+        return HarnessWall.current(listOf(receipt, said), host.now())
+    }
+}
+
+/**
+ * What the phone knows about the level a chip would run at (the one the person saved). The meters
+ * are the ones Credits holds; a read just answered at a level is not in them until the balance is
+ * read again, so it is counted here until the meters are heard to say something else.
+ */
+internal class HarnessLevels(private val host: V18Host, private val meters: () -> Map<CreditsLevel, LevelMeter>) {
+    /** The level of a read answered since the meters last changed, when it has an allowance of its own. */
+    private var spentLevel: String? = null
+    private var owner: String? = null
+    private var epoch = 0L
+    private var metersThen: Map<CreditsLevel, LevelMeter> = emptyMap()
+
+    /** A read was just answered at `level`. */
+    fun heard(level: String) {
+        spentLevel = level.takeIf { it != HarnessWall.QUICK }
+        owner = host.owner
+        epoch = host.accountEpoch
+        metersThen = meters()
+    }
+
+    /** `HarnessWall.levelOpen` for the level saved now: true, false, or null when the phone cannot tell. */
+    fun open(access: ReadAccess?): Boolean? {
+        val said = meters()
+        if (spentLevel != null && (owner != host.owner || epoch != host.accountEpoch || said != metersThen)) spentLevel = null
+        val level = host.analysisLevel
+        val meter = CreditsLevel.entries.firstOrNull { it.id == level }?.let { said[it] }
+        return HarnessWall.levelOpen(level, access, meter, if (spentLevel == level) 1 else 0)
+    }
+}
 
 object Harness {
     private const val SERVICE = "harness.center"
+    private const val RECEIPTS = "harness.receipts"
+
+    /** The balance as Credits holds it for the reader who is here now. Nothing is known before the risk notice. */
+    private fun receiptsOf(host: V18Host): HarnessReceipts = host.service(RECEIPTS) {
+        HarnessReceipts(host) { if (host.riskAccepted) CreditsCenter.of(host).access() else null }
+    }
 
     /** The centre of this host, built and started the first time it is asked for. */
     fun center(host: V18Host): HarnessCenter = host.service(SERVICE) { start(host) }
@@ -22,10 +101,12 @@ object Harness {
     /**
      * A row of a board was tapped: that is acting on a follow-up, and Bobby is asked about it. The
      * sheet goes away first, then the page hears about the read. False when the glass cannot take
-     * a question now.
+     * a question now, and when the next read would be refused: a row never leads into a sign-in or
+     * a paywall (the sheet draws it plain then, and this is the second lock).
      */
     fun pick(host: V18Host, row: HarnessBoard.Row): Boolean {
         val center = center(host)
+        if (!center.readsOpen) return false
         center.notePicked(row.symbol)
         return host.startRead(row.symbol, row.name, row.isEquity, center.copy.lookQuestion(row.symbol))
     }
@@ -41,6 +122,8 @@ object Harness {
         // briefing reminder checks it with the server): Pro with that switch on has its Monday.
         center.weeklyCovered = { host.signedIn && host.briefingNotifications && host.billing.value.isPro }
         center.market = { symbol -> quote(host, symbol) }
+        // "Forget" on an asset in Memory: its follow-up notes go with it, and the follow-up that was coming.
+        host.onAssetForgotten { symbol -> host.scope.launch(start = CoroutineStart.UNDISPATCHED) { center.forget(symbol) } }
         // The page is told once, after the turn that changed the line: several changes in one turn
         // are one redraw, and nothing is sent from inside a hook the session is still running.
         var redrawQueued = false
@@ -54,13 +137,81 @@ object Harness {
             }
         }
         // What was erased is no longer named in the history of what the glass said: a move line's id
-        // carries the asset and the day it was asked about.
-        center.onErased = { if (center.owner == host.owner) host.nudges.forgetIds(listOf(HarnessNudges.MOVE_KEY + ".")) }
+        // carries the asset and the day it was asked about. For the reader on the glass the centre
+        // that serves the lines lets go of them too; for anyone else only what is stored goes.
+        center.forgetLines = { symbol, reader ->
+            val prefixes = listOf(HarnessNudges.movePrefix(symbol))
+            if (reader == host.owner) host.nudges.forgetIds(prefixes) else NudgeCenter.forget(prefixes, reader, host.store)
+        }
+        center.linesKept = { reader -> NudgeCenter.count(HarnessNudges.movePrefix(), reader, host.store) }
+        // A yes that was erased is asked for again: the glass forgets it ever made the offer to that reader.
+        center.forgetOffer = { reader ->
+            val offer = listOf(HarnessNudges.OFFER_ID)
+            if (reader == host.owner) host.nudges.forgetIds(offer) else NudgeCenter.forget(offer, reader, host.store)
+        }
+        center.pruneLines = { reader, before -> NudgeCenter.prune(HarnessNudges.movePrefix(), before, reader, host.store) }
+        // Bobby never invites someone into a wall. What the phone knows about the reader's reads:
+        val receipts = receiptsOf(host)
+        center.access = { receipts.current() }
+        center.refreshAccess = { if (host.riskAccepted) CreditsCenter.of(host).load() }
+        // The session asks before it puts a question that asks by itself in front of the reader.
+        // After a read: that read's own receipt must say the next one is answered. On the home: only
+        // knowing the next one is refused takes the chips away (a first launch keeps them).
+        // Two meters are asked. The question Bobby's CIO wrote runs at Quick: the receipt counts
+        // those. A chip runs at the level the person saved: Deep and Max have an allowance of their
+        // own, and with it used up the paywall (or the sign-in) is what a chip would open. One
+        // answer covers the whole row, so both must hold.
+        val levels = HarnessLevels(host) { if (host.riskAccepted) CreditsCenter.of(host).snapshot().meters else emptyMap() }
+        var homeClosed = false
+        fun closedNow(): Boolean {
+            val said = receipts.current()
+            return HarnessWall.closed(said) || levels.open(said) == false
+        }
+        fun wallMoved() {
+            val closed = closedNow()
+            if (closed != homeClosed) {
+                homeClosed = closed
+                center.changed()
+            }
+        }
+        host.oneTap = object : OneTapRule {
+            override fun afterRead(access: JSONObject?): Boolean = afterRead(access, HarnessWall.QUICK)
+
+            override fun afterRead(access: JSONObject?, level: String): Boolean {
+                val receipt = ReadAccess.fromJson(access)
+                receipts.heard(receipt)
+                levels.heard(level)
+                // The session is sent again right after a delivered read: the home's row follows by itself.
+                homeClosed = closedNow()
+                // After a read not knowing is a no, for the level as for the receipt.
+                return HarnessWall.open(receipt) && levels.open(receipt) == true
+            }
+
+            override fun onHome(): Boolean = !closedNow()
+        }
+        // The reader's active theses as the planner reads them: the asset and the horizon set on it, never the words.
+        center.theses = { owner ->
+            host.theses.active(owner).map { thesis -> HarnessThesis(thesis.symbol, thesis.horizon?.let { HarnessHorizon.ofThesis(it) }, thesis.createdAtMillis) }
+        }
         center.load(host.owner)
 
-        // From the first delivered read. Never the question: a symbol, a name, a price.
-        host.onReadDelivered { read -> center.noteAsk(read.symbol, read.name, read.isEquity, read.price) }
-        host.onReadSaved { _, symbol -> center.noteSaved(symbol) }
+        // From the first delivered read. Never the question: a symbol, a name, a price, and who wrote
+        // the words. Only a question the person asked in their own words is followed up: a read Bobby
+        // started (a follow-up's button, a board row, the question after a read, a chip) is told apart
+        // here, and `chip` lets the centre keep a chip's read the way a question is before the yes.
+        host.onReadDelivered { read ->
+            val bobbys = read.origin == ReadOrigin.FOLLOW_UP || read.origin == ReadOrigin.CHIP
+            center.noteAsk(read.symbol, read.name, read.isEquity, read.price,
+                           origin = if (bobbys) HarnessEvent.Origin.FOLLOW_UP else null, chip = read.origin == ReadOrigin.CHIP,
+                           thread = read.origin == ReadOrigin.THREAD, horizon = HarnessHorizon.named(read.horizon))
+        }
+        // The review they chose on the save (72 or 168 hours) times the follow-up that was coming.
+        host.onReadSaved { _, symbol, reviewHours -> center.noteSaved(symbol, reviewHours) }
+        // A thesis of this reader was written, changed or archived: its horizon times the next follow-up.
+        host.theses.addListener { changed -> if (changed == ThesisBook.key(center.owner)) center.thesesChanged() }
+        // The person tapped the question Bobby's CIO wrote after a read: that is acting on what Bobby put
+        // in front of them, counted by asset (only while the centre may record). The words are not kept.
+        host.onNextQuestionPicked { symbol -> center.notePicked(symbol) }
         // Everything up to a price read runs inside the hook, so the centre never holds the
         // previous reader while the next one is already on the glass.
         host.onAppActive { host.scope.launch(start = CoroutineStart.UNDISPATCHED) { center.appActive() } }
@@ -103,14 +254,27 @@ object Harness {
             yield()
             center.appActive()
         }
+        // The phone heard how many reads are left (the balance read at launch, a code, a purchase):
+        // when that flips whether the next read is refused, the home loses or regains its one-tap
+        // chips and the line on the glass its button. After this turn too, so that the Credits centre
+        // is the one the app (or a suite) registered.
+        host.scope.launch {
+            yield()
+            homeClosed = closedNow()
+            CreditsCenter.of(host).revision.collect { wallMoved() }
+        }
         return center
     }
 
-    /** One price, without spending a read. Null before the risk notice, on any failure, and after eight seconds. */
+    /**
+     * One price, without spending a read. Null before the risk notice, on any failure, and after
+     * eight seconds. The person did not tap for it, so the request names nobody: the symbol, and
+     * neither the account nor the device.
+     */
     private suspend fun quote(host: V18Host, symbol: String): HarnessQuote? {
         if (!host.riskAccepted) return null
         return try {
-            withTimeoutOrNull(HarnessCenter.QUOTE_TIMEOUT_MS) { host.repository.market(symbol) }?.let { HarnessQuote(it.price, it.changePct) }
+            withTimeoutOrNull(HarnessCenter.QUOTE_TIMEOUT_MS) { host.repository.quote(symbol) }?.let { HarnessQuote(it.price, it.changePct) }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {

@@ -57,12 +57,20 @@ android {
         }
     }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
-    testOptions { unitTests.isReturnDefaultValues = true }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+        // A failed assertion says what it expected in the log, not only the line it was on: nobody can
+        // open the HTML report of a CI run, and one round costs ten minutes.
+        unitTests.all { it.testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
+    }
     sourceSets.getByName("main").java.srcDir(if (fcmEnabled) "src/fcm/java" else "src/noFcm/java")
     // What the JVM tests and the instrumented tests both stand on (the 1.8 host over a desk and a
     // screen in memory, the memory gateway): one copy, compiled into both, shipped in neither APK.
     sourceSets.getByName("test").java.srcDir("src/sharedTest/java")
     sourceSets.getByName("androidTest").java.srcDir("src/sharedTest/java")
+    // The reads the page's own tests are fed (android/nucleo/tests/fixtures/ask): the instrumented page
+    // test hands the same ones to the bundled page in a WebView. In the test APK only.
+    sourceSets.getByName("androidTest").assets.srcDir("../nucleo/tests/fixtures")
     if (fcmEnabled) {
         // Build-type manifests merge with main; the OAuth Activity remains in the main manifest.
         sourceSets.getByName("debug").manifest.srcFile("src/fcm/AndroidManifest.xml")

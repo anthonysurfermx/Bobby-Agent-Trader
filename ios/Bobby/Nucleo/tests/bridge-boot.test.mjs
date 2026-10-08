@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
+import { askStartCases } from './ask-start.cases.mjs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const locale = read('../src/shared/05-locale.js');
@@ -57,7 +58,8 @@ class Element {
 }
 
 function harness({ legacyEvents = false, language = 'en', rejectCollections = false, nudgeActive = true,
-  suggestions = { v: 1, quickAccess: [] }, holdAsks = false, measure = null, stallCollections = false } = {}) {
+  suggestions = { v: 1, quickAccess: [] }, holdAsks = false, measure = null, stallCollections = false,
+  theses = { v: 1, items: [] }, saved = null, speak = 'muted' } = {}) {
   const nodes = new Map(), calls = [], errors = [], pending = [];
   const made = () => Object.assign(new Element(), { measure });
   for (const match of template.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)) {
@@ -94,8 +96,8 @@ function harness({ legacyEvents = false, language = 'en', rejectCollections = fa
       if (stallCollections && ['theses', 'roster'].includes(envelope.method)) return new Promise(() => {});
       // A read the test answers itself (answer()), read silently so the page's own clock runs it.
       if (holdAsks && envelope.method === 'ask') return new Promise((resolve) => pending.push((result) => resolve({ v: 1, ok: true, result })));
-      if (holdAsks && envelope.method === 'speak') return Promise.resolve({ v: 1, ok: true, result: { status: 'muted' } });
-      const result = { session, roster, theses: { v: 1, items: [] }, island: { v: 1, available: false }, suggestions,
+      if (holdAsks && envelope.method === 'speak') return Promise.resolve({ v: 1, ok: true, result: { status: speak } });
+      const result = { session, roster, theses, island: { v: 1, available: false }, suggestions, saveThesis: saved,
         'nudge.seen': { count: 1, active: nudgeActive }, 'nudge.act': { status: 'done' } }[envelope.method] || { v: 1, opened: true };
       return Promise.resolve({ v: 1, ok: true, result });
     } } } },
@@ -273,7 +275,7 @@ test('no nudge, a malformed nudge or one without a button draws nothing and repo
 
 // ---- a read native starts (1.8): a follow-up's button or a row of a native board. Native names the asset
 // inside a single-use token and writes the question; the page runs it like a chip that carries a token ----
-test('ask.start asks with the token native issued, from the idle home, and never under a sheet or over a read', async () => {
+test('ask.start asks with the token native issued, from the idle home, and never under a sheet or while a read is on its way', async () => {
   const app = harness();
   app.boot(); await flush(); app.advance(1.2); await flush();
   assert.equal(app.context.nucleo.state(), 'IDLE');
@@ -295,15 +297,25 @@ test('ask.start asks with the token native issued, from the idle home, and never
 
 test('the page never writes nudge copy: no feature words live in the nudge code path', () => {
   const source = read('../src/app/55-read.js');
-  const block = source.slice(source.indexOf('/* ---- the nudge:'), source.indexOf('function receiveSuggestions'));
+  const block = source.slice(source.indexOf('/* ---- the nudge:'), source.indexOf('/* ---- a read native starts'));
   assert.ok(block.length > 200);
   assert.doesNotMatch(block, /tt\(|RMOD\.t\(/);                       // native-localized text only
   assert.doesNotMatch(block, /['"][^'"\n]*(credit|thesis|remind|invit|briefing)[^'"\n]*['"]/i);   // no feature copy in string literals
 });
 
-test('the Android page carries the same nudge code as iOS', () => {
+test('the Android page carries the same nudge code as iOS, and takes a read native starts from the same states', () => {
   const cut = (source) => source.slice(source.indexOf('/* ---- the nudge:'), source.indexOf('function receiveSuggestions'));
   assert.equal(cut(read('../../../../android/nucleo/src/app/55-read.js')), cut(read('../src/app/55-read.js')));
+  assert.ok(cut(read('../src/app/55-read.js')).includes('var ASK_FROM = {') && cut(read('../src/app/55-read.js')).includes('function askStart(p){'));
+  // What askStart leans on in the state machine: the turn back to the Desk face, and where a row is taken away.
+  const face = (source) => source.slice(source.indexOf('/* the sphere turns back to its Desk face'), source.indexOf('STATES.FACES = {'));
+  assert.ok(face(read('../src/app/60-fsm.js')).includes('function deskFace(){'));
+  assert.equal(face(read('../../../../android/nucleo/src/app/60-fsm.js')), face(read('../src/app/60-fsm.js')));
+  const row = (source) => source.slice(source.indexOf('/* ---- chips: born from the pill'), source.indexOf('function oneTapOff'))
+    + source.slice(source.indexOf('function chipsHide('), source.indexOf('/* ---- the live transcript'));
+  assert.ok(row(read('../src/app/55-read.js')).includes('op(c.el, 0)'));
+  assert.equal(row(read('../../../../android/nucleo/src/app/55-read.js')), row(read('../src/app/55-read.js')));
+  assert.equal(read('../../../../android/nucleo/src/app/30-dom.js'), read('../src/app/30-dom.js'), 'the DOM helpers and the belt are one file');
 });
 
 // ---- the next question (ARCHITECTURE.md §3.5): when the voice ends, the CIO's question is the first chip of the
@@ -316,10 +328,12 @@ const OWN = { v: 1, quickAccess: [{ symbol: 'NVDA' }, { symbol: 'BTC' }, { symbo
 const rowOf = (app) => chipsOf(app).map((node) => node.textContent);
 const asksOf = (app) => app.calls.filter((call) => call.method === 'ask').map((call) => call.params);
 const tap = (app, node) => app.nodes.get('stage').listeners.click({ target: node, detail: 0 });
-async function idle(options) {
-  const app = harness({ holdAsks: true, suggestions: OWN, ...options });
+async function idle(options = {}) {
+  const { seed, from = 'IDLE', ...rest } = options;
+  const app = harness({ holdAsks: true, suggestions: OWN, ...rest });
+  if (seed) seed(app.session);
   app.boot(); await flush(); app.advance(1.2); await flush();
-  assert.equal(app.context.nucleo.state(), 'IDLE');
+  assert.equal(app.context.nucleo.state(), from);
   return app;
 }
 // From the ask to the settled hand-back: the reply, the silent read on the page's own clock, then the row (born 1 s in).
@@ -536,15 +550,16 @@ test('the onboarding page marks a first question picked on a chip the same way, 
   assert.ok(sources.includes('voice'));
 });
 
-// ---- PINNED FACTS native works around (2026-10-08). The page is not changed here: the Android copy is pinned to it.
-// The page takes `ask.start` only from IDLE or FOLLOWUPS, says nothing when it does not and remembers nothing, and its
-// own clock stands still under a native sheet. So a board opened the moment the page asks for its session freezes it
-// in WAKE, and the question a row of that board asks is dropped: the sheet closes onto the home and nothing is asked.
-// NucleoSession makes up for both (Sources/Nucleo/NucleoSession.swift, "The page wakes up" and "Reads native starts"):
-// a stored follow-up tap opens its board only once the page has had `wakeTick` x `wakeTicks` in front with nothing
-// over it, and a question the page did not take is offered again with the same single-use token, `readOfferRepeats`
-// times, `readOfferSpacing` apart. If a test below changes, those numbers and Tests/NucleoReadStartTests.swift (which
-// drives the real session against a stand-in for this page) change with it. ----
+// ---- PINNED FACTS native leans on (2026-10-08). A read native starts is taken by the page from every state in which
+// a new read is what the person expects (the table of ARCHITECTURE.md §9.5; ask-start.cases.mjs runs it on both
+// phones). Where it is not, the page says nothing and remembers nothing, and its own clock stands still under a native
+// sheet. So a board opened the moment the page asks for its session freezes it in WAKE, and the question a row of that
+// board asks is not taken: the sheet closes onto a page that is still waking. NucleoSession makes up for the states
+// that end by themselves (Sources/Nucleo/NucleoSession.swift, "The page wakes up" and "Reads native starts"): a stored
+// follow-up tap opens its board only once the page has had `wakeTick` x `wakeTicks` in front with nothing over it, and
+// a question the page did not take is offered again with the same single-use token, `readOfferRepeats` times,
+// `readOfferSpacing` apart. If a test below changes, those numbers and Tests/NucleoReadStartTests.swift (which drives
+// the real session against a stand-in for this page) change with it. ----
 test('cold start: a board opened right after the session reply freezes the wake, and the question its row asks is dropped', async () => {
   const app = harness({ holdAsks: true });
   const emit = (name, payload) => app.context.nucleoBridge.emit(name, payload);
@@ -612,9 +627,9 @@ test('one token offered several times is asked once: taken from the idle home, i
   assert.deepEqual(app.errors, []);
 });
 
-test('a page that is coming home takes a question offered again once it is there; a finished read and an open keyboard never do', async () => {
+test('a page that is coming home takes a question offered again once it is there; a finished read and an open keyboard take it at once', async () => {
   const question = 'How does NVDA look today?';
-  // RETURNING (a read was closed): 0.8 s for the cards + 0.9 s. An offer during it is dropped, the next one is taken.
+  // RETURNING (a read was closed): 0.8 s for the cards + 0.9 s. An offer during it is not taken, the next one is.
   const home = await idle();
   await personRead(home, okRead());
   tap(home, home.nodes.get('close'));
@@ -625,21 +640,24 @@ test('a page that is coming home takes a question offered again once it is there
   assert.equal(home.context.nucleo.state(), 'IDLE', 'home within the 4 s native keeps offering for');
   home.context.nucleoBridge.emit('ask.start', { token: 'tok-1', question });
   assert.deepEqual(asksOf(home).slice(1), [{ token: 'tok-1' }]);
-  // HANDBACK (a read just delivered, its row showing) stays for 90 s: no offer made in a few seconds is taken.
+  // HANDBACK (a read just delivered, its row showing) stays for 90 s of the page's clock. Until 2026-10-08 no offer
+  // made there was taken ("a board row tapped over a finished read asks nothing"); the first one is, now.
   const read = await idle();
   await personRead(read, okRead());
   assert.equal(read.context.nucleo.state(), 'HANDBACK');
-  for (let second = 0; second < 5; second++) {
-    read.context.nucleoBridge.emit('ask.start', { token: 'tok-2', question });
-    read.advance(1); await flush();
-  }
-  assert.equal(read.context.nucleo.state(), 'HANDBACK');
-  assert.equal(asksOf(read).length, 1, 'a board row tapped over a finished read asks nothing: only a page change can fix that');
-  // TYPING ("Another question"): the same, for as long as the keyboard is open.
-  tap(read, chipsOf(read)[0]);
-  assert.equal(read.context.nucleo.state(), 'TYPING');
-  read.context.nucleoBridge.emit('ask.start', { token: 'tok-3', question });
-  assert.equal(read.context.nucleo.state(), 'TYPING');
-  assert.equal(asksOf(read).length, 1);
-  assert.deepEqual(home.errors.concat(read.errors), []);
+  read.context.nucleoBridge.emit('ask.start', { token: 'tok-2', question });
+  assert.equal(read.context.nucleo.state(), 'SENDING');
+  assert.deepEqual(asksOf(read).slice(1), [{ token: 'tok-2' }], 'a board row tapped over a finished read asks Bobby');
+  // TYPING ("Another question"): the same, the keyboard closes.
+  const typing = await idle();
+  await personRead(typing, okRead());
+  tap(typing, chipsOf(typing)[0]);
+  assert.equal(typing.context.nucleo.state(), 'TYPING');
+  typing.context.nucleoBridge.emit('ask.start', { token: 'tok-3', question });
+  assert.equal(typing.context.nucleo.state(), 'SENDING');
+  assert.deepEqual(asksOf(typing).slice(1), [{ token: 'tok-3' }]);
+  assert.deepEqual(home.errors.concat(read.errors, typing.errors), []);
 });
+
+askStartCases({ test, assert, flush, Element, idle, handBack, personRead, tap, chipsOf, rowOf, asksOf, okRead, synthesis,
+  source: (file) => read('../src/' + file), architecture: read('../ARCHITECTURE.md') });

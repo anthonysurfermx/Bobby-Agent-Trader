@@ -221,7 +221,7 @@ class V18RuntimeTest {
         val heard = ArrayList<ReadSummary>()
         val saved = ArrayList<Pair<String, String>>()
         bench.host.onReadDelivered { heard.add(it) }
-        bench.host.onReadSaved { requestId, symbol -> saved.add(requestId to symbol) }
+        bench.host.onReadSaved { requestId, symbol, _ -> saved.add(requestId to symbol) }
         bench.deliver(requestId = "r1", symbol = "NVDA", verdict = "review", price = 131.2,
                       memory = JSONObject().put("recorded", true).put("asks", 3).put("lastAskedDaysAgo", 5).put("changeSinceLastAskPct", 4.2))
         val summary = heard.single()
@@ -243,8 +243,8 @@ class V18RuntimeTest {
         assertEquals(true, bench.nudges.lastRead?.saved)
         assertEquals(listOf("other" to "BTC", "r1" to "NVDA"), saved)
 
-        bench.host.readDelivered(JSONObject().put("status", "quota"))
-        bench.host.readDelivered(bench.read(requestId = "r2").put("status", "error"))
+        bench.host.readDelivered(JSONObject().put("status", "quota"), ReadOrigin.PERSON)
+        bench.host.readDelivered(bench.read(requestId = "r2").put("status", "error"), ReadOrigin.PERSON)
         assertEquals("only a delivered read counts", 1, heard.size)
         bench.desk.riskNotice = RiskNotice.WITHDRAWN
         assertNull("no summary without consent", bench.host.readSummary("r1"))
@@ -254,13 +254,105 @@ class V18RuntimeTest {
         val bench = V18TestBench(backgroundScope)
         val evidenceOnly = bench.read(requestId = "r1", price = null)
         evidenceOnly.getJSONObject("technicals").put("price", 118.0)
-        bench.host.readDelivered(evidenceOnly)
+        bench.host.readDelivered(evidenceOnly, ReadOrigin.PERSON)
         assertEquals(118.0, bench.host.readSummary("r1")?.price ?: 0.0, 0.0)
         bench.deliver(requestId = "r2", price = null)
         assertNull("a value the app does not have is not shown", bench.host.readSummary("r2")?.price)
         for (i in 3..9) bench.deliver(requestId = "r$i")
         assertNull("the last five only", bench.host.readSummary("r2"))
         assertNotNull(bench.host.readSummary("r9"))
+    }
+
+    // Who wrote the words, and what they said about how long they are looking (slice 1 of the follow-ups)
+
+    @Test fun aDeliveredReadSaysTheHorizonTheQuestionNamedAndASaveTheReviewChosen() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        val heard = ArrayList<ReadSummary>()
+        val reviews = ArrayList<Int?>()
+        bench.host.onReadDelivered { heard.add(it) }
+        bench.host.onReadSaved { _, _, reviewHours -> reviews.add(reviewHours) }
+        bench.deliver(requestId = "r1")
+        assertNull("a reply that names none says none", heard.last().horizon)
+        for (horizon in listOf("intraday", "week", "month", "long", "unspecified")) {
+            bench.host.readDelivered(bench.read(requestId = "h-$horizon").put("sufficiency", JSONObject().put("horizon", horizon).put("level", "ok")), ReadOrigin.PERSON)
+            assertEquals(horizon, heard.last().horizon)
+            assertEquals("kept with the read", horizon, bench.host.readSummary("h-$horizon")?.horizon)
+        }
+        assertEquals(setOf("intraday", "week", "month", "long", "unspecified"), ReadSummary.HORIZONS)
+        // One of the desk's five values or nothing: never a sentence, never the question.
+        bench.host.readDelivered(bench.read(requestId = "h-odd").put("sufficiency", JSONObject().put("horizon", "until the new chips ship")), ReadOrigin.PERSON)
+        assertNull(heard.last().horizon)
+        bench.host.readDelivered(bench.read(requestId = "h-number").put("sufficiency", JSONObject().put("horizon", 7)), ReadOrigin.PERSON)
+        assertNull(heard.last().horizon)
+        assertFalse(heard.joinToString().contains("own words"))
+        // The review chosen on a save: the hours when there was a choice, nothing when there was none.
+        bench.host.readSaved("r1", "NVDA")
+        bench.host.readSaved("r1", "NVDA", 168)
+        assertEquals(listOf<Int?>(null, 168), reviews)
+    }
+
+    @Test fun aDeliveredReadSaysWhoStartedItAndNothingSaysItForARestoredOne() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        val heard = ArrayList<ReadSummary>()
+        bench.host.onReadDelivered { heard.add(it) }
+        bench.deliver(requestId = "r1")
+        assertEquals("a read nobody marked is the person's own question", ReadOrigin.PERSON, heard.last().origin)
+        for ((index, origin) in ReadOrigin.entries.withIndex()) {
+            bench.host.readDelivered(bench.read(requestId = "o$index"), origin)
+            assertEquals(origin, heard.last().origin)
+            assertEquals("kept with the read, for a feature that asks later", origin, bench.host.readSummary("o$index")?.origin)
+        }
+        assertFalse("who started it is not the question: nothing of the words is kept", heard.joinToString().contains("own words"))
+        bench.host.readDelivered(JSONObject().put("status", "quota"), ReadOrigin.FOLLOW_UP)
+        assertEquals("only a delivered read counts", 1 + ReadOrigin.entries.size, heard.size)
+    }
+
+    @Test fun pickingTheQuestionBobbyWroteIsToldByItsAssetAndNeverAfterTheHostIsGone() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        val picked = ArrayList<String>()
+        val stop = bench.host.onNextQuestionPicked { picked.add(it) }
+        bench.host.onNextQuestionPicked { throw IllegalStateException("one listener failing never stops the others or the read") }
+        bench.host.nextQuestionPicked("NVDA")
+        assertEquals(listOf("NVDA"), picked)
+        stop()
+        bench.host.nextQuestionPicked("BTC")
+        assertEquals("a listener that left hears nothing", listOf("NVDA"), picked)
+        val late = ArrayList<String>()
+        bench.host.onNextQuestionPicked { late.add(it) }
+        bench.host.close()
+        bench.host.nextQuestionPicked("ETH")
+        assertTrue(late.isEmpty())
+    }
+
+    @Test fun bobbyOffersItsOneTapQuestionsUntilARuleSaysTheNextReadWouldBeRefused() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        val receipt = JSONObject().put("tier", "free").put("remaining", 0).put("paywall", true)
+        assertSame(OneTapRule.ALWAYS, bench.host.oneTap)
+        assertTrue("until a rule is set, a read hands back its question", bench.host.offersOneTapAfterRead(receipt))
+        assertTrue("and a reply without a receipt too", bench.host.offersOneTapAfterRead(null))
+        assertTrue(bench.host.offersOneTapOnHome())
+
+        val asked = ArrayList<JSONObject?>()
+        var homeOpen = true
+        bench.host.oneTap = object : OneTapRule {
+            override fun afterRead(access: JSONObject?): Boolean { asked.add(access); return access != null && access.optInt("remaining") > 0 }
+            override fun onHome(): Boolean = homeOpen
+        }
+        assertFalse(bench.host.offersOneTapAfterRead(receipt))
+        assertFalse(bench.host.offersOneTapAfterRead(null))
+        assertTrue(bench.host.offersOneTapAfterRead(JSONObject().put("remaining", 3)))
+        assertEquals("the rule sees the read's own receipt, as it came", listOf(receipt, null), asked.take(2))
+        assertTrue(bench.host.offersOneTapOnHome())
+        homeOpen = false
+        assertFalse(bench.host.offersOneTapOnHome())
+
+        // A rule that fails: after a read nothing is offered (only a chip is lost); the home stays as it was.
+        bench.host.oneTap = object : OneTapRule {
+            override fun afterRead(access: JSONObject?): Boolean = throw IllegalStateException("no meter")
+            override fun onHome(): Boolean = throw IllegalStateException("no meter")
+        }
+        assertFalse(bench.host.offersOneTapAfterRead(receipt))
+        assertTrue(bench.host.offersOneTapOnHome())
     }
 
     // Accounts and consent

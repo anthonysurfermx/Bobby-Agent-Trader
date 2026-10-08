@@ -162,6 +162,26 @@ internal object V18Json {
     }
 }
 
+/**
+ * Who started a read. A chain of follow-ups belongs to a question the person asked by themselves,
+ * typed or spoken, in their own words (iOS `NucleoReadOrigin`). The session decides it when the
+ * question is asked and carries it through a confirmation, a retry and a sign-in.
+ */
+enum class ReadOrigin {
+    /** The person, in their own words: typed or spoken. */
+    PERSON,
+    /** The person again: their own second question about the read on screen. */
+    THREAD,
+    /** Bobby: the question it wrote after a read, the button of a follow-up, a row of a board. */
+    FOLLOW_UP,
+    /**
+     * The person picked an asset on a chip and Bobby wrote the question it asks: an asset of the
+     * idle home, an asset or a mover of the row after a read, an example of the first question.
+     * One tap, not their words (the page marks it: `ask {question, chip: true}`).
+     */
+    CHIP,
+}
+
 /** What a 1.8 screen may know about a recent read (the editor drafts a thesis from it). No question text. */
 data class ReadSummary(
     val requestId: String,
@@ -175,8 +195,19 @@ data class ReadSummary(
     val why: String?,
     val risk: String?,
     val watch: String?,
+    /** Who started it. The read itself does not say: the session does (`V18Runtime.readDelivered`). */
+    val origin: ReadOrigin = ReadOrigin.PERSON,
+    /**
+     * How long the question was looking, as the desk read it (`sufficiency.horizon` in the reply:
+     * `intraday`, `week`, `month`, `long` or `unspecified`). One of five fixed values, never the
+     * person's words; null when the reply says none.
+     */
+    val horizon: String? = null,
 ) {
     companion object {
+        /** The desk's five horizons (`Horizon` in api/_lib/desk-debate.ts). Anything else is not carried. */
+        val HORIZONS: Set<String> = setOf("intraday", "week", "month", "long", "unspecified")
+
         /**
          * From a delivered read as the session hands it to the page (`status: "ok"`). The price is
          * the market's when it answered, else the one the desk's evidence carried. The question the
@@ -196,6 +227,7 @@ data class ReadSummary(
                 price = price?.takeIf { it > 0 }, asOf = V18Json.text(read.optJSONObject("provenance"), "asOf") ?: "",
                 headline = V18Json.text(synthesis, "headline"), why = V18Json.text(synthesis, "why"),
                 risk = V18Json.text(synthesis, "risk"), watch = V18Json.text(synthesis, "watch"),
+                horizon = V18Json.text(read.optJSONObject("sufficiency"), "horizon")?.takeIf { it in HORIZONS },
             )
         }
     }

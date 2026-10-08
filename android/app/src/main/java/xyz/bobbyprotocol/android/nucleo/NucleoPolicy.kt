@@ -42,6 +42,14 @@ object NucleoPolicy {
     data class Award(val counters: Counters, val points: Int)
 
     /** Genuine local offline progress; authenticated reconciliation always replaces it with server counters. */
+    /**
+     * The review the person chose when saving a read, in hours: the one the page sent, when the
+     * save kept it. A read whose verdict is to wait is saved with no review, and a save the page
+     * sent no review with did not offer one: both say nothing about when they will look again
+     * (iOS: `NucleoSession.chosenHorizon`).
+     */
+    fun chosenReview(sent: Boolean, wait: Boolean, hours: Int): Int? = if (sent && !wait) hours else null
+
     fun award(state: Counters, wait: Boolean, now: Long, offsetMinutes: Int): Award {
         val today = Instant.ofEpochMilli(now).atOffset(ZoneOffset.ofTotalSeconds(-offsetMinutes.coerceIn(-840, 840) * 60)).toLocalDate()
         val count = if (state.dailyAwardsDay == today.toString()) state.dailyAwards else 0

@@ -4,11 +4,12 @@
 # test saved on the device. CI calls it from .github/workflows/android-emulator.yml; by hand:
 # `bash android/tools/run-emulator-tests.sh`. Extra arguments go to Gradle.
 #
-# Three parts, the ones that load the least first, so that an emulator that stops under the WebGL
-# page (it has, on a runner without a GPU) costs the later parts and not the earlier ones:
+# Four parts, the ones that load the least first, so that an emulator that stops under the page
+# (it has, on a runner without a GPU) costs the later parts and not the earlier ones:
 #   screens  the 1.8 screens drawn over a staged account (no page, no activity of the app)
 #   device   the real activity with its page: the profile, the permission question, a notice, a rotation
 #   others   every other instrumented test
+#   page     the bundled page kept running in a WebView while a read plays: the line on the glass, the row after a read
 # The tests decide the result: a failed part fails this script after everything is collected.
 set -u
 cd "$(dirname "$0")/.."
@@ -19,6 +20,7 @@ out=build/emulator
 device_shots=/data/local/tmp/bobby-shots
 screens=xyz.bobbyprotocol.android.v18.V18ScreensInstrumentedTest
 device=xyz.bobbyprotocol.android.V18DeviceInstrumentedTest
+page=xyz.bobbyprotocol.android.v18.FollowUpPageInstrumentedTest
 argument=-Pandroid.testInstrumentationRunnerArguments
 
 mkdir -p "$out/shots"
@@ -42,11 +44,18 @@ part() {
   adb pull "$device_shots/." "$out/shots" > /dev/null 2>&1 || true
   # A screen test sets the system's font size and puts it back; if it was cut short, the next part still starts at 100%.
   adb shell settings put system font_scale 1.0 > /dev/null 2>&1 || true
+  # An emulator that stopped says nothing itself: what the machine's kernel saw (it ran out of memory, it crashed) is printed.
+  if ! adb get-state > /dev/null 2>&1; then
+    echo "The emulator is gone after the part '$name'. What this machine's kernel says:"
+    { sudo -n dmesg 2>/dev/null || dmesg 2>/dev/null || true; } | grep -i -E 'out of memory|killed process|segfault|general protection' | tail -8 || true
+    free -m 2>/dev/null || true
+  fi
 }
 
 part screens "$argument.class=$screens" "$@"
 part device "$argument.class=$device" "$@"
-part others "$argument.notClass=$screens,$device" "$@"
+part others "$argument.notClass=$screens,$device,$page" "$@"
+part page "$argument.class=$page" "$@"
 
 kill "$logcat" 2>/dev/null || true
 echo "Screenshots collected: $(find "$out/shots" -name '*.png' | wc -l | tr -d ' ')"
