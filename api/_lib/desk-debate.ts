@@ -7,6 +7,7 @@ import { completeJson, LlmHttpError, LlmIncompleteError, type JsonSchemaSpec, ty
 import { alternateProvider, levelPlan, type DeskLevel, type LevelPlan } from './desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
 import type { ReaderContext } from './user-memory.js';
+import { LEARNING_CONTEXT_RULE, type LearningContext } from './learning-context.js';
 import type { AppTextTier } from './app-model.js';
 
 const Paragraph = z.string().trim().min(20).max(1800);
@@ -859,7 +860,7 @@ async function reviewThesis(spec: ModelSpec, system: string, input: unknown, ver
  */
 export async function runDeskDebate(
   question: string, evidence: DeskEvidence & Partial<Awaited<ReturnType<typeof loadDeskEvidenceV2>>>, language: AppLanguage,
-  opts: { locale?: string; level?: DeskLevel; tier?: AppTextTier; usage?: LlmUsage[]; onEvent?: (event: DeskEvent) => void; signal?: AbortSignal; reader?: ReaderContext | null; thesis?: DeskThesis | null; now?: number } = {},
+  opts: { locale?: string; level?: DeskLevel; tier?: AppTextTier; usage?: LlmUsage[]; onEvent?: (event: DeskEvent) => void; signal?: AbortSignal; reader?: ReaderContext | LearningContext | null; thesis?: DeskThesis | null; now?: number } = {},
 ) {
   const level = opts.level ?? 'rapido';
   const tier = opts.tier === 'pro' ? 'pro' : 'free';
@@ -893,7 +894,7 @@ export async function runDeskDebate(
   // The reader's memory (api/_lib/user-memory.ts) reaches the CIO only, and only to frame the answer.
   const reader = opts.reader ?? null;
   const cioInput = { ...input, alpha, red, ...(rebuttal ? { rebuttal } : {}), ...(reader ? { reader } : {}) };
-  const readerRule = reader ? ` ${READER_RULE}` : '';
+  const readerRule = reader ? ` ${READER_RULE}${'version' in reader && reader.version === 1 ? ` ${LEARNING_CONTEXT_RULE}` : ''}` : '';
   const cio = plan.scenarios
     ? await role(plan.cio, 'cio', `${cioPrompt}${readerRule} Also return scenarios: confirm is one sentence naming the observable condition in the evidence that would confirm the conditional thesis, invalidate is one sentence naming the condition that would invalidate it. Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape},"scenarios":{"confirm":"...","invalidate":"..."}}.`, cioInput, VerdictWithScenarios, VERDICT_SCENARIOS_SCHEMA, ctx)
     : await role(plan.cio, 'cio', `${cioPrompt}${readerRule} Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape}}.`, cioInput, Verdict, VERDICT_SCHEMA, ctx);

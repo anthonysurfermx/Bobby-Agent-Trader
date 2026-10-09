@@ -402,8 +402,14 @@ final class NucleoSession: ObservableObject {
 
     /// One line and one button for the app page, or nil: after consent only, never under a sheet.
     func currentNudge() -> NucleoNudge? {
-        guard glassIsFreeForANudge else { NudgeCenter.shared.withhold(); return nil }
-        return NudgeCenter.shared.current(NudgeCenter.shared.moment(signedIn: signedIn))
+        guard glassIsFreeForANudge else {
+            NudgeCenter.shared.withhold(); nudgeRefreshAt = nil; nudgeRefreshId = nil
+            return nil
+        }
+        let nudge = NudgeCenter.shared.current(NudgeCenter.shared.moment(signedIn: signedIn))
+        if let nudge { scheduleNudgeRefresh(for: nudge.id) }
+        else { nudgeRefreshAt = nil; nudgeRefreshId = nil }
+        return nudge
     }
 
     private var glassIsFreeForANudge: Bool {
@@ -412,16 +418,22 @@ final class NucleoSession: ObservableObject {
     }
 
     private var nudgeRefreshAt: Date?
+    private var nudgeRefreshId: String?
 
-    /// A nudge that just finished its round stays for its showing, then the page is told it is gone
-    /// (otherwise a page that never hears another session change would keep drawing it).
+    /// Refresh both showing limits and source expiry without waiting for another user action.
     private func scheduleNudgeRefresh(for id: String) {
-        guard let ends = NudgeCenter.shared.showingEnds(id), nudgeRefreshAt != ends else { return }
+        guard let ends = NudgeCenter.shared.refreshAt(id) else {
+            nudgeRefreshAt = nil; nudgeRefreshId = nil; return
+        }
+        guard nudgeRefreshAt != ends || nudgeRefreshId != id else { return }
         nudgeRefreshAt = ends
+        nudgeRefreshId = id
         let delay = max(1, ends.timeIntervalSince(NudgeCenter.shared.now()) + 1)
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            guard let self, !self.tornDown, self.nudgeRefreshAt == ends else { return }
+            guard let self, !self.tornDown, self.nudgeRefreshAt == ends, self.nudgeRefreshId == id,
+                  NudgeCenter.shared.isCurrent(id) else { return }
             self.nudgeRefreshAt = nil
+            self.nudgeRefreshId = nil
             self.sessionChanged()
         }
     }
@@ -448,12 +460,12 @@ final class NucleoSession: ObservableObject {
                                               memory: MemoryReceipt(json: result["memory"])))
         // 1.8: from the first question, the harness knows what to come back to (on this phone only). A read
         // Bobby started is told apart here: only the person's own question is followed up, and a chip
-        // whose words Bobby wrote is not one (`chip` lets the centre keep it before the yes).
+        // whose words Bobby wrote is not one (its opaque id is held only for a contextual yes).
         let origin = desk.readOrigin(requestId: requestId) ?? .person
         harness?.noteAsk(symbol: symbol, name: asset["name"] as? String ?? symbol, isEquity: asset["isEquity"] as? Bool ?? false,
                          price: desk.readSummary(requestId: requestId)?.price,
                          origin: origin == .followUp || origin == .chip ? .followUp : nil, chip: origin == .chip,
-                         thread: origin == .thread, horizon: HarnessHorizon(named: (result["sufficiency"] as? [String: Any])?["horizon"]))
+                         thread: origin == .thread, horizon: HarnessHorizon(named: (result["sufficiency"] as? [String: Any])?["horizon"]), requestId: requestId)
         sessionChanged()
     }
 

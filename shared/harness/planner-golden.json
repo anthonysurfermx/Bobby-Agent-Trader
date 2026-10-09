@@ -47,10 +47,7 @@
     },
     "interestWeights": {
       "ask": 1,
-      "saved": 1,
-      "picked": 1,
-      "opened": 0.5,
-      "returned": 1
+      "saved": 1
     },
     "threadWeight": 1,
     "thesisWeight": 2,
@@ -478,7 +475,7 @@
       "expectedPlan": []
     },
     {
-      "name": "An answer ends the streak, and the week names the asset they answered about.",
+      "name": "An answer ends the streak but teaches no asset preference: the week names the latest own question.",
       "now": "2026-10-08T12:01:00-06:00",
       "timeZone": "America/Mexico_City",
       "events": [
@@ -495,7 +492,7 @@
       ],
       "expectedPlan": [
         {"step": "asset", "fireAt": "2026-10-09T12:00:00-06:00", "symbol": "AAPL", "days": 1},
-        {"step": "week", "fireAt": "2026-10-12T12:00:00-06:00", "symbol": "TSLA", "others": 1}
+        {"step": "week", "fireAt": "2026-10-12T12:00:00-06:00", "symbol": "AAPL", "others": 1}
       ]
     },
     {
@@ -516,7 +513,7 @@
       ]
     },
     {
-      "name": "A tap does not keep a kind from resting.",
+      "name": "A tap keeps neither a kind active nor its asset favoured: the week names the latest own question.",
       "now": "2026-10-08T12:01:00-06:00",
       "timeZone": "America/Mexico_City",
       "events": [
@@ -529,7 +526,7 @@
         {"kind": "ask", "at": "2026-10-08T12:00:00-06:00", "symbol": "AAPL"}
       ],
       "expectedPlan": [
-        {"step": "week", "fireAt": "2026-10-12T12:00:00-06:00", "symbol": "TSLA", "others": 1}
+        {"step": "week", "fireAt": "2026-10-12T12:00:00-06:00", "symbol": "AAPL", "others": 1}
       ]
     },
     {
@@ -551,7 +548,7 @@
       ]
     },
     {
-      "name": "The hour they answer at is learned from three answers, never from taps; it stays inside 09:00-21:00 and 18 hours after the question.",
+      "name": "Three answers teach the hour within 09:00-21:00 and the 18-hour gap, while the latest own question determines weekly interest.",
       "now": "2026-10-08T23:01:00-06:00",
       "timeZone": "America/Mexico_City",
       "events": [
@@ -570,7 +567,7 @@
       ],
       "expectedPlan": [
         {"step": "asset", "fireAt": "2026-10-10T09:00:00-06:00", "symbol": "TSLA", "days": 2},
-        {"step": "week", "fireAt": "2026-10-12T09:00:00-06:00", "symbol": "AAPL", "others": 1}
+        {"step": "week", "fireAt": "2026-10-12T09:00:00-06:00", "symbol": "TSLA", "others": 1}
       ]
     },
     {
@@ -942,7 +939,7 @@
       ]
     },
     {
-      "name": "A tap weighs less than an answer: the week names the asset they answered about, not the one they only tapped.",
+      "name": "Neither taps nor answers add asset interest: the week names the latest own question.",
       "now": "2026-10-07T10:01:00-06:00",
       "timeZone": "America/Mexico_City",
       "events": [
@@ -956,7 +953,7 @@
       ],
       "expectedPlan": [
         {"step": "asset", "fireAt": "2026-10-08T10:00:00-06:00", "symbol": "NVDA", "days": 1},
-        {"step": "week", "fireAt": "2026-10-12T10:00:00-06:00", "symbol": "BTC", "others": 2}
+        {"step": "week", "fireAt": "2026-10-12T10:00:00-06:00", "symbol": "NVDA", "others": 2}
       ]
     },
     {
@@ -1255,7 +1252,7 @@
       ]
     },
     {
-      "name": "A chip Bobby wrote starts no chain: tapped after an answered follow-up, about another asset, it is a read Bobby started.",
+      "name": "A chip Bobby wrote starts no chain and adds no weekly asset: only the own-question asset appears.",
       "now": "2026-10-08T17:12:00-06:00",
       "timeZone": "America/Mexico_City",
       "events": [
@@ -1267,7 +1264,7 @@
         {"kind": "ask", "at": "2026-10-08T17:10:00-06:00", "symbol": "BTC", "origin": "followUp"}
       ],
       "expectedPlan": [
-        {"step": "week", "fireAt": "2026-10-12T16:40:00-06:00", "symbol": "NVDA", "others": 1}
+        {"step": "week", "fireAt": "2026-10-12T16:40:00-06:00", "symbol": "NVDA", "others": 0}
       ]
     },
     {
@@ -1283,7 +1280,7 @@
       ]
     },
     {
-      "name": "Never sooner than 18 hours after the last one shown, even on another local day: the hour they answer at would put the week at nine the next morning, so it waits for the Monday after.",
+      "name": "The 18-hour gap moves the week to the next Monday, where the own question has expired from its window; a Bobby read cannot keep it alive.",
       "now": "2026-10-05T08:15:00-06:00",
       "timeZone": "America/Mexico_City",
       "events": [
@@ -1297,9 +1294,7 @@
         {"kind": "returned", "at": "2026-10-05T08:10:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-04T21:00:00-06:00"},
         {"kind": "ask", "at": "2026-10-05T08:11:00-06:00", "symbol": "NVDA", "origin": "followUp"}
       ],
-      "expectedPlan": [
-        {"step": "week", "fireAt": "2026-10-12T09:00:00-06:00", "symbol": "NVDA", "others": 0}
-      ]
+      "expectedPlan": []
     },
     {
       "name": "Clocks go back (Europe/Madrid, 25 October): the follow-up keeps the hour on the clock, 25 hours after the question.",

@@ -50,11 +50,13 @@ enum NucleoDeskIO {
         var currency: String? = nil
         var exchange: String? = nil
         var asOf: String? = nil
+        var provider: String? = nil
         var json: [String: Any] {
             var result: [String: Any] = ["price": NucleoDeskIO.orNull(price), "changePct": NucleoDeskIO.orNull(changePct)]
             if let currency { result["currency"] = currency }
             if let exchange { result["exchange"] = exchange }
             if let asOf { result["asOf"] = asOf }
+            if let provider { result["provider"] = provider }
             return result
         }
     }
@@ -270,7 +272,8 @@ enum NucleoDeskIO {
                                                        body: ["tool": "get_market", "args": ["symbol": symbol]]),
               let obj = reply.json as? [String: Any] else { return Market(price: nil, changePct: nil) }
         return Market(price: num(obj["price"]), changePct: num(obj["change_24h_pct"]),
-                      currency: obj["currency"] as? String, exchange: obj["exchange"] as? String, asOf: obj["asOf"] as? String)
+                      currency: obj["currency"] as? String, exchange: obj["exchange"] as? String, asOf: obj["asOf"] as? String,
+                      provider: obj["provider"] as? String)
     }
 
     /// What the metered read (`voice-tool run_debate`) came to (§8.2).

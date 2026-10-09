@@ -12,13 +12,13 @@ import java.time.temporal.ChronoUnit
 // The harness (1.8): what comes next. A pure function of the ledger and the clock; a port of
 // ios/Bobby/Sources/V18/Harness/HarnessPlanner.swift.
 //
-// Follow-ups belong to a question the person asked by themselves. That question gets the steps of
+// Follow-ups belong to an own question or a contextual yes to follow a Bobby-authored read. That anchor gets the steps of
 // the chain, in order, and never more than `maxPerQuestion` of them whatever is answered:
 //   1. the asset      how what they asked about moved, when they said they would look again
 //   2. the week       the Monday after: the assets they asked about since the Monday before it
 // and then silence, until they ask again. The list is always "what happens if they do nothing".
 // A tap on a notification changes nothing here. A read Bobby started (the button of a follow-up,
-// the question Bobby wrote after a read, a chip) is at most an answer: it never starts a chain.
+// the question Bobby wrote after a read, a chip) starts no chain without that separate explicit choice.
 //
 // When the first one comes (`waitFor`), from what the person said, in this order:
 //   a thesis they wrote about the asset   weeks → 7 days; months or longer → no asset follow-up
@@ -167,9 +167,10 @@ object HarnessPlanner {
         val thesis = ledger.events(HarnessEvent.Kind.THESIS).lastOrNull { it.symbol == symbol && it.at <= now }?.horizon
         if (thesis != null) return Wait(thesis.waitDays, Wait.Source.THESIS)
         val saved = ledger.events(HarnessEvent.Kind.SAVED)
-            .lastOrNull { it.symbol == symbol && it.at >= question.at && it.at <= now && (it.horizonHours ?: 0) > 24 }?.horizonHours
+            .lastOrNull { it.symbol == symbol && it.at >= question.followUpAnchorAt && it.at <= now && (it.horizonHours ?: 0) > 24 }?.horizonHours
         if (saved != null) return Wait(maxOf(1, saved / 24), Wait.Source.SAVED)
-        val named = question.horizon
+        // A horizon in Bobby's generated question is not a timeframe declared by the person.
+        val named = question.horizon.takeIf { question.isQuestion }
         if (named != null) return Wait(named.waitDays, Wait.Source.NAMED)
         return Wait(1, Wait.Source.STANDARD)
     }
@@ -177,17 +178,18 @@ object HarnessPlanner {
     /** The follow-ups still to come, earliest first. Empty when there is nothing to come back to. */
     fun plan(whole: HarnessLedger, now: Long, zone: ZoneId, options: Options = Options()): List<HarnessFollowUp> {
         val ledger = whole.upTo(now)
-        val question = ledger.question(now) ?: return emptyList()
+        val question = ledger.followUpAnchor(now) ?: return emptyList()
+        val anchorAt = question.followUpAnchorAt
         val symbol = question.symbol ?: return emptyList()
-        if (now - question.at > options.anchorDays * HARNESS_DAY_MS) return emptyList()
+        if (now - anchorAt > options.anchorDays * HARNESS_DAY_MS) return emptyList()
         val streak = ledger.unansweredStreak(now)
         val streakLast = streak.last
         if (streak.count >= options.quietAfter && streakLast != null && now - streakLast < options.quietDays * HARNESS_DAY_MS) return emptyList()
         // What this question already got. Answered or not, it counts.
-        val sentSince = ledger.events(HarnessEvent.Kind.SENT, since = question.at)
+        val sentSince = ledger.events(HarnessEvent.Kind.SENT, since = anchorAt)
         val room = options.maxPerQuestion - sentSince.size
         if (room <= 0) return emptyList()
-        val known = ledger.assets(since = now - options.anchorDays * HARNESS_DAY_MS, now = now)
+        val known = ledger.followUpAssets(since = now - options.anchorDays * HARNESS_DAY_MS, now = now)
         val subject = known.firstOrNull { it.symbol == symbol } ?: return emptyList()
         val done = sentSince.mapNotNull { it.step }.toSet()
         val everSent = ledger.events(HarnessEvent.Kind.SENT)
@@ -197,7 +199,7 @@ object HarnessPlanner {
 
         // The day the next asset or sector lands on. Null: the person is looking far ahead, and gets
         // neither. A step that is skipped leaves its day to the next one.
-        var day: LocalDate? = wait.days?.let { firstDay(question.at, it, time, zone, options) }
+        var day: LocalDate? = wait.days?.let { firstDay(anchorAt, it, time, zone, options) }
         var lastSlot: LocalDate? = null
         val result = ArrayList<HarnessFollowUp>()
         val walked = HashSet<HarnessStep>()
@@ -235,7 +237,7 @@ object HarnessPlanner {
                 }
                 HarnessStep.WEEK -> {
                     if (HarnessStep.WEEK in done || options.weeklyCovered || profile.rests(HarnessStep.WEEK)) continue
-                    val monday = nextMonday(lastSlot ?: localDate(question.at, zone))
+                    val monday = nextMonday(lastSlot ?: localDate(anchorAt, zone))
                     // Which assets it holds is decided below, once its Monday is final.
                     result.add(HarnessFollowUp(HarnessStep.WEEK, moment(monday, time, zone)))
                     lastSlot = monday
@@ -258,11 +260,11 @@ object HarnessPlanner {
             var fireAt = candidate.fireAt
             var tries = 0
             // An asset or a sector moves to the next day; the week stays a Monday.
-            while (tooClose(fireAt, question.at, previous, zone, options) && tries < 8) {
+            while (tooClose(fireAt, anchorAt, previous, zone, options) && tries < 8) {
                 fireAt = Instant.ofEpochMilli(fireAt).atZone(zone).plusDays(if (candidate.step == HarnessStep.WEEK) 7 else 1).toInstant().toEpochMilli()
                 tries += 1
             }
-            if (tooClose(fireAt, question.at, previous, zone, options)) continue
+            if (tooClose(fireAt, anchorAt, previous, zone, options)) continue
             val weekBefore = fireAt - 7 * HARNESS_DAY_MS
             val shown = ledger.events(HarnessEvent.Kind.SENT, since = weekBefore).size + kept.count { it.fireAt > weekBefore }
             if (shown >= options.maxPerWeek) continue
@@ -271,14 +273,14 @@ object HarnessPlanner {
             var followUp = HarnessFollowUp(candidate.step, fireAt, candidate.symbol, candidate.name, candidate.isEquity, candidate.sector)
             when (candidate.step) {
                 HarnessStep.ASSET -> {
-                    val days = ChronoUnit.DAYS.between(localDate(question.at, zone), localDate(fireAt, zone))
+                    val days = ChronoUnit.DAYS.between(localDate(anchorAt, zone), localDate(fireAt, zone))
                     followUp = followUp.copy(days = maxOf(1L, days).toInt())
                 }
                 HarnessStep.SECTOR -> Unit
                 HarnessStep.WEEK -> {
                     // A week is about what they asked since the Monday before it: an older question has
                     // none. It names the asset that matters most to them among those, the latest one on a tie.
-                    val assets = ledger.assets(since = weekStart(fireAt, zone, options.weekWindowDays), now = now)
+                    val assets = ledger.followUpAssets(since = weekStart(fireAt, zone, options.weekWindowDays), now = now)
                     val repeated = everSent.any { it.step == HarnessStep.WEEK && fireAt - it.at < options.weekFreshDays * HARNESS_DAY_MS }
                     if (repeated) continue
                     val favourite = profile.favourite(assets.map { it.symbol }) ?: continue
@@ -311,7 +313,7 @@ object HarnessPlanner {
     fun timeOfDay(question: HarnessEvent, profile: HarnessProfile, zone: ZoneId, options: Options): TimeOfDay {
         val learned = profile.hour
         if (learned != null) return TimeOfDay(minOf(maxOf(learned, options.earliestHour), options.latestHour), 0)
-        val local = Instant.ofEpochMilli(question.at).atZone(zone)
+        val local = Instant.ofEpochMilli(question.followUpAnchorAt).atZone(zone)
         if (local.hour < options.earliestHour) return TimeOfDay(options.earliestHour, 0)
         if (local.hour >= options.latestHour) return TimeOfDay(options.latestHour, 0)
         return TimeOfDay(local.hour, local.minute)

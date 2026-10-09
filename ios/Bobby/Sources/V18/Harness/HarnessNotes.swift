@@ -8,7 +8,7 @@
 //    event carries and every field of the profile goes through an exhaustive `switch` below: a new
 //    one does not compile until it has a sentence or is marked internal with the reason.
 //  - A question the person asked is counted apart from a read whose question Bobby wrote: the
-//    planner follows up the first and never the second, and the screen says which is which.
+//    planner follows the first and an explicit contextual yes for the second; the screen says both.
 //  - What the glass keeps about the lines it drew ("NVDA +2.3% since you asked": how often, whether
 //    it was tapped) is said here too and goes with "Erase notes"; it lasts as long as the ledger.
 //  - Facts and what Bobby does, never what the person "is": "Asked 3 times, last on Oct 5.",
@@ -40,7 +40,7 @@ extension HarnessEvent {
     /// The stored fields of an event, one case each (HarnessSurfaceTests checks the list against
     /// the struct itself, so a field added there fails until it has its case here).
     enum Field: String, CaseIterable {
-        case kind, at, symbol, name, isEquity, price, step, sector, ref, origin, thread, horizon, horizonHours, readId, availableFrom
+        case kind, at, symbol, name, isEquity, price, step, sector, ref, origin, thread, horizon, horizonHours, readId, availableFrom, followUpRequestedAt
     }
 }
 
@@ -72,6 +72,7 @@ struct HarnessNotes: Equatable {
         case .thread: return .kept("a second question of their own about the same read: it is one of “Asked N times”; the mark only makes that asset weigh more when the week picks the one it names")
         case .readId: return .kept("an opaque link to the dated answer in the saved-read ledger; it contains no words of that answer")
         case .availableFrom: return .kept("the next local day chosen on an explicit save, returned in the save confirmation; it schedules no notification")
+        case .followUpRequestedAt: return .said("“You requested follow-ups for this read.”, apart from questions the person wrote")
         }
     }
 
@@ -121,6 +122,7 @@ struct HarnessNotes: Equatable {
         var lastAsked: Date?
         /// Reads whose question Bobby wrote (a follow-up's button, a board row, a chip).
         var started = 0
+        var explicitlyFollowed = false
         /// The last read of either kind: the order of the rows.
         var lastRead: Date?
         var named: HarnessHorizon?
@@ -155,6 +157,7 @@ struct HarnessNotes: Equatable {
                     } else {
                         $0.started += 1
                     }
+                    if event.explicitFollowUpRequested, event.followUpAnchorAt <= now { $0.explicitlyFollowed = true }
                     $0.lastRead = event.at
                     $0.own = true
                 }
@@ -196,6 +199,9 @@ struct HarnessNotes: Equatable {
             } else if asset.started > 1 {
                 lines.append(L.t("\(asset.started) reads from questions Bobby wrote.", "\(asset.started) lecturas desde preguntas que escribió Bobby."))
             }
+            if asset.explicitlyFollowed {
+                lines.append(L.t("You requested follow-ups for this read.", "Pediste seguimiento de esta lectura."))
+            }
             if let named = asset.named { lines.append(sentence(named: named)) }
             if asset.saved { lines.append(sentence(savedHours: asset.savedHours)) }
             if asset.thesis { lines.append(sentence(thesis: asset.thesisHorizon)) }
@@ -214,8 +220,9 @@ struct HarnessNotes: Equatable {
         for field in HarnessProfile.Field.allCases {
             switch field {
             case .interest:
-                // Internal: one weight per asset, computed from the events said above and from nothing
-                // else. It chooses which asset the week names, and that asset is listed.
+                // Internal: own questions, explicit follow-up requests, saves and active theses contribute.
+                // Opening, picking or answering Bobby teaches timing, never an asset preference.
+                // The week names a learned asset, and that asset is listed.
                 break
             case .hour:
                 // Only once the planner really uses it (three answers), and as the planner uses it.

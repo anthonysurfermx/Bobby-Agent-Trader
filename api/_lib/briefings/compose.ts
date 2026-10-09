@@ -15,12 +15,14 @@
 //   · Section facts and statuses come from the narrative, which copied them from evidence.
 // ============================================================
 import { createHash } from 'node:crypto';
-import { DEFAULT_ASSETS, LIMITS, isSupportedAsset } from './config.js';
+import { CONSENT_VERSIONS, DEFAULT_ASSETS, LIMITS, isSupportedAsset } from './config.js';
 import { NARRATIVE_LIMITS, clip, factsOnlyAssetSection, riskDetail } from './narrative.js';
 import type {
   BriefContent, BriefEvidence, BriefLanguage, BriefQuality, BriefSection, Cadence, ComposerMemory, FrozenSettings, Period, SharedNarrative,
 } from './types.js';
 import { BRIEF_LANGUAGES, CADENCES } from './types.js';
+import { explanationFor } from '../learning-context.js';
+import { buildLearningOpportunity, isLearningOpportunity, type LearningOpportunityOptions } from '../learning-opportunity.js';
 
 const TITLES: Record<BriefLanguage, Record<Cadence, string>> = {
   es: { morning: 'Apertura de mercado', close: 'Cierre de mercado', weekly: 'Resumen semanal' },
@@ -106,19 +108,22 @@ function narration(opening: string, sections: BriefSection[], cadence: Cadence):
 
 export function composeReport(input: {
   period: Period; frozen: FrozenSettings; memory: ComposerMemory | null; memoryAllowed: boolean; narrative: SharedNarrative; evidence: BriefEvidence;
+  learning?: LearningOpportunityOptions;
 }): { content: BriefContent; quality: BriefQuality; usesMemory: boolean; memoryAssets: string[] } {
   const { period, frozen, narrative, evidence } = input;
-  const memory = input.memoryAllowed ? input.memory : null;
+  const learning = input.learning?.enabled === true;
+  const memory = input.memoryAllowed && (!learning || frozen.analysisConsent && frozen.analysisConsentVersion === CONSENT_VERSIONS.analysis) ? input.memory : null;
   const lang = narrative.language;
   const weekly = period.cadence === 'weekly';
 
   // ---- asset selection ----
   const asked = normalize(memory?.frequentAssets).slice(0, LIMITS.assetsPerAccount);
   const interests = normalize(frozen.assets).slice(0, LIMITS.assetsPerAccount);
-  const selected = weekly && asked.length ? [...asked] : [...interests];
+  // Opportunity rollout cannot let history without authored/exposed lineage displace an explicit follow.
+  const selected = weekly && asked.length ? learning ? normalize([...interests, ...asked]).slice(0, LIMITS.assetsPerAccount) : [...asked] : [...interests];
   const personalBasis = asked.length ? 'asked_assets' : interests.length ? 'explicit_interests' : 'general';
   const memoryAssets: string[] = [];
-  if (weekly && asked.length) memoryAssets.push(...asked);
+  if (weekly && asked.length) memoryAssets.push(...asked.filter(s => selected.includes(s)));
   if (!weekly && memory) {
     for (const s of normalize(memory.frequentAssets)) {
       if (selected.length >= LIMITS.assetsPerAccount) break;
@@ -127,7 +132,7 @@ export function composeReport(input: {
   }
   if (!selected.length) selected.push(...normalize(DEFAULT_ASSETS).slice(0, LIMITS.assetsPerAccount));
 
-  const explain = memory?.experience === 'new';
+  const explain = learning ? explanationFor(memory).experience === 'new' : memory?.experience === 'new';
   const deepRisk = memory?.explainRiskDepth === 'high';
 
   // ---- sections ----
@@ -174,8 +179,16 @@ export function composeReport(input: {
     equitySession: { ...evidence.equitySession },
   };
 
+  if (learning) {
+    const opportunity = buildLearningOpportunity({ period, frozen, memory, memoryAllowed: memory !== null, evidence, content, options: input.learning! });
+    if (opportunity) {
+      content.learningOpportunity = opportunity;
+    }
+  }
+
   const quality: BriefQuality = narrative.source === 'facts_only' ? 'facts_only' : evidence.degraded || fellBack ? 'partial' : 'full';
-  const usesMemory = memory !== null && (memoryAssets.length > 0 || explainersUsed || riskDetailUsed);
+  // A default explanation is not memory; declared preferences in metadata still require privacy withdrawal.
+  const usesMemory = memory !== null && (memoryAssets.length > 0 || explainersUsed && (!learning || memory.experience === 'new') || riskDetailUsed || !!content.learningOpportunity && (content.learningOpportunity.context.explanation.source === 'explicit' || content.learningOpportunity.context.explanation.explainRiskDepth !== undefined));
   return { content, quality, usesMemory, memoryAssets: usesMemory ? memoryAssets : [] };
 }
 
@@ -195,6 +208,7 @@ export function validateContent(content: BriefContent): string | null {
   if (!isStr(content.title, 120) || !isStr(content.opening, NARRATIVE_LIMITS.opening)) return 'bad_header';
   if (!isIsoOrNull(content.dataAsOf) || content.dataAsOf === null) return 'bad_data_as_of';
   if (!Array.isArray(content.sources) || !content.equitySession || typeof content.equitySession.state !== 'string') return 'bad_evidence';
+  if (content.learningOpportunity !== undefined && !isLearningOpportunity(content.learningOpportunity)) return 'bad_learning_opportunity';
   const sections = content.sections;
   if (!Array.isArray(sections) || sections.length < 1) return 'bad_sections';
   const assets = sections.filter((s) => s?.kind === 'asset');

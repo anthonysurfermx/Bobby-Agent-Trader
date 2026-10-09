@@ -2,12 +2,44 @@ import Foundation
 import XCTest
 @testable import Bobby
 
-/// The harness (1.8), the plan. Follow-ups belong to a question the person asked by themselves: the
+/// The harness (1.8), the plan. Follow-ups belong to an own question or an explicit contextual choice: the
 /// asset when they said they would look again (the next day at the soonest), the week on Monday,
 /// then silence until they ask again. A tap answers nothing; an answer never starts a chain; ignoring
 /// follow-ups makes Bobby quieter. Everything is a pure function of the ledger and the clock.
 /// The same rules, as data for every platform: shared/harness/planner-golden.json (HarnessGoldenTests).
 final class HarnessPlannerTests: XCTestCase {
+    func testAnExplicitFollowUpChoiceAnchorsAtItsYesWithoutClaimingAnOwnQuestion() {
+        let readAt = at(7, 15), requestedAt = at(7, 18)
+        ledger.note(HarnessEvent(kind: .ask, at: readAt, symbol: "NVDA", origin: .followUp,
+                                 horizon: .long, followUpRequestedAt: requestedAt))
+        let followUps = plan(at(7, 18, 1))
+        XCTAssertEqual(followUps.map(\.step), [.asset, .week])
+        XCTAssertEqual(followUps.first?.fireAt, at(8, 18))
+        XCTAssertEqual(followUps.first?.symbol, "NVDA")
+        XCTAssertEqual(followUps.last?.others, 0)
+        XCTAssertNil(ledger.question(before: at(7, 18, 1)))
+        XCTAssertEqual(ledger.followUpAssets(since: at(7, 0), now: at(7, 18, 1)).first?.asks, 0)
+    }
+
+    func testAnUnrequestedOrFutureBobbyReadStartsNoPlan() {
+        ledger.note(HarnessEvent(kind: .ask, at: at(7, 15), symbol: "NVDA", origin: .followUp))
+        XCTAssertTrue(plan(at(7, 18)).isEmpty)
+        ledger.note(HarnessEvent(kind: .ask, at: at(7, 16), symbol: "BTC", origin: .followUp, followUpRequestedAt: at(7, 19)))
+        XCTAssertTrue(plan(at(7, 18)).isEmpty)
+    }
+
+    func testTheOptionalSectorUsesTheOwnAnchorWhenBobbysLatestReadHasNoSector() {
+        ask("NVDA", at(7, 15))
+        ask("BTC", at(7, 16), equity: false, origin: .followUp)
+        let current = plan(at(7, 16, 1), withSector)
+        XCTAssertEqual(current.map(\.step), [.asset, .sector, .week])
+        XCTAssertEqual(current.map(\.symbol), ["NVDA", "NVDA", "NVDA"])
+        XCTAssertEqual(current.first { $0.step == .sector }?.sector, HarnessSectors.sector(of: "NVDA")?.id)
+        XCTAssertEqual(current.last?.others, 0)
+        XCTAssertLessThanOrEqual(current.count, withSector.maxPerQuestion)
+        XCTAssertLessThanOrEqual(current.count, withSector.maxPerWeek)
+        XCTAssertTrue(current.allSatisfy { $0.fireAt > at(7, 16, 1) })
+    }
     private var calendar: Calendar = {
         var c = Calendar(identifier: .gregorian)
         c.timeZone = TimeZone(identifier: "America/Mexico_City")!
@@ -882,9 +914,9 @@ final class HarnessPlannerTests: XCTestCase {
             let before = HarnessLegacyRules.plan(ledger: ledger, now: now, calendar: calendar)
             let after = HarnessPlanner.plan(ledger: ledger, now: now, calendar: calendar, options: assetThenWeek)
             XCTAssertLessThanOrEqual(after.count, before.count, "round \(round): \(after.map(\.step.rawValue)) against \(before.map(\.step.rawValue))")
-            // The owner's other choice keeps the same promise: the first build had the sector too.
-            let sector = HarnessPlanner.plan(ledger: ledger, now: now, calendar: calendar, options: withSector)
-            XCTAssertLessThanOrEqual(sector.count, before.count, "round \(round), with the sector: \(sector.map(\.step.rawValue)) against \(before.map(\.step.rawValue))")
+            // Optional sectors use an own-question/explicit-choice population, while the first
+            // build could anchor on any Bobby read. Their caps are checked by testNoPlanEverBreaksACap;
+            // a different subject's historical count is not a bound for that optional chain.
             if !before.isEmpty { compared += 1 }
             if after.count < before.count { fewer += 1 }
         }

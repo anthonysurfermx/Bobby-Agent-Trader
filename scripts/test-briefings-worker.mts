@@ -27,6 +27,7 @@ delete process.env.BOBBY_BRIEFINGS_DAILY_CAP_USD;
 delete process.env.BOBBY_BRIEFINGS_MONTHLY_CAP_USD;
 delete process.env.BOBBY_BRIEFINGS_LLM;
 delete process.env.BOBBY_BRIEFINGS_MEMORY;
+delete process.env.BOBBY_LEARNING_OPPORTUNITIES_ENABLED;
 delete process.env.VERCEL_ENV;
 process.env.OPENAI_API_KEY = 'test-openai';
 process.env.ANTHROPIC_API_KEY = 'test-anthropic';
@@ -39,6 +40,7 @@ const dbMod = await import('../api/_lib/briefings/db.ts');
 const cal = await import('../api/_lib/briefings/calendar.ts');
 const { buildEvidence } = await import('../api/_lib/briefings/evidence.ts');
 const { validateNarrative } = await import('../api/_lib/briefings/narrative.ts');
+const { validateContent } = await import('../api/_lib/briefings/compose.ts');
 const { withReservation } = await import('../api/_lib/briefings/budget.ts');
 const { ensureAudio } = await import('../api/_lib/briefings/voice.ts');
 const { encryptToken, tokenFingerprint } = await import('../api/_lib/briefings/push-crypto.ts');
@@ -123,6 +125,9 @@ function fakeDb(over: Record<string, (...a: any[]) => any> = {}) {
     fillOutbox: async () => 0,
     claimOutbox: async () => [],
     outboxResult: async () => {},
+    deliveryReport: async () => null,
+    deliveredOpportunity: async () => false,
+    reserveDeliveryOpportunity: async () => true,
     purge: async () => ({ storagePaths: [] }),
   };
   const db: Record<string, (...a: any[]) => any> = {};
@@ -216,6 +221,7 @@ function harness(o: {
     sendApns: async (_cfg, n) => { apns.push(n); return o.apns ? o.apns(n) : { outcome: 'accepted', status: 200, reason: null }; },
     closeApns: () => {},
     pushMasterKey: () => MASTER,
+    opportunitiesEnabled: () => false,
     audioStore: () => ({ put: async () => {}, get: async () => null, remove: async (paths) => { removed.push(paths); } }),
     logger,
     ...o.deps,
@@ -587,6 +593,135 @@ async function call(h: (req: any, res: any) => Promise<unknown>, req: import('@v
   const h6 = harness({ db: { claimBriefs: async () => [], openLanguages: async () => [], claimOutbox: queue([[outboxItem()]], []) } });
   const r6 = await h6.run({ deadlineMs: workerMod.APNS_MIN_REMAINING_MS - 1_000 });
   eq([h6.apns.length, h6.db.named('claimOutbox').length, r6.stoppedEarly], [0, 0, true], 'no time for an APNs batch → nothing claimed');
+}
+
+// ---- learning → sourced analysis → useful window → current claimed delivery, all sinks mocked ----
+{
+  setCaps(false);
+  const at = cal.nyLocalToUtc('2026-10-05', '07:55');
+  const dueAt = cal.nyLocalToUtc('2026-10-05', '08:00');
+  const fixtureEvidence = await buildEvidence(P, ['BTC'], {
+    now: () => at, snapshot: async () => snapshot(at), agenda: async () => [],
+    dailyCloses: async () => [{ symbol: 'BTC', from: { at: cal.nyLocalToUtc('2026-09-25', '16:00').toISOString(), price: 100 }, to: { at: cal.nyLocalToUtc('2026-10-02', '16:00').toISOString(), price: 102 } }],
+  });
+  const reader = claimed({ frozen: { ...FROZEN, assets: ['BTC'], analysisConsent: true, analysisConsentVersion: 1, audioConsent: false }, memory: { frequentAssets: ['BTC'], experience: null, explainRiskDepth: null } });
+  const intent = outboxItem({ briefId: reader.id, expiresAt: P.pushExpiresAt });
+  type Content = import('../api/_lib/briefings/types.ts').BriefContent;
+  let published: Content | null = null;
+  let clock = at.getTime();
+  let rowState = 'pending';
+  let claimedDelivery = false;
+  let decryptions = 0;
+  const h = harness({
+    db: {
+      claimBriefs: queue([[reader]], []),
+      publishBrief: async (p) => { published = p.content; return { ok: true }; },
+      claimOutbox: async () => clock >= dueAt.getTime() && rowState === 'pending' && !claimedDelivery ? (claimedDelivery = true, [intent]) : [],
+      deliveryReport: async () => published ? { content: published, identityId: IDENTITY } : null,
+      deliveredOpportunity: async () => rowState === 'sent',
+      outboxResult: async (_id, _fence, outcome) => { if (outcome === 'accepted') rowState = 'sent'; },
+    },
+    deps: { opportunitiesEnabled: () => true, memoryOn: () => true, buildEvidence: async () => fixtureEvidence, now: () => clock,
+      decryptToken: () => { decryptions++; return TOKEN_HEX; },
+    },
+  });
+  const first = await h.run({ now: at });
+  ok(published, 'learning integration publishes actual deterministic content');
+  const content = published! as Content;
+  eq([content.learningOpportunity?.interest.origin, content.learningOpportunity?.source.kind, h.db.named('publishBrief')[0][0] && (h.db.named('publishBrief')[0][0] as any).usesMemory], ['explicit_setting', 'dated_history', true], 'explicit follow + consented factual history → shared sourced content → metadata retains withdrawal markers');
+  eq([first.accepted, h.apns.length, decryptions], [0, 0, 0], 'preparation does not push or decrypt');
+  clock = dueAt.getTime();
+  const delivery = await h.run({ now: dueAt });
+  eq([delivery.accepted, h.apns.length, decryptions], [1, 1, 1], 'real worker guard allows one mocked APNs attempt in the source/useful window');
+  eq(h.apns[0].briefId, reader.id, 'delivery refers to the published report, without exposing its personal content');
+  eq(h.db.named('deliveredOpportunity')[0], [intent.deviceId, IDENTITY, content.learningOpportunity!.factKey], 'accepted-fact lookup uses server report owner and claimed device');
+  const replay = await h.run({ now: dueAt });
+  eq([replay.accepted, h.apns.length], [0, 1], 'existing sent-outbox state keeps repeated worker tick idempotent');
+
+  const eventPushContent: Content = structuredClone(content);
+  Object.assign(eventPushContent.learningOpportunity!, {
+    trigger: 'event_triggered', reason: 'accepted_source_change',
+    source: { ...content.learningOpportunity!.source, kind: 'accepted_event', documentDigest: 'a'.repeat(64), url: 'https://example.org/official-document' },
+    novelty: { comparison: 'accepted_source_change', baselineAt: null, baselinePrice: null, price: null, changePct: null },
+  });
+  const dailyPushContent: Content = structuredClone(content);
+  const dailyAsOf = new Date(dueAt.getTime() - MIN).toISOString();
+  const dailyExpires = new Date(dueAt.getTime() + 14 * MIN).toISOString();
+  dailyPushContent.cadence = 'morning';
+  dailyPushContent.sources = [{ name: 'okx_spot', ok: true, freshness: '24_7' }];
+  const dailyAsset = dailyPushContent.sections.find(s => s.kind === 'asset' && s.symbol === 'BTC')!;
+  dailyAsset.asOf = dailyAsOf; dailyAsset.status = '24_7';
+  Object.assign(dailyPushContent.learningOpportunity!, {
+    source: { kind: 'live_quote', names: ['okx_spot'], asOf: dailyAsOf, expiresAt: dailyExpires },
+    novelty: { comparison: 'reported_window', baselineAt: null, baselinePrice: null, price: 102, changePct: 2 },
+    delivery: { ...content.learningOpportunity!.delivery, cadence: 'morning', periodKey: '2026-10-05', expiresAt: dailyExpires },
+  });
+  eq(validateContent(eventPushContent), null, 'event-push fixture is valid metadata, so channel policy must reject it');
+  eq(validateContent(dailyPushContent), null, 'daily-push fixture is valid metadata, so adoption policy must reject it');
+
+  const cases: Array<{ label: string; content?: unknown; report?: null; reportError?: boolean; dedupeError?: boolean; reserveError?: boolean; reserveConflict?: boolean; duplicate?: boolean; reason: string }> = [
+    { label: 'ready content missing', report: null, reason: 'opportunity_ineligible' },
+    { label: 'malformed stored content', content: { version: 99 }, reason: 'opportunity_ineligible' },
+    { label: 'legacy report missing opportunity', content: { ...content, learningOpportunity: undefined }, reason: 'opportunity_ineligible' },
+    { label: 'in-app preference', content: { ...content, learningOpportunity: { ...content.learningOpportunity!, delivery: { ...content.learningOpportunity!.delivery, preference: 'in_app', channel: 'in_app' } } }, reason: 'opportunity_ineligible' },
+    { label: 'expired sourced opportunity', content: { ...content, learningOpportunity: { ...content.learningOpportunity!, source: { ...content.learningOpportunity!.source, expiresAt: dueAt.toISOString() }, delivery: { ...content.learningOpportunity!.delivery, expiresAt: dueAt.toISOString() } } }, reason: 'opportunity_ineligible' },
+    { label: 'content storage failure', reportError: true, reason: 'opportunity_unavailable' },
+    { label: 'unknown prior delivery', dedupeError: true, reason: 'opportunity_unavailable' },
+    { label: 'same source fact already APNs-accepted', duplicate: true, reason: 'opportunity_duplicate' },
+    { label: 'atomic reservation conflict', reserveConflict: true, reason: 'opportunity_duplicate' },
+    { label: 'reservation outcome unknown', reserveError: true, reason: 'opportunity_unavailable' },
+    { label: 'event metadata requests push without per-type consent', content: eventPushContent, reason: 'opportunity_ineligible' },
+    { label: 'daily metadata requests push without adopted refresh strategy', content: dailyPushContent, reason: 'opportunity_ineligible' },
+  ];
+  for (const c of cases) {
+    let decrypted = 0;
+    const blocked = harness({ db: {
+      claimBriefs: async () => [], openLanguages: async () => [], claimOutbox: queue([[intent]], []),
+      deliveryReport: async () => { if (c.reportError) throw new dbMod.BriefingStorageError('delivery_report', 503); return c.report === null ? null : { content: c.content ?? content, identityId: IDENTITY }; },
+      deliveredOpportunity: async () => { if (c.dedupeError) throw new dbMod.BriefingStorageError('delivered_opportunity', null); return !!c.duplicate; },
+      reserveDeliveryOpportunity: async () => { if (c.reserveError) throw new dbMod.BriefingStorageError('reserve_opportunity', null); return !c.reserveConflict; },
+    }, deps: { opportunitiesEnabled: () => true, now: () => dueAt.getTime(), decryptToken: () => { decrypted++; return TOKEN_HEX; } } });
+    const r = await blocked.run({ now: dueAt });
+    eq([r.accepted, r.dispatched, blocked.apns.length, decrypted], [0, 0, 0, 0], `${c.label}: no provider attempt or token decryption`);
+    eq(blocked.db.named('outboxResult').map(a => [a[2], a[4]]), [['config', c.reason]], `${c.label}: release uses existing fenced outcome, never a success receipt`);
+  }
+
+  const another = outboxItem({ briefId: randomUUID(), deviceId: intent.deviceId, expiresAt: P.pushExpiresAt });
+  const parallel = harness({ db: { claimBriefs: async () => [], openLanguages: async () => [], claimOutbox: queue([[intent, another]], []), deliveryReport: async () => ({ content, identityId: IDENTITY }), deliveredOpportunity: async () => false }, deps: { opportunitiesEnabled: () => true, now: () => dueAt.getTime() } });
+  await parallel.run({ now: dueAt });
+  eq(parallel.apns.length, 1, 'same account/device/fact in a parallel delivery batch gets one attempt');
+  eq(parallel.db.named('outboxResult').filter(a => a[4] === 'opportunity_duplicate').length, 1, 'tick reservation rejects the concurrent duplicate before sending');
+
+  // Two independent lambdas have separate Tick sets: the database primary key arbitrates them.
+  const reservations = new Set<string>();
+  const atomicReserve = async (identity: string, device: string, fact: string) => {
+    const key = `${identity}:${device}:${fact}`;
+    if (reservations.has(key)) return false;
+    reservations.add(key);
+    await Promise.resolve();
+    return true;
+  };
+  const concurrent = () => harness({ db: { claimBriefs: async () => [], openLanguages: async () => [], claimOutbox: queue([[intent]], []), deliveryReport: async () => ({ content, identityId: IDENTITY }), deliveredOpportunity: async () => false, reserveDeliveryOpportunity: atomicReserve }, deps: { opportunitiesEnabled: () => true, now: () => dueAt.getTime() } });
+  const workerA = concurrent(), workerB = concurrent();
+  await Promise.all([workerA.run({ now: dueAt }), workerB.run({ now: dueAt })]);
+  eq([workerA.apns.length + workerB.apns.length, reservations.size], [1, 1], 'atomic source reservation allows only one of two independent workers to attempt APNs');
+  eq([...workerA.db.named('outboxResult'), ...workerB.db.named('outboxResult')].filter(a => a[4] === 'opportunity_duplicate').length, 1, 'losing worker releases without a claimed receipt');
+  const crashed = concurrent();
+  await crashed.run({ now: dueAt });
+  eq(crashed.apns.length, 0, 'a consumed reservation never takes over after an uncertain/crashed worker');
+
+  let lateClock = dueAt.getTime();
+  let lateDecryptions = 0;
+  const short = structuredClone(content);
+  short.learningOpportunity!.source.expiresAt = cal.nyLocalToUtc('2026-10-05', '08:01').toISOString();
+  short.learningOpportunity!.delivery.expiresAt = short.learningOpportunity!.source.expiresAt;
+  const late = harness({ db: { claimBriefs: async () => [], openLanguages: async () => [], claimOutbox: queue([[intent]], []), deliveryReport: async () => ({ content: short, identityId: IDENTITY }), deliveredOpportunity: async () => { lateClock += 2 * MIN; return false; } }, deps: { opportunitiesEnabled: () => true, now: () => lateClock, decryptToken: () => { lateDecryptions++; return TOKEN_HEX; } } });
+  const lateResult = await late.run({ now: dueAt });
+  eq([late.apns.length, lateDecryptions, lateResult.expired], [0, 0, 1], 'useful source window is rechecked after slow storage, before decryption');
+
+  const off = harness({ db: { claimBriefs: async () => [], openLanguages: async () => [], claimOutbox: queue([[intent]], []), deliveryReport: async () => { throw new Error('must not read'); } }, deps: { opportunitiesEnabled: () => false, now: () => dueAt.getTime() } });
+  await off.run({ now: dueAt });
+  eq([off.apns.length, off.db.named('deliveryReport').length, off.db.named('deliveredOpportunity').length], [1, 0, 0], 'rollout switch off leaves the authorized legacy delivery path unchanged');
 }
 
 // ---- purge ----

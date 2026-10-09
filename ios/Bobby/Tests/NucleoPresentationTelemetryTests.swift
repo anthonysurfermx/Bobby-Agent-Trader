@@ -41,9 +41,9 @@ final class NucleoPresentationTelemetryTests: XCTestCase {
         <html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
         <div id="card" style="position:absolute;left:10px;top:200px;width:300px;height:100px;opacity:0">Fixture actual result</div>
         <script>
-        var W=window,D=document,onScreen=true,SHEET=false;
+        var W=window,D=document,onScreen=true,SHEET=false,ST={name:'CARDS'};
         var READ={model:{},reply:{status:'ok'},requestId:'\(id)'};
-        var A={cardsOn:true,rev:[{x:1}]},el={cards:[document.getElementById('card')]};
+        var A={cardsOn:true,viewOnly:false,rev:[{x:1}]},el={cards:[document.getElementById('card')]};
         function canRun(){return !D.hidden && onScreen && !SHEET;}
         function noop(){}
         function bcall(method,params){window.webkit.messageHandlers.capture.postMessage({method:method,params:params});return Promise.resolve({accepted:true});}
@@ -58,9 +58,17 @@ final class NucleoPresentationTelemetryTests: XCTestCase {
         _ = try await web.evaluateJavaScript("SHEET=true;el.cards[0].style.opacity='1';true")
         try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertTrue(recorder.messages.isEmpty)
+        // A stored card can be visible beside a stale result object but never presents that result.
+        _ = try await web.evaluateJavaScript("SHEET=false;ST.name='THESIS_VIEW';A.viewOnly=true;true")
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertTrue(recorder.messages.isEmpty, "stored explanation is no new result receipt")
+        // The view-only flag independently protects a stored card while state transitions settle.
+        _ = try await web.evaluateJavaScript("ST.name='CARDS';true")
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertTrue(recorder.messages.isEmpty, "view-only never acknowledges the retained request")
         let presented = expectation(description: "visible card after two real frames")
         recorder.presented = presented
-        _ = try await web.evaluateJavaScript("SHEET=false;true")
+        _ = try await web.evaluateJavaScript("A.viewOnly=false;true")
         await fulfillment(of: [presented], timeout: 5)
         try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertEqual(recorder.messages.count, 1)

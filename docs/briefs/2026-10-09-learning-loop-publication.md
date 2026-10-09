@@ -1,0 +1,7 @@
+# Learning loop review candidate
+
+Reconstructed from the exact e439c0ea patch on f08f119c (draft continuity PR #166). This is a stacked draft, not a claim of integration with current main. Review the incremental diff against codex/nucleo-read-continuity. Reconcile the plain/terms/technical wording changes in production #169/#170 before merging to main.
+
+The candidate distinguishes user-originated activity from Bobby suggestions, adapts existing consented account memory to LearningContext v1 for CIO wording, validates historical/current quote comparisons, and adds deterministic learning opportunities with expiry and duplicate suppression. Weekly delivery remains disabled unless BOBBY_LEARNING_OPPORTUNITIES_ENABLED=on and existing plan/consent/cadence checks pass. This flag grants no new permission. No live market-event feed is implemented. Context in the CIO prompt is not mechanical verdict isolation.
+
+Publication checks: production build passed on Node 24.19.0; test:learning-loop passed (context, market provenance, opportunities and worker). Worker PostgreSQL integration skipped without DATABASE_URL. Original artifact has 1,138 passing iOS tests, not rerun in this publication step. Android native/consent integration, physical-device behavior, TestFlight and real APNs delivery remain unverified. No migration, production deployment or notification activation is part of publication.

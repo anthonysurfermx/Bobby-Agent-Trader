@@ -43,6 +43,8 @@ import {
 import { buildEvidence } from './evidence.js';
 import { factsOnlyNarrative, narrativeRequest, validateNarrative } from './narrative.js';
 import { decryptToken } from './push-crypto.js';
+import { canDeliverLearningOpportunity, learningOpportunitiesEnabled } from '../learning-opportunity.js';
+import type { BriefContent } from './types.js';
 import { llmJsonOnce, llmReserveUsd } from './providers.js';
 import { ensureAudio } from './voice.js';
 import type { BriefEvidence, BriefLanguage, Period, SharedNarrative } from './types.js';
@@ -57,7 +59,7 @@ export interface TickReport {
 
 export type WorkerDb = Pick<typeof dbModule,
   'reconcile' | 'seedPeriod' | 'openLanguages' | 'neededAssets' | 'claimShared' | 'commitShared' | 'claimBriefs' | 'publishBrief'
-  | 'failBrief' | 'requestAudio' | 'fillOutbox' | 'claimOutbox' | 'outboxResult' | 'purge'>;
+  | 'failBrief' | 'requestAudio' | 'fillOutbox' | 'claimOutbox' | 'outboxResult' | 'deliveryReport' | 'deliveredOpportunity' | 'reserveDeliveryOpportunity' | 'purge'>;
 
 export interface WorkerDeps {
   enabled: () => boolean;
@@ -78,6 +80,7 @@ export interface WorkerDeps {
   ensureAudio: typeof ensureAudio;
   ttsModel: () => string;
   memoryOn: () => boolean;
+  opportunitiesEnabled: () => boolean;
   settleSeconds: () => number;
   apnsConfig: () => ApnsConfig | null;
   sendApns: (cfg: ApnsConfig, n: ApnsNotification, now: Date) => Promise<ApnsOutcome>;
@@ -109,6 +112,7 @@ const DEFAULT_DEPS: WorkerDeps = {
   ensureAudio,
   ttsModel: () => TTS_MODEL(),
   memoryOn: () => briefingsMemoryOn(),
+  opportunitiesEnabled: () => learningOpportunitiesEnabled(),
   settleSeconds: () => settleSeconds(),
   apnsConfig: () => apnsConfig(),
   sendApns: (cfg, n, now) => sendApns(cfg, n, undefined, now),
@@ -155,6 +159,8 @@ interface Tick {
   /** The period clock: opts.now advanced by the wall-clock time spent in this tick. */
   nowAt: () => number;
   remaining: () => number;
+  /** Tick-local claim reservation complements retained accepted-delivery dedupe, without inventing receipts. */
+  opportunityClaims: Set<string>;
 }
 
 interface PeriodCtx {
@@ -182,6 +188,7 @@ export async function runTick(opts: { now: Date; worker: string; deadlineAt: num
     worker: opts.worker,
     report: emptyReport(true),
     codes: new Set(),
+    opportunityClaims: new Set(),
     nowAt: () => opts.now.getTime() + (d.now() - startedAt),
     remaining: () => opts.deadlineAt - d.now(),
   };
@@ -410,6 +417,8 @@ async function personalStage(t: Tick, p: PeriodCtx): Promise<Published[]> {
           period: p.period, frozen: item.frozen, memory: item.memory,
           memoryAllowed: memoryOn && item.memory !== null && item.frozen.analysisConsent === true,
           narrative: shared.narrative, evidence: shared.evidence,
+          // This adapter represents only the existing weekly opt-in. It grants no event channel or global mode sync.
+          ...(d.opportunitiesEnabled() ? { learning: { enabled: true, now: new Date(t.nowAt()), preference: p.period.cadence === 'weekly' ? 'push' as const : 'in_app' as const } } : {}),
         });
       } catch {
         await fail(item.id, item.fence, 'compose_error', true); // deterministic: the same input fails again
@@ -547,6 +556,47 @@ async function deliver(t: Tick, cfg: ApnsConfig, master: Buffer, item: dbModule.
   if (!Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= d.now()) {
     t.report.expired++;
     return 'skipped'; // the lease runs out and the next claim (or reconcile) marks it expired
+  }
+  if (d.opportunitiesEnabled()) {
+    let key: string | null = null;
+    let deliveryContent: BriefContent | null = null;
+    let reason = 'opportunity_ineligible';
+    let eligible = false;
+    try {
+      // The claim already checked current paid plan, opted-in cadence, memory privacy and device binding.
+      // Re-read ready content so withdrawal or missing/stale source data cannot become a notification.
+      const published = await d.db.deliveryReport(item.briefId);
+      if (published && !d.validateContent(published.content as BriefContent) && canDeliverLearningOpportunity(published.content as BriefContent, new Date(d.now()), item.expiresAt)) {
+        deliveryContent = published.content as BriefContent;
+        const opportunity = (published.content as BriefContent).learningOpportunity!;
+        key = `${item.deviceId}:${published.identityId}:${opportunity.factKey}`;
+        if (t.opportunityClaims.has(key)) reason = 'opportunity_duplicate';
+        else {
+          t.opportunityClaims.add(key); // reserve before awaiting the dedupe read (parallel delivery batch)
+          if (await d.db.deliveredOpportunity(item.deviceId, published.identityId, opportunity.factKey)) reason = 'opportunity_duplicate';
+          else if (!canDeliverLearningOpportunity(deliveryContent, new Date(d.now()), item.expiresAt)) reason = 'opportunity_expired';
+          else if (!await d.db.reserveDeliveryOpportunity(published.identityId, item.deviceId, opportunity.factKey, opportunity.delivery.expiresAt, new Date(d.now()))) reason = 'opportunity_duplicate';
+          else eligible = true;
+        }
+      }
+    } catch (e) {
+      reason = 'opportunity_unavailable';
+      d.logger.error('[briefing-worker] opportunity', errCode(e));
+    }
+    if (!eligible) {
+      // Existing config release burns no provider attempt and never claims a receipt. Retry is bounded by expiry.
+      t.codes.add(reason);
+      if (reason === 'opportunity_expired') t.report.expired++;
+      try { await d.db.outboxResult(item.id, item.fence, 'config', null, reason, reason === 'opportunity_unavailable' ? RELEASE_RETRY_S : 3600); }
+      catch (e) { d.logger.error('[briefing-worker] release', errCode(e)); }
+      return 'skipped';
+    }
+    // The read can consume the remaining useful window; never decrypt or send a late opportunity.
+    if (!deliveryContent || !canDeliverLearningOpportunity(deliveryContent, new Date(d.now()), item.expiresAt)) {
+      t.report.expired++;
+      try { await d.db.outboxResult(item.id, item.fence, 'config', null, 'opportunity_expired', 3600); } catch (e) { d.logger.error('[briefing-worker] release', errCode(e)); }
+      return 'skipped';
+    }
   }
   let token: string;
   try {

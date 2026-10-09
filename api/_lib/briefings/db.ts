@@ -9,6 +9,7 @@ import { bobbyRest, bobbyServiceHeaders } from '../bobby-db.js';
 import type { BriefSettings, Cadence, ComposerMemory, DeviceEnvironment, FrozenSettings, PermissionState } from './types.js';
 import { BRIEF_LANGUAGES, type BriefLanguage } from './types.js';
 import { COMPANION_VOICES, voiceForCompanion } from './config.js';
+import { createHash } from 'node:crypto';
 
 export class BriefingStorageError extends Error {
   constructor(readonly rpc: string, readonly status: number | null) {
@@ -189,6 +190,68 @@ export async function claimOutbox(worker: string, leaseSeconds: number, limit: n
 export type OutboxOutcome = 'accepted' | 'retry' | 'invalid_token' | 'ambiguous' | 'config';
 export async function outboxResult(id: string, fence: number, outcome: OutboxOutcome, apnsStatus: number | null, reason: string | null, retryAfterSeconds: number | null): Promise<void> {
   await rpc('bobby_brief_outbox_result', { p_id: id, p_fence: fence, p_outcome: outcome, p_apns_status: apnsStatus, p_reason: reason ? reason.slice(0, 48) : null, p_retry_after_seconds: retryAfterSeconds });
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Server-only read of existing tables. Unknown storage is an error, never an empty result or permission. */
+async function deliveryRows(name: string, table: string, query: URLSearchParams): Promise<Record<string, unknown>[]> {
+  let r: Response;
+  try { r = await fetch(bobbyRest(`${table}?${query}`), { method: 'GET', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) }); }
+  catch { throw new BriefingStorageError(name, null); }
+  if (!r.ok) throw new BriefingStorageError(name, r.status);
+  let rows: unknown;
+  try { rows = await r.json(); } catch { throw new BriefingStorageError(name, r.status); }
+  if (!Array.isArray(rows) || rows.length > 1 || rows.some(v => !v || typeof v !== 'object' || Array.isArray(v))) throw new BriefingStorageError(name, r.status);
+  return rows as Record<string, unknown>[];
+}
+
+/** Used only for a brief id from the server-authorized outbox claim. No API exposes this service read. */
+export async function deliveryReport(briefId: string): Promise<{ content: unknown; identityId: string } | null> {
+  if (!UUID.test(briefId)) throw new BriefingStorageError('delivery_report', 400);
+  const rows = await deliveryRows('delivery_report', 'bobby_briefs', new URLSearchParams({
+    select: 'id,identity_id,state,content', id: `eq.${briefId}`, state: 'eq.ready', limit: '1',
+  }));
+  if (!rows.length) return null;
+  const row = rows[0];
+  if (row.id !== briefId || row.state !== 'ready' || typeof row.identity_id !== 'string' || !UUID.test(row.identity_id)) throw new BriefingStorageError('delivery_report', 200);
+  return { content: row.content, identityId: row.identity_id };
+}
+
+/** Factual dedupe within retained accepted deliveries for the same account/device; sent means APNs accepted.
+ * No last-view claim: an accepted push is not proof of opening or reading. The existing FK supplies the join. */
+export async function deliveredOpportunity(deviceId: string, identityId: string, factKey: string): Promise<boolean> {
+  if (!UUID.test(deviceId) || !UUID.test(identityId) || !/^[a-f0-9]{64}$/.test(factKey)) throw new BriefingStorageError('delivered_opportunity', 400);
+  const rows = await deliveryRows('delivered_opportunity', 'bobby_brief_outbox', new URLSearchParams({
+    select: 'id,brief:bobby_briefs!inner(id)', device_id: `eq.${deviceId}`, identity_id: `eq.${identityId}`,
+    state: 'eq.sent', 'brief.content->learningOpportunity->>factKey': `eq.${factKey}`, limit: '1',
+  }));
+  if (rows.length && (typeof rows[0].id !== 'string' || !UUID.test(rows[0].id) || !rows[0].brief || typeof rows[0].brief !== 'object' || Array.isArray(rows[0].brief))) throw new BriefingStorageError('delivered_opportunity', 200);
+  return rows.length > 0;
+}
+
+/** Atomic at-most-once reservation using the existing service-only receipt table and its primary key.
+ * state=done records a reservation, not a delivery; status/response stay null. There is no takeover/retry.
+ * A crash, unreadable token or uncertain POST after reservation deliberately sacrifices this useful window.
+ * The row lives only until source/window expiry; accepted outbox rows supply longer factual dedupe. */
+export async function reserveDeliveryOpportunity(identityId: string, deviceId: string, factKey: string, expiresAt: string, now: Date): Promise<boolean> {
+  if (!UUID.test(identityId) || !UUID.test(deviceId) || !/^[a-f0-9]{64}$/.test(factKey) || !Number.isFinite(now.getTime()) || !Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= now.getTime() || Date.parse(expiresAt) - now.getTime() > 30 * 60_000) throw new BriefingStorageError('reserve_opportunity', 400);
+  const scope = 'learning_opportunity';
+  const key = createHash('sha256').update(`v1:${deviceId}:${factKey}`).digest('hex');
+  const query = new URLSearchParams({ on_conflict: 'identity_id,scope,idem_key', select: 'identity_id,scope,idem_key,digest,state' });
+  let r: Response;
+  try {
+    r = await fetch(bobbyRest(`bobby_brief_idempotency?${query}`), { method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'resolution=ignore-duplicates,return=representation' }),
+      body: JSON.stringify({ identity_id: identityId, scope, idem_key: key, digest: factKey, state: 'done', status: null, response: null, expires_at: expiresAt }), signal: AbortSignal.timeout(4000),
+    });
+  } catch { throw new BriefingStorageError('reserve_opportunity', null); }
+  if (!r.ok) throw new BriefingStorageError('reserve_opportunity', r.status);
+  let rows: unknown;
+  try { rows = await r.json(); } catch { throw new BriefingStorageError('reserve_opportunity', r.status); }
+  if (!Array.isArray(rows) || rows.length > 1) throw new BriefingStorageError('reserve_opportunity', r.status);
+  if (!rows.length) return false; // primary-key conflict: another worker already reserved the source fact
+  const row = obj(rows[0], 'reserve_opportunity');
+  if (row.identity_id !== identityId || row.scope !== scope || row.idem_key !== key || row.digest !== factKey || row.state !== 'done') throw new BriefingStorageError('reserve_opportunity', r.status);
+  return true;
 }
 
 // ---- budget ----

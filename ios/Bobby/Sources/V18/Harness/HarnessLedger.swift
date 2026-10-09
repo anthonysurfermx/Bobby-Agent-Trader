@@ -113,11 +113,19 @@ struct HarnessEvent: Codable, Equatable {
     /// Explicit in-app continuity: an opaque saved-read id and its first local day. No answer text.
     var readId: String? = nil
     var availableFrom: Date? = nil
+    /// A contextual "Yes, tell me" about this Bobby-authored read. Never a question of their own.
+    var followUpRequestedAt: Date? = nil
 
     /// The one kind that says "this person answers Bobby".
     var isAnswer: Bool { kind == .returned }
     /// A question the person asked by themselves: the only thing follow-ups start from.
-    var isQuestion: Bool { kind == .ask && origin == nil }
+    /// Older in-app saved-read pointers used `ask` plus `readId`; those are continuity, not questions.
+    var isQuestion: Bool { kind == .ask && origin == nil && readId == nil }
+    var explicitFollowUpRequested: Bool {
+        kind == .ask && origin == .followUp && readId == nil && followUpRequestedAt.map { $0 >= at } == true
+    }
+    var isFollowUpAnchor: Bool { isQuestion || explicitFollowUpRequested }
+    var followUpAnchorAt: Date { explicitFollowUpRequested ? followUpRequestedAt! : at }
 }
 
 /// An asset the person asked about, as the ledger knows it.
@@ -133,6 +141,8 @@ struct HarnessAsset: Equatable, Identifiable {
     /// The price at the first ask of the window `assets(since:)` was called with.
     let firstPrice: Double?
     let asks: Int
+    /// The latest comparison baseline came from their own question, rather than a followed Bobby read.
+    var lastAskedByPerson = true
     var id: String { symbol }
 }
 
@@ -164,6 +174,7 @@ struct HarnessLedger: Codable, Equatable {
         }
         if let price = event.price, !(price.isFinite && price > 0) { event.price = nil }
         if let hours = event.horizonHours, !Self.saveHorizons.contains(hours) { event.horizonHours = nil }
+        if !event.explicitFollowUpRequested { event.followUpRequestedAt = nil }
         let index = events.lastIndex { $0.at <= event.at }.map { $0 + 1 } ?? 0
         events.insert(event, at: index)
         prune(now: events.last?.at ?? event.at)
@@ -196,6 +207,7 @@ struct HarnessLedger: Codable, Equatable {
         events[index].thread = full.thread
         events[index].horizon = full.horizon
         events[index].horizonHours = full.horizonHours.flatMap { Self.saveHorizons.contains($0) ? $0 : nil }
+        if full.explicitFollowUpRequested { events[index].followUpRequestedAt = full.followUpRequestedAt }
         return true
     }
 
@@ -233,20 +245,42 @@ struct HarnessLedger: Codable, Equatable {
         events.last { $0.at <= now && $0.isQuestion }
     }
 
-    /// The assets asked about since `since`, most recently asked first.
+    /// The latest own question or explicit request to follow a Bobby-authored read.
+    func followUpAnchor(before now: Date) -> HarnessEvent? {
+        events.filter { $0.isFollowUpAnchor && $0.at <= now && $0.followUpAnchorAt <= now }
+            .max { $0.followUpAnchorAt < $1.followUpAnchorAt }
+    }
+
+    /// Assets in the person's own questions, most recently asked first. A Bobby-authored read is
+    /// kept in the event ledger but never makes its asset look like a preference the person stated.
     func assets(since: Date, now: Date) -> [HarnessAsset] {
+        assets(since: since, now: now, followUps: false)
+    }
+
+    /// Explicit follow-up choices are available to the planner without being counted as questions.
+    func followUpAssets(since: Date, now: Date) -> [HarnessAsset] {
+        assets(since: since, now: now, followUps: true)
+    }
+
+    private func assets(since: Date, now: Date, followUps: Bool) -> [HarnessAsset] {
         var order: [String] = []
         var bySymbol: [String: [HarnessEvent]] = [:]
-        for event in events where event.kind == .ask && event.at >= since && event.at <= now {
-            guard let symbol = event.symbol else { continue }
+        for original in events where (followUps ? original.isFollowUpAnchor : original.isQuestion) && original.at <= now {
+            var event = original
+            if followUps { event.at = original.followUpAnchorAt }
+            guard event.at >= since, event.at <= now else { continue }
+            guard let symbol = Self.validSymbol(event.symbol) else { continue }
             if bySymbol[symbol] == nil { order.append(symbol) }
             bySymbol[symbol, default: []].append(event)
         }
         return order.compactMap { symbol -> HarnessAsset? in
-            guard let asks = bySymbol[symbol], let first = asks.first, let last = asks.last else { return nil }
+            guard let found = bySymbol[symbol] else { return nil }
+            let asks = found.sorted { $0.at < $1.at }
+            guard let first = asks.first, let last = asks.last else { return nil }
             return HarnessAsset(symbol: symbol, name: last.name ?? symbol, isEquity: last.isEquity ?? false,
                                 firstAskedAt: first.at, lastAskedAt: last.at, lastPrice: last.price,
-                                firstPrice: asks.first { $0.price != nil }?.price, asks: asks.count)
+                                firstPrice: asks.first { $0.price != nil }?.price, asks: asks.filter(\.isQuestion).count,
+                                lastAskedByPerson: last.isQuestion)
         }
         .sorted { $0.lastAskedAt > $1.lastAskedAt }
     }
@@ -278,10 +312,9 @@ struct HarnessProfile: Equatable {
     /// Answers needed before the hour they come at is trusted over the hour they asked at.
     static let hourSamples = 3
 
-    /// What each thing they did says about how much the asset matters. An answered follow-up weighs
-    /// as much as a question, on top of the question, save or pick that answered it. A tap alone
-    /// weighs half a question: they looked, and did nothing with it.
-    static let weights: [HarnessEvent.Kind: Double] = [.ask: 1, .saved: 1, .picked: 1, .opened: 0.5, .returned: 1]
+    /// Interest is inferred only from their own questions, explicit saves and active theses.
+    /// Responding to Bobby teaches timing; it cannot turn Bobby's suggestions into a preference.
+    static let weights: [HarnessEvent.Kind: Double] = [.ask: 1, .saved: 1]
     /// A second question of their own about the same read, on top of the question itself.
     static let threadWeight = 1.0
     /// A thesis they wrote and keep active. It does not fade: it counts until the thesis is archived.
@@ -294,14 +327,15 @@ struct HarnessProfile: Equatable {
         var ignored: [HarnessStep: Int] = [:]
         var hours: [Int: (count: Int, latest: Date)] = [:]
         let statsFrom = now.addingTimeInterval(-statsDays * 86_400)
+        let retainedFrom = now.addingTimeInterval(-Double(HarnessLedger.retentionDays) * 86_400)
         var theses = Set<String>()
-        for event in ledger.events where event.at <= now {
-            if let symbol = event.symbol {
+        for event in ledger.events where event.at <= now && (event.kind == .thesis || event.at >= retainedFrom) {
+            if let symbol = HarnessLedger.validSymbol(event.symbol) {
                 if event.kind == .thesis {
                     if theses.insert(symbol).inserted { interest[symbol, default: 0] += thesisWeight }
-                } else if let weight = weights[event.kind] {
-                    let ageDays = now.timeIntervalSince(event.at) / 86_400
-                    interest[symbol, default: 0] += (weight + (event.thread == true ? threadWeight : 0)) * pow(0.5, ageDays / halfLifeDays)
+                } else if let weight = weights[event.kind], event.kind != .ask || event.isQuestion || (event.explicitFollowUpRequested && event.followUpAnchorAt <= now) {
+                    let ageDays = now.timeIntervalSince(event.kind == .ask ? event.followUpAnchorAt : event.at) / 86_400
+                    interest[symbol, default: 0] += (weight + (event.isQuestion && event.thread == true ? threadWeight : 0)) * pow(0.5, ageDays / halfLifeDays)
                 }
             }
             guard event.at >= statsFrom, let step = event.step else { continue }
@@ -333,6 +367,56 @@ struct HarnessProfile: Equatable {
             if best == nil || score > best!.score { best = (symbol, score) }
         }
         return best?.symbol
+    }
+}
+
+/// A bounded, versioned view of local learning. It contains observed actions, never question text
+/// or a claim about what the person owns or prefers. No network path reads or sends this type.
+struct HarnessLearningContext: Equatable, Sendable {
+    static let currentVersion = 1
+    static let maxAssets = 5
+
+    struct Asset: Equatable, Sendable {
+        let symbol: String
+        let ownQuestions: Int
+        let ownThreads: Int
+        let explicitFollowUps: Int
+        let explicitSaves: Int
+        let activeThesis: Bool
+        /// Reads prompted by Bobby, reported separately and worth no inferred interest.
+        let bobbyReads: Int
+        let lastOwnQuestionAt: Date?
+        let inferredInterest: Double
+    }
+
+    let version: Int
+    let asOf: Date
+    let assets: [Asset]
+
+    static func make(_ ledger: HarnessLedger, now: Date, calendar: Calendar,
+                     eligibleSymbols: Set<String>? = nil) -> HarnessLearningContext {
+        var retained = ledger.upTo(now)
+        retained.prune(now: now)
+        let profile = HarnessProfile.make(retained, now: now, calendar: calendar)
+        var rows: [Asset] = []
+        for (symbol, score) in profile.interest where score > 0 {
+            guard eligibleSymbols?.contains(symbol) ?? true else { continue }
+            let events = retained.events.filter { HarnessLedger.validSymbol($0.symbol) == symbol }
+            let own = events.filter(\.isQuestion)
+            rows.append(Asset(symbol: symbol, ownQuestions: own.count,
+                              ownThreads: own.filter { $0.thread == true }.count,
+                              explicitFollowUps: events.filter { $0.explicitFollowUpRequested && $0.followUpAnchorAt <= now }.count,
+                              explicitSaves: events.filter { $0.kind == .saved }.count,
+                              activeThesis: events.contains { $0.kind == .thesis },
+                              bobbyReads: events.filter { $0.kind == .ask && $0.origin != nil }.count,
+                              lastOwnQuestionAt: own.last?.at, inferredInterest: score))
+        }
+        rows.sort { a, b in
+            if a.inferredInterest != b.inferredInterest { return a.inferredInterest > b.inferredInterest }
+            if a.lastOwnQuestionAt != b.lastOwnQuestionAt { return (a.lastOwnQuestionAt ?? .distantPast) > (b.lastOwnQuestionAt ?? .distantPast) }
+            return a.symbol < b.symbol
+        }
+        return HarnessLearningContext(version: currentVersion, asOf: now, assets: Array(rows.prefix(maxAssets)))
     }
 }
 

@@ -1,4 +1,5 @@
 import { APP_LANGUAGES, type AppLanguage } from '../../../src/lib/app-language.js';
+import type { LearningOpportunityV1 } from '../learning-opportunity.js';
 // ============================================================
 // Bobby Pro market briefings — shared types (build 53).
 // Contract: docs/product/pro-market-briefings-implementation.md (implementation spec) and
@@ -143,6 +144,8 @@ export interface BriefContent {
   dataAsOf: string;
   sources: BriefEvidence['sources'];
   equitySession: EquitySessionState;
+  /** Optional rollout metadata. Authorization remains in current DB consent/plan/device checks. */
+  learningOpportunity?: LearningOpportunityV1;
 }
 
 /** Account briefing settings as stored (bobby_brief_settings) and returned by GET. */

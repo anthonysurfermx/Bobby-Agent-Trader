@@ -21,12 +21,15 @@ struct NucleoNudge: Equatable {
     let id: String
     let text: String
     let cta: String
+    /// Native-only refresh deadline: a dated claim can change while the page stays open.
+    let refreshAt: Date?
 
     /// Ids are lowercase on the wire (a UUID fragment or an ISO week may arrive in capitals).
-    init(id: String, text: String, cta: String) {
+    init(id: String, text: String, cta: String, refreshAt: Date? = nil) {
         self.id = id.lowercased()
         self.text = text
         self.cta = cta
+        self.refreshAt = refreshAt
     }
 
     var json: [String: Any] { ["id": id, "text": text, "cta": cta] }
@@ -200,6 +203,14 @@ final class NudgeCenter {
         guard let record = records[rawId.lowercased()], !record.done, record.shown > 0 else { return nil }
         let roundDone = record.shown % policy.perRound == 0 || record.shown >= policy.lifetime
         return roundDone ? Date(timeIntervalSince1970: record.at + policy.showingGap) : nil
+    }
+
+    /// The next native clock change, including the first showing of a sourced market claim.
+    func refreshAt(_ rawId: String) -> Date? {
+        let id = rawId.lowercased()
+        guard currentId == id else { return nil }
+        return [showingEnds(id), served[id]?.nudge.refreshAt].compactMap { $0 }
+            .filter { $0 > now() }.min()
     }
 
     /// The person tapped it: it is retired, then its source acts. `gone` when it is not the nudge on

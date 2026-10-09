@@ -110,6 +110,10 @@ data class HarnessEvent(
     val horizon: HarnessHorizon? = null,
     /** `SAVED`: the review horizon they chose, 24, 72 or 168. */
     val horizonHours: Int? = null,
+    /** Legacy saved-read continuity pointer. It never states a question of their own. */
+    val readId: String? = null,
+    /** The contextual yes to follow this Bobby-authored read, separate from its delivery time. */
+    val followUpRequestedAt: Long? = null,
 ) {
     enum class Kind(val raw: String) {
         /** A read was delivered. */
@@ -156,8 +160,13 @@ data class HarnessEvent(
     /** The one kind that says "this person answers Bobby". */
     val isAnswer: Boolean get() = kind == Kind.RETURNED
 
-    /** A question the person asked by themselves: the only thing follow-ups start from. */
-    val isQuestion: Boolean get() = kind == Kind.ASK && origin == null
+    /** A question the person asked by themselves. Legacy ask/readId pointers are continuity, not questions. */
+    val isQuestion: Boolean get() = kind == Kind.ASK && origin == null && readId == null
+
+    val explicitFollowUpRequested: Boolean get() = kind == Kind.ASK && origin == Origin.FOLLOW_UP && readId == null &&
+        followUpRequestedAt?.let { it >= at } == true
+    val isFollowUpAnchor: Boolean get() = isQuestion || explicitFollowUpRequested
+    val followUpAnchorAt: Long get() = if (explicitFollowUpRequested) followUpRequestedAt!! else at
 
     /** Only what is there is written: a symbol, a price, a moment, a fixed value. Never a question. */
     fun toJson(): JSONObject {
@@ -173,6 +182,8 @@ data class HarnessEvent(
         if (thread != null) json.put("thread", thread)
         if (horizon != null) json.put("horizon", horizon.raw)
         if (horizonHours != null) json.put("horizonHours", horizonHours)
+        if (readId != null) json.put("readId", readId)
+        if (followUpRequestedAt != null) json.put("followUpRequestedAt", followUpRequestedAt)
         return json
     }
 
@@ -183,7 +194,8 @@ data class HarnessEvent(
             return HarnessEvent(kind, at, HarnessJson.text(json, "symbol"), HarnessJson.text(json, "name"), json.opt("isEquity") as? Boolean,
                                 HarnessJson.double(json, "price"), HarnessStep.of(HarnessJson.text(json, "step")), HarnessJson.text(json, "sector"),
                                 HarnessJson.long(json, "ref"), Origin.of(HarnessJson.text(json, "origin")), json.opt("thread") as? Boolean,
-                                HarnessHorizon.named(json.opt("horizon")), HarnessJson.int(json, "horizonHours"))
+                                HarnessHorizon.named(json.opt("horizon")), HarnessJson.int(json, "horizonHours"),
+                                HarnessJson.text(json, "readId"), HarnessJson.long(json, "followUpRequestedAt"))
         }
     }
 }
@@ -201,6 +213,8 @@ data class HarnessAsset(
     /** The price at the first ask of the window `assets` was called with that had one. */
     val firstPrice: Double?,
     val asks: Int,
+    /** Origin of the latest comparison anchor, independent of the accumulated own-question count. */
+    val lastAskedByPerson: Boolean = true,
 )
 
 class HarnessLedger {
@@ -223,6 +237,7 @@ class HarnessLedger {
         if (price != null && !(price.isFinite() && price > 0)) kept = kept.copy(price = null)
         val hours = kept.horizonHours
         if (hours != null && hours !in SAVE_HORIZONS) kept = kept.copy(horizonHours = null)
+        if (kept.followUpRequestedAt != null && !kept.explicitFollowUpRequested) kept = kept.copy(followUpRequestedAt = null)
         val index = list.indexOfLast { it.at <= kept.at } + 1
         list.add(index, kept)
         prune(list.last().at)
@@ -254,7 +269,8 @@ class HarnessLedger {
         val symbol = full.symbol?.uppercase(Locale.ROOT)
         val index = list.indexOfFirst { it.kind == full.kind && it.at == full.at && it.symbol == symbol }
         if (index < 0) return false
-        list[index] = list[index].copy(thread = full.thread, horizon = full.horizon, horizonHours = full.horizonHours?.takeIf { it in SAVE_HORIZONS })
+        list[index] = list[index].copy(thread = full.thread, horizon = full.horizon, horizonHours = full.horizonHours?.takeIf { it in SAVE_HORIZONS },
+                                      followUpRequestedAt = full.followUpRequestedAt?.takeIf { full.explicitFollowUpRequested } ?: list[index].followUpRequestedAt)
         return true
     }
 
@@ -296,19 +312,32 @@ class HarnessLedger {
      */
     fun question(before: Long): HarnessEvent? = list.lastOrNull { it.at <= before && it.isQuestion }
 
-    /** The assets asked about since `since`, most recently asked first. */
+    /** Own questions and contextual follow-up choices; delivery order is not the choice's order. */
+    fun followUpAnchor(before: Long): HarnessEvent? = list.filter { it.isFollowUpAnchor && it.at <= before && it.followUpAnchorAt <= before }
+        .maxByOrNull { it.followUpAnchorAt }
+
+    /** Assets in their own questions; a Bobby-authored read stays in the ledger but states no preference. */
     fun assets(since: Long, now: Long): List<HarnessAsset> {
+        return assetRows(list.filter { it.isQuestion && it.at >= since && it.at <= now }) { it.at }
+    }
+
+    /** Scheduling subjects include a contextual yes without turning it into an own question. */
+    fun followUpAssets(since: Long, now: Long): List<HarnessAsset> {
+        return assetRows(list.filter { it.isFollowUpAnchor && it.at <= now && it.followUpAnchorAt >= since && it.followUpAnchorAt <= now }
+            .sortedBy { it.followUpAnchorAt }) { it.followUpAnchorAt }
+    }
+
+    private fun assetRows(events: List<HarnessEvent>, dated: (HarnessEvent) -> Long): List<HarnessAsset> {
         val bySymbol = LinkedHashMap<String, ArrayList<HarnessEvent>>()
-        for (event in list) {
-            if (event.kind != HarnessEvent.Kind.ASK || event.at < since || event.at > now) continue
-            val symbol = event.symbol ?: continue
+        for (event in events) {
+            val symbol = validSymbol(event.symbol) ?: continue
             bySymbol.getOrPut(symbol) { ArrayList() }.add(event)
         }
         return bySymbol.map { (symbol, asks) ->
             val first = asks.first()
             val last = asks.last()
-            HarnessAsset(symbol, last.name ?: symbol, last.isEquity ?: false, first.at, last.at, last.price,
-                         asks.firstOrNull { it.price != null }?.price, asks.size)
+            HarnessAsset(symbol, last.name ?: symbol, last.isEquity ?: false, dated(first), dated(last), last.price,
+                         asks.firstOrNull { it.price != null }?.price, asks.count { it.isQuestion }, last.isQuestion)
         }.sortedByDescending { it.lastAskedAt }
     }
 
@@ -358,10 +387,48 @@ class HarnessLedger {
                 // The same rules `note` applies, for a store somebody else may have written to.
                 val symbol = if (event.symbol == null) null else validSymbol(event.symbol) ?: continue
                 val price = event.price?.takeIf { it.isFinite() && it > 0 }
-                read.add(event.copy(symbol = symbol, price = price, horizonHours = event.horizonHours?.takeIf { it in SAVE_HORIZONS }))
+                read.add(event.copy(symbol = symbol, price = price, horizonHours = event.horizonHours?.takeIf { it in SAVE_HORIZONS },
+                                    followUpRequestedAt = event.followUpRequestedAt?.takeIf { event.explicitFollowUpRequested }))
             }
             ledger.list.addAll(read.sortedBy { it.at })
             return ledger
+        }
+    }
+}
+
+/** Bounded local learning, never question text, a declared preference or a network payload. */
+data class HarnessLearningContext(val version: Int, val asOf: Long, val assets: List<Asset>) {
+    data class Asset(
+        val symbol: String,
+        val ownQuestions: Int,
+        val ownThreads: Int,
+        val explicitFollowUps: Int,
+        val explicitSaves: Int,
+        val activeThesis: Boolean,
+        val bobbyReads: Int,
+        val lastOwnQuestionAt: Long?,
+        val inferredInterest: Double,
+    )
+
+    companion object {
+        const val CURRENT_VERSION = 1
+        const val MAX_ASSETS = 5
+
+        fun make(ledger: HarnessLedger, now: Long, zone: ZoneId, eligibleSymbols: Set<String>? = null): HarnessLearningContext {
+            // HarnessLedger is mutable; build a fresh snapshot so deriving context cannot prune its caller.
+            val retained = HarnessLedger()
+            ledger.events.filter { it.at <= now }.forEach(retained::note)
+            retained.prune(now)
+            val profile = HarnessProfile.make(retained, now, zone)
+            val rows = profile.interest.filter { (symbol, score) -> score > 0 && (eligibleSymbols == null || symbol in eligibleSymbols) }
+                .map { (symbol, score) ->
+                    val events = retained.events.filter { HarnessLedger.validSymbol(it.symbol) == symbol }
+                    val own = events.filter { it.isQuestion }
+                    Asset(symbol, own.size, own.count { it.thread == true }, events.count { it.explicitFollowUpRequested && it.followUpAnchorAt <= now }, events.count { it.kind == HarnessEvent.Kind.SAVED },
+                          events.any { it.kind == HarnessEvent.Kind.THESIS }, events.count { it.kind == HarnessEvent.Kind.ASK && it.origin != null },
+                          own.lastOrNull()?.at, score)
+                }.sortedWith(compareByDescending<Asset> { it.inferredInterest }.thenByDescending { it.lastOwnQuestionAt ?: Long.MIN_VALUE }.thenBy { it.symbol })
+            return HarnessLearningContext(CURRENT_VERSION, now, rows.take(MAX_ASSETS))
         }
     }
 }
@@ -412,13 +479,11 @@ class HarnessProfile(
         const val HOUR_SAMPLES = 3
 
         /**
-         * What each thing they did says about how much the asset matters. An answered follow-up
-         * weighs as much as a question, on top of the question, save or pick that answered it. A
-         * tap alone weighs half a question: they looked, and did nothing with it.
+         * Interest is inferred only from their own questions, contextual follow-up choices, explicit saves and active theses.
+         * Responding to Bobby teaches timing; it cannot make Bobby's suggestions a preference.
          */
         val WEIGHTS: Map<HarnessEvent.Kind, Double> = mapOf(
-            HarnessEvent.Kind.ASK to 1.0, HarnessEvent.Kind.SAVED to 1.0, HarnessEvent.Kind.PICKED to 1.0,
-            HarnessEvent.Kind.OPENED to 0.5, HarnessEvent.Kind.RETURNED to 1.0,
+            HarnessEvent.Kind.ASK to 1.0, HarnessEvent.Kind.SAVED to 1.0,
         )
         /** A second question of their own about the same read, on top of the question itself. */
         const val THREAD_WEIGHT = 1.0
@@ -433,19 +498,21 @@ class HarnessProfile(
             // hour -> (answers at that hour, the latest of them)
             val hours = TreeMap<Int, Pair<Int, Long>>()
             val statsFrom = now - STATS_DAYS * HARNESS_DAY_MS
+            val retainedFrom = now - HarnessLedger.RETENTION_DAYS * HARNESS_DAY_MS
             val theses = HashSet<String>()
             for (event in ledger.events) {
-                if (event.at > now) continue
-                val symbol = event.symbol
+                if (event.at > now || (event.kind != HarnessEvent.Kind.THESIS && event.at < retainedFrom)) continue
+                val symbol = HarnessLedger.validSymbol(event.symbol)
                 if (symbol != null) {
                     if (event.kind == HarnessEvent.Kind.THESIS) {
                         // One thesis, one weight: a pointer written twice is not two theses.
                         if (theses.add(symbol)) interest[symbol] = (interest[symbol] ?: 0.0) + THESIS_WEIGHT
                     } else {
                         val weight = WEIGHTS[event.kind]
-                        if (weight != null) {
-                            val ageDays = (now - event.at) / HARNESS_DAY_MS.toDouble()
-                            val whole = weight + if (event.thread == true) THREAD_WEIGHT else 0.0
+                        if (weight != null && (event.kind != HarnessEvent.Kind.ASK || event.isQuestion || event.explicitFollowUpRequested && event.followUpAnchorAt <= now)) {
+                            val dated = if (event.explicitFollowUpRequested) event.followUpAnchorAt else event.at
+                            val ageDays = (now - dated) / HARNESS_DAY_MS.toDouble()
+                            val whole = weight + if (event.isQuestion && event.thread == true) THREAD_WEIGHT else 0.0
                             interest[symbol] = (interest[symbol] ?: 0.0) + whole * 0.5.pow(ageDays / HALF_LIFE_DAYS)
                         }
                     }

@@ -85,8 +85,9 @@ class HarnessLedgerTest {
         ledger.note(HarnessEvent(HarnessEvent.Kind.ASK, t0 + 80 * second, symbol = "TSLA", name = "TSLA", isEquity = true, price = 10.0, thread = true))
         assertEquals("TSLA", ledger.question(t0 + 90 * second)?.symbol)
         assertEquals("the clock decides what has happened yet", "NVDA", ledger.question(t0 + 70 * second)?.symbol)
-        // The asset is known from every read, whoever started it (the line on the glass counts from the last one).
-        assertEquals(2, ledger.asset("TSLA", since = t0, now = t0 + 90 * second)?.asks)
+        // Bobby's read stays in the ledger, but only their own question belongs to learned assets.
+        assertEquals(3, ledger.events(HarnessEvent.Kind.ASK).size)
+        assertEquals(1, ledger.asset("TSLA", since = t0, now = t0 + 90 * second)?.asks)
     }
 
     @Test fun anAppOpeningIsRefusedAndOnesKeptByAndroid120AreDropped() {
@@ -116,10 +117,11 @@ class HarnessLedgerTest {
                      listOf("ask", "saved", "appOpen", "sent", "opened", "returned", "picked", "thesis"), HarnessEvent.Kind.entries.map { it.raw })
         assertTrue(HarnessEvent(HarnessEvent.Kind.ASK, t0, symbol = "NVDA").isQuestion)
         assertFalse(HarnessEvent(HarnessEvent.Kind.ASK, t0, symbol = "NVDA", origin = HarnessEvent.Origin.FOLLOW_UP).isQuestion)
+        assertFalse(HarnessEvent(HarnessEvent.Kind.ASK, t0, symbol = "NVDA", readId = "stored-read").isQuestion)
         assertFalse(HarnessEvent(HarnessEvent.Kind.PICKED, t0, symbol = "NVDA").isQuestion)
     }
 
-    @Test fun aTapWeighsLessThanAQuestionAndAnAnswerAsMuchAsOne() {
+    @Test fun onlyOwnQuestionsExplicitSavesAndThesesTeachAssetInterest() {
         val now = t0 + 60 * second
         fun interest(vararg events: HarnessEvent): Double {
             val ledger = HarnessLedger()
@@ -127,17 +129,201 @@ class HarnessLedgerTest {
             return HarnessProfile.make(ledger, now, utc).interest["NVDA"] ?: 0.0
         }
         val question = interest(ask("NVDA", 0))
-        val tap = interest(HarnessEvent(HarnessEvent.Kind.OPENED, t0, symbol = "NVDA", step = HarnessStep.ASSET))
-        val answer = interest(HarnessEvent(HarnessEvent.Kind.RETURNED, t0, symbol = "NVDA", step = HarnessStep.ASSET))
-        assertEquals("they looked and did nothing with it", 0.5, tap / question, 0.001)
-        assertEquals("on top of the question, save or pick that answered it", 1.0, answer / question, 0.001)
-        assertTrue(tap < answer)
-        // Their own second question about the same read counts twice; a read Bobby started counts once.
+        for (kind in listOf(HarnessEvent.Kind.OPENED, HarnessEvent.Kind.PICKED, HarnessEvent.Kind.RETURNED)) {
+            assertEquals("$kind answers Bobby's timing, never states an asset preference", 0.0,
+                         interest(HarnessEvent(kind, t0, symbol = "NVDA", step = HarnessStep.ASSET)), 0.0)
+        }
+        // Their own second question counts twice; repeating Bobby's question contributes no interest.
         val thread = interest(HarnessEvent(HarnessEvent.Kind.ASK, t0, symbol = "NVDA", thread = true))
         assertEquals(2.0, thread / question, 0.001)
-        assertEquals(1.0, interest(HarnessEvent(HarnessEvent.Kind.ASK, t0, symbol = "NVDA", origin = HarnessEvent.Origin.FOLLOW_UP)) / question, 0.001)
+        assertEquals(0.0, interest(HarnessEvent(HarnessEvent.Kind.ASK, t0, symbol = "NVDA", origin = HarnessEvent.Origin.FOLLOW_UP, thread = true)), 0.0)
+        assertEquals("an explicit save counts even when Bobby offered the read", 1.0,
+                     interest(HarnessEvent(HarnessEvent.Kind.SAVED, t0, symbol = "NVDA")) / question, 0.001)
         assertNull("being shown something says nothing about them", HarnessProfile.WEIGHTS[HarnessEvent.Kind.SENT])
         assertNull(HarnessProfile.WEIGHTS[HarnessEvent.Kind.APP_OPEN])
+    }
+
+    @Test fun repeatedBobbyOffersCannotManufactureAFavouriteAsset() {
+        val now = t0 + 300 * second
+        val ledger = HarnessLedger().also { it.note(ask("MU", 0)); it.note(ask("BTC", 1)) }
+        val before = HarnessProfile.make(ledger, now, utc)
+        for (i in 0 until 40) {
+            val at = t0 + (i + 2) * second
+            ledger.note(HarnessEvent(HarnessEvent.Kind.ASK, at, symbol = "NVDA", origin = HarnessEvent.Origin.FOLLOW_UP))
+            ledger.note(HarnessEvent(HarnessEvent.Kind.OPENED, at, symbol = "NVDA", step = HarnessStep.ASSET))
+            ledger.note(HarnessEvent(HarnessEvent.Kind.PICKED, at, symbol = "NVDA"))
+            ledger.note(HarnessEvent(HarnessEvent.Kind.RETURNED, at, symbol = "NVDA", step = HarnessStep.ASSET))
+        }
+        val after = HarnessProfile.make(ledger, now, utc)
+        assertEquals(before.interest, after.interest)
+        assertNull(ledger.asset("NVDA", t0, now))
+        assertEquals("BTC", after.favourite(listOf("NVDA", "MU", "BTC")))
+        assertEquals(40, after.answered[HarnessStep.ASSET])
+        assertTrue("response timing is learned independently from interest", after.hour != null)
+    }
+
+    @Test fun learningContextSeparatesOwnEvidenceFromBobbyAndContainsNoWords() {
+        val ledger = HarnessLedger()
+        ledger.note(ask("MU", 0))
+        ledger.note(HarnessEvent(HarnessEvent.Kind.ASK, t0 + second, symbol = "MU", thread = true))
+        ledger.note(HarnessEvent(HarnessEvent.Kind.SAVED, t0 + 2 * second, symbol = "MU"))
+        ledger.note(HarnessEvent(HarnessEvent.Kind.THESIS, t0 + 3 * second, symbol = "MU"))
+        ledger.note(HarnessEvent(HarnessEvent.Kind.ASK, t0 + 4 * second, symbol = "MU", origin = HarnessEvent.Origin.FOLLOW_UP))
+        ledger.note(HarnessEvent(HarnessEvent.Kind.ASK, t0 + 5 * second, symbol = "NVDA", origin = HarnessEvent.Origin.FOLLOW_UP))
+        val now = t0 + 300 * second
+        val context = HarnessLearningContext.make(ledger, now, utc)
+        assertEquals(1, context.version); assertEquals(now, context.asOf)
+        assertEquals(listOf("MU"), context.assets.map { it.symbol })
+        val asset = context.assets.single()
+        assertEquals(2, asset.ownQuestions); assertEquals(1, asset.ownThreads); assertEquals(1, asset.explicitSaves)
+        assertTrue(asset.activeThesis); assertEquals(1, asset.bobbyReads); assertEquals(t0 + second, asset.lastOwnQuestionAt)
+        assertEquals(HarnessProfile.make(ledger, now, utc).interest["MU"] ?: 0.0, asset.inferredInterest, 0.0)
+        assertEquals(0, asset.explicitFollowUps)
+        assertEquals(setOf("symbol", "ownQuestions", "ownThreads", "explicitFollowUps", "explicitSaves", "activeThesis", "bobbyReads", "lastOwnQuestionAt", "inferredInterest"),
+                     asset.javaClass.declaredFields.filterNot { it.isSynthetic }.map { it.name }.toSet())
+    }
+
+    @Test fun learningContextIsBoundedFreshAndDropsFutureEvidenceWithoutChangingTheLedger() {
+        val old = HarnessLedger().also { it.note(ask("OLD", 0)) }
+        val later = t0 + (HarnessLedger.RETENTION_DAYS + 1) * day
+        assertTrue(HarnessLearningContext.make(old, later, utc).assets.isEmpty())
+        assertTrue(HarnessProfile.make(old, later, utc).interest.isEmpty())
+        assertEquals("deriving context never prunes its mutable caller", 1, old.events.size)
+        val ledger = HarnessLedger()
+        for (i in 0 until 8) ledger.note(ask("ASSET$i", i.toLong()))
+        ledger.note(ask("FUTURE", 400))
+        val context = HarnessLearningContext.make(ledger, t0 + 300 * second, utc)
+        assertEquals(HarnessLearningContext.MAX_ASSETS, context.assets.size)
+        assertFalse(context.assets.any { it.symbol == "FUTURE" }); assertEquals("ASSET7", context.assets.first().symbol)
+        assertEquals(listOf("ASSET0"), HarnessLearningContext.make(ledger, t0 + 300 * second, utc, setOf("ASSET0")).assets.map { it.symbol })
+    }
+
+    @Test fun learningContextFollowsItsOwnersStoreAndErasure() {
+        val store = HarnessStore(OpenStore())
+        val now = t0 + 300 * second
+        store.write(HarnessLedger().also { it.note(ask("MU", 0)) }, "a")
+        store.write(HarnessLedger().also { it.note(ask("BTC", 0)) }, "b")
+        assertEquals(listOf("MU"), HarnessLearningContext.make(store.ledger("a"), now, utc).assets.map { it.symbol })
+        assertEquals(listOf("BTC"), HarnessLearningContext.make(store.ledger("b"), now, utc).assets.map { it.symbol })
+        store.forget("a")
+        assertTrue(HarnessLearningContext.make(store.ledger("a"), now, utc).assets.isEmpty())
+        assertEquals(listOf("BTC"), HarnessLearningContext.make(store.ledger("b"), now, utc).assets.map { it.symbol })
+    }
+
+    @Test fun legacySavedReadPointersAreNotOwnQuestionsOrDuplicateInterest() {
+        val now = t0 + 300 * second
+        val ledger = HarnessLedger()
+        ledger.note(HarnessEvent(HarnessEvent.Kind.ASK, t0, symbol = "MU", readId = "stored-read"))
+        assertNull(ledger.question(now)); assertNull(ledger.asset("MU", t0, now))
+        assertTrue(HarnessProfile.make(ledger, now, utc).interest.isEmpty())
+        ledger.note(HarnessEvent(HarnessEvent.Kind.SAVED, t0, symbol = "MU", readId = "stored-read"))
+        val asset = HarnessLearningContext.make(ledger, now, utc).assets.single()
+        assertEquals(0, asset.ownQuestions); assertEquals(1, asset.explicitSaves); assertNull(asset.lastOwnQuestionAt)
+        assertEquals(Math.pow(0.5, 300.0 / 86_400 / HarnessProfile.HALF_LIFE_DAYS), asset.inferredInterest, 0.000_001)
+        assertEquals("the compatibility pointer remains without teaching a question", 1, ledger.events(HarnessEvent.Kind.ASK).size)
+    }
+
+    @Test fun contextualFollowUpIsAnExplicitChoiceWithoutCreatingAnOwnQuestion() {
+        val requested = t0 + 100 * second
+        val read = HarnessEvent(HarnessEvent.Kind.ASK, t0, symbol = "NVDA", name = "NVIDIA", isEquity = true, price = 100.0,
+                                origin = HarnessEvent.Origin.FOLLOW_UP, thread = true)
+        val ledger = HarnessLedger().also { it.note(read) }
+        assertNull(ledger.followUpAnchor(requested))
+        assertTrue(HarnessLearningContext.make(ledger, requested, utc).assets.isEmpty())
+        assertTrue(ledger.complete(read.copy(followUpRequestedAt = requested)))
+        val event = ledger.events.single()
+        assertEquals(HarnessEvent.Origin.FOLLOW_UP, event.origin)
+        assertFalse(event.isQuestion)
+        assertTrue(event.explicitFollowUpRequested)
+        assertNull(ledger.question(requested))
+        assertEquals(requested, ledger.followUpAnchor(requested)?.followUpAnchorAt)
+        assertTrue(ledger.assets(t0, requested).isEmpty())
+        val followed = ledger.followUpAssets(t0, requested).single()
+        assertEquals(requested, followed.firstAskedAt); assertEquals(requested, followed.lastAskedAt)
+        assertEquals(100.0, followed.lastPrice); assertEquals(0, followed.asks)
+        val context = HarnessLearningContext.make(ledger, requested, utc).assets.single()
+        assertEquals(0, context.ownQuestions); assertEquals(0, context.ownThreads)
+        assertEquals(1, context.explicitFollowUps); assertEquals(1, context.bobbyReads)
+        assertNull(context.lastOwnQuestionAt)
+        assertEquals("a contextual yes counts once, without a Bobby thread bonus", 1.0, context.inferredInterest, 0.0)
+        assertTrue(ledger.complete(read), "completing old metadata cannot remove the later explicit yes")
+        assertEquals(requested, ledger.events.single().followUpRequestedAt)
+    }
+
+    @Test fun followUpAnchorUsesTheChoiceTimeAndLaterBobbyReadsCannotReplaceIt() {
+        val ledger = HarnessLedger()
+        val read = HarnessEvent(HarnessEvent.Kind.ASK, t0, symbol = "NVDA", origin = HarnessEvent.Origin.FOLLOW_UP,
+                                followUpRequestedAt = t0 + 120 * second)
+        ledger.note(read)
+        ledger.note(ask("MU", 60))
+        ledger.note(HarnessEvent(HarnessEvent.Kind.ASK, t0 + 150 * second, symbol = "TSLA", origin = HarnessEvent.Origin.FOLLOW_UP))
+        assertEquals("MU", ledger.followUpAnchor(t0 + 90 * second)?.symbol)
+        assertEquals("NVDA", ledger.followUpAnchor(t0 + 160 * second)?.symbol)
+        assertEquals("MU", ledger.question(t0 + 160 * second)?.symbol)
+        assertEquals(listOf("NVDA", "MU"), ledger.followUpAssets(t0, t0 + 160 * second).map { it.symbol })
+    }
+
+    @Test fun mixedAssetHistoryKeepsTheLatestAnchorOriginSeparateFromOwnQuestionCounts() {
+        val ledger = HarnessLedger().also { it.note(ask("NVDA", 0, price = 100.0)) }
+        val requested = t0 + 120 * second
+        ledger.note(HarnessEvent(HarnessEvent.Kind.ASK, t0 + 60 * second, symbol = "NVDA", name = "NVIDIA", isEquity = true,
+                                 price = 102.0, origin = HarnessEvent.Origin.FOLLOW_UP, followUpRequestedAt = requested))
+        val followed = ledger.followUpAssets(t0, requested).single()
+        assertEquals(1, followed.asks)
+        assertFalse("an earlier own ask does not change the origin of the newer anchor", followed.lastAskedByPerson)
+        assertEquals(requested, followed.lastAskedAt)
+        assertEquals(102.0, followed.lastPrice)
+        val own = ledger.assets(t0, requested).single()
+        assertTrue(own.lastAskedByPerson); assertEquals(t0, own.lastAskedAt); assertEquals(100.0, own.lastPrice)
+        ledger.note(ask("NVDA", 180, price = 103.0))
+        val later = ledger.followUpAssets(t0, t0 + 180 * second).single()
+        assertEquals(2, later.asks); assertTrue(later.lastAskedByPerson)
+        assertEquals(t0 + 180 * second, later.lastAskedAt); assertEquals(103.0, later.lastPrice)
+    }
+
+    @Test fun invalidOrFutureFollowUpChoicesCannotTeachInterestOrScheduleBeforeTheirMoment() {
+        val now = t0 + 10 * second
+        val read = HarnessEvent(HarnessEvent.Kind.ASK, t0, symbol = "NVDA", origin = HarnessEvent.Origin.FOLLOW_UP)
+        val ledger = HarnessLedger().also { it.note(read.copy(followUpRequestedAt = t0 + 20 * second)) }
+        assertNull(ledger.followUpAnchor(now))
+        assertTrue(ledger.followUpAssets(t0, now).isEmpty())
+        assertTrue(HarnessProfile.make(ledger, now, utc).interest.isEmpty())
+        assertTrue(HarnessLearningContext.make(ledger, now, utc).assets.isEmpty())
+        for (invalid in listOf(read.copy(followUpRequestedAt = t0 - second),
+                               read.copy(kind = HarnessEvent.Kind.SAVED, followUpRequestedAt = t0),
+                               read.copy(origin = null, followUpRequestedAt = t0),
+                               read.copy(readId = "legacy", followUpRequestedAt = t0))) {
+            val stored = HarnessLedger().also { it.note(invalid) }.events.single()
+            assertNull(stored.followUpRequestedAt)
+            val raw = JSONObject().put("events", org.json.JSONArray().put(invalid.toJson())).toString()
+            assertNull(HarnessLedger.fromJson(raw).events.single().followUpRequestedAt)
+        }
+    }
+
+    @Test fun contextualChoiceSurvivesJsonButLegacyRecordsGainNoChoice() {
+        val event = HarnessEvent(HarnessEvent.Kind.ASK, t0, symbol = "NVDA", origin = HarnessEvent.Origin.FOLLOW_UP,
+                                 followUpRequestedAt = t0 + second)
+        val ledger = HarnessLedger().also { it.note(event) }
+        assertEquals(event, HarnessLedger.fromJson(ledger.toJson().toString()).events.single())
+        val legacy = event.toJson().also { it.remove("followUpRequestedAt") }
+        val restored = HarnessEvent.fromJson(legacy)!!
+        assertNull(restored.followUpRequestedAt); assertFalse(restored.isFollowUpAnchor)
+        val pointer = event.copy(origin = null, readId = "stored-read", followUpRequestedAt = null)
+        val stored = HarnessLedger().also { it.note(pointer) }
+        assertEquals(pointer, HarnessLedger.fromJson(stored.toJson().toString()).events.single())
+        assertFalse(pointer.isQuestion); assertFalse(pointer.isFollowUpAnchor)
+    }
+
+    @Test fun contextualChoiceRemainsBoundedToItsOwnerAndIsErasedWithTheirLedger() {
+        val store = HarnessStore(OpenStore())
+        val ledger = HarnessLedger().also { it.note(HarnessEvent(HarnessEvent.Kind.ASK, t0, symbol = "NVDA",
+            origin = HarnessEvent.Origin.FOLLOW_UP, followUpRequestedAt = t0 + second)) }
+        store.write(ledger, "a")
+        assertEquals(1, HarnessLearningContext.make(store.ledger("a"), t0 + 2 * second, utc).assets.single().explicitFollowUps)
+        assertTrue(HarnessLearningContext.make(store.ledger("b"), t0 + 2 * second, utc).assets.isEmpty())
+        assertTrue(HarnessLearningContext.make(ledger, t0 + (HarnessLedger.RETENTION_DAYS + 1) * day, utc).assets.isEmpty())
+        store.forget("a")
+        assertTrue(store.ledger("a").isEmpty())
     }
 
     @Test fun aThesisRaisesItsAssetAndDoesNotFade() {

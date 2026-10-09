@@ -13,7 +13,8 @@ import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
 import { LlmHttpError, type LlmUsage } from './_lib/llm.js';
 import type { Identity } from './_lib/user-identity.js';
 import { clientBinding, issueClientReadReceipt } from './_lib/client-telemetry.js';
-import { memoryDeskAllowed, MEMORY_RECORD_TIMEOUT_MS, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memoryReceipt, memorySummary, readerContext, recordAsk, type MemoryReceipt, type MemorySummary } from './_lib/user-memory.js';
+import { memoryDeskAllowed, MEMORY_RECORD_TIMEOUT_MS, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memoryReceipt, memorySummary, recordAsk, type MemoryReceipt, type MemorySummary } from './_lib/user-memory.js';
+import { buildLearningContext } from './_lib/learning-context.js';
 
 // Máximo runs four app-model calls inside a 160 s budget (api/_lib/desk-levels.ts).
 export const config = { maxDuration: 180 };
@@ -255,7 +256,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const tier = access.tier === 'pro' ? 'pro' : 'free';
     const evidence = await loadDeskEvidenceFor(symbol, assetType, levelPlan(level, tier).evidence, timeframeRequestOf(question, language));
     const summary: MemorySummary | null = await within(summaryTask, MEMORY_SUMMARY_TIMEOUT_MS);
-    const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null, evidence.technicals.price, language, locale);
+    const reader = buildLearningContext(summary, symbol, { now: Date.now(), firstName: summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null, priceNow: evidence.technicals.price, language, locale });
     const asked = horizonOf(question, language);
     const result = await runDeskDebate(question, evidence, language, { locale, level, tier, usage, signal: left.signal, onEvent: live ? send : undefined, reader, ...(thesis ? { thesis } : {}) });
     // The reader left while the last call was already in flight.
