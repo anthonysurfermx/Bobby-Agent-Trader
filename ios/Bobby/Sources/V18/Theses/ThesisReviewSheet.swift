@@ -15,7 +15,7 @@ extension ThesisReviewer.Environment {
     @MainActor
     static func live(_ session: NucleoSession, transport: @escaping Transport = { request, auth in
         await NucleoDeskIO.debate(symbol: request.symbol, question: request.question, isEquity: request.isEquity,
-                                  level: request.level, auth: auth, requestId: request.requestId, thesis: request.thesis)
+                                  level: request.level, auth: auth, speech: SpeakingDial().value(AccountSession.shared.session?.userId), requestId: request.requestId, thesis: request.thesis)
     }) -> ThesisReviewer.Environment {
         var env = ThesisReviewer.Environment()
         // Whose bearer the read carries is the desk's own rule (signed out and fixture mode included).

@@ -58,6 +58,7 @@ var TETHER_A = [-140 * DEG, -40 * DEG, 90 * DEG], AG_DOT = [[22.5, 195], [367.5,
 function rimMask(x, y, cy, r){ var d = Math.sqrt((x - 195) * (x - 195) + (y - cy) * (y - cy)); return sstep(r - 4, r + 12, d); }
 
 function render(){
+  if (typeof dialRefine === "function") dialRefine();
   if (!S){ return; }
   var i, k;
   var cy = S.cy.x + S.lean.x + S.sag.x, r = S.r.x * (1 + S.gulp.x + tickScale());

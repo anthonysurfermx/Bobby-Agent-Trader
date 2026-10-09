@@ -6,7 +6,7 @@ const source = fs.readFileSync(new URL('../src/app/55-read.js', import.meta.url)
 const observe = source.slice(source.indexOf('function observePresentedRead(){'), source.indexOf("/* the header's second line"));
 function harness() {
   const calls = [], card = { textContent: 'Actual result', getBoundingClientRect: () => ({ left: 10, top: 200, right: 300, bottom: 400, width: 290, height: 200 }) };
-  const context = vm.createContext({ BR: { METHODS: ['read.rendered'] }, READ: { model: {}, reply: {status: 'ok'}, requestId: 'test-id' }, A: {cardsOn: true, rev: [{x: 1}]}, el: { cards: [card] },
+  const context = vm.createContext({ ST: { name: 'CARDS' }, BR: { METHODS: ['read.rendered'] }, READ: { model: {}, reply: {status: 'ok'}, requestId: 'test-id' }, A: {cardsOn: true, rev: [{x: 1}]}, el: { cards: [card] },
     W: { innerWidth: 390, innerHeight: 844, getComputedStyle: () => ({visibility: 'visible', display: 'block', opacity: '1'}) },
     canRun: () => true, bcall: (method, body) => {calls.push({method,body}); return Promise.resolve({accepted: true});}, noop() {} });
   vm.runInContext(observe, context);

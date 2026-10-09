@@ -333,12 +333,13 @@ enum NucleoDeskIO {
     /// Exactly `BobbyAPI.debate`'s request: POST api/desk-debate, Origin header, 100 s timeout.
     /// Uses the same account-scoped retry as other private requests.
     static func debate(symbol: String, question: String, isEquity: Bool, level: NucleoAnalysisLevel = .rapido,
-                       auth: BobbyMeterAuth = .account, requestId: String? = nil, thesis: ThesisContext? = nil,
+                       auth: BobbyMeterAuth = .account, speech: String? = nil, requestId: String? = nil, thesis: ThesisContext? = nil,
                        onEvent: (@Sendable ([String: Any]) -> Void)? = nil) async -> DebateOutcome {
         do {
             var body: [String: Any] = ["symbol": symbol, "question": question, "language": L.ttsLang,
                                        "locale": L.localeIdentifier, "country": L.country ?? NSNull() as Any,
                                        "assetType": isEquity ? "equity" : "crypto", "level": level.rawValue]
+            if let speech, SpeakingDial.values.contains(speech) { body["speech"] = speech }
             if let requestId { body["requestId"] = requestId }
             // 1.8: a review the person started carries their thesis; a plain question never has this key.
             if let thesis { body["thesis"] = thesis.json }
@@ -554,6 +555,7 @@ final class NucleoDesk {
     var generation: () -> UUID = { AccountSession.shared.generation }
     var isSignedIn: () -> Bool = { AccountSession.shared.isSignedIn }
     var userID: () -> String? = { AccountSession.shared.session?.userId }
+    var speakingLevel: () -> String? = { SpeakingDial().value(AccountSession.shared.session?.userId) }
     var emit: (String, [String: Any]) -> Void = { _, _ in }
     var debateStarted: (NucleoAnalysisLevel) -> Void = { _ in }
     var askFinished: ([String: Any]) -> Void = { _ in }
@@ -952,8 +954,9 @@ final class NucleoDesk {
             }
         }
         if !fixtures { BobbyTelemetry.shared.readStarted(job.requestId) }
+        let speech = speakingLevel()
         async let deskRead = NucleoDeskIO.debate(symbol: symbol, question: question, isEquity: isEquity, level: level,
-                                               auth: auth, requestId: job.requestId, onEvent: live)
+                                               auth: auth, speech: speech, requestId: job.requestId, onEvent: live)
         let market = await marketRead ?? NucleoDeskIO.Market(price: nil, changePct: nil)
         guard isCurrent(job) else { return Self.cancelledResult }
         emit("ask.stage", ["requestId": job.requestId, "stage": "market", "market": market.json])

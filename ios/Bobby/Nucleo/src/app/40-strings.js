@@ -177,7 +177,7 @@ var STR = /*STRINGS-BEGIN*/{
     "read.saved": "Análise guardada",
     "read.home": "Voltar ao Bobby",
     "read.summary": "Ver resumo",
-    "read.saveHelp": 'Guarda o ativo e o seu veredito.',
+    "read.saveHelp": 'Guarda o ativo e o veredito.',
     "read.savedLocal": "Guardada neste telefone.",
 
     "greet.morning": "Bom dia.",

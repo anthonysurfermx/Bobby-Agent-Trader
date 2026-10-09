@@ -258,10 +258,40 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 /* a row's value keeps one line whenever it fits; its label wraps in the room that is left */
 .card dt{flex:1 1 0;min-width:0;white-space:normal;line-height:13px;overflow-wrap:anywhere}
 .card dd{flex:none;max-width:64%;padding-left:12px;overflow-wrap:anywhere}
+
+/* The dial surrounds the existing orb; the glass remains untouched. */
+#speakingDial{position:absolute;inset:0;z-index:30;display:none;text-align:center;color:var(--ink);pointer-events:none}
+#speakingDial.on{display:block} #speakingDial button,#speakingDial input{pointer-events:auto}
+#speakingQuestion{position:absolute;top:154px;left:30px;width:330px;font:300 26px/32px var(--serif)}
+#speakingArc{position:absolute;top:423px;left:47px;width:296px;height:63px;overflow:visible;pointer-events:none}
+#speakingRange{position:absolute;top:420px;left:47px;width:296px;height:68px;opacity:.01;cursor:pointer;touch-action:pan-x}
+#speakingRange:focus-visible{opacity:.15;outline:2px solid #A795EF}
+#speakingLabels{position:absolute;top:484px;left:23px;width:344px;display:flex;justify-content:space-between}
+#speakingLabels button{border:0;background:none;color:var(--ink2);font:400 13px/20px var(--sans);padding:12px 2px;min-width:95px}
+#speakingLabels button[aria-pressed=true]{color:#F2EDE4}
+#speakingSample{position:absolute;top:552px;left:34px;width:322px;font:400 17px/25px var(--sans);color:var(--ink2)}
+#speakingConfirm{position:absolute;top:690px;left:70px;width:250px;min-height:48px;border:1px solid #F2EDE433;border-radius:28px;background:transparent;color:#F2EDE4;font:400 16px var(--sans)}
+#speakingSkip{position:absolute;top:750px;left:95px;width:200px;min-height:44px;border:0;background:none;color:var(--ink2);font:400 14px var(--sans)}
+#speakingError{position:absolute;top:659px;left:30px;width:330px;color:#F2EDE4;font:400 13px var(--sans)}
+.speaking-on #pill *,.speaking-on #chipRow *,.speaking-on #hintS,.speaking-on #micGlow,.speaking-on #greet,.speaking-on #pill,.speaking-on #hint,.speaking-on #chips,.speaking-on #avatar,.speaking-on #lvl{visibility:hidden!important;pointer-events:none!important}
+.speaking-greet #greet .t{white-space:normal;font-size:26px;line-height:32px}
+#speakingRefine{position:absolute;top:790px;left:12px;width:366px;display:none;justify-content:center;gap:6px;z-index:30}
+#speakingRefine.on{display:flex} #speakingRefine button{background:#0B0A09;border:1px solid #F2EDE426;border-radius:20px;color:#F2EDE4;font:400 12px var(--sans);padding:12px 8px;min-height:44px}
+
 </style>
 </head>
 <body data-page="app">
 <div id="stage">
+<div id="speakingDial" aria-hidden="true">
+ <div id="speakingQuestion"></div>
+ <svg id="speakingArc" viewBox="0 0 296 63" aria-hidden="true"><path d="M8 8 Q148 100 288 8" fill="none" stroke="#F2EDE438" stroke-width="1"/><circle id="speakingThumb" cx="8" cy="8" r="5" fill="#F2EDE4"/></svg>
+ <input id="speakingRange" type="range" min="0" max="2" step="1" value="0" />
+ <div id="speakingLabels"><button type="button" data-dial="0"></button><button type="button" data-dial="1"></button><button type="button" data-dial="2"></button></div>
+ <div id="speakingSample" aria-live="polite"></div><div id="speakingError" role="alert"></div>
+ <button id="speakingConfirm" type="button"></button><button id="speakingSkip" type="button"></button>
+</div>
+<div id="speakingRefine"><button type="button" data-refine="-1"></button><button type="button" data-refine="0"></button><button type="button" data-refine="1"></button></div>
+
   <div id="amb"></div>
   <div id="pool"></div>
   <canvas id="gl" aria-hidden="true"></canvas>

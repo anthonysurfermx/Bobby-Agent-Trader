@@ -67,11 +67,11 @@ function onStage(p){
   else if (p.stage === 'market'){ r.market = p.market || null; dockAsset(); }
 }
 /* Acknowledgment after two real animation frames with a settled, visible result card.
-   Native owns validation and any telemetry receipt; the page only names the current request UUID.
-   Older Android contracts without read.rendered remain silent until the method is available. */
+   Native retains the signed receipt; this trusted page only names the current request UUID. */
 function observePresentedRead(){
-  var r = READ;
   if (!BR || !BR.METHODS || BR.METHODS.indexOf('read.rendered') < 0) return;
+  if (ST.name === 'THESIS_VIEW' || A.viewOnly) return;
+  var r = READ;
   if (!r || !r.model || !r.reply || r.reply.status !== 'ok' || !r.requestId || r.presented) return;
   if (!canRun()){ r.visibleFrames = 0; return; }
   var visible = false;
@@ -200,6 +200,31 @@ function fillSats(model){
 var CH = null, LUT_N = 512, LUT_LEAD = new Float32Array((LUT_N + 1) * 2), LUT_LINE = new Float32Array((LUT_N + 1) * 2), LUT_OK = false, PT = { x: 0, y: 0 };
 var NOW_X = 280;
 function axisFmt(v, step){ if (Math.abs(step) >= 1) return Math.round(v).toLocaleString(LOCALE); var dp = step >= 0.1 ? 1 : step >= 0.01 ? 2 : 4; return v.toLocaleString(LOCALE, { minimumFractionDigits:dp, maximumFractionDigits:dp }); }
+/* Keep the full localized subtitle in the 90 px beside the support bracket. */
+function chartSubtitle(text, y){
+  var node = el.cBrS, width = 90;
+  node.textContent = text || ''; att(node, 'y', f2(y));
+  if (!text || node.getComputedTextLength() <= width) return;
+  var best = null, bestWidth = Infinity;
+  function splitAt(i){
+    var a = text.slice(0, i).trim(), b = text.slice(i).trim();
+    if (!a || !b) return;
+    node.textContent = a; var wa = node.getComputedTextLength();
+    node.textContent = b; var wb = node.getComputedTextLength();
+    var w = Math.max(wa, wb);
+    if (w < bestWidth){ best = [a, b]; bestWidth = w; }
+  }
+  for (var i = 1; i < text.length; i++) if (/\s/.test(text.charAt(i))) splitAt(i);
+  /* A single long word can still use both lines without dropping characters. */
+  if (bestWidth > width) for (i = 1; i < text.length; i++) splitAt(i);
+  if (!best){ node.textContent = text; return; }
+  node.textContent = '';
+  best.forEach(function(line, index){
+    var span = D.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+    span.setAttribute('x', '296'); span.setAttribute('y', f2(y + index * 14));
+    span.textContent = line; node.appendChild(span);
+  });
+}
 function buildChart(ch, prov, receivedAt){
   el.cLines.textContent = '';
   if (!ch){ CH = null; return; }
@@ -253,8 +278,8 @@ function buildChart(ch, prov, receivedAt){
   if (br && fin(br.to)){
     var ya = nowY, yb = Y(br.to), mid = (ya + yb) / 2;
     att(el.cBrL, 'y1', f2(ya)); att(el.cBrL, 'y2', f2(yb)); att(el.cBrA, 'y1', f2(ya)); att(el.cBrA, 'y2', f2(ya)); att(el.cBrB, 'y1', f2(yb)); att(el.cBrB, 'y2', f2(yb));
-    el.cBrT.textContent = br.label; el.cBrS.textContent = br.sub;
-    att(el.cBrT, 'y', f2(mid - 2)); att(el.cBrS, 'y', f2(mid + 12));
+    el.cBrT.textContent = br.label; att(el.cBrT, 'y', f2(mid - 2));
+    chartSubtitle(br.sub, mid + 12);
   } else { el.cBrT.textContent = ''; el.cBrS.textContent = ''; }
   var src = ch.source || {};
   /* the UI never names the exchange behind the candles (Base-only naming) */
@@ -338,9 +363,9 @@ function fillThesisCard(th, o){
   el.saveSw.style.setProperty('--sc', css(vc.c, 0.95));
   el.tpill.textContent = th.pill; el.tpill.style.background = css(mixC(C.cardBg, vc.c, 0.2), 0.86); el.tpill.style.border = '.5px solid ' + css(vc.c, 0.5); el.tpill.style.color = vc.css;
   A.saved.set(o.readOnly ? 1 : 0); A.savePress.set(1); A.sweepT = -9; A.xp.set(0); A.xpO.set(0);
-  saveRoll.set(o.readOnly ? th.savedLabel : th.saveLabel, true);
+  saveRoll.set(o.readOnly ? tt('read.saved') : tt('read.save'), true);
   A.saveC = vk;
-  st(el.save, 'display', 'block');
+  st(el.save, 'display', o.readOnly ? 'none' : 'block');
 }
 function setHorizon(hrs){
   HZ = hrs;
@@ -467,12 +492,12 @@ function chipsShow(list, eyebrow, ofRead){
   A.chipX.set(0);
   var x = 20, tall = 40;
   list.forEach(function(c, i){
-    /* `apple`: the Sign in chip (white, the Android neutral account mark); `pro`: the Bobby Pro chip */
+    /* `apple`: the Sign in with Apple chip (white, the Apple logo in the system font); `pro`: the Bobby Pro chip */
     var style = c.style === 'apple' || c.style === 'pro' || c.style === 'nudge' ? ' ' + c.style : '';
     var b = c.style === 'ask' ? askChip(c.label) : mk('button', 'chip' + style, c.style === 'apple' ? null : c.label);
     if (i === 0) b.className += ' first';
     b.type = 'button'; b.setAttribute('data-hit', 'chip'); b.setAttribute('data-i', String(i));
-    if (c.style === 'apple'){ var lg = mk('span', 'lg', '◉'); lg.setAttribute('aria-hidden', 'true'); b.appendChild(lg); b.appendChild(D.createTextNode(c.label)); b.setAttribute('aria-label', c.label); }
+    if (c.style === 'apple'){ b.textContent = c.label; b.setAttribute('aria-label', c.label); }
     else if (c.ariaLabel) b.setAttribute('aria-label', c.ariaLabel);
     op(b, 0); el.chipRow.appendChild(b);
     if (c.style === 'ask') askShrink(b);

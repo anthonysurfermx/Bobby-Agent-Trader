@@ -46,6 +46,13 @@ function dockOut(){
 }
 var EVENING_HOUR = { es: 20, pt: 20 };   /* "Buenas tardes" / "Boa tarde" run until 20:00; the other four languages turn to the evening at 18:00 */
 function setGreeting(){
+  if (typeof dialGreeting !== "undefined" && dialGreeting){
+    var question = dialWords()[5]; lineSet(A.greet, question, "", el.greetT, el.greetS);
+    att(el.greetT, 'role', 'heading'); att(el.greetT, 'aria-level', '1'); att(el.greetT, 'aria-label', question);
+    Array.prototype.forEach.call(el.greetT.querySelectorAll('span'), function(word){ word.setAttribute('aria-hidden', 'true'); });
+    return;
+  }
+  if (el.greetT && el.greetT.removeAttribute){ ['role','aria-level','aria-label'].forEach(function(k){ el.greetT.removeAttribute(k); }); el.greetT._a = {}; }
   var h = SES && fin(SES.localHour) ? SES.localHour : new Date().getHours();
   var k = (h >= 5 && h < 12) ? 'morning' : (h >= 12 && h < (EVENING_HOUR[LANG] || 18)) ? 'afternoon' : 'evening';
   var sub = LEDGER.length ? tt('greet.saved', { symbol: LEDGER[0].symbol }) : tt(k === 'evening' ? 'greet.sub.night' : 'greet.sub.day');
@@ -207,7 +214,7 @@ STATES.WAKE = {
     cue(0.55, function(){ meriIn(); });
     cue(0.70, function(){ A.pillY.to(0, 'soft'); A.pillO.tween(1, 0.3, E.fade); });
     cue(0.85, function(){ S.lean.to(4, BODY.gaze); S.lean.to(0, BODY.gaze, null, 0.26); });
-    cue(0.90, function(){ go('IDLE'); });
+    cue(0.90, function(){ go(SES && SES.riskAccepted && SES.speaking && SES.speaking.offer ? 'SPEAKING_DIAL' : 'IDLE'); });
   },
   down: function(h, p){ if (h === 'pill' || h === 'surface') return STATES.IDLE.down(h, p); return null; }
 };

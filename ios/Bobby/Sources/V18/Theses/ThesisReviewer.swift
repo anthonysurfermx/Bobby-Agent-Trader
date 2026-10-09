@@ -85,7 +85,7 @@ final class ThesisReviewer: ObservableObject {
         /// The desk request (tests inject a stub; nothing else in this file touches the network).
         var send: Send = { request in
             await NucleoDeskIO.debate(symbol: request.symbol, question: request.question, isEquity: request.isEquity,
-                                      level: request.level, auth: .account, requestId: request.requestId, thesis: request.thesis)
+                                      level: request.level, auth: .account, speech: SpeakingDial().value(AccountSession.shared.session?.userId), requestId: request.requestId, thesis: request.thesis)
         }
         /// Every access object the server sends updates the credits the app shows, as on the desk.
         var accessChanged: (BobbyReadAccess) -> Void = { BobbyAccessCenter.shared.record($0) }

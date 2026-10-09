@@ -15,6 +15,7 @@ struct MemoryView: View {
     /// R11: nothing reaches the network before the risk notice is accepted.
     let riskAccepted: Bool
     /// Shown as its own sheet (a close button); pushed from the briefing settings it has a back button.
+    var onSpeaking: (() -> Void)? = nil
     var onClose: (() -> Void)? = nil
     /// Observed so a sign-in or sign-out redraws the screen; the center names the account.
     @ObservedObject private var account = AccountSession.shared
@@ -41,6 +42,11 @@ struct MemoryView: View {
                     }
                 }
                 .padding(.trailing, -7)
+                if let onSpeaking {
+                    Button(L.t("How Bobby speaks", "Cómo te habla Bobby"), action: onSpeaking)
+                        .quietFont(15, .regular).foregroundStyle(Theme.cream)
+                        .padding(.vertical, 18).accessibilityIdentifier("memory-speaking")
+                }
                 content.padding(.top, 2)
             }
             .padding(.horizontal, 24)

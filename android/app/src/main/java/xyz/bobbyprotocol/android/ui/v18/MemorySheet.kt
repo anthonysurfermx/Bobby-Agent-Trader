@@ -104,6 +104,7 @@ private fun MemoryScreen(host: V18Host, center: MemoryCenter, onClose: () -> Uni
     }
 
     QuietSheet(host, host.text("Memory", "Memoria"), "memory-close", onClose) {
+        QuietRow(host.text("How Bobby speaks", "Cómo te habla Bobby"), "memory-speaking", chevron = true, onClick = { host.openSpeakingDial() })
         val now = c()
         val snapshot = now.snapshot
         if (now.currentUser() == null) {
