@@ -25,7 +25,7 @@ eq(speechFor('terms', null), 'terms', 'the middle of the dial');
 eq(speechFor(null, 'some'), 'plain', 'null is no choice');
 eq([speechRule('plain'), speechRule('terms'), speechRule('technical')], [PLAIN_RULE, TERMS_RULE, ''], 'one rule per wording; technical adds nothing');
 eq(PLAIN_RULE === TERMS_RULE, false, 'two different rules');
-for (const must of ['in plain words first and then name its term once, in brackets', 'Numbers stay exactly as the evidence gives them', 'only if you are certain of it', "wholly in the reader's language"])
+for (const must of ["the word traders use in the reader's language", 'only inside those brackets, right after its plain meaning', 'in plain words first and then name its term once, in brackets', 'Numbers stay exactly as the evidence gives them', 'only if you are certain of it', "wholly in the reader's language"])
   eq(TERMS_RULE.includes(must), true, `terms rule says: ${must}`);
 for (const never of ['verdict', 'buy', 'sell', 'recommend'])
   eq(TERMS_RULE.toLowerCase().includes(never), false, `terms rule never speaks of: ${never}`);
