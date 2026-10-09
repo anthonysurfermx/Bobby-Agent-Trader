@@ -38,6 +38,9 @@ Rules a client can rely on:
 - `nextAction` is null in an `explanation`.
 - A tapped `followUp` goes straight back to this endpoint, without the asset search: it is a learning question,
   and a word such as "bitcoin" in it must not open a market read the person did not ask for.
+- `orientation_limit` (429) is the person's day used, or the day of their address or its network (a shared
+  Wi-Fi, an office): `error.message` says which, so show it as it comes. `allowance` is always the person's own
+  and can show turns remaining when it was the network's day that ran out.
 - A turn is counted only when it was answered. `allowance.remaining` is null when the server could not say.
   The day is the UTC day; `Retry-After` on a 429 says how many seconds remain of it.
 - `companion_unavailable` with `retryable: true` also covers storage that could not answer and two turns of

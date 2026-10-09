@@ -47,12 +47,21 @@ export function companionModel(env: NodeJS.ProcessEnv = process.env): string {
  */
 export const companionAllowance = (model: string) => (/haiku/.test(model) ? 10 : 5);
 
-/** Every companion turn served in a day, all people together: the ceiling on what this pilot can spend. */
-export function companionDailyCeiling(env: NodeJS.ProcessEnv = process.env): number {
+/**
+ * Every companion turn served in a day, all people together. A turn on a dearer model can cost twenty times one
+ * on Haiku, so the ceiling follows the model unless the owner sets it: at its worst (every reply as long as the
+ * call allows) a full day stays well under the desk's own daily cap.
+ */
+export function companionDailyCeiling(model: string, env: NodeJS.ProcessEnv = process.env): number {
   const n = Number(env.BOBBY_COMPANION_DAILY_TURNS);
-  return Number.isInteger(n) && n > 0 && n <= 100_000 ? n : 1500;
+  return Number.isInteger(n) && n > 0 && n <= 100_000 ? n : /haiku/.test(model) ? 1500 : 400;
 }
 
+/** What the companion may spend in a UTC day, in dollars, counted on its own ledger surface. */
+export function companionDailyUsd(env: NodeJS.ProcessEnv = process.env): number {
+  const n = Number(env.BOBBY_COMPANION_DAILY_USD);
+  return Number.isFinite(n) && n > 0 && n <= 1000 ? n : 3;
+}
 /** The request of contract v1. `context` is accepted so a later client is not refused; v0 never reads it. */
 export const CompanionRequest = z.object({
   version: z.literal(COMPANION_VERSION),

@@ -6,9 +6,10 @@
 //     the fixed sentence (in the six languages, each of which passes the same review); a bad next question is
 //     dropped and the text served. The sentences are the ones an independent review got past the first rules,
 //     and the good ones those rules wrongly replaced;
-//   · what a turn may cost: an unreadable ledger, a cap reached, unreadable storage, the person's day, the
-//     address's day and the day's ceiling each refuse before any model call, and hold when the requests arrive
-//     together; a provider failure counts nothing;
+//   · what a turn may cost: an unreadable ledger, a cap reached (the desk's, or the companion's own), unreadable
+//     storage, the person's day, the address's, its network's and everyone's each refuse before any model call,
+//     and hold when the requests arrive together; a provider failure costs the person nothing, and a slot whose
+//     answer was lost is not left behind;
 //   · a look-alike the search offered travels as `candidate`, and only then can the reply be a desk offer;
 //   · the model is the role's (BOBBY_COMPANION_MODEL), ten turns on Haiku and five on a dearer model, and the cost
 //     is one row on the desk ledger with role `companion`;
@@ -23,7 +24,7 @@ process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'test-service';
 process.env.ANTHROPIC_API_KEY = 'test-anthropic';
 process.env.BOBBY_PROTOCOL_BASE_URL = 'https://bobby.test';
 process.env.RATE_LIMIT_SALT = 'test-salt';
-for (const key of ['BOBBY_COMPANION_ENABLED', 'BOBBY_COMPANION_MODEL', 'BOBBY_COMPANION_DAILY_TURNS', 'BOBBY_APP_TEXT_MODEL', 'BOBBY_LLM_PRIMARY', 'OPENAI_API_KEY']) delete process.env[key];
+for (const key of ['BOBBY_COMPANION_ENABLED', 'BOBBY_COMPANION_MODEL', 'BOBBY_COMPANION_DAILY_TURNS', 'BOBBY_COMPANION_DAILY_USD', 'BOBBY_APP_TEXT_MODEL', 'BOBBY_LLM_PRIMARY', 'OPENAI_API_KEY']) delete process.env[key];
 
 // waitUntil (@vercel/functions) reads the request context from this symbol: capture what the handler defers.
 const deferred: Promise<unknown>[] = [];
@@ -31,7 +32,9 @@ const deferred: Promise<unknown>[] = [];
 const settle = async () => { await Promise.all(deferred.splice(0)); };
 
 const lib = await import('../api/_lib/companion.ts');
-const { CompanionRequest, CompanionResponse, companionAllowance, companionDailyCeiling, companionEnabled, companionFallback, companionModel, companionPrompt, reviewCompanionReply } = lib;
+const { CompanionRequest, CompanionResponse, companionAllowance, companionDailyCeiling, companionDailyUsd, companionEnabled, companionFallback, companionModel, companionPrompt, reviewCompanionReply } = lib;
+const { resetCompanionGuards } = await import('../api/_lib/companion-spend.ts');
+const { takeSlot } = await import('../api/_lib/companion-slots.ts');
 const { resetLlmSpendCache } = await import('../api/_lib/llm-usage.ts');
 const { default: handler } = await import('../api/companion-turn.ts');
 
@@ -46,7 +49,8 @@ eq(companionModel({}), 'claude-haiku-5-5', 'Haiku unless the owner sets the role
 eq(companionModel({ BOBBY_COMPANION_MODEL: ' claude-sonnet-5-5 ' }), 'claude-sonnet-5-5', 'the role can be given Sonnet');
 assert.throws(() => companionModel({ BOBBY_COMPANION_MODEL: 'gpt-6' })); checks++;
 eq([companionAllowance('claude-haiku-5-5'), companionAllowance('claude-sonnet-5-5'), companionAllowance('claude-opus-5-5')], [10, 5, 5], 'ten turns on Haiku, half on a dearer model');
-eq([companionDailyCeiling({}), companionDailyCeiling({ BOBBY_COMPANION_DAILY_TURNS: '200' }), companionDailyCeiling({ BOBBY_COMPANION_DAILY_TURNS: '-3' }), companionDailyCeiling({ BOBBY_COMPANION_DAILY_TURNS: 'many' })], [1500, 200, 1500, 1500], 'the day ceiling');
+eq([companionDailyCeiling('claude-haiku-5-5', {}), companionDailyCeiling('claude-sonnet-5-5', {}), companionDailyCeiling('claude-sonnet-5-5', { BOBBY_COMPANION_DAILY_TURNS: '200' }), companionDailyCeiling('claude-haiku-5-5', { BOBBY_COMPANION_DAILY_TURNS: '-3' }), companionDailyCeiling('claude-opus-5-5', { BOBBY_COMPANION_DAILY_TURNS: 'many' })], [1500, 400, 200, 1500, 400], 'the day ceiling follows what a turn costs, unless the owner sets it');
+eq([companionDailyUsd({}), companionDailyUsd({ BOBBY_COMPANION_DAILY_USD: '0.5' }), companionDailyUsd({ BOBBY_COMPANION_DAILY_USD: 'lots' })], [3, 0.5, 3], 'the companion\'s own daily amount');
 
 // ---------- 2. the contract's fixtures ----------
 const DIR = fileURLToPath(new URL('../shared/harness/companion-contract-v1/', import.meta.url));
@@ -298,14 +302,19 @@ for (const line of ['I could not finish the explanation. You can try again.', 'T
 // ---------- 5. the endpoint ----------
 type Call = { url: string; method: string; body: any; headers: Record<string, string> };
 const calls: Call[] = [];
-/** The slot rows of `api_cache`: the key is all a slot is. */
-const store = new Set<string>();
+/** The slot rows of `api_cache`: the key, and the token of the request that wrote it. */
+const store = new Map<string, string>();
 const world = {
   spend: { day: 1, month: 10 } as { day: number; month: number } | null, storage: true,
+  /** What the companion's own surface shows spent today, or null when that read fails. */
+  own: 0 as number | null,
   /** Storage that fails for some requests only. */
   breaks: (_method: string, _url: URL): boolean => false,
-  /** Reads wait this long, so requests sent together all read before any of them writes. */
+  /** An insert that is written while its answer is lost (slow storage). */
+  losesAnswer: (_key: string): boolean => false,
+  /** Reads answer this late with what was there when they arrived: requests sent together all read before any writes. */
   readDelayMs: 0,
+  lostInserts: 0,
   model: (): Response => claude({ text: good.text, followUp: good.followUp, aboutAsset: false }),
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -319,23 +328,32 @@ globalThis.fetch = (async (input: RequestInfo | URL, init: RequestInit = {}) => 
   const u = new URL(url);
   if (u.hostname === 'api.anthropic.com') return world.model();
   if (u.pathname.endsWith('/rpc/bobby_llm_spend')) return world.spend ? json(world.spend) : json({ message: 'down' }, 500);
-  if (u.pathname.endsWith('/bobby_llm_usage')) return json(null, 201);
+  if (u.pathname.endsWith('/bobby_llm_usage')) {
+    if (method !== 'GET') return json(null, 201);
+    assert.equal(u.searchParams.get('surface'), 'eq.companion');
+    return world.own === null ? json({ message: 'down' }, 500) : json(world.own ? [{ usd: world.own }] : []);
+  }
   if (u.pathname.endsWith('/agent_events')) return json(null, 201);   // a provider failure is also an owner event
   if (u.pathname.endsWith('/api_cache')) {
     if (!world.storage || world.breaks(method, u)) return json({ message: 'down' }, 500);
     if (method === 'GET') {
+      const there = listed(u).filter((key) => store.has(key));
       if (world.readDelayMs) await new Promise((done) => setTimeout(done, world.readDelayMs));
-      return json(listed(u).filter((key) => store.has(key)).map((cache_key) => ({ cache_key })));
+      return json(there.map((cache_key) => ({ cache_key })));
     }
     if (method === 'DELETE') {
       if ((u.searchParams.get('cache_key') ?? '').startsWith('like.')) return json(null, 204);   // the sweep of past days
-      for (const key of listed(u)) store.delete(key);
+      // A row goes only with the token that wrote it.
+      const token = (u.searchParams.get('payload->>slot') ?? '').replace(/^eq\./, '');
+      assert.match(token, /^[0-9a-f]{32}$/, 'every delete of a slot names its token');
+      for (const key of listed(u)) if (store.get(key) === token) store.delete(key);
       return json(null, 204);
     }
     // The primary key decides: one insert of a key wins, every other gets nothing back.
     assert.match((init.headers as Record<string, string>).Prefer, /resolution=ignore-duplicates/);
-    if (store.has(body.cache_key)) return json([]);
-    store.add(body.cache_key);
+    if (store.has(body.cache_key)) { world.lostInserts++; return json([]); }
+    store.set(body.cache_key, body.payload.slot);
+    if (world.losesAnswer(body.cache_key)) return json({ message: 'timeout' }, 504);
     return json([{ cache_key: body.cache_key }], 201);
   }
   throw new Error(`Unexpected request ${method} ${url}`);
@@ -351,17 +369,19 @@ const send = async (body: Record<string, unknown> = {}, headers: Record<string, 
   await handler({ method, headers: { origin: 'https://bobbyprotocol.xyz', 'x-forwarded-for': '10.9.0.2', 'x-bobby-device': 'device-1234567890abcdef', ...headers }, body: { ...REQUEST, ...body } } as never, res as never);
   return res;
 };
+/** One request on a fresh instance: nothing cached, the per-minute line reset. */
 const turn = async (body: Record<string, unknown> = {}, headers: Record<string, string> = {}, method = 'POST') => {
   resetLlmSpendCache();
+  resetCompanionGuards();
   calls.length = 0;
   const res = await send(body, headers, method);
   await settle();
   return res;
 };
 const modelCalls = () => calls.filter((c) => new URL(c.url).hostname === 'api.anthropic.com');
-const slots = (scope: string) => [...store].filter((key) => key.startsWith(`cturn_${scope}_`));
-/** Fills every slot of the scope that `sample` belongs to, as `count` earlier turns would have. */
-const fill = (sample: string, count: number) => { for (let n = 1; n <= count; n++) store.add(sample.replace(/_\d+$/, `_${n}`)); };
+const slots = (scope: string) => [...store.keys()].filter((key) => key.startsWith(`cturn_${scope}_`));
+/** Fills the slots of the scope that `sample` belongs to, as `count` earlier turns would have. */
+const fill = (sample: string, count: number) => { for (let n = 1; n <= count; n++) { const key = sample.replace(/_\d+$/, `_${n}`); if (!store.has(key)) store.set(key, 'seed'); } };
 const quiet = async <T>(task: () => Promise<T>): Promise<{ value: T; lines: any[] }> => {
   const lines: any[] = [];
   const saved = console.error;
@@ -406,12 +426,13 @@ try {
   const sent = modelCalls()[0].body;
   eq([sent.model, sent.output_config?.effort, JSON.parse(sent.messages[0].content)], ['claude-haiku-5-5', 'low', { question: REQUEST.question }], 'Haiku at low effort, and only the question is sent as input');
   eq(sent.system, companionPrompt('es', 'es-MX', 'plain'), 'the fixed instructions, in the request language and wording');
-  const ledger = calls.filter((c) => c.url.endsWith('/bobby_llm_usage'));
-  eq([ledger.length, ledger[0].body.length, ledger[0].body[0].surface, ledger[0].body[0].role, ledger[0].body[0].level], [1, 1, 'desk', 'companion', null], 'one row on the desk ledger, role companion');
+  const ledger = calls.filter((c) => c.url.endsWith('/bobby_llm_usage') && c.method === 'POST');
+  eq([ledger.length, ledger[0].body.length, ledger[0].body[0].surface, ledger[0].body[0].role, ledger[0].body[0].level], [1, 1, 'companion', 'companion', null], 'one row on the companion\'s own ledger surface: the desk\'s caps and reports do not count it');
   eq(first.lines.filter((l) => l.route === 'companion-turn').map(({ ms: _ms, ...rest }) => rest), [{ route: 'companion-turn', event: 'turn', source: 'model', rejected: null, offer: false, followUp: true, language: 'es', speech: 'plain', model: 'claude-haiku-5-5' }], 'one log line, with no text of the person or the answer');
   ok(!JSON.stringify(first.lines).includes('invertido'), 'the question is not logged');
-  eq([slots('p').length, slots('a').length, slots('d').length], [1, 1, 1], 'the turn holds one slot of the person, of the address and of the day');
-  ok([...store].every((key) => /^cturn_[pad]_[a-z0-9]+_\d{8}_\d+$/.test(key) && !key.includes('device-1234567890abcdef') && !key.includes('10.9.0.2')), 'a slot key carries hashes and the day, never the install id or the address');
+  eq([slots('p').length, slots('a').length, slots('n').length, slots('d').length], [1, 1, 1, 1], 'the turn holds one slot of the person, of the address, of its network and of the day');
+  ok([...store.keys()].every((key) => /^cturn_[pand]_[a-z0-9]+_\d{8}_\d+$/.test(key) && !key.includes('device-1234567890abcdef') && !key.includes('10.9.0.2')), 'a slot key carries hashes and the day, never the install id or the address');
+  eq(new Set(store.values()).size, 1, 'the four slots carry the one token of the request that took them');
   eq(calls.filter((c) => c.method === 'DELETE' && c.url.includes('like.cturn')).length, 1, 'the first turn of a person\'s day sweeps the slots of past days');
 
   // The wording and a context.
@@ -428,11 +449,16 @@ try {
   eq(replaced.lines.filter((l) => l.event === 'turn').map((l) => [l.source, typeof l.rejected]), [['fallback', 'string']], 'the log says it was replaced and why, by class');
   eq(replaced.value.body.allowance.consumed, 3, 'a replaced reply is a served turn');
 
-  // The provider fails: nothing is counted, for anyone.
+  // The provider fails: the person, the network and the day get their slots back; the address keeps the attempt.
   world.model = () => json({ type: 'error', error: { type: 'overloaded_error', message: 'busy' } }, 529);
   const failed = await quiet(() => turn());
-  eq([failed.value.statusCode, failed.value.body.error.code, failed.value.body.error.retryable, failed.value.body.allowance], [503, 'companion_unavailable', true, { kind: 'orientation', consumed: 3, remaining: 7 }], 'a provider failure is retryable and counts nothing');
-  eq([slots('p').length, slots('a').length, slots('d').length], [3, 3, 3], '…its three slots were given back');
+  eq([failed.value.statusCode, failed.value.body.error.code, failed.value.body.error.retryable, failed.value.body.allowance], [503, 'companion_unavailable', true, { kind: 'orientation', consumed: 3, remaining: 7 }], 'a provider failure is retryable and costs the person nothing');
+  eq([slots('p').length, slots('a').length, slots('n').length, slots('d').length], [3, 4, 3, 3], '…while the address keeps the attempt, so a failing provider is not an unlimited number of calls');
+  eq(failed.lines.filter((l) => l.event === 'failed').map((l) => l.timedOut), [false], '…and the log says it was not a timeout');
+  // A call that timed out may have been billed: it also keeps its place in the day.
+  world.model = () => { throw Object.assign(new Error('timed out'), { name: 'TimeoutError' }); };
+  const slow = await quiet(() => turn());
+  eq([slow.value.statusCode, slow.value.body.error.code, slots('p').length, slots('a').length, slots('n').length, slots('d').length], [503, 'companion_unavailable', 3, 5, 3, 4], 'a call that timed out keeps its place in the day, and still costs the person nothing');
   world.model = () => claude('I would rather chat about this in prose.');
   const prose = await quiet(() => turn());
   eq([prose.value.statusCode, prose.value.body.reply, prose.value.body.allowance.consumed], [200, companionFallback('es'), 4], 'a model that answers in prose (a refusal, another shape) is replaced by the fixed sentence');
@@ -447,11 +473,12 @@ try {
   eq(modelCalls()[0].body.system, companionPrompt('es', 'es-MX', 'plain'), '…and the instructions are the same fixed text');
   eq([unrelated.value.body.kind, unrelated.value.body.allowance.consumed], ['explanation', 6], 'a coincidence is answered as an explanation');
   world.model = () => claude({ text: good.text, followUp: good.followUp, aboutAsset: true });
+  const [peopleBefore, addressBefore] = [slots('p').length, slots('a').length];
   const offered = await quiet(() => turn(ASKED));
   eq(offered.value.body, { ...fixture('response-desk-offer.json'), allowance: { kind: 'orientation', consumed: 6, remaining: 4 } }, 'a question about the candidate is a desk offer: the client asks the person to confirm');
   ok(CompanionResponse.safeParse(offered.value.body).success, 'the offer is a contract reply');
   eq(offered.lines.filter((l) => l.event === 'turn').map((l) => l.offer), [true], '…and the log says so');
-  eq([slots('p').length, slots('a').length], [6, 7], 'an offer does not use the person\'s allowance; the address keeps the attempt, the model was paid');
+  eq([slots('p').length - peopleBefore, slots('a').length - addressBefore], [0, 1], 'an offer does not use the person\'s allowance; the address keeps the attempt, the model was paid');
   const unasked = await quiet(() => turn());
   eq([unasked.value.body.kind, unasked.value.body.nextAction], ['explanation', null], 'with no candidate sent there is nothing to offer, whatever the model says');
   world.model = () => claude({ text: good.text, followUp: good.followUp, aboutAsset: false });
@@ -468,40 +495,63 @@ try {
   eq([other.value.statusCode, other.value.body.allowance], [200, { kind: 'orientation', consumed: 1, remaining: 9 }], 'another install starts its own day');
   const addressSlots = slots('a');
   fill(addressSlots[0], 40);
-  const people = slots('p').length;
+  const [people, days] = [slots('p').length, slots('d').length];
   const crowded = await quiet(() => turn({}, { 'x-bobby-device': 'device-abcdefabcdef1234' }));
   eq([crowded.value.statusCode, crowded.value.body.error.code, modelCalls().length], [429, 'orientation_limit', 0], 'an address that used four allowances is refused whatever the install id');
-  eq(slots('p').length, people, '…and the slot the person took first was given back');
-  for (const key of slots('a')) if (!addressSlots.includes(key)) store.delete(key);
+  eq([crowded.value.body.error.message, crowded.value.body.allowance], ['Hoy llegaron demasiadas preguntas desde esta red. Mañana seguimos.', { kind: 'orientation', consumed: 1, remaining: 9 }], '…and the person is told it is the network\'s day that is used, not theirs');
+  eq([slots('p').length, slots('d').length], [people, days], '…their own slot was given back, and the day\'s was never touched');
+  for (const key of slots('a')) if (store.get(key) === 'seed') store.delete(key);
+  // The same for a network: many addresses of one range.
+  const networkSlots = slots('n');
+  fill(networkSlots[0], 160);
+  const ranged = await quiet(() => turn({}, { 'x-bobby-device': 'device-range-0000000001', 'x-forwarded-for': '10.9.0.201' }));
+  eq([ranged.value.statusCode, ranged.value.body.error.code, ranged.value.body.allowance, modelCalls().length], [429, 'orientation_limit', { kind: 'orientation', consumed: 0, remaining: 10 }, 0], 'a network that used sixteen allowances is refused, whatever the address inside it');
+  for (const key of slots('n')) if (store.get(key) === 'seed') store.delete(key);
 
   // No install id: the address is the person.
   const anonymous = await quiet(() => turn({}, { 'x-bobby-device': '', 'x-forwarded-for': '10.9.0.77' }));
   eq([anonymous.value.statusCode, anonymous.value.body.allowance.consumed], [200, 1], 'without an install id the address is counted');
 
-  // Sonnet: the role's model, half the allowance.
+  // Sonnet: the role's model, half the allowance, a lower ceiling for everyone.
   process.env.BOBBY_COMPANION_MODEL = 'claude-sonnet-5-5';
   const sonnet = await quiet(() => turn({}, { 'x-bobby-device': 'device-sonnet-0000000001' }));
   eq([modelCalls()[0].body.model, sonnet.value.body.allowance], ['claude-sonnet-5-5', { kind: 'orientation', consumed: 1, remaining: 4 }], 'Sonnet when the owner sets it, with five turns a day');
   delete process.env.BOBBY_COMPANION_MODEL;
 
-  // Requests that arrive together. A read-then-write counter lets all of them through; a slot lets one in.
-  const burst = async (count: number, headers: (n: number) => Record<string, string>) => {
+  // One address asking faster than a person can: stopped on the instance, before any storage.
+  resetCompanionGuards();
+  let fast = response();
+  for (let n = 0; n < 21; n++) { calls.length = 0; resetLlmSpendCache(); fast = await quiet(() => send({}, { 'x-forwarded-for': '10.9.5.5' })).then((r) => r.value); }
+  eq([fast.statusCode, fast.body.error.code, fast.body.error.retryable, fast.headers['retry-after'], calls.length], [503, 'companion_unavailable', true, '60', 0], 'the twenty-first request of a minute from one address is refused before anything is fetched');
+
+  // Requests that arrive together, each reading the slots before any of them has written.
+  const together = async (count: number, headers: (n: number) => Record<string, string>) => {
     resetLlmSpendCache();
+    resetCompanionGuards();
     calls.length = 0;
+    world.lostInserts = 0;
     world.readDelayMs = 5;
     const answers = await quiet(() => Promise.all(Array.from({ length: count }, (_, n) => send({}, headers(n)))));
     world.readDelayMs = 0;
     await settle();
     return answers.value.map((res) => res.statusCode);
   };
-  const samePerson = await burst(40, () => ({ 'x-bobby-device': 'device-burst-0000000001', 'x-forwarded-for': '10.9.1.1' }));
+  // One person from many addresses (the per-minute line is per address): ten slots, forty requests.
+  const samePerson = await together(40, (n) => ({ 'x-bobby-device': 'device-burst-0000000001', 'x-forwarded-for': `10.20.${n}.1` }));
+  ok(world.lostInserts > 0, `the requests really raced: ${world.lostInserts} inserts lost a slot to another`);
   eq([modelCalls().length <= 10, samePerson.filter((code) => code === 200).length === modelCalls().length, samePerson.every((code) => [200, 429, 503].includes(code))], [true, true, true], 'forty requests of one person at once: never more model calls than their allowance');
-  ok(modelCalls().length >= 1, '…and the burst is not simply refused whole');
-  const manyInstalls = await burst(120, (n) => ({ 'x-bobby-device': `device-rotating-${String(n).padStart(8, '0')}`, 'x-forwarded-for': '10.9.1.2' }));
-  eq([modelCalls().length <= 40, manyInstalls.filter((code) => code === 200).length === modelCalls().length], [true, true], 'a hundred and twenty install ids from one address at once: never more than the address\'s four allowances');
+  ok(modelCalls().length >= 4, `…and they spread over the free slots instead of all trying the same one (${modelCalls().length} served)`);
+  // The slots themselves, a hundred and twenty takers of one address's forty.
+  world.readDelayMs = 5;
+  const takers = await Promise.all(Array.from({ length: 120 }, (_, n) => takeSlot('a', 'feedfacefeedfacefeedface', 40, String(n).padStart(32, '0'))));
+  world.readDelayMs = 0;
+  eq([takers.filter((slot) => slot.state === 'taken').length <= 40, new Set(takers.flatMap((slot) => (slot.state === 'taken' ? [slot.key] : []))).size === takers.filter((slot) => slot.state === 'taken').length, takers.every((slot) => slot.state === 'taken' || slot.state === 'busy')],
+    [true, true, true], 'a hundred and twenty takers of forty slots at once: no slot is taken twice, and a loser is told to try again, not that the day is used');
+  ok(takers.filter((slot) => slot.state === 'taken').length >= 20, `…most of the forty are taken (${takers.filter((slot) => slot.state === 'taken').length})`);
+  // Everyone: three turns left in the day, thirty people at once.
   for (const key of slots('d')) store.delete(key);
   process.env.BOBBY_COMPANION_DAILY_TURNS = '3';
-  const everyone = await burst(30, (n) => ({ 'x-bobby-device': `device-crowd-${String(n).padStart(11, '0')}`, 'x-forwarded-for': `10.9.2.${n + 1}` }));
+  const everyone = await together(30, (n) => ({ 'x-bobby-device': `device-crowd-${String(n).padStart(11, '0')}`, 'x-forwarded-for': `10.30.${n}.1` }));
   ok(modelCalls().length <= 3 && everyone.filter((code) => code === 200).length === modelCalls().length, `thirty people at once with three turns left in the day: never more than three (${modelCalls().length} served)`);
   delete process.env.BOBBY_COMPANION_DAILY_TURNS;
 
@@ -512,21 +562,39 @@ try {
   eq([blind.value.statusCode, blind.value.body.error.code, blind.value.body.error.retryable, modelCalls().length], [503, 'companion_paused', true, 0], 'a ledger that cannot be read stops the turn');
   eq(blind.lines.filter((l) => l.event === 'paused').map((l) => l.reason), ['ledger_unreadable'], '…and says so in the log');
   world.spend = { day: 15, month: 20 };
-  eq([(await quiet(() => turn({}, fresh))).value.body.error.code, modelCalls().length], ['companion_paused', 0], 'the daily cap stops the turn');
+  eq([(await quiet(() => turn({}, fresh))).value.body.error.code, modelCalls().length], ['companion_paused', 0], 'the desk\'s daily cap stops the turn');
   world.spend = { day: 1, month: 300 };
   eq([(await quiet(() => turn({}, fresh))).value.body.error.code, modelCalls().length], ['companion_paused', 0], 'the monthly cap stops the turn');
   world.spend = { day: 1, month: 10 };
+  // The companion's own amount for the day.
+  world.own = null;
+  const ownBlind = await quiet(() => turn({}, fresh));
+  eq([ownBlind.value.body.error.code, ownBlind.value.body.error.retryable, ownBlind.lines.filter((l) => l.event === 'paused').map((l) => l.reason), modelCalls().length], ['companion_paused', true, ['ledger_unreadable'], 0], 'its own spend unreadable stops the turn');
+  world.own = 3.2;
+  const ownFull = await quiet(() => turn({}, fresh));
+  eq([ownFull.value.body.error.code, ownFull.value.body.error.retryable, ownFull.lines.filter((l) => l.event === 'paused').map((l) => l.reason), modelCalls().length], ['companion_paused', false, ['own_cap'], 0], 'its own daily amount reached stops the turn, whatever the desk has left');
+  world.own = 0;
   world.storage = false;
   const dark = await quiet(() => turn({}, fresh));
   eq([dark.value.statusCode, dark.value.body.error.code, dark.value.body.error.retryable, modelCalls().length], [503, 'companion_unavailable', true, 0], 'storage that cannot be read stops the turn, and says it can be retried');
   world.storage = true;
   // Storage that fails after the person's slot was taken is still a failure, never "you used your day".
   world.breaks = (method, u) => method === 'GET' && (u.searchParams.get('cache_key') ?? '').includes('cturn_a_');
-  const heldBefore = slots('p').length;
+  const heldBefore = store.size;
   const blip = await quiet(() => turn({}, fresh));
   eq([blip.value.statusCode, blip.value.body.error.code, blip.value.body.error.retryable, blip.value.headers['retry-after'], modelCalls().length], [503, 'companion_unavailable', true, undefined, 0], 'a storage failure on the address is a retryable failure, not a used-up day');
   world.breaks = () => false;
-  eq(slots('p').length, heldBefore, '…and the person\'s slot was given back');
+  eq(store.size, heldBefore, '…and every slot the request had taken was given back');
+  // Slow storage: the slot is written but its answer never arrives. Left there, every retry would use a turn nobody got.
+  world.losesAnswer = (key) => key.startsWith('cturn_p_');
+  for (let n = 0; n < 6; n++) {
+    const lost = await quiet(() => turn({}, fresh));
+    eq([lost.value.statusCode, lost.value.body.error.code, lost.value.body.error.retryable, modelCalls().length], [503, 'companion_unavailable', true, 0], `slow storage, try ${n + 1}: refused as a failure that can be retried`);
+  }
+  world.losesAnswer = () => false;
+  eq(store.size, heldBefore, 'six tries on slow storage left no slot behind');
+  eq((await quiet(() => turn({}, fresh))).value.body.allowance, { kind: 'orientation', consumed: 1, remaining: 9 }, '…and the person\'s day is whole once storage answers again');
+  // The ceiling of the day.
   process.env.BOBBY_COMPANION_DAILY_TURNS = '1';
   const dayKey = slots('d')[0];
   for (const key of slots('d')) store.delete(key);
