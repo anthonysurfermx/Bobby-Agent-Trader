@@ -121,7 +121,7 @@ for (const model of MODELS) {
       const started = Date.now();
       try {
         const turn = await runCompanionTurn(question, language, { locale: LOCALE[language], speech: 'plain', candidate, usage, model });
-        rows.push({ id, model, language, question, ok: true, source: turn.source, rejected: turn.rejected, text: turn.text, followUp: turn.followUp,
+        rows.push({ id, model, language, question, ok: true, source: turn.source, rejected: turn.rejected, judge: turn.judge, text: turn.text, followUp: turn.followUp,
           written: written.get(`${model}\n${JSON.stringify({ question, ...(candidate ? { candidate } : {}) })}`) ?? null, ...(candidate ? { candidate: candidate.symbol, offered: turn.aboutCandidate, expected: about } : {}),
           words: turn.text.split(/\s+/).length, ms: Date.now() - started, usd: usage.reduce((a, u) => a + u.usd, 0), tokensIn: usage.reduce((a, u) => a + u.tokensIn, 0), tokensOut: usage.reduce((a, u) => a + u.tokensOut, 0) });
       } catch (error) {
@@ -138,7 +138,7 @@ for (const model of MODELS) {
   const sorted = served.map((r) => Number(r.ms)).sort((a, b) => a - b);
   const sum = (key: string) => served.reduce((a, r) => a + Number(r[key] ?? 0), 0);
   console.log(`${model}: answered ${served.length}/${mine.length}; model's own reply ${served.filter((r) => r.source === 'model').length}; replaced ${served.filter((r) => r.source === 'fallback').map((r) => `${r.id}:${r.rejected}`).join(' ') || 'none'}; ` +
-    `with next question ${served.filter((r) => r.followUp).length}; look-alikes read right ${served.filter((r) => 'offered' in r && r.offered === r.expected).length}/${served.filter((r) => 'offered' in r).length}` +
+    `second reader: read ${served.filter((r) => r.judge === 'read').length}, did not answer ${served.filter((r) => r.judge === 'unavailable').length}; with next question ${served.filter((r) => r.followUp).length}; look-alikes read right ${served.filter((r) => 'offered' in r && r.offered === r.expected).length}/${served.filter((r) => 'offered' in r).length}` +
     `${served.filter((r) => 'offered' in r && r.offered !== r.expected).map((r) => ` ${r.id}`).join('')}; words avg ${(sum('words') / Math.max(1, served.length)).toFixed(0)} max ${Math.max(0, ...served.map((r) => Number(r.words)))}; ` +
     `USD per turn ${(sum('usd') / Math.max(1, served.length)).toFixed(5)}; ms p50 ${sorted[Math.floor(sorted.length / 2)] ?? 0} max ${sorted.at(-1) ?? 0}`);
 }

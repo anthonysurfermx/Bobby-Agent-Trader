@@ -54,6 +54,9 @@ Rules a client can rely on:
   "did you mean…?" confirmation) must exist in the six languages too; the web's are in
   `src/lib/companions/web-translations-extra.json`. The rules that decide what a reply may say are written and
   tested per language (`api/_lib/companion-review.ts`).
-- The answer never states a market figure, a return, a promise or a product to choose; when a model's reply
-  does, the server serves a fixed sentence instead (still `kind: "explanation"`). A `followUp` that is not one
-  plain question in the person's voice, or that asks what to buy, is sent as null.
+- Every reply is read by a second small model before it is sent. The answer never states a market figure, a
+  return, a promise or a product to choose, and never tells the person what kind of investor they are; when a
+  model's reply does, the server serves a fixed sentence instead (still `kind: "explanation"`). A `followUp`
+  that is not one plain question in the person's voice, or that asks what to buy, is sent as null. A reply the
+  second reader could not check is never sent: the client gets `companion_unavailable`, retryable, and the
+  turn is not counted. Expect about four seconds for a turn.

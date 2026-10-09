@@ -18,13 +18,18 @@ export async function companionSpend(now = Date.now()): Promise<number | null> {
   const day = new Date(now).toISOString().slice(0, 10);
   if (spentToday && spentToday.day === day && now - spentToday.at < 60_000) return spentToday.usd;
   try {
-    // The latest thousand rows of the day: more than a full day writes on a dear model, and on Haiku a
-    // thousand rows cost cents, far from the amount this guards.
-    const r = await fetch(bobbyRest(`bobby_llm_usage?surface=eq.${COMPANION_SURFACE}&created_at=gte.${day}T00:00:00Z&select=usd&order=created_at.desc&limit=1000`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(2500) });
-    if (!r.ok) return null;
-    const rows = await r.json() as Array<{ usd?: unknown }>;
-    if (!Array.isArray(rows)) return null;
-    const usd = rows.reduce((sum, row) => sum + (Number(row.usd) || 0), 0);
+    // Every row of the day, a thousand at a time (a turn writes a row for the model that speaks and one for the
+    // one that reads it, and a retry writes another). A day longer than this reads is not "cheap": it is unknown.
+    let usd = 0;
+    for (let page = 0; ; page++) {
+      if (page === 20) return null;
+      const r = await fetch(bobbyRest(`bobby_llm_usage?surface=eq.${COMPANION_SURFACE}&created_at=gte.${day}T00:00:00Z&select=usd&order=id.asc&limit=1000&offset=${page * 1000}`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(2500) });
+      if (!r.ok) return null;
+      const rows = await r.json() as Array<{ usd?: unknown }>;
+      if (!Array.isArray(rows)) return null;
+      for (const row of rows) { const n = Number(row.usd); if (!Number.isFinite(n) || n < 0) return null; usd += n; }
+      if (rows.length < 1000) break;
+    }
     spentToday = { at: now, day, usd };
     return usd;
   } catch {
