@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "requestId": null,
+  "kind": "error",
+  "error": {
+    "code": "orientation_limit",
+    "retryable": false,
+    "message": "Son todas las explicaciones de hoy. Mañana seguimos."
+  },
+  "allowance": { "kind": "orientation", "consumed": 10, "remaining": 0 }
+}

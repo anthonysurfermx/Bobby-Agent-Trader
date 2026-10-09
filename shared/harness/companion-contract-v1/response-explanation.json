@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "requestId": "90d2564c-6064-4275-95cd-5a3c7c0b5b56",
+  "kind": "explanation",
+  "reply": {
+    "text": "Puedes empezar entendiendo qué significa invertir: poner dinero en algo cuyo valor puede cambiar, con la posibilidad de perderlo. Yo te explico los conceptos paso a paso.",
+    "followUp": "¿Cómo funciona una acción?"
+  },
+  "nextAction": null,
+  "allowance": { "kind": "orientation", "consumed": 1, "remaining": 9 }
+}

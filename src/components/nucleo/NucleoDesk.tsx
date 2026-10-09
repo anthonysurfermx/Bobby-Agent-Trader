@@ -41,7 +41,7 @@ import LevelControl, { LEVEL_HUE, allowanceFor, levelName, storedLevel, storeLev
 import LimitDialog, { type LimitState } from './LimitDialog';
 import InvitePanel from './InvitePanel';
 import {
-  AGENT_TONE, marketQuery, assetSearch, candles, debateFor, isNoTrade, isUnavailable, localizedMomentum, localizedTrend, money as formatMoney, noTradeReason, prettyName, resolveAsset, runAgents, runDebate, topMovers, type Agents,
+  AGENT_TONE, marketQuery, assetSearch, candles, companionTurn, debateFor, isNoTrade, isUnavailable, localizedMomentum, localizedTrend, money as formatMoney, noTradeReason, prettyName, readsAsAQuestion, resolveQuestion, runAgents, runDebate, topMovers, type Agents,
   type AgentKey, type Answer, type Candle, type Mover, type Resolution, type Snapshot,
 } from './deskData';
 
@@ -52,7 +52,7 @@ interface BrowserRecognition {
   onend: (() => void) | null; onerror: (() => void) | null;
 }
 
-type Phase = 'idle' | 'resolving' | 'alpha' | 'redTeam' | 'rebuttal' | 'cio' | 'reveal' | 'complete' | 'error' | 'confirm' | 'gate';
+type Phase = 'idle' | 'resolving' | 'alpha' | 'redTeam' | 'rebuttal' | 'cio' | 'reveal' | 'complete' | 'error' | 'confirm' | 'gate' | 'guide';
 type LiveArgs = { alpha?: string; red?: string; rebuttal?: string };
 /** The first sentence, for the voices around the glass; the whole text stays in the debate card. */
 const firstSentence = (text: string, max = 170) => { const m = text.match(/^.*?[.!?](?=\s|$)/); const one = (m ? m[0] : text).trim(); return one.length > max ? `${one.slice(0, max).replace(/\s+\S*$/, '')}…` : one; };
@@ -242,6 +242,8 @@ export default function NucleoDesk() {
     return fresh;
   }, [consentNow]);
   const [deskError, setDeskError] = useState<string | null>(null);
+  // The companion's answer to a question that names no asset (pilot; api/companion-turn): its words and the next question to tap.
+  const [guide, setGuide] = useState<{ text: string; next: string | null } | null>(null);
   const [agents, setAgents] = useState<Agents | null>(null);
   // The live desk: each argument as it arrives; a debate that did not finish; what "Retry" re-runs.
   const [live, setLive] = useState<LiveArgs>({});
@@ -422,7 +424,7 @@ export default function NucleoDesk() {
     progressStore.setQuickAccess([snap.symbol, ...asked.filter((s) => s !== snap.symbol)].slice(0, 6));
   }, [say, progress.quickAccess, progress.quickAccessCustomized, refreshAccess, consentNow]);
 
-  const ask = useCallback(async (query: string, spoken?: string) => {
+  const ask = useCallback(async (query: string, spoken?: string, via?: 'guide') => {
     const q = query.trim();
     if (!q) return;
     // Typed, dictated, a chip or a link: before the notice is accepted the question waits here and nothing is sent.
@@ -441,6 +443,7 @@ export default function NucleoDesk() {
     requestRef.current = controller;
     voice.stop();
     setDeskError(null);
+    setGuide(null);
     setAnswer(null);
     setSnapshot(null);
     setPending(null);
@@ -455,8 +458,36 @@ export default function NucleoDesk() {
     questionRef.current = q;
     setPhase('resolving');
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    const r = await resolveAsset(q, controller.signal);
+    // The companion's own next question goes back to the companion: it is about learning, and a word such as
+    // "bitcoin" in it must not open a market read the person did not ask for.
+    const { found: r, unavailable } = via === 'guide' ? { found: null, unavailable: false } : await resolveQuestion(q, controller.signal);
     if (controller.signal.aborted) return;
+    // A question that names no asset is the companion's, when the pilot is on. A search that did not answer is
+    // not "no asset": it keeps today's message. Off, or unable to answer, the desk does what it did before.
+    if (!unavailable && (!r || readsAsAQuestion(q, r))) {
+      const turn = await companionTurn(q, controller.signal);
+      if (controller.signal.aborted) return;
+      if (turn?.kind === 'explanation') {
+        setGuide({ text: turn.text, next: turn.next });
+        setMessages((m) => [...m, { from: 'bobby', text: turn.text }]);
+        setPhase('guide');
+        say(turn.text);
+        return;
+      }
+      if (turn?.kind === 'limit') {
+        setPhase('error');
+        setDeskError(turn.message);
+        setMessages((m) => [...m, { from: 'bobby', text: turn.message }]);
+        return;
+      }
+    }
+    if (via === 'guide') {
+      setPhase('error');
+      const msg = t('I could not finish the explanation. You can try again.', 'No pude completar la explicación. Puedes intentarlo de nuevo.', 'Não consegui terminar a explicação. Você pode tentar de novo.');
+      setDeskError(msg);
+      setMessages((m) => [...m, { from: 'bobby', text: msg }]);
+      return;
+    }
     if (!r) {
       setPhase('error');
       const msg = t('I could not resolve that asset. Try a name or ticker: bitcoin, NVDA, gold.', 'No pude resolver ese activo. Prueba con el nombre o ticker: bitcoin, NVDA, oro.', 'Não consegui identificar esse ativo. Tente um nome ou ticker: bitcoin, NVDA, ouro.');
@@ -466,7 +497,7 @@ export default function NucleoDesk() {
     }
     if (r.needsConfirmation) { setPending(r); setPhase('confirm'); return; }
     await analyze(r.snapshot, controller);
-  }, [analyze, voice, consentNow, holdFor]);
+  }, [analyze, voice, consentNow, holdFor, say]);
 
   // The meter: on load, whenever the account changes, and after a Stripe checkout (the webhook can
   // lag a few seconds, so a welcome polls until the subscription shows up). A question the gate held
@@ -555,7 +586,7 @@ export default function NucleoDesk() {
     if (revealRef.current) clearTimeout(revealRef.current);
     voice.stop();
     sfxTock();
-    setPhase('idle'); setSnapshot(null); setAnswer(null); setPending(null); setDeskError(null); setAward(null); setLandEvent(null); setSeries([]); setLimit(null);
+    setPhase('idle'); setSnapshot(null); setAnswer(null); setPending(null); setDeskError(null); setGuide(null); setAward(null); setLandEvent(null); setSeries([]); setLimit(null);
     setLive({}); setAgentsFailed(null); setDeskRetry(null); setShowDebate(false);
   };
   // "Retry" re-asks the same question, on the level that failed (or Rápido when the premium pause said so).
@@ -673,7 +704,7 @@ export default function NucleoDesk() {
     if (revealRef.current) clearTimeout(revealRef.current);
     voice.stop(); closeRecognition();
     setSheet('none'); setLimit(null); setSignInPrompt(false); setInviteOpen(false); setInspected(null);
-    setPhase('idle'); setSnapshot(null); setAnswer(null); setPending(null); setDeskError(null); setAward(null); setLandEvent(null); setSeries([]);
+    setPhase('idle'); setSnapshot(null); setAnswer(null); setPending(null); setDeskError(null); setGuide(null); setAward(null); setLandEvent(null); setSeries([]);
     setLive({}); setAgentsFailed(null); setDeskRetry(null); setShowDebate(false);
     invalidateAccess();
     setWithdrawn(true);
@@ -1019,6 +1050,18 @@ export default function NucleoDesk() {
   const scheduledGiftDetail = meter?.tier === 'pro' && paidPro && grantExpiry
     ? t(` · gifted Pro through ${grantExpiry}`, ` · Pro regalado hasta el ${grantExpiry}`, ` · Pro presente até ${grantExpiry}`)
     : '';
+  // The companion answered: its words beside the sphere, and the next question the person could ask, one tap away.
+  const guideStage = phase === 'guide' && guide ? (
+    <div className="flex flex-col items-center">
+      <NucleoSphere size={desktop ? 220 : 170} mode={voice.speaking ? 'listen' : 'idle'} />
+      <p className="n-caption long mt-12" aria-live="polite">{guide.text}</p>
+      {guide.next && (
+        <div className="n-chips mt-6">
+          <button type="button" className="n-chip" onClick={() => { sfxTock(); void ask(guide.next!, undefined, 'guide'); }}>{guide.next}</button>
+        </div>
+      )}
+    </div>
+  ) : null;
   const errorStage = phase === 'error' ? (
     <div className="flex flex-col items-center">
       <NucleoSphere size={desktop ? 220 : 170} mode="idle" />
@@ -1107,7 +1150,7 @@ export default function NucleoDesk() {
         <AnimatePresence mode="wait">
           <motion.section key={reading ? 'think' : done ? 'result' : phase === 'confirm' ? 'confirm' : phase === 'error' ? 'error' : 'idle'}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }} className="w-full">
-            {reading ? thinkStage : done ? resultStage : phase === 'confirm' ? confirmCard : phase === 'error' ? errorStage : idleStage}
+            {reading ? thinkStage : done ? resultStage : phase === 'confirm' ? confirmCard : phase === 'error' ? errorStage : phase === 'guide' ? guideStage : idleStage}
           </motion.section>
         </AnimatePresence>
         {cards}
