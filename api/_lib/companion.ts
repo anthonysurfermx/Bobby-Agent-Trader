@@ -12,8 +12,10 @@
 //   · Stateless. v0 reads the question, the language and the wording choice (`speech`). A `context` object is
 //     accepted and ignored, so nothing new about a person travels and no privacy text changes.
 //   · No market evidence reaches this call, so the answer may state no market figure, promise nothing and
-//     recommend nothing to put money in (api/_lib/companion-review.ts). A reply that does is replaced by a fixed
-//     sentence; the turn is still served.
+//     recommend nothing to put money in. A second small model reads every reply before the person does
+//     (api/_lib/companion-judge.ts): a refused reply is replaced by a fixed sentence and the turn is still
+//     served; a reply it could not read is not shown at all (the person is told to try again). The
+//     deterministic rules (api/_lib/companion-review.ts) are the guard only when the owner turns that reader off.
 //   · `followUp` is the next question the PERSON could ask, in their voice: tapping it is a new, self-contained
 //     turn. Bobby asking the person something needs the conversation to travel, which is the next version.
 //   · `kind` is "explanation", except in one case. The asset search guesses from look-alike letters, and for a
@@ -26,7 +28,8 @@
 import { z } from 'zod';
 import { APP_LANGUAGES, APP_LOCALES, appLocale, languageName, type AppLanguage } from '../../src/lib/app-language.js';
 import { DEFAULT_APP_TEXT_MODEL } from './app-model.js';
-import { reviewCompanionReply, type CompanionRejection } from './companion-review.js';
+import { companionJudgeModel, judgeCompanionReply } from './companion-judge.js';
+import { nextQuestionShape, reviewCompanionReply, type CompanionRejection } from './companion-review.js';
 import { SPEECH, type Speech } from './desk-plain-words.js';
 import { completeJson, LlmHttpError, type JsonSchemaSpec, type LlmUsage, type ModelSpec } from './llm.js';
 
@@ -138,23 +141,30 @@ const OFFER: Record<AppLanguage, (symbol: string) => string> = {
 /** The fixed sentence of a desk offer. The client shows its own confirmation; this is for one that has none. */
 export const companionOffer = (language: AppLanguage, symbol: string) => OFFER[language](symbol.toUpperCase());
 
+/** The model answered and its second reader did not: the reply was paid for and cannot be shown. */
+export class CompanionUnchecked extends Error {
+  constructor() { super('The companion reply could not be checked'); this.name = 'CompanionUnchecked'; }
+}
+
 export interface CompanionTurn {
   text: string; followUp: string | null; source: 'model' | 'fallback'; rejected: CompanionRejection | null; model: string;
   /** The model read the question as being about the candidate the client sent: the caller offers the desk instead of the text. */
   aboutCandidate: boolean;
+  /** The second reader: it read the reply; the owner turned it off (the deterministic rules read it instead); or there was nothing to read. */
+  judge: 'read' | 'off' | 'skipped';
 }
 
 /**
- * One turn: one model call, reviewed. Throws when the provider does not answer (the caller answers
+ * One turn: one model call, read by a second model before it is shown. Throws when the provider does not answer, or when the reply could not be checked (the caller answers
  * `companion_unavailable` and counts nothing); a reply the review refuses, a refusal or another shape is served
  * as the fixed sentence.
  */
 export async function runCompanionTurn(
   question: string, language: AppLanguage,
-  opts: { locale?: string; speech?: Speech | null; candidate?: CompanionCandidate; usage?: LlmUsage[]; model?: string; timeoutMs?: number } = {},
+  opts: { locale?: string; speech?: Speech | null; candidate?: CompanionCandidate; usage?: LlmUsage[]; model?: string; timeoutMs?: number; /** The second reader's model; null turns it off. */ judge?: string | null } = {},
 ): Promise<CompanionTurn> {
   const model = opts.model ?? companionModel();
-  const spec: ModelSpec = { provider: 'anthropic', model, effort: 'low', maxTokens: 1500, timeoutMs: opts.timeoutMs ?? 25_000 };
+  const spec: ModelSpec = { provider: 'anthropic', model, effort: 'low', maxTokens: 1500, timeoutMs: opts.timeoutMs ?? 20_000 };
   const usage = opts.usage ?? [];
   let raw: z.infer<typeof Reply>;
   try {
@@ -163,12 +173,23 @@ export async function runCompanionTurn(
   } catch (error) {
     // The model wrote something that cannot be shown (a refusal, prose, another shape): the person still gets the
     // fixed sentence. A provider that never answered is the caller's failure to report.
-    if (!(error instanceof LlmHttpError) && (usage.at(-1)?.tokensOut ?? 0) > 0) return { ...companionFallback(language), source: 'fallback', rejected: 'shape', model, aboutCandidate: false };
+    if (!(error instanceof LlmHttpError) && (usage.at(-1)?.tokensOut ?? 0) > 0) return { ...companionFallback(language), source: 'fallback', rejected: 'shape', model, aboutCandidate: false, judge: 'skipped' };
     throw error;
   }
   // Only a candidate the client sent can be offered: the model's own idea of an asset never is.
-  if (opts.candidate && raw.aboutAsset) return { text: companionOffer(language, opts.candidate.symbol), followUp: null, source: 'model', rejected: null, model, aboutCandidate: true };
+  if (opts.candidate && raw.aboutAsset) return { text: companionOffer(language, opts.candidate.symbol), followUp: null, source: 'model', rejected: null, model, aboutCandidate: true, judge: 'skipped' };
+  // The second reader decides. Its "keep" for the next question still has to be one short question with no figure.
+  const judgeModel = opts.judge === undefined ? companionJudgeModel() : opts.judge;
+  const next = raw.followUp.trim();
+  const verdict = judgeModel ? await judgeCompanionReply(question, { text: raw.text, followUp: next || null }, language, { model: judgeModel, locale: opts.locale, usage }) : null;
+  if (verdict) {
+    if (verdict.rejected) return { ...companionFallback(language), source: 'fallback', rejected: verdict.rejected, model, aboutCandidate: false, judge: 'read' };
+    return { text: raw.text, followUp: verdict.keepNext && nextQuestionShape(next, question) ? next : null, source: 'model', rejected: null, model, aboutCandidate: false, judge: 'read' };
+  }
+  // The reader did not answer: a reply nobody could check is not shown. The caller tells the person to try again.
+  if (judgeModel) throw new CompanionUnchecked();
+  // The owner turned the reader off: the deterministic rules are the guard.
   const reviewed = reviewCompanionReply(question, raw, language);
-  if ('rejected' in reviewed) return { ...companionFallback(language), source: 'fallback', rejected: reviewed.rejected, model, aboutCandidate: false };
-  return { ...reviewed, source: 'model', rejected: null, model, aboutCandidate: false };
+  if ('rejected' in reviewed) return { ...companionFallback(language), source: 'fallback', rejected: reviewed.rejected, model, aboutCandidate: false, judge: 'off' };
+  return { ...reviewed, source: 'model', rejected: null, model, aboutCandidate: false, judge: 'off' };
 }

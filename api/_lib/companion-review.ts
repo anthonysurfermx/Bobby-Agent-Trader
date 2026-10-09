@@ -77,7 +77,7 @@ function worded(words: string): string {
 }
 const THOUSAND = 'k|mil|thousand|mille|mila|tausend', MILLION = 'millones|millon|millions?|milhoes|milhao|milioni|milione|millionen';
 /** The numbers the person wrote, as digits: "1,000", "10k", "10 mil", "mil", "diez mil". */
-function theirNumbers(question: string): Set<string> {
+export function theirNumbers(question: string): Set<string> {
   const q = fold(question), out = new Set(numerals(q));
   for (const m of q.matchAll(new RegExp(`(\\d+(?:[.,]\\d+)*)\\s*(${THOUSAND}|${MILLION})(?![a-z])`, 'g'))) {
     const n = Number(m[1].replace(/[.,](?=\d{3}(?!\d))/g, '').replace(',', '.'));
@@ -106,7 +106,12 @@ const STANDS_OR_KEEPS = [
 ].join('|');
 const MARKET_NOW = new RegExp(`(?<![a-z])(?:${NOW}(?![a-z])[^.!?]{0,30}(?<![a-z])${MOVES}|${MOVES}(?![a-z])[^.!?]{0,30}(?<![a-z])${NOW}|${STANDS_OR_KEEPS})(?![a-z])`);
 
-function statesAFigure(text: string, question: string): boolean {
+/**
+ * A number the person did not write: digits, a percentage or currency mark, an amount in words, a multiple, or
+ * how a market is doing now. Exact where a model is not: it knows that "mil pesos" and "1,000 pesos" are the
+ * same amount and that two thousand is not.
+ */
+export function statesAFigure(text: string, question: string): boolean {
   const t = fold(text), q = fold(question), theirs = theirNumbers(question);
   if (numerals(t).some((n) => !theirs.has(n))) return true;
   if ((PERCENT_MARK.test(t) || PERCENT_WORD.test(t)) && !(PERCENT_MARK.test(q) || PERCENT_WORD.test(q))) return true;
@@ -300,6 +305,9 @@ const ASKS_THE_PERSON: Record<AppLanguage, RegExp> = {
   en: alt('you|your|yours|yourself'), es: alt('tienes|quieres|puedes|sabes|has|tu|tus|ti|te|usted|ustedes'), fr: alt('tu|ton|ta|tes|toi|vous|votre|vos'),
   pt: alt('tu|teu|tua|teus|tuas|voce|seu|sua|tens|queres|podes'), it: alt('tu|tuo|tua|tuoi|tue|hai|vuoi|puoi|ti'), de: alt('du|dein\\w*|dir|dich|hast|willst|kannst|mochtest'),
 };
+/** The shape of a next question, whatever it asks: one question, short enough for a chip, with no figure. */
+export const nextQuestionShape = (next: string, question: string) => next.length >= 6 && next.length <= 140 && ONE_QUESTION.test(next) && !statesAFigure(next, question);
+
 function usableNext(next: string, question: string, language: AppLanguage): boolean {
   if (next.length < 6 || next.length > 140 || !ONE_QUESTION.test(next)) return false;
   const folded = fold(next);

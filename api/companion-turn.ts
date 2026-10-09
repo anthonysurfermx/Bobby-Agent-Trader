@@ -40,7 +40,7 @@ import { deviceHash } from './_lib/access.js';
 import { DESK_QUESTION_MAX } from './_lib/desk-debate.js';
 import { llmCaps, llmSpend, logLlmUsage } from './_lib/llm-usage.js';
 import type { LlmUsage } from './_lib/llm.js';
-import { COMPANION_VERSION, CompanionRequest, companionAllowance, companionDailyCeiling, companionDailyUsd, companionEnabled, companionModel, runCompanionTurn } from './_lib/companion.js';
+import { COMPANION_VERSION, CompanionRequest, CompanionUnchecked, companionAllowance, companionDailyCeiling, companionDailyUsd, companionEnabled, companionModel, runCompanionTurn } from './_lib/companion.js';
 
 export const config = { maxDuration: 60 };
 
@@ -152,7 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const started = Date.now();
   try {
     const turn = await runCompanionTurn(question, language, { locale, speech, candidate, usage, model });
-    console.error(JSON.stringify({ route: 'companion-turn', event: 'turn', source: turn.source, rejected: turn.rejected, offer: turn.aboutCandidate, followUp: turn.followUp !== null, language, speech: speech ?? 'plain', model, ms: Date.now() - started }));
+    console.error(JSON.stringify({ route: 'companion-turn', event: 'turn', source: turn.source, rejected: turn.rejected, judge: turn.judge, offer: turn.aboutCandidate, followUp: turn.followUp !== null, language, speech: speech ?? 'plain', model, ms: Date.now() - started }));
     if (turn.aboutCandidate && candidate) {
       // The question was about an asset after all: the client asks the person to confirm it. The model call was
       // paid, so the address, the network and the day keep their slots; the person's allowance is for explanations.
@@ -167,13 +167,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       reply: { text: turn.text, followUp: turn.followUp }, nextAction: null,
       allowance: { kind: 'orientation', consumed: mine.used, remaining: limit - mine.used },
     });
-  } catch {
+  } catch (error) {
     // Nothing reached the person: their turn and the network's come back. The address keeps the attempt, so a
-    // failing provider is not an unlimited number of calls; a call that timed out may have been billed, so it
-    // keeps its place in the day as well.
-    const timedOut = usage.some((row) => row.stop === 'timeout' || row.stop === 'deadline');
-    await giveBack(timedOut ? [mine, around] : [mine, around, shared], token);
-    console.error(JSON.stringify({ route: 'companion-turn', event: 'failed', timedOut, language, model, ms: Date.now() - started }));
+    // failing provider is not an unlimited number of calls. A call that timed out may have been billed, and a
+    // reply its second reader could not check was: both keep their place in the day as well.
+    const timedOut = usage.some((row) => row.stop === 'timeout' || row.stop === 'deadline'), unchecked = error instanceof CompanionUnchecked;
+    await giveBack(timedOut || unchecked ? [mine, around] : [mine, around, shared], token);
+    console.error(JSON.stringify({ route: 'companion-turn', event: 'failed', timedOut, unchecked, language, model, ms: Date.now() - started }));
     return refuse(503, 'companion_unavailable', COPY.unavailable[language], true, before);
   } finally {
     if (usage.length) waitUntil(logLlmUsage(usage, { surface: COMPANION_SURFACE, level: null }).then(forgetCompanionSpend));
