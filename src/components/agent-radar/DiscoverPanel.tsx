@@ -11,7 +11,6 @@ import type { AgentLogEntry } from '@/components/claw-trader/AgentActivityLog';
 import { AgentActivityLog } from '@/components/claw-trader/AgentActivityLog';
 import { DexQuotePanel } from '@/components/claw-trader/DexQuotePanel';
 import { CEXInsightBadge } from './CEXInsightBadge';
-import { CopyTradeCard } from './CopyTradeCard';
 import { OnchainIntelBadge } from './OnchainIntelBadge';
 
 function formatUSD(n: number): string {
@@ -207,11 +206,6 @@ export function DiscoverPanel({ markets, whaleSignals, loading, progress, agentL
                       marketTitle={market.title}
                       polymarketWhales={market.traders.map(t => t.address)}
                     />
-
-                    {/* Copy Trade */}
-                    {market.traders.length > 0 && (
-                      <CopyTradeCard market={market} trader={market.traders[0]} />
-                    )}
 
                     {/* DEX Quote */}
                     <DexQuotePanel

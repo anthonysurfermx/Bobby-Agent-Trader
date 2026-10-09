@@ -250,6 +250,33 @@ try {
   assert.match(detectIntentSource, /const escapedKey = (?:normalizeWords\(key\)|key)\.replace\(\/\[\.\*\+\?\^\$\{\}\(\)\|\[\\\]\\\\\]\/g/, 'dynamic regular-expression keys must be fully escaped');
   assert.match(blogServiceSource, /new DOMParser\(\)\.parseFromString/, 'blog excerpts must use an HTML parser instead of incomplete regex sanitization');
 
+  // Legacy advice doors 2026-10-09 — hackathon routes that handed a person a bet size
+  // from their own budget and risk level. The scan is retired, explain no longer builds
+  // the prompts that asked for a pick, and a manual cycle needs internal auth like a
+  // scheduled one. A refused call reaches no upstream.
+  {
+    const upstream = fetchCalls;
+    const { default: chatAnalyzeHandler } = await import('../api/chat-analyze.js');
+    const scan = responseRecorder();
+    await chatAnalyzeHandler({ ...request({}), method: 'GET', query: { query: 'bitcoin', amount: '1000', risk: 'medium' } } as unknown as VercelRequest, scan.response);
+    assert.equal(scan.state.status, 410, 'chat-analyze must stay retired');
+
+    const { default: explainHandler } = await import('../api/explain.js');
+    for (const context of ['chat-opportunity', 'chat-deep-analysis', 'signals']) {
+      const explained = responseRecorder();
+      await explainHandler(request({ context, data: { amount: 1000, risk: 'medium' } }), explained.response);
+      assert.deepEqual([explained.state.status, explained.state.body?.code], [400, 'invalid_context'], `explain must not answer the retired ${context} context`);
+    }
+
+    // The freeze above answers 503 before the auth check; lift it for this one call.
+    process.env.PROTOCOL_CUTOVER_FREEZE = 'false';
+    const { default: agentRunHandler } = await import('../api/agent-run.js');
+    const manual = responseRecorder();
+    await agentRunHandler({ ...request({}), method: 'GET', query: { manual: 'true' } } as unknown as VercelRequest, manual.response);
+    assert.equal(manual.state.status, 401, 'a manual agent run must require internal auth');
+    assert.equal(fetchCalls, upstream, 'a retired or refused legacy route must not reach Polymarket or a model');
+  }
+
   console.log('api-security: 51/51 checks passed');
 } finally {
   globalThis.fetch = originalFetch;

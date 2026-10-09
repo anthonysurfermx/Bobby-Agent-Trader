@@ -4,11 +4,11 @@
 // Shows what the agent SEES, THINKS, and DOES
 // ============================================================
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
 import {
-  Bot, Activity, TrendingUp, TrendingDown, Shield, Clock, Zap,
+  Bot, Activity, TrendingUp, TrendingDown, Shield, Clock,
   Brain, Target, AlertCircle, CheckCircle, FlaskConical, ChevronDown,
 } from 'lucide-react';
 
@@ -252,47 +252,6 @@ function PlaceholderChart() {
   );
 }
 
-// ---- Typewriter for cycle chat ----
-
-function CycleTypewriter({ text, speed = 10 }: { text: string; speed?: number }) {
-  const [displayed, setDisplayed] = useState('');
-  const [done, setDone] = useState(false);
-  const idxRef = useRef(0);
-  const rafRef = useRef<number>(0);
-  const lastRef = useRef(0);
-
-  const skip = () => { if (!done) { setDisplayed(text); setDone(true); } };
-
-  useEffect(() => {
-    idxRef.current = 0;
-    lastRef.current = 0;
-    setDisplayed('');
-    setDone(false);
-
-    const step = (ts: number) => {
-      if (!lastRef.current) lastRef.current = ts;
-      const elapsed = ts - lastRef.current;
-      if (elapsed >= speed) {
-        const next = Math.min(idxRef.current + Math.min(Math.floor(elapsed / speed), 4), text.length);
-        idxRef.current = next;
-        lastRef.current = ts;
-        setDisplayed(text.slice(0, next));
-        if (next >= text.length) { setDone(true); return; }
-      }
-      rafRef.current = requestAnimationFrame(step);
-    };
-    rafRef.current = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [text, speed]);
-
-  return (
-    <div onClick={skip} className="cursor-pointer">
-      <span>{displayed}</span>
-      {!done && <span className="inline-block w-[5px] h-[12px] bg-green-400 ml-[1px] align-middle animate-pulse" />}
-    </div>
-  );
-}
-
 // ---- Advisor Score / Track Record ----
 
 function AdvisorScore({
@@ -423,18 +382,15 @@ function AdvisorScore({
 interface DashboardProps {
   advisorName?: string;
   scanIntervalHours?: number;
-  onCycleComplete?: () => void;
 }
 
-export function AgentDashboard({ advisorName, scanIntervalHours, onCycleComplete }: DashboardProps = {}) {
+export function AgentDashboard({ advisorName, scanIntervalHours }: DashboardProps = {}) {
   const [cycles, setCycles] = useState<AgentCycle[]>([]);
   const [trades, setTrades] = useState<AgentTrade[]>([]);
   const [positions, setPositions] = useState<AgentPosition[]>([]);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedCycle, setExpandedCycle] = useState<string | null>(null);
-  const [triggerLoading, setTriggerLoading] = useState(false);
-  const [animatedCycleId, setAnimatedCycleId] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -453,79 +409,6 @@ export function AgentDashboard({ advisorName, scanIntervalHours, onCycleComplete
 
   useEffect(() => { loadData(); }, []);
 
-  // Live analysis phases
-  const [analysisPhases, setAnalysisPhases] = useState<string[]>([]);
-  const phaseTimerRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-
-  const triggerManualRun = async () => {
-    setTriggerLoading(true);
-    setAnalysisPhases([]);
-
-    // Clear old timers
-    phaseTimerRef.current.forEach(clearTimeout);
-    phaseTimerRef.current = [];
-
-    // Simulate phase progression while waiting for API
-    const phases = [
-      { text: 'Connecting to OKX OnchainOS...', delay: 0 },
-      { text: 'Scanning ETH, SOL, Base whale signals...', delay: 800 },
-      { text: 'Filtering signals (score > 20)...', delay: 2200 },
-      { text: 'Fetching Polymarket leaderboard (top 15)...', delay: 3500 },
-      { text: 'Self-optimizing prompt from last 10 cycles...', delay: 5000 },
-      { text: 'Alpha Hunter analyzing opportunities...', delay: 6500 },
-      { text: 'Red Team finding attack vectors...', delay: 8500 },
-      { text: 'Judge agent making final verdict...', delay: 10500 },
-      { text: 'Kelly Criterion sizing positions...', delay: 12000 },
-      { text: 'Generating personalized report...', delay: 13000 },
-    ];
-    phases.forEach(p => {
-      const t = setTimeout(() => setAnalysisPhases(prev => [...prev, p.text]), p.delay);
-      phaseTimerRef.current.push(t);
-    });
-
-    try {
-      const res = await fetch('/api/agent-run?manual=true');
-      const data = await res.json();
-
-      // Clear phase timers and show final
-      phaseTimerRef.current.forEach(clearTimeout);
-      phaseTimerRef.current = [];
-
-      if (data.ok) {
-        const c = data.cycle;
-        const d = data.debate;
-        setAnalysisPhases([
-          `OKX: ${c.signals_found} signals detected`,
-          `Filter: ${c.signals_filtered} passed quality gate`,
-          `Polymarket: ${data.polymarket?.length || 0} consensus markets`,
-          ...(d ? [
-            `Alpha Hunter: "${(d.alphaView || '').slice(0, 80)}..."`,
-            `Red Team: "${(d.redTeamView || '').slice(0, 80)}..."`,
-            `Judge verdict: ${c.llm_decisions || 0} approved, ${d.sizingMethod || 'kelly'}`,
-          ] : [
-            `Claude: ${c.llm_decisions || 0} decisions`,
-          ]),
-          `${c.trades_executed} trades, $${(c.total_usd_deployed || 0).toFixed(2)} deployed`,
-          `${d?.selfOptimized ? '✦ Self-optimized prompt · ' : ''}Done in ${(c.latency_ms / 1000).toFixed(1)}s`,
-        ]);
-        await loadData();
-        setCycles(prev => {
-          if (prev.length > 0) {
-            setExpandedCycle(prev[0].id);
-            setAnimatedCycleId(prev[0].id);
-          }
-          return prev;
-        });
-        onCycleComplete?.();
-      }
-    } catch (err) {
-      console.error('Manual trigger failed:', err);
-      setAnalysisPhases(prev => [...prev, 'Error: cycle failed']);
-    }
-    // Clear phases after 5s so user can read results
-    setTimeout(() => { setAnalysisPhases([]); setTriggerLoading(false); }, 5000);
-  };
-
   // Stats
   const totalTrades = trades.length;
   const totalDeployed = cycles.reduce((sum, c) => sum + (c.total_usd_deployed || 0), 0);
@@ -536,7 +419,7 @@ export function AgentDashboard({ advisorName, scanIntervalHours, onCycleComplete
   return (
     <div className="space-y-5">
 
-      {/* ======== HEADER + RUN BUTTON ======== */}
+      {/* ======== HEADER ======== */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500/20 to-cyan-500/20 flex items-center justify-center border border-green-500/20">
@@ -549,67 +432,7 @@ export function AgentDashboard({ advisorName, scanIntervalHours, onCycleComplete
             </p>
           </div>
         </div>
-        <button
-          onClick={triggerManualRun}
-          disabled={triggerLoading}
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-green-500/15 border border-green-500/30 text-green-400 rounded-xl hover:bg-green-500/25 transition-colors disabled:opacity-40"
-        >
-          {triggerLoading ? (
-            <>
-              <Activity className="w-3.5 h-3.5 animate-spin" />
-              Analyzing...
-            </>
-          ) : (
-            <>
-              <Zap className="w-3.5 h-3.5" />
-              Analyze Market
-            </>
-          )}
-        </button>
       </div>
-
-      {/* ======== LIVE ANALYSIS LOG ======== */}
-      <AnimatePresence>
-        {analysisPhases.length > 0 && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="bg-neutral-950/80 border border-green-500/20 rounded-xl overflow-hidden"
-          >
-            <div className="px-3 py-2.5 border-b border-green-500/10 flex items-center gap-2">
-              <Activity className="w-3.5 h-3.5 text-green-400 animate-pulse" />
-              <span className="text-[10px] font-medium text-green-400 uppercase tracking-wider">Live Analysis</span>
-            </div>
-            <div className="px-3 py-2 space-y-1 font-mono text-[11px] max-h-48 overflow-y-auto">
-              {analysisPhases.map((phase, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-start gap-2"
-                >
-                  <span className="text-green-500/60 shrink-0 mt-px">
-                    {i === analysisPhases.length - 1 && triggerLoading ? '▸' : '✓'}
-                  </span>
-                  <span className={i === analysisPhases.length - 1 && triggerLoading ? 'text-green-300' : 'text-green-400/70'}>
-                    {phase}
-                  </span>
-                </motion.div>
-              ))}
-              {triggerLoading && (
-                <div className="flex items-center gap-1 text-green-500/40 pt-1">
-                  <span className="inline-block w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-                  <span className="inline-block w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-                  <span className="inline-block w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* ======== STATS BAR ======== */}
       <div className="grid grid-cols-5 gap-2">
@@ -655,7 +478,7 @@ export function AgentDashboard({ advisorName, scanIntervalHours, onCycleComplete
         {!loading && cycles.length === 0 && (
           <div className="text-center py-6">
             <Brain className="w-6 h-6 text-neutral-700 mx-auto mb-2" />
-            <p className="text-xs text-neutral-500">No reports yet. Click "Analyze Market" to trigger the first analysis.</p>
+            <p className="text-xs text-neutral-500">No reports yet.</p>
           </div>
         )}
 
@@ -712,8 +535,6 @@ export function AgentDashboard({ advisorName, scanIntervalHours, onCycleComplete
                           ? matchedMsg.message.replace(/\*/g, '').replace(/_/g, '')
                           : null;
 
-                        const shouldAnimate = animatedCycleId === cycle.id;
-
                         return (
                           <div className="flex items-start gap-3">
                             {/* Advisor avatar */}
@@ -734,11 +555,7 @@ export function AgentDashboard({ advisorName, scanIntervalHours, onCycleComplete
                               {msgText ? (
                                 <div className="bg-green-500/5 border border-green-500/10 rounded-xl rounded-tl-sm p-3">
                                   <div className="text-[11px] text-green-300/90 leading-relaxed whitespace-pre-line font-mono">
-                                    {shouldAnimate ? (
-                                      <CycleTypewriter text={msgText} speed={6} />
-                                    ) : (
-                                      msgText
-                                    )}
+                                    {msgText}
                                   </div>
                                 </div>
                               ) : (
