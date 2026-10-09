@@ -59,7 +59,7 @@ class Element {
 
 function harness({ legacyEvents = false, language = 'en', rejectCollections = false, nudgeActive = true,
   suggestions = { v: 1, quickAccess: [] }, holdAsks = false, measure = null, stallCollections = false,
-  theses = { v: 1, items: [] }, saved = null, speak = 'muted' } = {}) {
+  theses = { v: 1, items: [] }, saved = null, speak = 'muted', speaking = null, chooseFails = false } = {}) {
   const nodes = new Map(), calls = [], errors = [], pending = [];
   const made = () => Object.assign(new Element(), { measure });
   for (const match of template.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)) {
@@ -72,7 +72,7 @@ function harness({ legacyEvents = false, language = 'en', rejectCollections = fa
     companion: momo, xp: 0, level: { number: 1, progress: 0.2 }, streak: 0,
     signedIn: false, riskAccepted: true, riskVersion: 6, reducedMotion: false,
     mic: { state: 'undetermined', onDevice: true }, hints: {}, pendingRead: null,
-    platform: 'ios', appVersion: '1.5 (45)',
+    platform: 'ios', appVersion: '1.5 (45)', speaking,
     analysisLevel: { id: 'rapido', label: language === 'es' ? 'Rápido' : 'Quick', color: '#A795EF' },
   };
   const document = {
@@ -91,6 +91,11 @@ function harness({ legacyEvents = false, language = 'en', rejectCollections = fa
     setTimeout: () => 0, requestAnimationFrame(callback) { nextFrame = callback; }, Image: class {},
     webkit: { messageHandlers: { nucleo: { postMessage(envelope) {
       calls.push(JSON.parse(JSON.stringify(envelope)));
+      if (envelope.method === "speaking.choose") {
+        if (chooseFails) return Promise.reject(new Error("storage failed"));
+        session.speaking = { ...session.speaking, value: envelope.params.value, offer: false, refine: false };
+        return Promise.resolve({ v: 1, ok: true, result: session });
+      }
       if (rejectCollections && ['theses', 'roster', 'island', 'suggestions'].includes(envelope.method)) return Promise.reject(new Error('offline'));
       // Native never answers the two collections the page waits for before it starts: the page starts on its own clock.
       if (stallCollections && ['theses', 'roster'].includes(envelope.method)) return new Promise(() => {});
@@ -661,3 +666,32 @@ test('a page that is coming home takes a question offered again once it is there
 
 askStartCases({ test, assert, flush, Element, idle, handBack, personRead, tap, chipsOf, rowOf, asksOf, okRead, synthesis,
   source: (file) => read('../src/' + file), architecture: read('../ARCHITECTURE.md') });
+
+for (const language of ['es','en','fr','pt','it','de']) {
+ test(language + ': first launch asks only speech; skip persists plain then reaches the home', async () => {
+  const app = harness({ language, speaking: { owner:'guest', value:null, offer:true, refine:false } });
+  app.boot(); await flush(); app.advance(1.1); await flush();
+  assert.equal(app.context.nucleo.state(), 'SPEAKING_DIAL');
+  assert.equal(app.nodes.get('speakingRange').getAttribute('aria-valuetext'), ({es:'Sencillo',en:'Plain',fr:'Simple',pt:'Simples',it:'Semplice',de:'Einfach'})[language]);
+  app.nodes.get('speakingSkip').listeners.click(); await flush(); app.advance(2);
+  assert.equal(app.context.nucleo.state(), 'IDLE');
+  assert.equal(app.session.speaking.value,'plain');
+  assert.equal(app.calls.filter(c=>c.method==='speaking.choose').length,1);
+  assert.equal(app.calls.filter(c=>c.method==='ask').length,0);
+  assert.deepEqual(app.errors,[]);
+ });
+}
+test('updating readers stay on home; memory opens the dial and label taps change the preview',async()=>{
+ const app=harness({speaking:{owner:'a',value:null,offer:false,refine:false}});app.boot();await flush();app.advance(1.1);
+ assert.equal(app.context.nucleo.state(),'IDLE');app.context.nucleoBridge.emit('speaking.open',{});
+ assert.equal(app.context.nucleo.state(),'SPEAKING_DIAL');
+ app.nodes.get('speakingRange').listeners.input({target:{value:'2'}});
+ assert.equal(app.nodes.get('speakingRange').getAttribute('aria-valuetext'),'Technical');
+ app.nodes.get('speakingConfirm').listeners.click();await flush();app.advance(2);
+ assert.equal(app.session.speaking.value,'technical');assert.deepEqual(app.errors,[]);
+});
+test('failed persistence keeps the dial open and allows retry',async()=>{
+ const app=harness({chooseFails:true,speaking:{owner:'a',value:null,offer:true,refine:false}});app.boot();await flush();app.advance(1.1);
+ app.nodes.get('speakingConfirm').listeners.click();await flush();assert.equal(app.context.nucleo.state(),'SPEAKING_DIAL');
+ assert.equal(app.nodes.get('speakingError').textContent,'Try again');assert.equal(app.session.speaking.value,null);
+});

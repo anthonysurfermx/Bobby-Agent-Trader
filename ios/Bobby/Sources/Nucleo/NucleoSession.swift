@@ -156,8 +156,10 @@ final class NucleoSession: ObservableObject {
         self.speech = speech ?? NucleoSpeech(defaults: defaults)
         let speech = self.speech
         self.defaults = defaults
+        SpeakingDial(defaults: defaults).prepare(existing: profile.onboarded)
         desk = NucleoDesk(profile: profile, companions: companions, ledger: ledger, fixtures: fixtures)
         nucleoVoice = NucleoVoice(voice: voice)
+        desk.speakingLevel = { [weak self] in guard let self else { return nil }; return SpeakingDial(defaults: self.defaults).value(self.fixtures ? nil : self.desk.userID()) }
         if fixtures {
             // Fixture mode is always the signed-out path: no ProgressSync, no island, no Apple, no bearer.
             desk.isSignedIn = { false }
@@ -215,6 +217,16 @@ final class NucleoSession: ObservableObject {
     var onboarded: Bool { profile.onboarded && companions.companionId != nil }
     var page: NucleoPage { NucleoPage.route(onboarded: profile.onboarded, companionId: companions.companionId, riskAccepted: profile.acceptedRiskNotice) }
 
+    func openSpeakingDial() {
+        guard profile.acceptedRiskNotice, !desk.isBusy else { return }
+        sheet = nil
+        let generation = accountGeneration
+        after(briefingSheetDelay) { [weak self] in
+            guard let self, self.accountGeneration == generation, self.profile.acceptedRiskNotice else { return }
+            self.emit("speaking.open", [:])
+        }
+    }
+
     func emit(_ name: String, _ payload: [String: Any]) {
         guard !tornDown else { return }
         if name == "ask.stage" { notch.stage(payload) }
@@ -236,6 +248,14 @@ final class NucleoSession: ObservableObject {
             return roster()
         case "suggestions":
             return await suggestions()
+        case "speaking.choose":
+            let dial = SpeakingDial(defaults: defaults)
+            let owner = fixtures ? nil : AccountSession.shared.session?.userId
+            guard profile.acceptedRiskNotice, try p.string("owner") == dial.tag(owner) else { throw NucleoFault.invalid("stale reader") }
+            let value = try p.string("value", oneOf: Set(SpeakingDial.values))!
+            dial.choose(value, owner: owner, feedback: try p.bool("feedback", required: false) ?? false)
+            nucleoVoice.stop()
+            return sessionChanged()
         case "ask":
             return try await desk.ask(p)
         case "cancel":
@@ -371,6 +391,7 @@ final class NucleoSession: ObservableObject {
             "mic": speech.permission().json, "hints": hints,
             "pendingRead": desk.pendingRead() ?? NSNull(), "fixtures": fixtures, "platform": "ios", "appVersion": appVersion,
             "analysisLevel": NucleoLevelCenter.shared.level.pageJSON,
+            "speaking": SpeakingDial(defaults: defaults).json(fixtures ? nil : AccountSession.shared.session?.userId),
             "nudge": currentNudge().map { $0.json as Any } ?? NSNull(),
         ]
         // Bobby never invites someone into a wall: when the phone KNOWS the next read is refused, the
@@ -447,6 +468,7 @@ final class NucleoSession: ObservableObject {
     private func readDelivered(_ result: [String: Any]) {
         guard result["status"] as? String == "ok", let requestId = result["requestId"] as? String,
               let asset = result["asset"] as? [String: Any], let symbol = asset["symbol"] as? String else { return }
+        SpeakingDial(defaults: defaults).delivered(requestId, owner: fixtures ? nil : AccountSession.shared.session?.userId)
         let agents = result["agents"] as? [String: Any]
         NudgeCenter.shared.noteRead(NudgeRead(requestId: requestId, symbol: symbol, name: asset["name"] as? String ?? symbol,
                                               isEquity: asset["isEquity"] as? Bool ?? false,
@@ -1379,6 +1401,7 @@ final class NucleoSession: ObservableObject {
         let wasAnonymous = accountUserID == nil
         accountGeneration = account.generation
         accountUserID = account.session?.userId
+        if wasAnonymous, let owner = accountUserID { SpeakingDial(defaults: defaults).inheritGuest(owner) }
         desk.invalidatePending(preservingAnonymousSignInRetries: wasAnonymous && accountUserID != nil)
         notch.reset()
         speech.cancel()

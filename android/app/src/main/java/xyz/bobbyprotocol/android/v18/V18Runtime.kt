@@ -46,6 +46,7 @@ interface V18Desk {
     fun readToken(symbol: String, name: String, isEquity: Boolean, question: String): String
     /** The page has not asked with this token yet, and it is still good (not expired, same reader, same consent). */
     fun tokenWaiting(token: String): Boolean
+    fun openSpeakingDial() {}
     fun deskBody(symbol: String, question: String, isEquity: Boolean, level: String): JSONObject
     /** The quick-access symbols the current owner kept (never the default tickers shown when they keep none). */
     val shortcuts: List<String>
@@ -565,6 +566,8 @@ class V18Runtime(
         val consent = consentGeneration
         return V18Fence { !closed && desk.accountEpoch == epoch && desk.owner == owner && consentGeneration == consent }
     }
+
+    override fun openSpeakingDial() = desk.openSpeakingDial()
 
     override fun present(route: String): Boolean {
         val shell = shell ?: return false

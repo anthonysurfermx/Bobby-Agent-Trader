@@ -27,6 +27,14 @@ final class NucleoHost: ObservableObject {
     static let voiceMuteResetKey = "nucleo.voiceMuteReset.v1"
 
     init(options: NucleoLaunchOptions) {
+#if DEBUG
+        // A simulator-only review reset. Production never has this entry point.
+        if options.fixtures != nil && ProcessInfo.processInfo.arguments.contains("-qa-speaking-reset") {
+            let defaults = UserDefaults.standard
+            for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("bobby.speaking.") { defaults.removeObject(forKey: key) }
+            defaults.set(true, forKey: "bobby.speaking.fresh")
+        }
+#endif
         session = NucleoSession(fixtures: options.fixtures != nil)
         let defaults = UserDefaults.standard
         if !defaults.bool(forKey: Self.voiceMuteResetKey) {
@@ -198,7 +206,7 @@ private struct NucleoStage: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
         case .memory:
-            MemoryView(riskAccepted: session.profile.acceptedRiskNotice) { session.sheet = nil }
+            MemoryView(riskAccepted: session.profile.acceptedRiskNotice, onSpeaking: { session.openSpeakingDial() }, onClose: { session.sheet = nil })
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)

@@ -6,6 +6,7 @@ extension NativeTranslations18 {
     /// `NucleoNudge.textLimit` with a symbol of up to eight characters (Memory18NudgeTests measures them).
     static let memory: [String: [String: String]] = {
         var result: [String: [String: String]] = [:]
+        result["How Bobby speaks"] = ["fr": "Comment Bobby te parle", "pt": "Como o Bobby fala contigo", "it": "Come ti parla Bobby", "de": "Wie Bobby mit dir spricht"]
         // The consent sheet
         // What reaches the AI provider, as api/_lib/user-memory.ts (readerContext) sends it
         result["Not now"] = ["fr": "Pas maintenant", "pt": "Agora não", "it": "Non ora", "de": "Nicht jetzt"]
