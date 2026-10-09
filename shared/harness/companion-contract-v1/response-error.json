@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "requestId": "90d2564c-6064-4275-95cd-5a3c7c0b5b56",
+  "kind": "error",
+  "error": {
+    "code": "companion_unavailable",
+    "retryable": true,
+    "message": "No pude completar la explicación. Puedes intentarlo de nuevo."
+  },
+  "allowance": { "kind": "orientation", "consumed": 0, "remaining": null }
+}

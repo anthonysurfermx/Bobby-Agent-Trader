@@ -54,6 +54,7 @@
     "test:desk-debate": "tsx scripts/test-desk-debate.mts",
     "test:desk-timeframe": "tsx scripts/test-desk-timeframe.mts",
     "test:desk-plain-words": "tsx scripts/test-desk-plain-words.mts",
+    "test:companion": "tsx scripts/test-companion.mts",
     "test:desk-levels": "tsx scripts/test-desk-levels.mts && tsx scripts/test-invite-link.mts",
     "test:desk-thesis": "tsx scripts/test-desk-thesis.mts",
     "test:desk-suggestions": "tsx scripts/test-desk-suggestions.mts",
