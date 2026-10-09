@@ -6,6 +6,7 @@ import { getVoiceAsset, isEquitySymbol } from '../../src/lib/voice-assets.js';
 import { completeJson, LlmHttpError, LlmIncompleteError, type JsonSchemaSpec, type LlmUsage, type ModelSpec } from './llm.js';
 import { alternateProvider, levelPlan, type DeskLevel, type LevelPlan } from './desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
+import { PLAIN_RULE, chartWordsIn, firstLines, wantsPlainWords } from './desk-plain-words.js';
 import { changeSinceLastAsk, readerForModel, signedPercent, type AssetClass, type ReaderContext } from './user-memory.js';
 import { FOLLOW_UP_MAX, NEXT_QUESTION_RULE, nextQuestionFallback, nextQuestionSecond, nextQuestionViolation, repeatsQuestion } from './desk-next-question.js';
 import type { AppTextTier } from './app-model.js';
@@ -937,9 +938,12 @@ export async function runDeskDebate(
   const reader = opts.reader ? readerForModel(opts.reader) : null;
   const cioInput = { ...input, alpha, red, ...(rebuttal ? { rebuttal } : {}), ...(reader ? { reader } : {}) };
   const readerRule = reader ? ` ${READER_RULE}` : '';
+  // Plain words for everyone who has not said they are experienced (guests have no profile: they are new).
+  const plain = wantsPlainWords(reader?.prefs?.experience);
+  const plainRule = plain ? PLAIN_RULE : '';
   const cio = plan.scenarios
-    ? await role(plan.cio, 'cio', `${cioPrompt}${readerRule} Also return scenarios: confirm is one sentence naming the observable condition in the evidence that would confirm the conditional thesis, invalidate is one sentence naming the condition that would invalidate it. Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape},"scenarios":{"confirm":"...","invalidate":"..."}}.`, cioInput, VerdictWithScenarios, VERDICT_SCENARIOS_SCHEMA, ctx)
-    : await role(plan.cio, 'cio', `${cioPrompt}${readerRule} Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape}}.`, cioInput, Verdict, VERDICT_SCHEMA, ctx);
+    ? await role(plan.cio, 'cio', `${cioPrompt}${readerRule}${plainRule} Also return scenarios: confirm is one sentence naming the observable condition in the evidence that would confirm the conditional thesis, invalidate is one sentence naming the condition that would invalidate it. Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape},"scenarios":{"confirm":"...","invalidate":"..."}}.`, cioInput, VerdictWithScenarios, VERDICT_SCENARIOS_SCHEMA, ctx)
+    : await role(plan.cio, 'cio', `${cioPrompt}${readerRule}${plainRule} Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape}}.`, cioInput, Verdict, VERDICT_SCHEMA, ctx);
   // "wait" carries no thesis to point at: a direction next to it would read as a trade.
   const agents = { alpha: alpha.analysis, red: red.analysis, cio: cio.analysis, verdict: cio.verdict, direction: cio.verdict === 'wait' ? 'none' as const : cio.direction };
   reviewDeskOutput(agents);
@@ -950,6 +954,11 @@ export async function runDeskDebate(
   const near = typeof price === 'number' && price > 0 && cio.synthesis.watchLevel > price * 0.5 && cio.synthesis.watchLevel < price * 1.5;
   const synthesis = { ...cio.synthesis, watchLevel: near ? cio.synthesis.watchLevel : null, followUp: servedFollowUp(cio.synthesis.followUp, language, evidence.symbol, level, question) };
   // The next question is not in this list: it was judged apart, just above, and a bad one was replaced, not thrown.
+  if (plain) {
+    // The meter of PLAIN_RULE: the words are from the desk's own list, never the reader's text.
+    const left = chartWordsIn(firstLines(synthesis), language);
+    if (left.length) console.error(JSON.stringify({ route: 'desk-debate', event: 'plain_words_missed', count: left.length, words: left.slice(0, 6), language, level }));
+  }
   for (const extra of [rebuttal?.analysis, scenarios?.confirm, scenarios?.invalidate, synthesis.headline, synthesis.why, synthesis.risk, synthesis.watch]) {
     if (!extra) continue;
     const violation = publicTextViolation(extra);

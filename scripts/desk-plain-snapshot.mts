@@ -16,6 +16,9 @@
 // remembered reader is handed the finished change since their last ask instead of the stored price.
 // And once more the same day, after the adversarial review: the next-question rule the CIO is told names the
 // ticker, other people, suggestions, forecasts and plain market words. Nothing else moved.
+// And on 2026-10-09 (plain words, api/_lib/desk-plain-words.ts): the CIO's prompt gained PLAIN_RULE for every
+// reader who has not said they are experienced. Alpha's and Red Team's prompts, every input and every reply
+// stayed as they were.
 // One key is left out of the compared reply on purpose: `memory` (the receipt of what memory kept), which
 // 1.8 adds for an account whose memory applies. Everything around it must stay identical.
 import assert from 'node:assert/strict';
