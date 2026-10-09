@@ -59,4 +59,4 @@ export function chartWordsIn(text: string, language: AppLanguage): string[] {
 }
 
 /** The four lines a reader sees first, as one text for the meter. */
-export const firstLines = (s: { headline: string; why: string; risk: string; watch: string }) => [s.headline, s.why, s.risk, s.watch].join(' · ');
+export const firstLines = (s: { headline?: string; why?: string; risk?: string; watch?: string }) => [s.headline, s.why, s.risk, s.watch].map(line => line ?? '').join(' · ');
