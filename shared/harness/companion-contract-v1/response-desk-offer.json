@@ -1,16 +1,20 @@
 {
   "version": 1,
-  "requestId": "1d837412-222d-4478-99c7-a6cfcf5b8641",
+  "requestId": "5f0d8a7e-9d2f-4a55-8f0b-3c2f6f0f5b11",
   "kind": "desk_offer",
   "reply": {
-    "text": "Podemos revisar información de Micron y separar lo que sabemos de lo que falta.",
+    "text": "Parece que la pregunta es sobre ETH.",
     "followUp": null
   },
   "nextAction": {
     "type": "open_desk",
-    "symbol": "MU",
-    "question": "¿Qué información ayuda a entender el movimiento de MU?",
+    "symbol": "ETH",
+    "question": "qué opinas de ethereun hoy",
     "requiresConfirmation": true
   },
-  "allowance": { "kind": "orientation", "consumed": 2, "remaining": 8 }
+  "allowance": {
+    "kind": "orientation",
+    "consumed": 2,
+    "remaining": 8
+  }
 }

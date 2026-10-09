@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "requestId": "5f0d8a7e-9d2f-4a55-8f0b-3c2f6f0f5b11",
+  "question": "qué opinas de ethereun hoy",
+  "language": "es",
+  "locale": "es-MX",
+  "speech": "plain",
+  "candidate": {
+    "symbol": "ETH",
+    "name": "Ethereum"
+  }
+}

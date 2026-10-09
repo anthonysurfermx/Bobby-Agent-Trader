@@ -244,6 +244,8 @@ export default function NucleoDesk() {
   const [deskError, setDeskError] = useState<string | null>(null);
   // The companion's answer to a question that names no asset (pilot; api/companion-turn): its words and the next question to tap.
   const [guide, setGuide] = useState<{ text: string; next: string | null } | null>(null);
+  /** A tapped next question that could not be answered: asked again as it was, without the asset search. */
+  const [guideRetry, setGuideRetry] = useState<string | null>(null);
   const [agents, setAgents] = useState<Agents | null>(null);
   // The live desk: each argument as it arrives; a debate that did not finish; what "Retry" re-runs.
   const [live, setLive] = useState<LiveArgs>({});
@@ -294,7 +296,7 @@ export default function NucleoDesk() {
     const readEpoch = accessGate.current.revision;
     if (revealRef.current) clearTimeout(revealRef.current);
     setDeskError(null);
-    setDeskRetry(null);
+    setDeskRetry(null); setGuideRetry(null);
     setSnapshot(snap);
     setAnswer(null);
     setReadReceipt(null);
@@ -429,7 +431,8 @@ export default function NucleoDesk() {
     if (!q) return;
     // Typed, dictated, a chip or a link: before the notice is accepted the question waits here and nothing is sent.
     if (!consentNow()) { holdFor({ kind: 'ask', q, ...(spoken ? { spoken, starter: spoken === howLooks(q) } : {}) }); return; }
-    const lv = deskLevelRef.current;
+    // A tapped next question is the companion's and spends no read: it is held to no level's allowance.
+    const lv = via === 'guide' ? 'rapido' : deskLevelRef.current;
     const allowance = lv === 'rapido' ? null : allowanceFor(lv, accessRef.current);
     if (allowance && allowance.state !== 'open') {
       const tier = accessRef.current?.levels?.tier ?? accessRef.current?.access.tier ?? 'anon';
@@ -444,6 +447,7 @@ export default function NucleoDesk() {
     voice.stop();
     setDeskError(null);
     setGuide(null);
+    setGuideRetry(null);
     setAnswer(null);
     setSnapshot(null);
     setPending(null);
@@ -464,8 +468,10 @@ export default function NucleoDesk() {
     if (controller.signal.aborted) return;
     // A question that names no asset is the companion's, when the pilot is on. A search that did not answer is
     // not "no asset": it keeps today's message. Off, or unable to answer, the desk does what it did before.
+    // A look-alike the search offered for a whole sentence travels with the question: the companion says
+    // whether the person meant that asset ("qué opinas de ethereun hoy") or not ("Tengo 1,000 pesos…" → MENGO).
     if (!unavailable && (!r || readsAsAQuestion(q, r))) {
-      const turn = await companionTurn(q, controller.signal);
+      const turn = await companionTurn(q, controller.signal, r ? { symbol: r.snapshot.symbol, name: r.confirmName } : undefined);
       if (controller.signal.aborted) return;
       if (turn?.kind === 'explanation') {
         setGuide({ text: turn.text, next: turn.next });
@@ -474,7 +480,8 @@ export default function NucleoDesk() {
         say(turn.text);
         return;
       }
-      if (turn?.kind === 'limit') {
+      // With a look-alike in hand, a used-up day of explanations still leaves the confirmation the desk always gave.
+      if (turn?.kind === 'limit' && !r) {
         setPhase('error');
         setDeskError(turn.message);
         setMessages((m) => [...m, { from: 'bobby', text: turn.message }]);
@@ -485,6 +492,8 @@ export default function NucleoDesk() {
       setPhase('error');
       const msg = t('I could not finish the explanation. You can try again.', 'No pude completar la explicación. Puedes intentarlo de nuevo.', 'Não consegui terminar a explicação. Você pode tentar de novo.');
       setDeskError(msg);
+      // Typed again it would go through the asset search: the retry keeps it a learning question.
+      setGuideRetry(q);
       setMessages((m) => [...m, { from: 'bobby', text: msg }]);
       return;
     }
@@ -587,7 +596,7 @@ export default function NucleoDesk() {
     voice.stop();
     sfxTock();
     setPhase('idle'); setSnapshot(null); setAnswer(null); setPending(null); setDeskError(null); setGuide(null); setAward(null); setLandEvent(null); setSeries([]); setLimit(null);
-    setLive({}); setAgentsFailed(null); setDeskRetry(null); setShowDebate(false);
+    setLive({}); setAgentsFailed(null); setDeskRetry(null); setGuideRetry(null); setShowDebate(false);
   };
   // "Retry" re-asks the same question, on the level that failed (or Rápido when the premium pause said so).
   const retry = (r: { symbol: string; level: DeskLevel }) => {
@@ -705,7 +714,7 @@ export default function NucleoDesk() {
     voice.stop(); closeRecognition();
     setSheet('none'); setLimit(null); setSignInPrompt(false); setInviteOpen(false); setInspected(null);
     setPhase('idle'); setSnapshot(null); setAnswer(null); setPending(null); setDeskError(null); setGuide(null); setAward(null); setLandEvent(null); setSeries([]);
-    setLive({}); setAgentsFailed(null); setDeskRetry(null); setShowDebate(false);
+    setLive({}); setAgentsFailed(null); setDeskRetry(null); setGuideRetry(null); setShowDebate(false);
     invalidateAccess();
     setWithdrawn(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1066,6 +1075,9 @@ export default function NucleoDesk() {
     <div className="flex flex-col items-center">
       <NucleoSphere size={desktop ? 220 : 170} mode="idle" />
       <p className="n-caption mt-12" role="alert">{deskError ?? lastBobby}</p>
+      {guideRetry && (
+        <button type="button" className="n-send mt-6" onClick={() => { sfxTock(); void ask(guideRetry, undefined, 'guide'); }}>{t('Try again', 'Reintentar', 'Tentar de novo')}</button>
+      )}
       {deskRetry && (
         <button type="button" className="n-send mt-6" onClick={() => retry(deskRetry)}>
           {deskRetry.level === deskLevel ? t('Try again', 'Reintentar', 'Tentar de novo') : t(`Continue with ${levelName(deskRetry.level)}`, `Seguir con ${levelName(deskRetry.level)}`, `Continuar com ${levelName(deskRetry.level)}`)}

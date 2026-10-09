@@ -3,20 +3,22 @@
 // BOBBY_COMPANION_ENABLED=on: until then every method answers 404 and no model is called.
 //
 // Contract v1 (shared/harness/companion-contract-v1/): the reply is always one of three tagged shapes,
-// `explanation`, `desk_offer` (not produced by v0) or `error`, each with the person's `allowance`.
+// `explanation`, `desk_offer` or `error`, each with the person's `allowance`.
 //
 // What a turn may cost, and who stops it. The desk's dollar guard reads a ledger cached for a minute and lets
 // the desk go on when the ledger cannot be read (api/_lib/llm-usage.ts). A conversation is a loop, so this
 // endpoint does the opposite, in this order, before any model call:
 //   1. the ledger must be readable and under the daily and the monthly cap, or the turn is refused
 //      (`companion_paused`): unknown is closed here;
-//   2. the person's allowance for the day (ten turns on Haiku, five on a dearer model; counted per install,
-//      or per address when the client sent no install id), read from storage or refused;
-//   3. four allowances per address a day, so rotating install ids buys nothing;
-//   4. a ceiling on all turns served in a day (BOBBY_COMPANION_DAILY_TURNS, 1500).
-// A turn is counted against the person only once it was answered: a provider failure costs them nothing.
-// The counters are the `api_cache` rate-limit rows (read, then write: a burst can overshoot by a few, which is
-// what steps 3 and 4 are for). An exact dollar reservation would need its own table.
+//   2. a slot of the person's day (ten turns on Haiku, five on a dearer model; per install, or per address
+//      when the client sent no install id);
+//   3. a slot of the address's day, four allowances, so rotating install ids buys nothing;
+//   4. a slot of everyone's day (BOBBY_COMPANION_DAILY_TURNS, 1500).
+// A slot is a row the database lets only one request insert (api/_lib/companion-slots.ts), so the three limits
+// hold when requests arrive together, which a read-then-write counter does not. Storage that cannot answer
+// refuses the turn. The slots are given back when the turn was not served: a provider failure costs nobody
+// anything, and a desk offer does not use the person's allowance. Days are UTC. The ledger itself is still
+// read from a one-minute cache: the dollar cap can be passed by what the slots allow in that minute.
 //
 // The cost is written to the desk's ledger (surface `desk`, role `companion`) so the existing guard sees it
 // without a migration; reports must split it out by role.
@@ -25,9 +27,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { waitUntil } from '@vercel/functions';
 import { appLanguage, type AppLanguage } from '../src/lib/app-language.js';
 import { requestOriginHost } from './_lib/origins.js';
-import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { getClientQuotaKeys } from './_lib/rate-limit.js';
-import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
+import { giveBack, slotsResetInS, sweepSlots, takeSharedSlot, takeSlot } from './_lib/companion-slots.js';
 import { deviceHash } from './_lib/access.js';
 import { DESK_QUESTION_MAX } from './_lib/desk-debate.js';
 import { llmCaps, llmSpend, logLlmUsage } from './_lib/llm-usage.js';
@@ -36,7 +37,6 @@ import { COMPANION_VERSION, CompanionRequest, companionAllowance, companionDaily
 
 export const config = { maxDuration: 60 };
 
-const DAY_S = 86_400;
 /** The whole request, `context` included, before anything is parsed. */
 const BODY_MAX = 8 * 1024;
 
@@ -64,30 +64,17 @@ const COPY: Record<'invalid' | 'long' | 'unavailable' | 'paused' | 'limit', Reco
   },
 };
 
-/** Turns already counted for this person today, or null when storage could not say (the caller refuses). */
-async function turnsUsed(person: string): Promise<{ used: number; resetsInS: number } | null> {
-  try {
-    const url = bobbyRest(`api_cache?cache_key=eq.${encodeURIComponent(`rl:companion:${person}`)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=payload,expires_at&limit=1`);
-    const r = await fetch(url, { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(3000) });
-    if (!r.ok) return null;
-    const rows = await r.json() as Array<{ payload?: { count?: unknown }; expires_at?: unknown }>;
-    if (!Array.isArray(rows)) return null;
-    if (!rows.length) return { used: 0, resetsInS: DAY_S };
-    const count = Number(rows[0].payload?.count), expires = Date.parse(String(rows[0].expires_at));
-    if (!Number.isSafeInteger(count) || count < 0 || !Number.isFinite(expires)) return null;
-    return { used: count, resetsInS: Math.max(60, Math.ceil((expires - Date.now()) / 1000)) };
-  } catch {
-    return null;
-  }
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store');
   if (!companionEnabled()) return res.status(404).json({ error: 'Not found' });
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!requestOriginHost(req.headers)) return res.status(403).json({ error: 'Origin not allowed' });
 
-  const body = (req.body ?? {}) as { language?: unknown; requestId?: unknown };
+  // @vercel/node parses the body when it is first read, and throws on JSON it cannot parse.
+  let raw: unknown = null;
+  let readable = true;
+  try { raw = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; } catch { readable = false; }
+  const body = (raw && typeof raw === 'object' ? raw : {}) as { language?: unknown; requestId?: unknown };
   const lang = appLanguage(body.language);
   const echoed = typeof body.requestId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.requestId) ? body.requestId : null;
   const refuse = (status: number, code: string, message: string, retryable: boolean, allowance: { consumed: number; remaining: number | null }) =>
@@ -95,11 +82,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const unknown = { consumed: 0, remaining: null };
 
   let size = BODY_MAX + 1;
-  try { size = Buffer.byteLength(JSON.stringify(req.body ?? null), 'utf8'); } catch { /* not JSON: refused below */ }
-  if (size > BODY_MAX) return refuse(400, 'invalid_request', COPY.invalid[lang], false, unknown);
-  const parsed = CompanionRequest.safeParse(req.body);
+  try { size = Buffer.byteLength(JSON.stringify(raw ?? null), 'utf8'); } catch { /* not JSON: refused below */ }
+  if (!readable || size > BODY_MAX) return refuse(400, 'invalid_request', COPY.invalid[lang], false, unknown);
+  const parsed = CompanionRequest.safeParse(raw);
   if (!parsed.success) return refuse(400, 'invalid_request', COPY.invalid[lang], false, unknown);
-  const { question, language, locale, speech } = parsed.data;
+  const { question, language, locale, speech, candidate } = parsed.data;
   // A code point is at most two UTF-16 units: the first test bounds Array.from's work.
   if (question.length > DESK_QUESTION_MAX * 2 || Array.from(question).length > DESK_QUESTION_MAX) return refuse(400, 'question_too_long', COPY.long[language], false, unknown);
   if (!process.env.ANTHROPIC_API_KEY) return refuse(503, 'companion_unavailable', COPY.unavailable[language], false, unknown);
@@ -119,35 +106,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const limit = companionAllowance(model);
   const person = deviceHash(req) ?? address.caller;
 
-  // 2. The person's day.
-  const before = await turnsUsed(person);
-  if (!before) return refuse(503, 'companion_unavailable', COPY.unavailable[language], true, unknown);
-  const spent = { consumed: Math.min(before.used, limit), remaining: Math.max(0, limit - before.used) };
-  const limited = () => { res.setHeader('Retry-After', String(before.resetsInS)); return refuse(429, 'orientation_limit', COPY.limit[language], false, { consumed: spent.consumed, remaining: 0 }); };
-  if (before.used >= limit) return limited();
-  // 3 and 4. The address and the day as a whole; both count the attempt and refuse when storage cannot answer.
-  if ((await checkPersistentLimit('companion-address', address.caller, limit * 4, DAY_S, { failClosed: true })).limited) return limited();
-  if ((await checkPersistentLimit('companion-day', 'all', companionDailyCeiling(), DAY_S, { failClosed: true })).limited) {
-    console.error(JSON.stringify({ route: 'companion-turn', event: 'paused', reason: 'daily_turns' }));
-    return refuse(503, 'companion_paused', COPY.paused[language], false, spent);
+  // 2. The person's day. Unreadable storage, or every slot tried lost to a request of their own, can be retried.
+  const mine = await takeSlot('p', person, limit);
+  if (mine.state === 'full') { res.setHeader('Retry-After', String(slotsResetInS())); return refuse(429, 'orientation_limit', COPY.limit[language], false, { consumed: limit, remaining: 0 }); }
+  if (mine.state !== 'taken') return refuse(503, 'companion_unavailable', COPY.unavailable[language], true, unknown);
+  const before = { consumed: mine.used - 1, remaining: limit - mine.used + 1 };
+  // 3 and 4. The address and everyone: taken together, and given back with the person's when either refuses.
+  const [theirs, shared] = await Promise.all([takeSlot('a', address.caller, limit * 4), takeSharedSlot('d', companionDailyCeiling())]);
+  if (theirs.state !== 'taken' || shared.state !== 'taken') {
+    await giveBack([mine, theirs, shared]);
+    if (theirs.state === 'full') { res.setHeader('Retry-After', String(slotsResetInS())); return refuse(429, 'orientation_limit', COPY.limit[language], false, { consumed: before.consumed, remaining: 0 }); }
+    if (theirs.state === 'taken' && shared.state === 'full') {
+      console.error(JSON.stringify({ route: 'companion-turn', event: 'paused', reason: 'daily_turns' }));
+      return refuse(503, 'companion_paused', COPY.paused[language], false, before);
+    }
+    return refuse(503, 'companion_unavailable', COPY.unavailable[language], true, before);
   }
 
   const usage: LlmUsage[] = [];
   const started = Date.now();
   try {
-    const turn = await runCompanionTurn(question, language, { locale, speech, usage, model });
-    // Counted only now: an answer reached the person.
-    await checkPersistentLimit('companion', person, limit, DAY_S);
-    console.error(JSON.stringify({ route: 'companion-turn', event: 'turn', source: turn.source, rejected: turn.rejected, followUp: turn.followUp !== null, language, speech: speech ?? 'plain', model, ms: Date.now() - started }));
+    const turn = await runCompanionTurn(question, language, { locale, speech, candidate, usage, model });
+    console.error(JSON.stringify({ route: 'companion-turn', event: 'turn', source: turn.source, rejected: turn.rejected, offer: turn.aboutCandidate, followUp: turn.followUp !== null, language, speech: speech ?? 'plain', model, ms: Date.now() - started }));
+    if (turn.aboutCandidate && candidate) {
+      // The question was about an asset after all: the client asks the person to confirm it. The model call was
+      // paid, so the address and the day keep their slots; the person's allowance is for explanations.
+      await giveBack([mine]);
+      return res.status(200).json({
+        version: COMPANION_VERSION, requestId: echoed, kind: 'desk_offer', reply: { text: turn.text, followUp: null },
+        nextAction: { type: 'open_desk', symbol: candidate.symbol.toUpperCase(), question, requiresConfirmation: true }, allowance: { kind: 'orientation', ...before },
+      });
+    }
     return res.status(200).json({
       version: COMPANION_VERSION, requestId: echoed, kind: 'explanation',
       reply: { text: turn.text, followUp: turn.followUp }, nextAction: null,
-      allowance: { kind: 'orientation', consumed: spent.consumed + 1, remaining: Math.max(0, spent.remaining - 1) },
+      allowance: { kind: 'orientation', consumed: mine.used, remaining: limit - mine.used },
     });
   } catch {
+    await giveBack([mine, theirs, shared]);
     console.error(JSON.stringify({ route: 'companion-turn', event: 'failed', language, model, ms: Date.now() - started }));
-    return refuse(503, 'companion_unavailable', COPY.unavailable[language], true, spent);
+    return refuse(503, 'companion_unavailable', COPY.unavailable[language], true, before);
   } finally {
     if (usage.length) waitUntil(logLlmUsage(usage, { surface: 'desk', level: null }));
+    // Once per person and day: the slot rows of past days go.
+    if (mine.used === 1) waitUntil(sweepSlots());
   }
 }

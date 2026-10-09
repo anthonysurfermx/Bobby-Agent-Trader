@@ -70,25 +70,43 @@ function resolutionOf(obj: Record<string, unknown>): Resolution | null {
 /** A whole sentence that only resembles a ticker ("Tengo 1,000 pesos al mes…" → MENGO) is a question, not an asset. */
 export const readsAsAQuestion = (query: string, found: Resolution) => found.needsConfirmation && found.fuzzy && query.trim().split(/\s+/).length >= 4;
 
-export type CompanionOutcome = { kind: 'explanation'; text: string; /** The next question the person could ask (the reply's follow-up), or null. */ next: string | null } | { kind: 'limit'; message: string };
+export type CompanionOutcome =
+  | { kind: 'explanation'; text: string; /** The next question the person could ask (the reply's follow-up), or null. */ next: string | null }
+  /** The question was about the look-alike after all: the desk asks the person to confirm it. */
+  | { kind: 'desk' }
+  | { kind: 'limit'; message: string };
+
+// Whether the pilot is on, asked once per page load without sending anything: the endpoint answers 404 to
+// every method while it is off and 405 to a GET once it is on. Off, no question ever leaves for it.
+let pilot: Promise<boolean> | null = null;
+function companionOn(): Promise<boolean> {
+  pilot ??= fetch('/api/companion-turn', { method: 'GET', cache: 'no-store', signal: AbortSignal.timeout(4000) })
+    .then((res) => { if (res.status === 405) return true; if (res.status !== 404) pilot = null; return false; })
+    .catch(() => { pilot = null; return false; });   // no answer is not "off": the next question asks again
+  return pilot;
+}
+
 /**
  * The companion's answer to a question that names no asset (POST /api/companion-turn, contract v1 in
- * shared/harness/companion-contract-v1). Null while the pilot is off (404) or when it could not answer: the
- * desk then does what it did before. Only the question, the language and the install id are sent.
+ * shared/harness/companion-contract-v1). Null while the pilot is off or when it could not answer: the desk
+ * then does what it did before. Only the question, the language, the install id and, when the search offered
+ * a look-alike, that guess are sent.
  */
-export async function companionTurn(question: string, signal: AbortSignal): Promise<CompanionOutcome | null> {
+export async function companionTurn(question: string, signal: AbortSignal, candidate?: { symbol: string; name: string }): Promise<CompanionOutcome | null> {
   try {
+    if (!(await companionOn()) || signal.aborted) return null;
     const { language, locale } = marketContext();
     // The install id alone: the companion needs no account, so no session travels with the question.
     const { 'x-bobby-device': device = '' } = await accessHeaders();
     const { data } = await deskJson<Record<string, any>>('/api/companion-turn', {
       signal, method: 'POST', headers: { 'Content-Type': 'application/json', 'x-bobby-device': device, 'x-bobby-platform': 'web' },
-      body: JSON.stringify({ version: 1, requestId: crypto.randomUUID(), question: question.slice(0, 1200), language, locale }),
+      body: JSON.stringify({ version: 1, requestId: crypto.randomUUID(), question: question.slice(0, 1200), language, locale, ...(candidate ? { candidate: { symbol: candidate.symbol, name: candidate.name.slice(0, 60) } } : {}) }),
     }, 32_000);
     if (data?.kind === 'explanation' && typeof data.reply?.text === 'string' && data.reply.text) {
       const next = data.reply['followUp'];
       return { kind: 'explanation', text: data.reply.text, next: typeof next === 'string' && next ? next : null };
     }
+    if (data?.kind === 'desk_offer') return { kind: 'desk' };
     if (data?.kind === 'error' && data.error?.code === 'orientation_limit' && typeof data.error.message === 'string') return { kind: 'limit', message: data.error.message };
   } catch { /* off, offline or not JSON */ }
   return null;
