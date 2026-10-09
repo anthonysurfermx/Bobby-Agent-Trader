@@ -7,6 +7,7 @@ import { requestOriginHost } from './_lib/origins.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
 import { DESK_QUESTION_MAX, DeskOutputRejected, DeskThesisSchema, horizonOf, loadDeskEvidenceFor, runDeskDebate, timeframeRequestOf } from './_lib/desk-debate.js';
+import { SPEECH } from './_lib/desk-plain-words.js';
 import { levelPlan } from './_lib/desk-levels.js';
 import { clientPlatform, consumeRead, refundRead, consumeLevel, refundLevel, recordOutcome, resolveCaller, type Access, type DeskOutcome } from './_lib/access.js';
 import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
@@ -25,9 +26,11 @@ export const config = { maxDuration: 180 };
 const QUOTA_CEILING = { global: 600, network: 60, caller: 30 } as const;
 const quotaCeiling = (key: string) => key === 'global' ? QUOTA_CEILING.global : key.startsWith('net:') ? QUOTA_CEILING.network : QUOTA_CEILING.caller;
 
+// `speech` (1.9, the dial) is how the answer is worded: plain, terms or technical. A value this server does not
+// know is ignored, never a 400, so a later client keeps working.
 // `thesis` (1.8) is the only field a 1.5-1.7 client never sends. The outer body stays tolerant (unknown keys are
 // dropped, as before); the thesis object itself is strict, and an invalid one is a 400 like any other field.
-const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(APP_LANGUAGES).default('en'), locale: z.enum(APP_LOCALES).optional(), level: z.enum(['rapido','profundo','maximo']).default('rapido'), requestId: z.string().uuid().optional(), thesis: DeskThesisSchema.nullish() })
+const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(APP_LANGUAGES).default('en'), locale: z.enum(APP_LOCALES).optional(), level: z.enum(['rapido','profundo','maximo']).default('rapido'), speech: z.enum(SPEECH).optional().catch(undefined), requestId: z.string().uuid().optional(), thesis: DeskThesisSchema.nullish() })
   .refine(body => body.locale === undefined || isAppLocale(body.locale, body.language), { path: ['locale'], message: 'Locale must match language' });
 
 /**
@@ -146,7 +149,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!parsed.success) {
     return refuse(res, 400, 'invalid_request', copy(lang, 'Choose an asset and type a question.', 'Elige un activo y escribe una pregunta.'));
   }
-  const { symbol, question, language, assetType, level, requestId } = parsed.data;
+  const { symbol, question, language, assetType, level, requestId, speech } = parsed.data;
   const locale = appLocale(language, parsed.data.locale);
   // Validated above even when the review is switched off; from here on it only ever travels to the reviewer call.
   const thesis = thesisReviewOn() ? parsed.data.thesis ?? null : null;
@@ -268,7 +271,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const summary: MemorySummary | null = await within(summaryTask, MEMORY_SUMMARY_TIMEOUT_MS);
     const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null, evidence.technicals.price, language, locale, evidence.provenance.assetType === 'crypto' ? 'crypto' : 'equity');
     const asked = horizonOf(question, language);
-    const result = await runDeskDebate(question, evidence, language, { locale, level, tier, usage, signal: left.signal, onEvent: live ? send : undefined, reader, ...(thesis ? { thesis } : {}) });
+    const result = await runDeskDebate(question, evidence, language, { locale, level, tier, usage, signal: left.signal, onEvent: live ? send : undefined, reader, speech, ...(thesis ? { thesis } : {}) });
     // The reader left while the last call was already in flight.
     if (left.signal.aborted) { await abandon(); return; }
     const telemetry = issueClientReadReceipt(clientBinding(req, knownIdentity), requestId);

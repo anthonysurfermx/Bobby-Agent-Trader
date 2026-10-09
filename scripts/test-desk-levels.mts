@@ -297,7 +297,7 @@ try {
         for (const [symbol, question] of rows) {
           const { value, lines } = silent(() => servedFollowUp(question, lang, symbol));
           if (value === question && lines.length === 0) continue;
-          const reason = lines.map((l) => JSON.parse(l).reason).join('+') || 'changed';
+          const reason = lines.map((l) => JSON.parse(l)).filter((l) => l.event !== 'plain_words_missed').map((l) => l.reason).join('+') || 'changed';
           tally[reason] = (tally[reason] ?? 0) + 1;
           refused.push(`      ${reason}: ${symbol} · ${question}`);
         }
@@ -383,7 +383,7 @@ try {
     };
     for (const lang of LANGS) for (const question of UNLISTED[lang]) {
       const { value, lines } = silent(() => servedFollowUp(question, lang, 'BTC'));
-      eq([nextQuestionViolation(question, lang, 'BTC'), publicTextViolation(question), value, lines.map((l) => JSON.parse(l).reason)], ['unlisted', null, FALLBACK[lang], ['unlisted']], `${lang}: "${question}" holds a word no question about a chart needs: replaced, and logged as unlisted`);
+      eq([nextQuestionViolation(question, lang, 'BTC'), publicTextViolation(question), value, lines.map((l) => JSON.parse(l)).filter((l) => l.event !== 'plain_words_missed').map((l) => l.reason)], ['unlisted', null, FALLBACK[lang], ['unlisted']], `${lang}: "${question}" holds a word no question about a chart needs: replaced, and logged as unlisted`);
     }
     for (const lang of LANGS) for (const question of [...SUGGESTED[lang], ...REVIEWED[lang]]) {
       eq([nextQuestionViolation(question, lang, 'BTC'), publicTextViolation(question)], ['act', null], `${lang}: "${question}" suggests acting or asks when, behind an allowed opener`);
@@ -632,7 +632,7 @@ try {
       const { followUp: served, ...rest } = read.agents.synthesis;
       const { followUp: _clean, ...cleanRest } = clean.agents.synthesis;
       eq([served, rest, read.agents.verdict, read.agents.direction, read.agents.cio], [FALLBACK[lang], cleanRest, clean.agents.verdict, clean.agents.direction, clean.agents.cio], `${what}: the read is served with the same verdict and synthesis, and the fixed question in ${lang}`);
-      eq(lines.map((l) => JSON.parse(l)), [{ route: 'desk-debate', event: 'follow_up_replaced', reason, language: lang, level: 'rapido' }], `${what}: one log line, by class`);
+      eq(lines.map((l) => JSON.parse(l)).filter((l) => l.event !== 'plain_words_missed'), [{ route: 'desk-debate', event: 'follow_up_replaced', reason, language: lang, level: 'rapido' }], `${what}: one log line, by class`);
       ok(typeof followUp !== 'string' || !lines.join('').includes(followUp), `${what}: the log never carries the question`);
     }
     // No followUp at all in the model's answer: still a read, still a string on the wire.
@@ -668,7 +668,7 @@ try {
       // The CIO's own question passes every rule and is the question just asked: replaced, and the log says why.
       const own = GOOD[lang][0];
       const echo = silent(() => servedFollowUp(own[1], lang, own[0], 'profundo', own[1].toUpperCase()));
-      eq([echo.value, echo.lines.map((l) => JSON.parse(l))], [nextQuestionFallback(lang, own[0]), [{ route: 'desk-debate', event: 'follow_up_replaced', reason: 'repeat', language: lang, level: 'profundo' }]], `${lang}: the CIO's own question, when it is the one just asked, is replaced and logged as a repeat`);
+      eq([echo.value, echo.lines.map((l) => JSON.parse(l)).filter((l) => l.event !== 'plain_words_missed')], [nextQuestionFallback(lang, own[0]), [{ route: 'desk-debate', event: 'follow_up_replaced', reason: 'repeat', language: lang, level: 'profundo' }]], `${lang}: the CIO's own question, when it is the one just asked, is replaced and logged as a repeat`);
       ok(!echo.lines.join('').includes(own[1]), `${lang}: …and the log carries no question`);
       eq(silent(() => servedFollowUp(own[1], lang, own[0], 'rapido', 'Is this real?')), { value: own[1], lines: [] }, `${lang}: after any other question it is served as written`);
     }
@@ -676,12 +676,12 @@ try {
     // Through the debate, as the handler runs it: the reader taps the chip, the CIO's next question is refused again.
     bad('Should I add to BTC here?');
     const tapped = await quiet(() => runDeskDebate(FALLBACK.en, evidence, 'en'));
-    eq([tapped.value.agents.synthesis.followUp, tapped.lines.map((l) => JSON.parse(l).reason)], [SECOND.en, ['act']], 'the fixed question was asked and the next one is refused: the reply carries the second fixed question');
+    eq([tapped.value.agents.synthesis.followUp, tapped.lines.map((l) => JSON.parse(l)).filter((l) => l.event !== 'plain_words_missed').map((l) => l.reason)], [SECOND.en, ['act']], 'the fixed question was asked and the next one is refused: the reply carries the second fixed question');
     bad('Should I add to BTC here?');
     eq((await quiet(() => runDeskDebate(tapped.value.agents.synthesis.followUp, evidence, 'en'))).value.agents.synthesis.followUp, FALLBACK.en, '…and a tap on that one is answered with the first again: never the question just answered');
     debateMock();
     const echoed = await quiet(() => runDeskDebate(SYN.followUp, evidence, 'en'));
-    eq([echoed.value.agents.synthesis.followUp, echoed.lines.map((l) => JSON.parse(l).reason)], [FALLBACK.en, ['repeat']], 'a CIO that hands the reader\'s own question back is given the fixed one');
+    eq([echoed.value.agents.synthesis.followUp, echoed.lines.map((l) => JSON.parse(l)).filter((l) => l.event !== 'plain_words_missed').map((l) => l.reason)], [FALLBACK.en, ['repeat']], 'a CIO that hands the reader\'s own question back is given the fixed one');
     debateMock();
     eq((await quiet(() => runDeskDebate(`BTC · ${SYN.followUp}`, evidence, 'en'))).value.agents.synthesis.followUp, FALLBACK.en, '…also when the question arrived behind its symbol');
   }
