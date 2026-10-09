@@ -4,7 +4,7 @@
 //     and stays silent on the plain way of saying the same thing and on ordinary uses of "support";
 //   · the rule keeps the numbers, the verdict and the language rule in the CIO's hands.
 import assert from 'node:assert/strict';
-import { PLAIN_RULE, chartWordsIn, firstLines, wantsPlainWords } from '../api/_lib/desk-plain-words.ts';
+import { PLAIN_RULE, TERMS_RULE, SPEECH, chartWordsIn, firstLines, speechFor, speechRule, wantsPlainWords } from '../api/_lib/desk-plain-words.ts';
 
 let checks = 0;
 const eq = (got: unknown, want: unknown, what: string) => { assert.deepEqual(got, want, what); checks++; };
@@ -14,6 +14,21 @@ eq(wantsPlainWords(undefined), true, 'no profile is new');
 eq(wantsPlainWords('new'), true, 'new');
 eq(wantsPlainWords('some'), true, 'some experience still reads plain words');
 eq(wantsPlainWords('experienced'), false, 'experienced keeps the desk vocabulary');
+
+// The dial: what the person chose on this request wins over the profile; without it, the profile decides.
+eq([...SPEECH], ['plain', 'terms', 'technical'], 'three ways of wording a read');
+eq(speechFor(undefined, null), 'plain', 'a guest who never touched the dial reads plain words');
+eq(speechFor(undefined, 'experienced'), 'technical', 'no choice, experienced profile: the desk vocabulary');
+eq(speechFor('plain', 'experienced'), 'plain', 'an experienced reader may ask for plain words');
+eq(speechFor('technical', 'new'), 'technical', 'a new reader may ask for the technical wording');
+eq(speechFor('terms', null), 'terms', 'the middle of the dial');
+eq(speechFor(null, 'some'), 'plain', 'null is no choice');
+eq([speechRule('plain'), speechRule('terms'), speechRule('technical')], [PLAIN_RULE, TERMS_RULE, ''], 'one rule per wording; technical adds nothing');
+eq(PLAIN_RULE === TERMS_RULE, false, 'two different rules');
+for (const must of ['in plain words first and then name its term once, in brackets', 'Numbers stay exactly as the evidence gives them', 'only if you are certain of it', "wholly in the reader's language"])
+  eq(TERMS_RULE.includes(must), true, `terms rule says: ${must}`);
+for (const never of ['verdict', 'buy', 'sell', 'recommend'])
+  eq(TERMS_RULE.toLowerCase().includes(never), false, `terms rule never speaks of: ${never}`);
 
 // Lines served by production on 2026-10-09.
 eq(chartWordsIn('El precio está sobrecomprado (RSI 79.4) y la tendencia de 1H es lateral, sin señal clara.', 'es'), ['rsi', '1h', 'sobrecomprado'], 'es: BTC why');
