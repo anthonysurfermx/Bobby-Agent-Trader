@@ -83,8 +83,9 @@ final class HarnessLedgerTests: XCTestCase {
         ledger.note(HarnessEvent(kind: .ask, at: t0.addingTimeInterval(80), symbol: "TSLA", name: "TSLA", isEquity: true, price: 10, thread: true))
         XCTAssertEqual(ledger.question(before: t0.addingTimeInterval(90))?.symbol, "TSLA")
         XCTAssertEqual(ledger.question(before: t0.addingTimeInterval(70))?.symbol, "NVDA", "the clock decides what has happened yet")
-        // The asset is known from every read, whoever started it (the line on the glass counts from the last one).
-        XCTAssertEqual(ledger.asset("TSLA", since: t0, now: t0.addingTimeInterval(90))?.asks, 2)
+        // The event stays in the ledger, but only their own question belongs to the learned assets.
+        XCTAssertEqual(ledger.events(.ask).count, 3)
+        XCTAssertEqual(ledger.asset("TSLA", since: t0, now: t0.addingTimeInterval(90))?.asks, 1)
     }
 
     func testAnAppOpeningIsRefusedAndOnesKeptByTheFirstBuildAreDropped() throws {
@@ -105,10 +106,11 @@ final class HarnessLedgerTests: XCTestCase {
         XCTAssertEqual(kinds.filter { HarnessEvent(kind: $0, at: t0).isAnswer }, [.returned], "not a tap, and not a pick that answers no follow-up")
         XCTAssertTrue(HarnessEvent(kind: .ask, at: t0, symbol: "NVDA").isQuestion)
         XCTAssertFalse(HarnessEvent(kind: .ask, at: t0, symbol: "NVDA", origin: .followUp).isQuestion)
+        XCTAssertFalse(HarnessEvent(kind: .ask, at: t0, symbol: "NVDA", readId: "stored-read").isQuestion)
         XCTAssertFalse(HarnessEvent(kind: .picked, at: t0, symbol: "NVDA").isQuestion)
     }
 
-    func testATapWeighsLessThanAQuestionAndAnAnswerAsMuchAsOne() {
+    func testOnlyOwnQuestionsExplicitSavesAndThesesTeachAssetInterest() {
         let calendar = Calendar(identifier: .gregorian)
         let now = t0.addingTimeInterval(60)
         func interest(_ events: [HarnessEvent]) -> Double {
@@ -117,17 +119,163 @@ final class HarnessLedgerTests: XCTestCase {
             return HarnessProfile.make(ledger, now: now, calendar: calendar).interest["NVDA"] ?? 0
         }
         let question = interest([ask("NVDA", 0)])
-        let tap = interest([HarnessEvent(kind: .opened, at: t0, symbol: "NVDA", step: .asset)])
-        let answer = interest([HarnessEvent(kind: .returned, at: t0, symbol: "NVDA", step: .asset)])
-        XCTAssertEqual(tap / question, 0.5, accuracy: 0.001, "they looked and did nothing with it")
-        XCTAssertEqual(answer / question, 1, accuracy: 0.001, "on top of the question, save or pick that answered it")
-        XCTAssertLessThan(tap, answer)
-        // Their own second question about the same read counts twice; a read Bobby started counts once.
+        for kind in [HarnessEvent.Kind.opened, .picked, .returned] {
+            XCTAssertEqual(interest([HarnessEvent(kind: kind, at: t0, symbol: "NVDA", step: .asset)]), 0,
+                           "\(kind) answers Bobby's timing, never states an asset preference")
+        }
+        // Their own second question counts twice. Repeating Bobby's question contributes no interest.
         let thread = interest([HarnessEvent(kind: .ask, at: t0, symbol: "NVDA", thread: true)])
         XCTAssertEqual(thread / question, 2, accuracy: 0.001)
-        XCTAssertEqual(interest([HarnessEvent(kind: .ask, at: t0, symbol: "NVDA", origin: .followUp)]) / question, 1, accuracy: 0.001)
+        XCTAssertEqual(interest([HarnessEvent(kind: .ask, at: t0, symbol: "NVDA", origin: .followUp, thread: true)]), 0)
+        XCTAssertEqual(interest([HarnessEvent(kind: .saved, at: t0, symbol: "NVDA")]) / question, 1, accuracy: 0.001,
+                       "a save is their explicit choice, including when Bobby offered the read")
         XCTAssertEqual(HarnessProfile.weights[.sent], nil, "being shown something says nothing about them")
         XCTAssertEqual(HarnessProfile.weights[.appOpen], nil)
+    }
+
+    func testRepeatedBobbyOffersCannotManufactureAFavouriteAsset() {
+        let calendar = Calendar(identifier: .gregorian), now = t0.addingTimeInterval(300)
+        var ledger = HarnessLedger(); ledger.note(ask("MU", 0)); ledger.note(ask("BTC", 1))
+        let before = HarnessProfile.make(ledger, now: now, calendar: calendar)
+        for i in 0..<40 {
+            let at = t0.addingTimeInterval(Double(i + 2))
+            ledger.note(HarnessEvent(kind: .ask, at: at, symbol: "NVDA", origin: .followUp))
+            ledger.note(HarnessEvent(kind: .opened, at: at, symbol: "NVDA", step: .asset))
+            ledger.note(HarnessEvent(kind: .picked, at: at, symbol: "NVDA"))
+            ledger.note(HarnessEvent(kind: .returned, at: at, symbol: "NVDA", step: .asset))
+        }
+        let after = HarnessProfile.make(ledger, now: now, calendar: calendar)
+        XCTAssertEqual(after.interest, before.interest)
+        XCTAssertNil(ledger.asset("NVDA", since: t0, now: now))
+        XCTAssertEqual(after.favourite(among: ["NVDA", "MU", "BTC"]), "BTC")
+        XCTAssertEqual(after.answered[.asset], 40, "responses still teach whether the timing worked")
+        XCTAssertNotNil(after.hour, "response timing is learned independently from interest")
+    }
+
+    func testLearningContextSeparatesOwnEvidenceFromBobbyAndContainsNoWords() throws {
+        let now = t0.addingTimeInterval(300), calendar = Calendar(identifier: .gregorian)
+        var ledger = HarnessLedger()
+        ledger.note(ask("MU", 0))
+        ledger.note(HarnessEvent(kind: .ask, at: t0.addingTimeInterval(1), symbol: "MU", thread: true))
+        ledger.note(HarnessEvent(kind: .saved, at: t0.addingTimeInterval(2), symbol: "MU"))
+        ledger.note(HarnessEvent(kind: .thesis, at: t0.addingTimeInterval(3), symbol: "MU"))
+        ledger.note(HarnessEvent(kind: .ask, at: t0.addingTimeInterval(4), symbol: "MU", origin: .followUp))
+        ledger.note(HarnessEvent(kind: .ask, at: t0.addingTimeInterval(5), symbol: "NVDA", origin: .followUp))
+        let context = HarnessLearningContext.make(ledger, now: now, calendar: calendar)
+        XCTAssertEqual(context.version, 1); XCTAssertEqual(context.asOf, now)
+        XCTAssertEqual(context.assets.map(\.symbol), ["MU"], "Bobby-only assets are not learned interests")
+        let asset = try XCTUnwrap(context.assets.first)
+        XCTAssertEqual(asset.ownQuestions, 2); XCTAssertEqual(asset.ownThreads, 1)
+        XCTAssertEqual(asset.explicitSaves, 1); XCTAssertTrue(asset.activeThesis); XCTAssertEqual(asset.bobbyReads, 1)
+        XCTAssertEqual(asset.lastOwnQuestionAt, t0.addingTimeInterval(1))
+        XCTAssertEqual(asset.inferredInterest, HarnessProfile.make(ledger, now: now, calendar: calendar).interest["MU"])
+        XCTAssertEqual(Mirror(reflecting: asset).children.compactMap(\.label),
+                       ["symbol", "ownQuestions", "ownThreads", "explicitFollowUps", "explicitSaves", "activeThesis", "bobbyReads", "lastOwnQuestionAt", "inferredInterest"],
+                       "no question, hypothesis, identity, or declared preference is exported")
+    }
+
+    func testLearningContextIsBoundedFreshAndDropsFutureEvidence() {
+        let calendar = Calendar(identifier: .gregorian)
+        var old = HarnessLedger(); old.note(ask("OLD", 0))
+        let later = t0.addingTimeInterval(Double(HarnessLedger.retentionDays + 1) * 86_400)
+        XCTAssertEqual(HarnessLearningContext.make(old, now: later, calendar: calendar).assets, [])
+        XCTAssertEqual(HarnessProfile.make(old, now: later, calendar: calendar).interest, [:], "a read of stale storage needs no new write to expire")
+        var ledger = HarnessLedger()
+        for i in 0..<8 { ledger.note(ask("ASSET\(i)", Double(i))) }
+        ledger.note(ask("FUTURE", 400))
+        let context = HarnessLearningContext.make(ledger, now: t0.addingTimeInterval(300), calendar: calendar)
+        XCTAssertEqual(context.assets.count, HarnessLearningContext.maxAssets)
+        XCTAssertFalse(context.assets.contains { $0.symbol == "FUTURE" })
+        XCTAssertEqual(context.assets.first?.symbol, "ASSET7")
+        XCTAssertEqual(HarnessLearningContext.make(ledger, now: t0.addingTimeInterval(300), calendar: calendar,
+                                                   eligibleSymbols: ["ASSET0"]).assets.map(\.symbol), ["ASSET0"],
+                       "eligibility is applied before the bounded top five, so a due asset cannot disappear behind ineligible ones")
+    }
+
+    func testLearningContextFollowsItsOwnersStoreAndErasure() {
+        let store = HarnessStore(defaults: defaults), now = t0.addingTimeInterval(300), calendar = Calendar(identifier: .gregorian)
+        var a = HarnessLedger(); a.note(ask("MU", 0))
+        var b = HarnessLedger(); b.note(ask("BTC", 0))
+        store.write(a, owner: "a"); store.write(b, owner: "b")
+        XCTAssertEqual(HarnessLearningContext.make(store.ledger(owner: "a"), now: now, calendar: calendar).assets.map(\.symbol), ["MU"])
+        XCTAssertEqual(HarnessLearningContext.make(store.ledger(owner: "b"), now: now, calendar: calendar).assets.map(\.symbol), ["BTC"])
+        store.forget(owner: "a")
+        XCTAssertTrue(HarnessLearningContext.make(store.ledger(owner: "a"), now: now, calendar: calendar).assets.isEmpty)
+        XCTAssertEqual(HarnessLearningContext.make(store.ledger(owner: "b"), now: now, calendar: calendar).assets.map(\.symbol), ["BTC"])
+    }
+
+    func testLegacySavedReadPointersAreNotOwnQuestionsOrDuplicateInterest() throws {
+        let now = t0.addingTimeInterval(300), calendar = Calendar(identifier: .gregorian)
+        var ledger = HarnessLedger()
+        ledger.note(HarnessEvent(kind: .ask, at: t0, symbol: "MU", readId: "stored-read"))
+        XCTAssertNil(ledger.question(before: now))
+        XCTAssertNil(ledger.asset("MU", since: t0, now: now))
+        XCTAssertTrue(HarnessProfile.make(ledger, now: now, calendar: calendar).interest.isEmpty)
+        ledger.note(HarnessEvent(kind: .saved, at: t0, symbol: "MU", readId: "stored-read"))
+        let asset = try XCTUnwrap(HarnessLearningContext.make(ledger, now: now, calendar: calendar).assets.first)
+        XCTAssertEqual(asset.ownQuestions, 0); XCTAssertEqual(asset.explicitSaves, 1)
+        XCTAssertNil(asset.lastOwnQuestionAt)
+        XCTAssertEqual(asset.inferredInterest, pow(0.5, 300 / 86_400 / HarnessProfile.halfLifeDays), accuracy: 0.000_001)
+        XCTAssertEqual(ledger.events(.ask).count, 1, "the compatibility pointer is retained without teaching a question")
+    }
+
+    func testAnExplicitFollowUpChoiceKeepsBobbysOriginAndTeachesOnlyItsOwnBucket() throws {
+        let requested = t0.addingTimeInterval(120), now = t0.addingTimeInterval(300)
+        let calendar = Calendar(identifier: .gregorian)
+        var ledger = HarnessLedger()
+        ledger.note(HarnessEvent(kind: .ask, at: t0, symbol: "MU", origin: .followUp, thread: true, followUpRequestedAt: requested))
+        XCTAssertNil(ledger.question(before: now))
+        XCTAssertEqual(ledger.followUpAnchor(before: now)?.at, t0, "the actual read timestamp stays factual")
+        XCTAssertEqual(ledger.followUpAnchor(before: now)?.followUpAnchorAt, requested)
+        XCTAssertTrue(ledger.assets(since: t0, now: now).isEmpty)
+        XCTAssertEqual(ledger.followUpAssets(since: t0, now: now).first?.asks, 0)
+        let context = HarnessLearningContext.make(ledger, now: now, calendar: calendar)
+        let asset = try XCTUnwrap(context.assets.first)
+        XCTAssertEqual(asset.ownQuestions, 0); XCTAssertEqual(asset.ownThreads, 0)
+        XCTAssertEqual(asset.explicitFollowUps, 1); XCTAssertEqual(asset.bobbyReads, 1)
+        XCTAssertNil(asset.lastOwnQuestionAt)
+        XCTAssertEqual(asset.inferredInterest, pow(0.5, 180.0 / 86_400 / HarnessProfile.halfLifeDays), accuracy: 0.000_001,
+                       "the explicit yes counts once, from its date, with no manufactured thread bonus")
+        let copy = try JSONDecoder().decode(HarnessLedger.self, from: JSONEncoder().encode(ledger))
+        XCTAssertEqual(copy, ledger)
+        XCTAssertEqual(copy.events.first?.origin, .followUp)
+        XCTAssertEqual(copy.events.first?.followUpRequestedAt, requested)
+    }
+
+    func testAFutureOrMalformedFollowUpChoiceCannotTeachInterestOrBecomeAnAnchor() {
+        let calendar = Calendar(identifier: .gregorian), now = t0.addingTimeInterval(60)
+        var ledger = HarnessLedger()
+        ledger.note(HarnessEvent(kind: .ask, at: t0, symbol: "MU", origin: .followUp, followUpRequestedAt: t0.addingTimeInterval(120)))
+        XCTAssertNil(ledger.followUpAnchor(before: now))
+        XCTAssertTrue(HarnessProfile.make(ledger, now: now, calendar: calendar).interest.isEmpty)
+        ledger.note(HarnessEvent(kind: .ask, at: t0, symbol: "NVDA", origin: .followUp, followUpRequestedAt: t0.addingTimeInterval(-1)))
+        ledger.note(HarnessEvent(kind: .ask, at: t0, symbol: "BTC", origin: .followUp, readId: "saved", followUpRequestedAt: t0))
+        XCTAssertNil(ledger.events.last?.followUpRequestedAt)
+        XCTAssertTrue(HarnessLearningContext.make(ledger, now: now, calendar: calendar).assets.isEmpty)
+    }
+
+    func testCompletingOldMetadataDoesNotEraseAnExplicitFollowUpChoice() {
+        var ledger = HarnessLedger()
+        let original = HarnessEvent(kind: .ask, at: t0, symbol: "MU", origin: .followUp, followUpRequestedAt: t0.addingTimeInterval(60))
+        ledger.note(original)
+        XCTAssertTrue(ledger.complete(HarnessEvent(kind: .ask, at: t0, symbol: "MU", origin: .followUp)))
+        XCTAssertEqual(ledger.events.first?.followUpRequestedAt, original.followUpRequestedAt)
+    }
+
+    func testAMixedAssetsLatestBaselineKeepsItsActualSource() throws {
+        var ledger = HarnessLedger()
+        ledger.note(ask("MU", 0, price: 100))
+        ledger.note(HarnessEvent(kind: .ask, at: t0.addingTimeInterval(60), symbol: "MU", price: 110,
+                                 origin: .followUp, followUpRequestedAt: t0.addingTimeInterval(120)))
+        var asset = try XCTUnwrap(ledger.followUpAssets(since: t0, now: t0.addingTimeInterval(180)).first)
+        XCTAssertEqual(asset.asks, 1)
+        XCTAssertFalse(asset.lastAskedByPerson, "an older own question cannot rename a newer Bobby baseline")
+        XCTAssertEqual(asset.lastPrice, 110)
+        XCTAssertEqual(asset.lastAskedAt, t0.addingTimeInterval(120))
+        ledger.note(ask("MU", 240, price: 115))
+        asset = try XCTUnwrap(ledger.followUpAssets(since: t0, now: t0.addingTimeInterval(300)).first)
+        XCTAssertTrue(asset.lastAskedByPerson)
+        XCTAssertEqual(asset.asks, 2); XCTAssertEqual(asset.lastPrice, 115)
     }
 
     func testAThesisRaisesItsAssetAndDoesNotFade() {

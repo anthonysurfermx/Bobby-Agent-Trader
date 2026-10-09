@@ -70,6 +70,7 @@
     "test:llm-ledger": "tsx scripts/test-llm-ledger.mts",
     "test:app-model-access": "node --import tsx scripts/test-app-model-access.mts",
     "test:user-memory": "tsx scripts/test-user-memory.mts",
+    "test:learning-loop": "node --import tsx scripts/test-learning-context.mts && node --import tsx scripts/test-market-provenance.mts && node --import tsx scripts/test-learning-opportunity.mts && node --import tsx scripts/test-briefings-worker.mts",
     "test:user-memory-pg": "tsx scripts/test-user-memory-pg.mts",
     "test:account-delete": "tsx scripts/test-account-delete.mts",
     "test:progress-atomic-pg": "tsx scripts/test-progress-atomic-pg.mts",

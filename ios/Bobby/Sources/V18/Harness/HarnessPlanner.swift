@@ -1,6 +1,6 @@
 // The harness (1.8): what comes next. A pure function of the ledger and the clock.
 //
-// Follow-ups belong to a question the person asked by themselves. That question gets the steps of
+// Follow-ups belong to an own question or a contextual yes to follow a Bobby-authored read. That anchor gets the steps of
 // the chain, in order, and never more than `maxPerQuestion` of them whatever is answered:
 //   1. the asset      how what they asked about moved, when they said they would look again
 //   2. the week       the Monday after: the assets they asked about since the Monday before it
@@ -125,23 +125,23 @@ enum HarnessPlanner {
         guard let symbol = question.symbol else { return Wait(days: 1, source: .standard) }
         let thesis = ledger.events(.thesis).last { $0.symbol == symbol && $0.at <= now }
         if let horizon = thesis?.horizon { return Wait(days: horizon.waitDays, source: .thesis) }
-        let saved = ledger.events(.saved).last { $0.symbol == symbol && $0.at >= question.at && $0.at <= now && ($0.horizonHours ?? 0) > 24 }
+        let saved = ledger.events(.saved).last { $0.symbol == symbol && $0.at >= question.followUpAnchorAt && $0.at <= now && ($0.horizonHours ?? 0) > 24 }
         if let hours = saved?.horizonHours { return Wait(days: max(1, hours / 24), source: .saved) }
-        if let horizon = question.horizon { return Wait(days: horizon.waitDays, source: .named) }
+        if question.isQuestion, let horizon = question.horizon { return Wait(days: horizon.waitDays, source: .named) }
         return Wait(days: 1, source: .standard)
     }
 
     /// The follow-ups still to come, earliest first. Empty when there is nothing to come back to.
     static func plan(ledger whole: HarnessLedger, now: Date, calendar: Calendar, options: Options = Options()) -> [HarnessFollowUp] {
         let ledger = whole.upTo(now)
-        guard let question = ledger.question(before: now), let symbol = question.symbol,
-              now.timeIntervalSince(question.at) <= options.anchorDays * 86_400 else { return [] }
+        guard let question = ledger.followUpAnchor(before: now), let symbol = question.symbol,
+              now.timeIntervalSince(question.followUpAnchorAt) <= options.anchorDays * 86_400 else { return [] }
         let streak = ledger.unansweredStreak(before: now)
         if streak.count >= options.quietAfter, let last = streak.last, now.timeIntervalSince(last) < options.quietDays * 86_400 { return [] }
         // What this question already got. Answered or not, it counts.
-        let sentSince = ledger.events(.sent, since: question.at)
+        let sentSince = ledger.events(.sent, since: question.followUpAnchorAt)
         let room = options.maxPerQuestion - sentSince.count
-        let known = ledger.assets(since: now.addingTimeInterval(-options.anchorDays * 86_400), now: now)
+        let known = ledger.followUpAssets(since: now.addingTimeInterval(-options.anchorDays * 86_400), now: now)
         guard room > 0, let subject = known.first(where: { $0.symbol == symbol }) else { return [] }
         let done = Set(sentSince.compactMap(\.step))
         let profile = HarnessProfile.make(ledger, now: now, calendar: calendar)
@@ -150,7 +150,7 @@ enum HarnessPlanner {
 
         // The day the next asset or sector lands on. Nil: the person is looking far ahead, and gets
         // neither. A step that is skipped leaves its day to the next one.
-        var day = wait.days.map { firstDay(after: question.at, wait: $0, time: time, calendar: calendar, options: options) }
+        var day = wait.days.map { firstDay(after: question.followUpAnchorAt, wait: $0, time: time, calendar: calendar, options: options) }
         var lastSlot: Date?
         var result: [HarnessFollowUp] = []
         var walked = Set<HarnessStep>()
@@ -180,7 +180,7 @@ enum HarnessPlanner {
                 day = calendar.date(byAdding: .day, value: 1, to: slot) ?? slot.addingTimeInterval(86_400)
             case .week:
                 guard !done.contains(.week), !options.weeklyCovered, !profile.rests(.week),
-                      let monday = nextMonday(after: lastSlot ?? calendar.startOfDay(for: question.at), calendar: calendar),
+                      let monday = nextMonday(after: lastSlot ?? calendar.startOfDay(for: question.followUpAnchorAt), calendar: calendar),
                       let fireAt = moment(on: monday, time: time, calendar: calendar) else { continue }
                 // Which assets it holds is decided below, once its Monday is final.
                 result.append(HarnessFollowUp(step: .week, fireAt: fireAt))
@@ -200,7 +200,7 @@ enum HarnessPlanner {
             guard kept.count < room else { break }
             var fireAt = candidate.fireAt
             let tooClose: (Date) -> Bool = { date in
-                if date.timeIntervalSince(question.at) < options.minimumGap { return true }
+                if date.timeIntervalSince(question.followUpAnchorAt) < options.minimumGap { return true }
                 guard let previous else { return false }
                 return date.timeIntervalSince(previous) < options.minimumGap || calendar.isDate(date, inSameDayAs: previous)
             }
@@ -219,13 +219,13 @@ enum HarnessPlanner {
                                            isEquity: candidate.isEquity, sector: candidate.sector)
             switch candidate.step {
             case .asset:
-                followUp.days = max(1, calendar.dateComponents([.day], from: calendar.startOfDay(for: question.at), to: calendar.startOfDay(for: fireAt)).day ?? 1)
+                followUp.days = max(1, calendar.dateComponents([.day], from: calendar.startOfDay(for: question.followUpAnchorAt), to: calendar.startOfDay(for: fireAt)).day ?? 1)
             case .sector:
                 break
             case .week:
                 // A week is about what they asked since the Monday before it: an older question has
                 // none. It names the asset that matters most to them among those, the latest one on a tie.
-                let assets = ledger.assets(since: weekStart(of: fireAt, calendar: calendar, days: options.weekWindowDays), now: now)
+                let assets = ledger.followUpAssets(since: weekStart(of: fireAt, calendar: calendar, days: options.weekWindowDays), now: now)
                 let repeated = ledger.events(.sent).contains { $0.step == .week && fireAt.timeIntervalSince($0.at) < options.weekFreshDays * 86_400 }
                 guard !repeated, let favourite = profile.favourite(among: assets.map(\.symbol)),
                       let named = assets.first(where: { $0.symbol == favourite }) else { continue }
@@ -248,7 +248,7 @@ enum HarnessPlanner {
     /// otherwise the time of their question, inside the allowed hours.
     static func timeOfDay(question: HarnessEvent, profile: HarnessProfile, calendar: Calendar, options: Options) -> (hour: Int, minute: Int) {
         if let hour = profile.hour { return (min(max(hour, options.earliestHour), options.latestHour), 0) }
-        let parts = calendar.dateComponents([.hour, .minute], from: question.at)
+        let parts = calendar.dateComponents([.hour, .minute], from: question.followUpAnchorAt)
         let hour = parts.hour ?? 18, minute = parts.minute ?? 0
         if hour < options.earliestHour { return (options.earliestHour, 0) }
         if hour >= options.latestHour { return (options.latestHour, 0) }

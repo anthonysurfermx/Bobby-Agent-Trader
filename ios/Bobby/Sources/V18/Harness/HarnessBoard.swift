@@ -51,7 +51,13 @@ struct HarnessBoard: Equatable {
         }
         let rolling = now.addingTimeInterval(-7 * 86_400)
         let planned = tap.flatMap { $0.step == .week ? $0.stamp : nil }.map { HarnessPlanner.weekStart(of: $0, calendar: calendar) }
-        return .week(ledger.assets(since: min(planned ?? rolling, rolling), now: now))
+        let from = min(planned ?? rolling, rolling)
+        let assets = ledger.followUpAssets(since: from, now: now)
+        var board = week(assets)
+        if ledger.events.contains(where: { $0.explicitFollowUpRequested && $0.followUpAnchorAt >= from && $0.followUpAnchorAt <= now }) {
+            board.basis = L.t("Since the read", "Desde la lectura")
+        }
+        return board
     }
 
     /// One row's number from a fresh quote. A sector reads the day's change; a week compares with

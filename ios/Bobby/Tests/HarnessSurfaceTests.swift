@@ -97,7 +97,7 @@ final class HarnessSurfaceTests: XCTestCase {
         center.currentUser = { [unowned self] in self.user }
         center.currentGeneration = { [unowned self] in self.generation }
         center.weeklyCovered = { false }
-        center.quote = { [unowned self] symbol in await MainActor.run { self.prices[symbol] } }
+        center.quote = { [unowned self] symbol in await MainActor.run { self.prices[symbol].map { HarnessQuote(price: $0, provider: "fixture", asOf: self.clock) } } }
         center.access = { [unowned self] in self.reads }
         center.refreshAccess = { [unowned self] in
             await MainActor.run {
@@ -656,6 +656,53 @@ final class HarnessSurfaceTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(source.candidate(moment)).cta, "Got it")
     }
 
+    func testLearningSelectsOwnInterestAndFreshEvidenceOffersTheExistingAnalysisEntry() async throws {
+        let center = make()
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        clock = at(7, 17)
+        await ask(center, "NVDA")
+        clock = at(7, 18)
+        await ask(center, "BTC", equity: false)
+        center.noteAsk(symbol: "TSLA", name: "Tesla", isEquity: true, price: 100, origin: .followUp)
+        await settle()
+        clock = at(8, 20)
+        prices["NVDA"] = 103
+        await center.appActive()
+        XCTAssertEqual(center.move?.symbol, "NVDA", "repeated own questions outrank a newer one; Bobby's suggestion is not an interest")
+        XCTAssertEqual(center.move?.opportunity?.kind, .marketChange)
+        XCTAssertEqual(center.move?.opportunity?.quote?.provider, "fixture")
+        let (session, bridge, recorder) = makeSession(harness: center, intent: HarnessIntent(observeAccount: false))
+        defer { session.teardown() }
+        _ = await call(bridge, "session", ["page": "app"])
+        let source = HarnessNudges.moveSource(center)
+        let candidate = try XCTUnwrap(source.candidate(NudgeMoment(signedIn: false, now: clock, lastRead: nil, readsThisLaunch: 0)))
+        let before = center.profile.interest
+        await source.act(candidate, session)
+        let start = try XCTUnwrap(recorder.named("ask.start").last)
+        XCTAssertEqual(start["question"] as? String, HarnessCopy.changedQuestion(symbol: "NVDA"))
+        XCTAssertEqual(center.profile.interest, before, "a tap on Bobby's content is not proof of a new preference")
+        XCTAssertEqual(Set(start.keys), ["token", "question"], "neither local learning nor a claimed account tier leaves the phone")
+    }
+
+    func testUndatedOrStaleQuoteOffersAReviewWithoutClaimingNews() async throws {
+        let center = make()
+        await ask(center, "NVDA")
+        clock = at(8, 20)
+        center.quote = { [unowned self] _ in HarnessQuote(price: 140, provider: "fixture", asOf: self.at(7, 20)) }
+        await center.appActive()
+        XCTAssertNil(center.move?.pct)
+        XCTAssertEqual(center.move?.opportunity?.kind, .review)
+        let source = HarnessNudges.moveSource(center)
+        let candidate = try XCTUnwrap(source.candidate(NudgeMoment(signedIn: false, now: clock, lastRead: nil, readsThisLaunch: 0)))
+        XCTAssertEqual(candidate.cta, "Review together")
+        let (session, bridge, recorder) = makeSession(harness: center, intent: HarnessIntent(observeAccount: false))
+        defer { session.teardown() }
+        _ = await call(bridge, "session", ["page": "app"])
+        await source.act(candidate, session)
+        XCTAssertEqual(recorder.named("ask.start").last?["question"] as? String, HarnessCopy.lookQuestion(symbol: "NVDA"))
+    }
+
     func testAFollowUpPathNeverEndsOnASignInOrAPaywallSheet() async throws {
         let walls: [(String, BobbyReadAccess?)] = [("a guest at the sign-in", Self.guest(left: 0)), ("a free account at the paywall", Self.free(left: 0)),
                                                    ("a phone that does not know", nil), ("a server that could not say", Self.unread)]
@@ -867,11 +914,13 @@ final class HarnessSurfaceTests: XCTestCase {
         XCTAssertEqual(said(center).count, 5, "and none of those asked anything")
     }
 
-    /// Before the yes there is no chain to protect, and the yes is the person's own request about
-    /// what they just read: a chip is kept the way a question is, so that yes has something to follow.
-    func testBeforeTheYesAChipIsKeptLikeAQuestionAndAfterItStartsNothing() async throws {
+    /// Bobby's initial chip stays Bobby's. The contextual yes is an explicit follow-up choice,
+    /// while own questions and subsequent suggested reads remain separate.
+    func testAnInitialBobbyChipNeedsAContextualYesAndNeverBecomesAnOwnQuestion() async throws {
+        NudgeCenter.shared.reset()
+        NudgeCenter.shared.now = { Date() }
         let center = make()
-        let (session, bridge, _) = makeSession(harness: center, intent: HarnessIntent(observeAccount: false))
+        let (session, bridge, recorder) = makeSession(harness: center, intent: HarnessIntent(observeAccount: false))
         defer { session.teardown() }
         session.desk.currentLevel = { .rapido }
         session.desk.setLevel = { _ in }
@@ -880,19 +929,95 @@ final class HarnessSurfaceTests: XCTestCase {
         XCTAssertEqual(first["status"] as? String, "ok")
         await settle()
         XCTAssertEqual(center.mode, .undecided)
-        let kept = try storedEvents()
-        XCTAssertEqual(kept.map { Set($0.keys) }, [["kind", "at", "symbol", "name", "isEquity", "price"]], "the asset, its price, the moment: nothing more than for a typed question")
+        XCTAssertTrue(try storedEvents().isEmpty)
+        XCTAssertTrue(HarnessLearningContext.make(center.ledger, now: clock, calendar: calendar).assets.isEmpty)
         // "Shall I keep you posted on NVDA?" · "Yes, tell me".
-        _ = await center.accept()
+        let requestId = try XCTUnwrap(first["requestId"] as? String)
+        let nudges = NudgeCenter.shared
+        nudges.unregisterAll()
+        defer { nudges.unregisterAll(); nudges.reset() }
+        nudges.register(HarnessNudges.offerSource(center))
+        let delivered = try XCTUnwrap(NudgeCenter.shared.lastRead)
+        XCTAssertEqual(delivered.requestId, requestId)
+        session.nudgesEnabled = true
+        let offer = try XCTUnwrap(session.sessionJSON()["nudge"] as? [String: Any])
+        let offerId = try XCTUnwrap(offer["id"] as? String)
+        XCTAssertEqual(offerId, HarnessNudges.offerId(for: requestId))
+        XCTAssertEqual(offer["text"] as? String, "Shall I keep you posted on NVDA?")
+        _ = await call(bridge, "nudge.seen", ["id": offerId])
+        let accepted = await call(bridge, "nudge.act", ["id": offerId])
+        XCTAssertEqual(accepted["status"] as? String, "done")
+        XCTAssertEqual(center.mode, .on)
+        let learned = try XCTUnwrap(HarnessLearningContext.make(center.ledger, now: clock, calendar: calendar).assets.first)
+        XCTAssertEqual(learned.ownQuestions, 0); XCTAssertEqual(learned.explicitFollowUps, 1)
+        XCTAssertEqual(learned.bobbyReads, 1)
+        XCTAssertNil(center.ledger.question(before: clock))
+        XCTAssertEqual(center.ledger.events(.ask).first?.origin, .followUp)
+        XCTAssertEqual(center.ledger.events(.ask).first?.followUpRequestedAt, clock)
+        XCTAssertEqual(fake.added.first(where: { $0.step == .asset })?.body, "Let's revisit NVDA")
+        XCTAssertTrue(center.notes.assets.flatMap(\.lines).contains("You requested follow-ups for this read."))
         XCTAssertEqual(coming(center), [moment(.asset, "NVDA", at(8, 16, 40)), moment(.week, "NVDA", at(12, 16, 40))], "the yes has something to follow")
         // From the yes on, a chip starts nothing.
         clock = at(7, 18)
         _ = await call(bridge, "ask", ["question": "How is BTC looking?", "chip": true])
         await settle()
-        XCTAssertEqual(said(center), ["NVDA(own)", "BTC(followUp)"])
+        XCTAssertEqual(said(center), ["NVDA(followUp)", "BTC(followUp)"])
         XCTAssertEqual(center.upcoming.map(\.step), [.asset, .week])
         XCTAssertEqual(center.upcoming.first?.symbol, "NVDA")
         XCTAssertEqual(center.upcoming.first?.fireAt, at(8, 16, 40))
+        // The notification returns to this choice and can enter the existing analysis flow.
+        clock = at(8, 16, 40)
+        let tap = HarnessTap(step: .asset, symbol: "NVDA", sector: nil, owner: HarnessCenter.ownerTag(user), stamp: clock)
+        prices["NVDA"] = 102
+        fake.deliver(before: clock)
+        await center.opened(tap)
+        await center.refreshMove()
+        let move = try XCTUnwrap(center.move)
+        XCTAssertFalse(move.askedByPerson)
+        let nudge = HarnessNudges.nudge(move, asks: true, now: clock)
+        XCTAssertEqual(nudge.text, "Let's revisit NVDA")
+        await HarnessNudges.moveSource(center).act(nudge, session)
+        await settle()
+        let start = try XCTUnwrap(recorder.named("ask.start").last)
+        XCTAssertEqual(start["question"] as? String, HarnessCopy.lookQuestion(symbol: "NVDA"))
+        XCTAssertEqual(Set(start.keys), ["token", "question"])
+        XCTAssertEqual(HarnessLearningContext.make(center.ledger, now: clock, calendar: calendar).assets.first?.ownQuestions, 0)
+        let board = HarnessBoard.make(for: HarnessTap(step: .week, symbol: "NVDA", sector: nil), ledger: center.ledger, now: clock, calendar: calendar)
+        XCTAssertEqual(board.rows.map(\.symbol), ["NVDA"])
+        XCTAssertEqual(board.basis, "Since the read")
+    }
+
+    func testAGlobalFollowUpSwitchDoesNotTurnAnInitialChipIntoInterest() async throws {
+        let center = make()
+        let (session, bridge, _) = makeSession(harness: center, intent: HarnessIntent(observeAccount: false))
+        defer { session.teardown() }
+        session.desk.currentLevel = { .rapido }; session.desk.setLevel = { _ in }
+        _ = await call(bridge, "session", ["page": "app"])
+        _ = await call(bridge, "ask", ["question": "How is NVDA looking?", "chip": true])
+        await settle()
+        _ = await center.accept()
+        XCTAssertTrue(center.ledger.isEmpty)
+        XCTAssertTrue(center.upcoming.isEmpty)
+        XCTAssertTrue(HarnessLearningContext.make(center.ledger, now: clock, calendar: calendar).assets.isEmpty)
+    }
+
+    func testAnOlderOwnQuestionCannotRenameTheLatestExplicitBobbyFollowUp() async throws {
+        let center = make()
+        await ask(center, "NVDA", price: 100)
+        clock = at(7, 17)
+        center.noteAsk(symbol: "NVDA", name: "NVIDIA", isEquity: true, price: 105,
+                       origin: .followUp, chip: true, requestId: "mixed")
+        await settle()
+        let accepted = await center.accept(following: "mixed")
+        XCTAssertEqual(accepted, .on)
+        clock = at(8, 20)
+        prices["NVDA"] = 108
+        await center.appActive()
+        let asset = try XCTUnwrap(center.dueAsset())
+        XCTAssertEqual(asset.asks, 1); XCTAssertFalse(asset.lastAskedByPerson)
+        let move = try XCTUnwrap(center.move)
+        XCTAssertFalse(move.askedByPerson)
+        XCTAssertEqual(HarnessNudges.nudge(move, asks: true, now: clock).text, "Let's revisit NVDA")
     }
 
     /// From a follow-up to the paywall in two taps: the read that spends the last one hands back no
@@ -1416,9 +1541,11 @@ final class HarnessSurfaceTests: XCTestCase {
         //    read from the ledger, WITHOUT a tap: the symbol of an asset, to the quote endpoint, to draw the number on
         //    the glass (when the app comes to the front, also before the yes) and on the week's board (once per row).
         //    The third asks how many reads are left and sends nothing of the ledger.
-        XCTAssertEqual(inside.keys.sorted(), ["HarnessBoard.swift", "HarnessCenter.swift"], "a new place that reaches a server has to be looked at")
+        XCTAssertEqual(inside.keys.sorted(), ["HarnessBoard.swift", "HarnessCenter.swift", "HarnessOpportunity.swift"], "a new network symbol has to be looked at")
+        XCTAssertEqual(inside["HarnessOpportunity.swift"], ["init?(market: NucleoDeskIO.Market) {"],
+                       "the opportunity consumes a value type only; it cannot initiate a request")
         XCTAssertEqual(inside["HarnessBoard.swift"], ["let market = await NucleoDeskIO.market(symbol)"])
-        XCTAssertEqual(inside["HarnessCenter.swift"], ["(await NucleoAsync.withTimeout(HarnessCenter.quoteTimeout) { await NucleoDeskIO.market(symbol).price }) ?? nil",
+        XCTAssertEqual(inside["HarnessCenter.swift"], ["guard let market = await NucleoAsync.withTimeout(HarnessCenter.quoteTimeout, { await NucleoDeskIO.market(symbol) }) else { return nil }",
                                                       "if !BobbyApp.isUnitTestHost { await NucleoLevelCenter.shared.refresh() }"])
         // What that request is: the symbol and nothing else, through the plain client (the metered read is the one
         // that carries the device and the account: BobbyAccessAPI).

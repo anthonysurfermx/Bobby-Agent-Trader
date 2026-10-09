@@ -36,6 +36,7 @@ const settle = async () => { await Promise.all(deferred.splice(0)); };
 
 const { readerContext, memoryReceipt, memoryPersonalizationOn, memoryDeskAllowed, MEMORY_PLATFORMS, MEMORY_SUMMARY_TIMEOUT_MS, MEMORY_RECORD_TIMEOUT_MS } = await import('../api/_lib/user-memory.ts');
 const { READER_RULE, horizonOf } = await import('../api/_lib/desk-debate.ts');
+const { LEARNING_CONTEXT_RULE } = await import('../api/_lib/learning-context.ts');
 const { resetLlmSpendCache } = await import('../api/_lib/llm-usage.ts');
 const { default: memoryHandler } = await import('../api/memory.ts');
 const { default: deskHandler } = await import('../api/desk-debate.ts');
@@ -366,10 +367,13 @@ try {
   const byRoleCalls = Object.fromEntries(models().map((c) => [byRole(c), c]));
   {
     const { lastAskedOn, ...rest } = inputOf(byRoleCalls.cio).reader.thisAsset;
-    eq({ ...inputOf(byRoleCalls.cio).reader, thisAsset: rest }, { prefs: { horizon: 'month', experience: 'new' }, thisAsset: { asks: 7, lastAskedDaysAgo: 2, lastHorizon: 'week', timesThisWeek: 1 }, oftenAsks: [{ symbol: 'BTC', asks: 4 }] }, 'the CIO receives the compact reader');
+    const { version, explanation, ...facts } = inputOf(byRoleCalls.cio).reader;
+    eq({ ...facts, thisAsset: rest }, { prefs: { horizon: 'month', experience: 'new' }, thisAsset: { asks: 7, lastAskedDaysAgo: 2, lastHorizon: 'week', timesThisWeek: 1 }, oftenAsks: [{ symbol: 'BTC', asks: 4 }] }, 'the CIO receives the compact factual reader');
+    eq([version, explanation], [1, { experience: 'new', source: 'explicit' }], 'the explanation policy is versioned and follows only an explicit preference');
     ok(typeof lastAskedOn === 'string' && lastAskedOn.length > 0, '…with the weekday of the last ask');
   }
   ok(systemOf(byRoleCalls.cio).includes(READER_RULE), 'with the rule: frame only, never change the verdict or judge suitability');
+  ok(systemOf(byRoleCalls.cio).includes(LEARNING_CONTEXT_RULE), 'learning frames explanation and the follow-up, never inferring a response, holding or sector');
   ok(/explainRiskDepth/.test(READER_RULE) && /how much the answer explains risk/.test(READER_RULE) && /never sets suitability, position sizing or a recommendation/.test(READER_RULE), 'the rule says explainRiskDepth sets only how much risk is explained, never suitability, sizing or recommendations');
   ok(!('reader' in inputOf(byRoleCalls.alpha)) && !('reader' in inputOf(byRoleCalls.red)), 'Alpha and Red Team never see the reader');
   ok(!systemOf(byRoleCalls.alpha).includes('reader is this reader') && !systemOf(byRoleCalls.red).includes('reader is this reader'), '…nor its rule');
@@ -388,6 +392,7 @@ try {
   eq([inputOf(byRoleCalls.alpha).reader, inputOf(byRoleCalls.red).reader], [undefined, undefined], 'alpha and red inputs carry no reader');
   const servedAlpha = inputOf(byRoleCalls.alpha);
   const servedAlphaSystem = systemOf(byRoleCalls.alpha);
+  const trustedReader = inputOf(byRoleCalls.cio).reader;
   const summaryCall = calls.find((c) => c.url.includes('rpc/bobby_memory_summary'))!;
   eq(summaryCall.body, { p_identity: IDENT, p_symbol: 'NVDA' }, 'the summary is read for this account and asset');
   await settle();
@@ -396,6 +401,23 @@ try {
   eq(rec[0].body, { p_identity: IDENT, p_symbol: 'NVDA', p_horizon: 'unspecified', p_price: 200 }, 'with the horizon the question named (none), not the preference, and the evidence price');
   ok(calls.indexOf(rec[0]) > calls.indexOf(models().at(-1)!), 'after the last model call, never before');
   eq(authCalls().length, 1, 'the account is verified once');
+
+  // Unknown request-body keys cannot supply memory, an account profile or a premium model.
+  const forged = await run({ question: 'Is NVDA worth a look?', tier: 'pro', model: 'claude-opus-5-5',
+    reader: { firstName: 'Forged owner', prefs: { experience: 'experienced' } },
+    learning: { version: 1, explanation: { experience: 'experienced', source: 'explicit' } },
+    context: { sector: 'invented interest', followUpAnswered: true } }, SIGNED_IN);
+  eq(forged.statusCode, 200, 'legacy outer-body tolerance is preserved');
+  eq(inputOf(models().find((c) => byRole(c) === 'cio')!).reader, trustedReader, 'only the authenticated memory summary determines reader context');
+  ok(models().every((c) => c.body.model === 'claude-haiku-5-5'), 'client tier/model fields cannot upgrade the account model');
+  ok(!models().some((c) => /Forged owner|invented interest|followUpAnswered/.test(JSON.stringify(c.body))), 'client-authored context reaches no model');
+
+  summaryReply = { ...REMEMBERED, prefs: { horizon: null, experience: null, risk: null } };
+  const defaultExplanation = await run({}, SIGNED_IN);
+  const defaultReader = inputOf(models().find((c) => byRole(c) === 'cio')!).reader;
+  eq([defaultExplanation.body.personalized, defaultReader.explanation, 'prefs' in defaultReader], [true, { experience: 'new', source: 'default' }, false], 'beginner explanation never becomes an inferred account preference');
+  ok(!calls.some(c => c.url.includes('bobby_user_prefs') && c.method === 'POST'), 'default experience is not persisted');
+  summaryReply = REMEMBERED;
 
   // The same question without memory: sufficiency and the Alpha/Red inputs are the same as with it.
   const plain = await run({ question: 'Is NVDA worth a look?' });

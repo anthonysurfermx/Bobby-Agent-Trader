@@ -207,7 +207,7 @@ final class NucleoReadStartTests: XCTestCase {
         center.currentUser = { nil }
         center.currentGeneration = { [unowned self] in self.generation }
         center.weeklyCovered = { false }
-        center.quote = { [unowned self] symbol in await MainActor.run { self.prices[symbol] } }
+        center.quote = { [unowned self] symbol in await MainActor.run { self.prices[symbol].map { HarnessQuote(price: $0, provider: "fixture", asOf: self.clock) } } }
         center.access = { BobbyReadAccess(tier: "free", used: 15, limit: 20, remaining: 5, resetsAt: nil, paywall: true, bonus: 0) }
         center.refreshAccess = {}
         center.load(owner: nil)

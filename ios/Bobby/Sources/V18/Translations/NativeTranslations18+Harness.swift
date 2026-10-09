@@ -24,6 +24,8 @@ extension NativeTranslations18 {
         result["What changed?"] = ["fr": "Quoi de neuf ?", "pt": "O que mudou?", "it": "Cosa è cambiato?", "de": "Was hat sich getan?"]
         result["Got it"] = ["fr": "Compris", "pt": "Entendido", "it": "Capito", "de": "Verstanden"]
         result["Open saved read"] = ["fr": "Ouvrir l’analyse", "pt": "Abrir análise guardada", "it": "Apri analisi salvata", "de": "Analyse öffnen"]
+        result["Your saved read of {0}"] = ["fr": "Ton analyse enregistrée de {0}", "pt": "A tua análise guardada de {0}", "it": "La tua analisi salvata di {0}", "de": "Deine gespeicherte Analyse zu {0}"]
+        result["Review together"] = ["fr": "Regardons ensemble", "pt": "Vamos rever", "it": "Rivediamo insieme", "de": "Gemeinsam prüfen"]
         // The questions asked on the person's tap.
         result["What changed in {0} since I asked?"] = ["fr": "Qu’est-ce qui a changé pour {0} depuis ma question ?", "pt": "O que mudou em {0} desde que perguntei?", "it": "Cosa è cambiato in {0} da quando ho chiesto?", "de": "Was hat sich bei {0} getan, seit ich gefragt habe?"]
         result["How does {0} look today?"] = ["fr": "Comment se présente {0} aujourd’hui ?", "pt": "Como está {0} hoje?", "it": "Come si presenta {0} oggi?", "de": "Wie sieht {0} heute aus?"]
@@ -46,6 +48,9 @@ extension NativeTranslations18 {
         result["Asked once, on {0}."] = ["fr": "Demandé une fois, le {0}.", "pt": "Perguntaste uma vez, a {0}.", "it": "Chiesto una volta, il {0}.", "de": "Einmal gefragt, am {0}."]
         result["Asked {0} times, last on {1}."] = ["fr": "Demandé {0} fois, la dernière le {1}.", "pt": "Perguntaste {0} vezes, a última a {1}.", "it": "Chiesto {0} volte, l’ultima il {1}.", "de": "{0}-mal gefragt, zuletzt am {1}."]
         result["One read from a question Bobby wrote."] = ["fr": "Une analyse à partir d’une question écrite par Bobby.", "pt": "Uma análise a partir de uma pergunta escrita pelo Bobby.", "it": "Un’analisi da una domanda scritta da Bobby.", "de": "Eine Analyse aus einer Frage, die Bobby geschrieben hat."]
+        result["You requested follow-ups for this read."] = ["fr": "Vous avez demandé un suivi de cette analyse.", "pt": "Pediste acompanhamento desta análise.", "it": "Hai richiesto aggiornamenti su questa analisi.", "de": "Du hast Updates zu dieser Analyse angefordert."]
+        result["Let's revisit {0}"] = ["fr": "Reprenons {0}", "pt": "Retomemos {0}", "it": "Rivediamo {0}", "de": "Schauen wir uns {0} an"]
+        result["Since the read"] = ["fr": "Depuis l’analyse", "pt": "Desde a análise", "it": "Dall’analisi", "de": "Seit der Analyse"]
         result["{0} reads from questions Bobby wrote."] = ["fr": "{0} analyses à partir de questions écrites par Bobby.", "pt": "{0} análises a partir de perguntas escritas pelo Bobby.", "it": "{0} analisi da domande scritte da Bobby.", "de": "{0} Analysen aus Fragen, die Bobby geschrieben hat."]
         result["“Since you asked” lines shown: {0}."] = ["fr": "Lignes « depuis ta question » affichées : {0}.", "pt": "Linhas “desde que perguntaste” mostradas: {0}.", "it": "Righe «da quando hai chiesto» mostrate: {0}.", "de": "Gezeigte Zeilen „seit deiner Frage“: {0}."]
         result["Your question was about today."] = ["fr": "Ta question portait sur aujourd’hui.", "pt": "A tua pergunta era sobre hoje.", "it": "La tua domanda riguardava oggi.", "de": "Deine Frage ging um heute."]

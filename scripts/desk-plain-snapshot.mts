@@ -3,7 +3,8 @@
 // scripts/fixtures/desk-plain-snapshot.json, which was written from the code before the 1.8 thesis review
 // existed (commit 5ee241a9): a request from a shipped client (iOS 1.5-1.7, Android, the web) must keep producing
 // the same prompts and reply, byte for byte. Model ids alone were adopted to Haiku 5.5 on 2026-10-07.
-// The eight Free captures stay unchanged; Pro account captures use Opus 5.5 at each of the same levels.
+// Seven Free captures stay unchanged; the memory-enabled CIO capture adopts factual learning context v1.
+// Pro account captures use Opus 5.5 at each of the same levels.
 //
 //   npx tsx scripts/desk-plain-snapshot.mts            compare (exit 1 on any difference)
 //   npx tsx scripts/desk-plain-snapshot.mts --write    rewrite the fixture (only when a change to the plain

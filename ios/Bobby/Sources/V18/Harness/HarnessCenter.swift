@@ -8,7 +8,7 @@
 //  - Nothing is recorded or scheduled before the risk notice is accepted; withdrawing it erases
 //    the ledger and cancels everything. Turning follow-ups off does the same.
 //  - What the phone writes depends on what the person said about follow-ups, and on nothing else:
-//      undecided  one entry per read they asked for (typed, spoken, or an asset picked on a chip):
+//      undecided  one entry per question in their own words (typed or spoken):
 //                 the asset, its price, the moment. It is what lets the glass say "NVDA +2.3% since
 //                 you asked" when they come back, and what the yes follows. No app openings, no
 //                 saves, no taps, no horizon, no thesis, no read started from a follow-up's own button.
@@ -46,8 +46,8 @@
 //    whose question Bobby wrote (the button of a follow-up, a board row, the question after a
 //    read, a chip that asks about an asset) is written with its origin and starts nothing: one
 //    tap on something Bobby put there never earns another chain. The one exception is the yes
-//    itself: before it there is no chain to protect, so a chip is kept the way a question is, and
-//    saying yes to "Shall I keep you posted on NVDA?" follows that read.
+//    itself: an opaque, launch-only read pointer lets a contextual yes explicitly request
+//    follow-ups for that read. Its Bobby origin stays intact; it never becomes an own question.
 //  - A no stays a no. Follow-ups turned off (the switch, or "Stop" on a notification) survive a
 //    sign-in, a sign-out and the Memory screen's "Delete everything": what was kept is erased,
 //    the refusal is not, and the offer is not made again by itself. An account that said no takes
@@ -253,10 +253,16 @@ struct HarnessMove: Equatable {
     let days: Int
     /// A saved reading to open instead of asking the desk. Runtime metadata, never answer text.
     var savedReadID: String? = nil
+    var opportunity: HarnessOpportunity? = nil
+    /// False when the person chose to follow a question Bobby wrote.
+    var askedByPerson = true
 
     /// Nil when the phone should say no number (HarnessCopy.move): a split, a renamed ticker or
     /// a bad price would otherwise read as a crash.
-    var pct: Double? { HarnessCopy.move(from: priceThen, to: priceNow, isEquity: isEquity) }
+    var pct: Double? {
+        if let opportunity, opportunity.kind != .marketChange { return nil }
+        return HarnessCopy.move(from: priceThen, to: priceNow, isEquity: isEquity)
+    }
 }
 
 /// Whether the next read would be answered, from the receipt the server sends with every reply
@@ -343,8 +349,9 @@ final class HarnessCenter: ObservableObject {
     /// A paying account whose Monday briefing is on gets its week from the server.
     var weeklyCovered: () -> Bool = { BriefingsCenter.shared.settings?.weeklyEnabled == true && BriefingsCenter.shared.eligiblePro == true }
     /// The latest price of an asset, read without spending a read. Nil when it could not be read.
-    var quote: (String) async -> Double? = { symbol in
-        (await NucleoAsync.withTimeout(HarnessCenter.quoteTimeout) { await NucleoDeskIO.market(symbol).price }) ?? nil
+    var quote: (String) async -> HarnessQuote? = { symbol in
+        guard let market = await NucleoAsync.withTimeout(HarnessCenter.quoteTimeout, { await NucleoDeskIO.market(symbol) }) else { return nil }
+        return HarnessQuote(market: market)
     }
     /// What the phone last heard about this person's reads: the receipt of the latest reply, else
     /// the one read when the app started. Nil when it does not know (and in the unit-test host,
@@ -380,7 +387,10 @@ final class HarnessCenter: ObservableObject {
     /// Events written without what the person said about their horizon, kept whole here until they
     /// say yes. In memory only: it never outlives the launch or the reader.
     private var held: [HarnessEvent] = []
-    private var quotes: [String: (price: Double, at: Date)] = [:]
+    /// Only the latest delivered read of this launch. A contextual yes names this opaque id;
+    /// a global switch never turns a Bobby-authored read into an asset choice.
+    private var offeredRead: (requestId: String, event: HarnessEvent, owner: String?, generation: UUID)?
+    private var quotes: [String: (value: HarnessQuote, at: Date)] = [:]
     private var syncTail: Task<Void, Never>?
     /// Grows whenever the plan or the reader changes: a sync that started before does not finish its writes.
     private var revision = 0
@@ -495,6 +505,7 @@ final class HarnessCenter: ObservableObject {
         upcoming = planned.map(\.followUp)
         focus = nil
         held = []
+        offeredRead = nil
         quotes = [:]
         move = nil
     }
@@ -504,19 +515,19 @@ final class HarnessCenter: ObservableObject {
     /// A read was delivered. Only one the person asked for in their own words is followed up:
     /// `origin` says when Bobby wrote the question, and then it is at most an answer to a follow-up.
     /// `chip`: Bobby wrote the words and the person picked the asset (the idle home, the row after a
-    /// read). With follow-ups on that is a read Bobby started, like any other. Before the yes there
-    /// is no chain to protect: it is kept the way a question is, so the glass can say how the asset
-    /// moved since, and a yes to "Shall I keep you posted on NVDA?" has that read to follow.
+    /// read). Its origin always stays Bobby. Before the yes, its opaque request id and factual
+    /// metadata stay only in this launch so a contextual yes can request follow-ups explicitly.
     func noteAsk(symbol: String, name: String, isEquity: Bool, price: Double?, origin: HarnessEvent.Origin? = nil,
-                 chip: Bool = false, thread: Bool = false, horizon: HarnessHorizon? = nil) {
+                 chip: Bool = false, thread: Bool = false, horizon: HarnessHorizon? = nil, requestId: String? = nil) {
         guard keeping else { return }
-        let origin = chip && mode != .on ? nil : origin
+        let origin: HarnessEvent.Origin? = chip ? .followUp : origin
         let clock = now()
         // The answer comes first in time: what follows starts from the question itself.
         if recording { answerIfUseful(symbol: symbol, at: clock.addingTimeInterval(-0.001)) }
         var said = HarnessEvent(kind: .ask, at: clock, symbol: symbol, name: name, isEquity: isEquity, price: price, origin: origin)
         said.thread = thread && origin == nil ? true : nil
         said.horizon = horizon
+        offeredRead = mode == .undecided ? requestId.map { ($0, said, currentUser(), currentGeneration()) } : nil
         note(said)
         // They are looking at it now: the line about "since you asked" has nothing to say yet.
         if move?.symbol == symbol.uppercased() { move = nil }
@@ -554,13 +565,13 @@ final class HarnessCenter: ObservableObject {
         upcoming = []
         held = []
         focus = nil
+        offeredRead = nil
         move = nil
         if existing == nil {
-            // The summary may be from a chip or from a read made while follow-ups were off.
-            // Its dated price is kept as the comparison point, without an inferred horizon.
-            note(HarnessEvent(kind: .ask, at: clock, symbol: symbol, name: read.name, isEquity: read.isEquity,
-                              price: read.price, readId: read.requestId))
-            note(HarnessEvent(kind: .saved, at: clock, symbol: symbol, readId: read.requestId, availableFrom: availableFrom))
+            // A save is an explicit interest signal, never another question. Older saves used an
+            // ask pointer; new ones carry their own bounded metadata without inflating ask counts.
+            note(HarnessEvent(kind: .saved, at: clock, symbol: symbol, name: read.name, isEquity: read.isEquity,
+                              price: read.price, readId: read.requestId, availableFrom: availableFrom))
         }
         await replan()
         guard !Task.isCancelled, owner == user, currentUser() == user, currentGeneration() == generation,
@@ -621,10 +632,19 @@ final class HarnessCenter: ObservableObject {
 
     /// The offer's "Yes, tell me", or the switch turned on. The ONLY place iOS is asked.
     @discardableResult
-    func accept() async -> Outcome {
+    func accept(following requestId: String? = nil) async -> Outcome {
         guard consent() == .accepted else { return .consentRequired }
         guard !saving else { return .failed }
         let user = currentUser(), generation = currentGeneration()
+        let acceptingRevision = revision, acceptingMode = mode
+        func requestedRead() -> HarnessEvent? {
+            guard let requestId, let offeredRead, offeredRead.requestId == requestId,
+                  owner == user, offeredRead.owner == user, offeredRead.generation == generation,
+                  mode == .undecided, now() >= offeredRead.event.at,
+                  now().timeIntervalSince(offeredRead.event.at) < Self.heldWindow else { return nil }
+            return offeredRead.event
+        }
+        guard requestId == nil || requestedRead() != nil else { return .failed }
         saving = true
         defer { saving = false }
         // Before the first follow-up exists, iOS knows what to show on a locked screen and how to stop.
@@ -635,7 +655,10 @@ final class HarnessCenter: ObservableObject {
             permission = await notifier.status()
         }
         status = permission
-        guard currentUser() == user, currentGeneration() == generation, consent() == .accepted else { return .failed }
+        guard currentUser() == user, currentGeneration() == generation, consent() == .accepted,
+              revision == acceptingRevision, mode == acceptingMode else { return .failed }
+        let requested = requestedRead()
+        guard requestId == nil || requested != nil else { return .failed }
         if owner != user { load(owner: user) }
         mode = .on
         store.write(mode, owner: owner)
@@ -644,10 +667,16 @@ final class HarnessCenter: ObservableObject {
         // the yes, goes in whole.
         let clock = now()
         var completed = false
+        if var requested, requested.origin == .followUp {
+            requested.followUpRequestedAt = clock
+            ledger.note(requested)
+            completed = true
+        }
         for full in held where clock.timeIntervalSince(full.at) <= Self.heldWindow {
             if full.kind == .saved { ledger.note(full); completed = true } else if ledger.complete(full) { completed = true }
         }
         held = []
+        offeredRead = nil
         if completed { store.write(ledger, owner: owner) }
         await replan()
         return permission == .allowed ? .on : .denied
@@ -685,6 +714,7 @@ final class HarnessCenter: ObservableObject {
         }
         store.write(ledger, owner: owner)
         held.removeAll { $0.symbol?.uppercased() == symbol }
+        if offeredRead?.event.symbol?.uppercased() == symbol { offeredRead = nil }
         quotes[symbol] = nil
         if focus?.symbol == symbol { focus = nil }
         if move?.symbol == symbol { move = nil }
@@ -793,24 +823,28 @@ final class HarnessCenter: ObservableObject {
 
     // MARK: The glass
 
-    /// The asset to come back to now, if any: the tapped follow-up's, else the latest one asked
-    /// about long enough ago.
+    /// The saved answer or tapped follow-up takes precedence. Otherwise learning selects a
+    /// recent subject among the person's own questions that is ready to revisit.
     func dueAsset() -> HarnessAsset? {
         guard mode != .off, consent() == .accepted else { return nil }
         let clock = now()
-        let known = ledger.assets(since: clock.addingTimeInterval(-Self.dueDays * 86_400), now: clock)
-        if mode == .inApp {
-            guard let saved = dueSavedRead(), let symbol = saved.symbol else { return nil }
+        let known = ledger.followUpAssets(since: clock.addingTimeInterval(-Self.dueDays * 86_400), now: clock)
+        if mode == .inApp, let saved = dueSavedRead(), let symbol = saved.symbol {
             // Read-specific metadata keeps the original comparison even after another question.
-            guard let ask = ledger.events(.ask).last(where: { $0.readId == saved.readId }),
-                  let name = ask.name, let isEquity = ask.isEquity else { return nil }
-            return HarnessAsset(symbol: symbol, name: name, isEquity: isEquity, firstAskedAt: ask.at,
-                                lastAskedAt: ask.at, lastPrice: ask.price, firstPrice: ask.price, asks: 1)
+            let stored = saved.name != nil ? saved : ledger.events(.ask).last(where: { $0.readId == saved.readId })
+            guard let stored, let name = stored.name, let isEquity = stored.isEquity else { return nil }
+            return HarnessAsset(symbol: symbol, name: name, isEquity: isEquity, firstAskedAt: stored.at,
+                                lastAskedAt: stored.at, lastPrice: stored.price, firstPrice: stored.price, asks: 0)
         }
         if let focus, clock.timeIntervalSince(focus.at) <= Self.focusWindow, let asset = known.first(where: { $0.symbol == focus.symbol }) {
             return asset
         }
-        return known.first { clock.timeIntervalSince($0.lastAskedAt) >= Self.dueAfter }
+        let eligible = known.filter { clock.timeIntervalSince($0.lastAskedAt) >= Self.dueAfter }
+        // Learning chooses between subjects the person actually asked about. Repeated Bobby
+        // suggestions cannot turn themselves into interests (HarnessProfile filters their origin).
+        let context = HarnessLearningContext.make(ledger, now: clock, calendar: calendar(), eligibleSymbols: Set(eligible.map(\.symbol)))
+        let favourite = context.assets.first?.symbol
+        return eligible.first { $0.symbol == favourite }
     }
 
     /// The latest explicitly kept read, once its next LOCAL day begins. A newer keep replaces
@@ -839,23 +873,29 @@ final class HarnessCenter: ObservableObject {
             return
         }
         let user = owner, generation = currentGeneration()
+        let started = revision
         let couldAsk = readsOpen
-        var price = quotes[asset.symbol].flatMap { now().timeIntervalSince($0.at) <= Self.quoteLifetime ? $0.price : nil }
-        if price == nil {
-            price = await quote(asset.symbol)
-            guard owner == user, currentGeneration() == generation, consent() == .accepted else { return }
-            if let price, price.isFinite, price > 0 { quotes[asset.symbol] = (price, now()) } else { price = nil }
+        let savedID = mode == .inApp ? dueSavedRead()?.readId : nil
+        var observation = quotes[asset.symbol].flatMap { now().timeIntervalSince($0.at) <= Self.quoteLifetime ? $0.value : nil }
+        if observation == nil, savedID == nil {
+            observation = await quote(asset.symbol)
+            guard owner == user, currentUser() == user, currentGeneration() == generation, revision == started, consent() == .accepted else { return }
+            if let observation, observation.price.isFinite, observation.price > 0 {
+                quotes[asset.symbol] = (observation, now())
+            } else { observation = nil }
         }
         // The line's button asks Bobby, which is a read: the phone finds out whether one is left.
         if mode != .inApp, access() == nil {
             await refreshAccess()
-            guard owner == user, currentGeneration() == generation, consent() == .accepted else { return }
+            guard owner == user, currentUser() == user, currentGeneration() == generation, revision == started, consent() == .accepted else { return }
         }
-        guard let still = dueAsset(), still.symbol == asset.symbol else { return }
+        guard let still = dueAsset(), still.symbol == asset.symbol, still.lastAskedAt == asset.lastAskedAt,
+              (mode == .inApp ? dueSavedRead()?.readId : nil) == savedID else { return }
         let days = max(1, Int(now().timeIntervalSince(asset.lastAskedAt) / 86_400))
+        let opportunity = HarnessOpportunity.make(asset: asset, quote: observation, now: now(), savedReadID: savedID)
         let next = HarnessMove(symbol: asset.symbol, name: asset.name, isEquity: asset.isEquity, askedAt: asset.lastAskedAt,
-                               priceThen: asset.lastPrice, priceNow: price, days: days,
-                               savedReadID: mode == .inApp ? dueSavedRead()?.readId : nil)
+                               priceThen: asset.lastPrice, priceNow: opportunity.quote?.price, days: days,
+                               savedReadID: savedID, opportunity: opportunity, askedByPerson: asset.lastAskedByPerson)
         if next != move || readsOpen != couldAsk { move = next; changed() }
     }
 
@@ -957,7 +997,9 @@ final class HarnessCenter: ObservableObject {
     }
 
     private func notice(_ followUp: HarnessFollowUp) -> HarnessNotice {
-        HarnessNotice(id: followUp.id, title: HarnessCopy.notificationTitle, body: HarnessCopy.body(followUp), fireAt: followUp.fireAt,
+        let body = followUp.step == .asset && ledger.followUpAnchor(before: now())?.isQuestion == false
+            ? L.t("Let's revisit \(followUp.symbol ?? "")", "Retomemos \(followUp.symbol ?? "")") : HarnessCopy.body(followUp)
+        return HarnessNotice(id: followUp.id, title: HarnessCopy.notificationTitle, body: body, fireAt: followUp.fireAt,
                       step: followUp.step, symbol: followUp.symbol, sector: followUp.sector, owner: Self.ownerTag(owner), calendar: calendar())
     }
 
@@ -1009,6 +1051,7 @@ final class HarnessCenter: ObservableObject {
         focus = nil
         held = []
         quotes = [:]
+        offeredRead = nil
         if move != nil { move = nil }
         forgetLines(nil, owner)
         purge()

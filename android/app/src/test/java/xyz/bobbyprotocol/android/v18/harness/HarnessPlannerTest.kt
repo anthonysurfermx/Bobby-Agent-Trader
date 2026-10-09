@@ -1042,6 +1042,52 @@ class HarnessPlannerTest {
         assertTrue("the sector is one more than the first build far too often to call it rare: $oneMoreWithTheSector of 4000", oneMoreWithTheSector <= 12)
     }
 
+    // Explicit contextual choices are independent from delivered Bobby reads.
+    private val readAt = Instant.parse("2026-10-05T10:00:00Z").toEpochMilli()
+    private val requestedAt = Instant.parse("2026-10-06T17:00:00Z").toEpochMilli()
+    private val utc = java.time.ZoneOffset.UTC
+    private val read = HarnessEvent(HarnessEvent.Kind.ASK, readAt, symbol = "NVDA", name = "NVIDIA", isEquity = true,
+                                    price = 100.0, origin = HarnessEvent.Origin.FOLLOW_UP)
+
+    @Test fun bobbyReadStartsNoChainUntilTheContextualChoiceAndThenWaitsFromThatChoice() {
+        val ledger = HarnessLedger().also { it.note(read) }
+        assertTrue(HarnessPlanner.plan(ledger, requestedAt, utc).isEmpty())
+        assertTrue(ledger.complete(read.copy(followUpRequestedAt = requestedAt)))
+        val plan = HarnessPlanner.plan(ledger, requestedAt, utc)
+        assertEquals(listOf(HarnessStep.ASSET, HarnessStep.WEEK), plan.map { it.step })
+        assertEquals(Instant.parse("2026-10-07T17:00:00Z").toEpochMilli(), plan.first().fireAt)
+        assertEquals(1, plan.first().days)
+        assertEquals("NVDA", plan.first().symbol)
+        val count = ledger.events.size
+        ledger.note(read.copy(at = requestedAt + HARNESS_HOUR_MS, symbol = "TSLA"))
+        assertEquals(plan, HarnessPlanner.plan(ledger, requestedAt + HARNESS_HOUR_MS, utc))
+        assertEquals(count + 1, ledger.events.size)
+    }
+
+    @Test fun priorSendsAndSavesBelongToTheOriginalReadRatherThanTheLaterChoice() {
+        val ledger = HarnessLedger().also { it.note(read.copy(followUpRequestedAt = requestedAt)) }
+        ledger.note(HarnessEvent(HarnessEvent.Kind.SENT, requestedAt - HARNESS_HOUR_MS, symbol = "NVDA", step = HarnessStep.ASSET))
+        ledger.note(HarnessEvent(HarnessEvent.Kind.SAVED, requestedAt - 2 * HARNESS_HOUR_MS, symbol = "NVDA", horizonHours = 168))
+        val anchor = ledger.followUpAnchor(requestedAt)!!
+        assertEquals(HarnessPlanner.Wait.Source.STANDARD, HarnessPlanner.waitFor(anchor, ledger, requestedAt).source)
+        assertTrue(HarnessPlanner.plan(ledger, requestedAt, utc).any { it.step == HarnessStep.ASSET })
+    }
+
+    @Test fun aFutureChoiceAndAnExpiredAnchorProduceNoPlan() {
+        val ledger = HarnessLedger().also { it.note(read.copy(followUpRequestedAt = requestedAt)) }
+        assertTrue(HarnessPlanner.plan(ledger, requestedAt - 1, utc).isEmpty())
+        assertTrue(HarnessPlanner.plan(ledger, requestedAt + 15 * HARNESS_DAY_MS, utc).isEmpty())
+    }
+
+    @Test fun bobbyNamedHorizonIsNotMistakenForADeclaredTimeframe() {
+        val generated = read.copy(horizon = HarnessHorizon.LONG, followUpRequestedAt = requestedAt)
+        val ledger = HarnessLedger().also { it.note(generated) }
+        assertEquals(HarnessPlanner.Wait(1, HarnessPlanner.Wait.Source.STANDARD), HarnessPlanner.waitFor(generated, ledger, requestedAt))
+        assertTrue(HarnessPlanner.plan(ledger, requestedAt, utc).any { it.step == HarnessStep.ASSET })
+        val own = generated.copy(origin = null, followUpRequestedAt = null)
+        assertEquals(HarnessPlanner.Wait(null, HarnessPlanner.Wait.Source.NAMED), HarnessPlanner.waitFor(own, ledger, requestedAt))
+    }
+
     companion object {
         private val SYMBOLS = listOf("NVDA", "AMD", "TSLA", "BTC", "SOL", "GME", "AAPL")
     }

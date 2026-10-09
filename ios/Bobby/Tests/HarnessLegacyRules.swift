@@ -2,11 +2,27 @@ import Foundation
 @testable import Bobby
 
 /// The planner as it shipped in the first 1.8 build (commit 2eaa5f55), copied rule for rule and kept
-/// only as a yardstick: HarnessPlannerTests checks that the planner of today never plans more than
-/// this one would have. In it a tap on a notification was an answer, any answer started the chain
+/// only as a yardstick: HarnessPlannerTests checks that today's shipped asset→week chain never
+/// plans more than this one would have. Optional sectors have their own full cap suite; their
+/// subject population now differs from the all-ask history. A tap on a notification was an answer, any answer started the chain
 /// again from the next day, the chain was asset → sector → week, and nothing the person said about
 /// their horizon was read. Do not "fix" it: it is the past.
 enum HarnessLegacyRules {
+    /// Keep the first build's all-ask asset set independent of today's own-question-only reader.
+    /// This is the historical ledger projection, not a change to the old planner's rules.
+    private static func assets(_ ledger: HarnessLedger, since: Date, now: Date) -> [HarnessAsset] {
+        var bySymbol: [String: [HarnessEvent]] = [:]
+        for event in ledger.events where event.kind == .ask && event.at >= since && event.at <= now {
+            guard let symbol = event.symbol else { continue }
+            bySymbol[symbol, default: []].append(event)
+        }
+        return bySymbol.compactMap { symbol, asks in
+            guard let first = asks.first, let last = asks.last else { return nil }
+            return HarnessAsset(symbol: symbol, name: last.name ?? symbol, isEquity: last.isEquity ?? false,
+                                firstAskedAt: first.at, lastAskedAt: last.at, lastPrice: last.price,
+                                firstPrice: asks.first { $0.price != nil }?.price, asks: asks.count)
+        }.sorted { $0.lastAskedAt > $1.lastAskedAt }
+    }
     struct Profile {
         var interest: [String: Double] = [:]
         var hour: Int?
@@ -72,7 +88,7 @@ enum HarnessLegacyRules {
         let profile = Profile.make(ledger, now: now, calendar: calendar)
         let sentSince = ledger.events(.sent, since: anchor.at)
         let done = Set(sentSince.compactMap(\.step))
-        let known = ledger.assets(since: now.addingTimeInterval(-anchorDays * 86_400), now: now)
+        let known = assets(ledger, since: now.addingTimeInterval(-anchorDays * 86_400), now: now)
 
         let subject: HarnessAsset? = {
             if anchor.kind == .ask, let symbol = anchor.symbol { return known.first { $0.symbol == symbol } }
@@ -118,7 +134,7 @@ enum HarnessLegacyRules {
             let from = lastSlot ?? calendar.startOfDay(for: anchor.at)
             if let monday = HarnessPlanner.nextMonday(after: from, calendar: calendar),
                let fireAt = HarnessPlanner.moment(on: monday, time: time, calendar: calendar) {
-                let weekAssets = ledger.assets(since: now.addingTimeInterval(-weekWindowDays * 86_400), now: now)
+                let weekAssets = assets(ledger, since: now.addingTimeInterval(-weekWindowDays * 86_400), now: now)
                 let repeated = ledger.events(.sent).contains { $0.step == .week && fireAt.timeIntervalSince($0.at) < weekFreshDays * 86_400 }
                 if let first = weekAssets.first, !repeated {
                     result.append(HarnessFollowUp(step: .week, fireAt: fireAt, symbol: first.symbol, name: first.name,

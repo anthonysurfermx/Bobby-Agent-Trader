@@ -10,6 +10,7 @@ import { isListedStockSymbol } from '../src/lib/regional-stocks.js';
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { providerTime } from './_lib/market-provenance.js';
 import { isEquitySymbol, normalizeAssetSymbol } from '../src/lib/voice-assets.js';
 import { analyzeCandles, analysisSummary, type Candle } from '../src/lib/market-indicators.js';
 import { buildDeskBrief, type DeskBriefLanguage } from '../src/lib/voice-desk-brief.js';
@@ -87,6 +88,9 @@ function okxTickerToMarket(ticker: string, t: Record<string, string>, funding?: 
   return {
     symbol: ticker,
     ...extra,
+    provider: 'OKX',
+    // Provider time, never the fetch time. Missing provenance remains unknown.
+    asOf: providerTime(t.ts),
     price: last,
     change_24h_pct: changePct,
     high_24h: Number(t.high24h),
@@ -106,7 +110,7 @@ async function getMarket(symbol: string, venue?: AssetVenue) {
     const quote = stock.quotes?.[0];
     if (quote && Number(quote.price)) {
       return {
-        symbol: ticker, assetType: 'equity', currency: quote.currency ?? null, exchange: quote.exchange ?? null, asOf: quote.asOf ?? null, marketStatus: 'market-data', available: true,
+        symbol: ticker, assetType: 'equity', provider: 'Yahoo Finance', currency: quote.currency ?? null, exchange: quote.exchange ?? null, asOf: quote.asOf ?? null, marketStatus: 'market-data', available: true,
         price: Number(quote.price), change_24h_pct: Number(quote.change24h || 0), high_24h: Number(quote.dayHigh || 0), low_24h: Number(quote.dayLow || 0),
       };
     }

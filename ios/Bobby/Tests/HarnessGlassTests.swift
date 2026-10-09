@@ -211,7 +211,11 @@ final class HarnessGlassTests: XCTestCase {
         let read = NudgeRead(requestId: "r1", symbol: "NVDA", name: "NVIDIA", isEquity: true, verdict: "wait", saved: false, at: t0)
         let fresh = NudgeMoment(signedIn: false, now: t0.addingTimeInterval(60), lastRead: read, readsThisLaunch: 1)
         let offer = HarnessNudges.offer(fresh, mode: .undecided)
-        XCTAssertEqual(offer?.id, "harness.offer.v1")
+        XCTAssertEqual(offer?.id, HarnessNudges.offerId(for: read.requestId))
+        XCTAssertEqual(offer?.refreshAt, t0.addingTimeInterval(HarnessNudges.freshWindow))
+        XCTAssertNil(HarnessNudges.offer(NudgeMoment(signedIn: false, now: t0.addingTimeInterval(HarnessNudges.freshWindow),
+                                                    lastRead: read, readsThisLaunch: 1), mode: .undecided),
+                     "the expiry timer must remove the offer at its deadline")
         XCTAssertEqual(offer?.text, "Shall I keep you posted on NVDA?")
         XCTAssertEqual(offer?.cta, "Yes, tell me")
         XCTAssertNil(HarnessNudges.offer(fresh, mode: .on), "they already said yes")

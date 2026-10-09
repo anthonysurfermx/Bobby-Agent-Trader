@@ -10,6 +10,7 @@ final class FakeHarnessNotifier: HarnessNotifying {
     var grantsWhenAsked = true
     var addSucceeds = true
     var whileAsking: (() -> Void)?
+    var whileRequesting: (() async -> Void)?
     /// Runs while "iOS is writing" a request, before it answers.
     var whileAdding: ((HarnessNotice) async -> Void)?
     var whileReadingPending: (() async -> Void)?
@@ -33,6 +34,7 @@ final class FakeHarnessNotifier: HarnessNotifying {
     func requestPermission() async -> Bool {
         permissionRequests += 1
         whileAsking?()
+        await whileRequesting?()
         permission = grantsWhenAsked ? .allowed : .denied
         return grantsWhenAsked
     }
@@ -104,6 +106,75 @@ final class HarnessCenterTests: XCTestCase {
         try await super.tearDown()
     }
 
+    func testAContextualFollowUpChoiceCannotCrossAccountsOrGenerations() async {
+        let center = make()
+        center.noteAsk(symbol: "NVDA", name: "NVIDIA", isEquity: true, price: 100,
+                       origin: .followUp, chip: true, requestId: "chip-one")
+        user = "another-reader"
+        generation = UUID()
+        let switched = await center.accept(following: "chip-one")
+        XCTAssertEqual(switched, .failed)
+        XCTAssertTrue(center.ledger.isEmpty)
+        XCTAssertEqual(fake.permissionRequests, 0)
+        user = nil
+        let revived = await center.accept(following: "chip-one")
+        XCTAssertEqual(revived, .failed, "the original account alone cannot revive a previous generation")
+        XCTAssertTrue(center.ledger.isEmpty)
+    }
+
+    func testAContextualFollowUpChoiceExpiresOrIsDroppedWhenThePermissionPromptChangesAccount() async {
+        var center = make()
+        center.noteAsk(symbol: "NVDA", name: "NVIDIA", isEquity: true, price: 100,
+                       origin: .followUp, chip: true, requestId: "expired")
+        clock = clock.addingTimeInterval(HarnessCenter.heldWindow)
+        let expired = await center.accept(following: "expired")
+        XCTAssertEqual(expired, .failed)
+        XCTAssertEqual(fake.permissionRequests, 0)
+        center = make()
+        center.noteAsk(symbol: "NVDA", name: "NVIDIA", isEquity: true, price: 100,
+                       origin: .followUp, chip: true, requestId: "fresh")
+        fake.whileAsking = { [unowned self] in self.user = "another-reader"; self.generation = UUID() }
+        let changed = await center.accept(following: "fresh")
+        XCTAssertEqual(changed, .failed)
+        XCTAssertTrue(center.ledger.isEmpty)
+        XCTAssertTrue(center.upcoming.isEmpty)
+    }
+
+    func testASuspendedGlobalYesCannotOverwriteALaterOffInAppOrEraseChoice() async {
+        for later in ["off", "inApp", "erase"] {
+            defaults.removePersistentDomain(forName: suiteName)
+            fake = FakeHarnessNotifier()
+            let center = make()
+            await ask(center, "NVDA")
+            fake.whileRequesting = { [unowned self] in
+                switch later {
+                case "off": await center.turnOff()
+                case "inApp": _ = await center.keepForInAppReturn(self.keptRead())
+                default: await center.forgetLedger()
+                }
+            }
+            let result = await center.accept()
+            XCTAssertEqual(result, .failed, later)
+            XCTAssertEqual(center.mode, later == "off" ? .off : (later == "inApp" ? .inApp : .undecided), later)
+            XCTAssertTrue(center.upcoming.isEmpty, later)
+            if later != "inApp" { XCTAssertTrue(center.ledger.isEmpty, later) }
+            else { XCTAssertEqual(center.ledger.events(.saved).count, 1) }
+        }
+    }
+
+    func testAContextualChoiceExpiresWhileItsPermissionPromptIsOpen() async {
+        let center = make()
+        center.noteAsk(symbol: "NVDA", name: "NVIDIA", isEquity: true, price: 100,
+                       origin: .followUp, chip: true, requestId: "expires-during-prompt")
+        await settle()
+        fake.whileAsking = { [unowned self] in self.clock = self.clock.addingTimeInterval(HarnessCenter.heldWindow) }
+        let result = await center.accept(following: "expires-during-prompt")
+        XCTAssertEqual(result, .failed)
+        XCTAssertEqual(center.mode, .undecided)
+        XCTAssertTrue(center.ledger.isEmpty)
+        XCTAssertTrue(center.upcoming.isEmpty)
+    }
+
     /// Wednesday 7 October 2026, local time.
     private func at(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
         calendar.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour, minute: minute))!
@@ -118,7 +189,7 @@ final class HarnessCenterTests: XCTestCase {
         center.currentGeneration = { [unowned self] in self.generation }
         center.weeklyCovered = { false }
         center.quote = { [unowned self] symbol in
-            await MainActor.run { self.quoted.append(symbol); return self.prices[symbol] }
+            await MainActor.run { self.quoted.append(symbol); return self.prices[symbol].map { HarnessQuote(price: $0, provider: "fixture", asOf: self.clock) } }
         }
         center.changed = { [unowned self] in self.redraws += 1 }
         center.load(owner: user)
@@ -166,8 +237,8 @@ final class HarnessCenterTests: XCTestCase {
         XCTAssertEqual(reloaded.move?.symbol, "MU", "less than 20 h still counts as tomorrow locally")
         XCTAssertEqual(reloaded.move?.savedReadID, read.requestId)
         XCTAssertEqual(reloaded.move?.priceThen, 100)
-        XCTAssertEqual(reloaded.move?.priceNow, 105)
-        XCTAssertEqual(quoted, ["MU"], "only the quota-free quote runs on open")
+        XCTAssertNil(reloaded.move?.priceNow, "a stored answer is not presented as a fresh analysis")
+        XCTAssertEqual(quoted, [], "reopening the stored answer needs no market request")
         XCTAssertEqual(meterRequests, 0, "opening a saved reading needs no read entitlement")
         XCTAssertEqual(fake.permissionRequests, 0)
         XCTAssertTrue(fake.added.isEmpty)

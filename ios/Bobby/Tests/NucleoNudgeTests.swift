@@ -9,7 +9,8 @@ import XCTest
 final class NucleoNudgeTests: XCTestCase {
     private final class Recorder: NucleoEmitting {
         var events: [(name: String, payload: [String: Any])] = []
-        func emit(_ name: String, _ payload: [String: Any]) { events.append((name, payload)) }
+        var didEmit: ((String, [String: Any]) -> Void)?
+        func emit(_ name: String, _ payload: [String: Any]) { events.append((name, payload)); didEmit?(name, payload) }
         func pageReady() {}
     }
 
@@ -88,6 +89,29 @@ final class NucleoNudgeTests: XCTestCase {
     }
 
     // MARK: Etiquette
+
+    func testTheFirstShowingRefreshesWhenItsSourceExpiresAndUsesTheEarlierDeadline() {
+        let center = center()
+        var sourceEnd = clock.addingTimeInterval(1_200)
+        center.register(NudgeSource(key: "market", priority: 1,
+            candidate: { _ in NucleoNudge(id: "market.one", text: "A dated change", cta: "Review", refreshAt: sourceEnd) },
+            act: { _, _ in }))
+        _ = center.current(moment(center))
+        center.seen("market.one")
+        XCTAssertNil(center.showingEnds("market.one"))
+        XCTAssertEqual(center.refreshAt("market.one"), sourceEnd, "source expiry refreshes even the first showing")
+        clock.addTimeInterval(601)
+        _ = center.current(moment(center))
+        center.seen("market.one")
+        sourceEnd = clock.addingTimeInterval(60)
+        _ = center.current(moment(center))
+        XCTAssertEqual(center.refreshAt("market.one"), sourceEnd, "source expiry precedes the showing limit")
+        sourceEnd = clock.addingTimeInterval(1_200)
+        _ = center.current(moment(center))
+        XCTAssertEqual(center.refreshAt("market.one"), center.showingEnds("market.one"))
+        center.withhold()
+        XCTAssertNil(center.refreshAt("market.one"), "an old account or hidden nudge does not drive a refresh")
+    }
 
     func testTwoShowingsThenAWeekOfRestThenOneMoreRoundThenNeverAgain() {
         let center = center()
@@ -276,6 +300,31 @@ final class NucleoNudgeTests: XCTestCase {
     }
 
     // MARK: The session and the bridge
+
+    func testAnOpenPageRefreshesAnExpiredSourceWithoutAnotherTap() async {
+        NudgeCenter.shared.now = { Date() }
+        let expires = Date().addingTimeInterval(1)
+        NudgeCenter.shared.register(NudgeSource(key: "market", priority: 1,
+            candidate: { moment in
+                let fresh = moment.now < expires
+                return NucleoNudge(id: "market.one", text: fresh ? "A dated change" : "Revisit this asset",
+                                   cta: fresh ? "What changed?" : "Review together", refreshAt: fresh ? expires : nil)
+            }, act: { _, _ in }))
+        let (session, bridge, recorder) = makeSession()
+        defer { session.teardown() }
+        session.nudgesEnabled = true
+        let first = await result(bridge, "session", ["page": "app"])
+        XCTAssertEqual((first["nudge"] as? [String: String])?["cta"], "What changed?")
+        let refreshed = expectation(description: "native source deadline updates the idle page")
+        recorder.didEmit = { name, payload in
+            if name == "session.changed", (payload["nudge"] as? [String: String])?["cta"] == "Review together" { refreshed.fulfill() }
+        }
+        await fulfillment(of: [refreshed], timeout: 4)
+        recorder.didEmit = nil
+        let nudge = recorder.events.last { $0.name == "session.changed" }?.payload["nudge"] as? [String: String]
+        XCTAssertEqual(nudge?["text"], "Revisit this asset")
+        XCTAssertEqual(Set(nudge?.keys.map { $0 } ?? []), ["id", "text", "cta"], "the native deadline is not added to the page payload")
+    }
 
     private func makeSession(riskAccepted: Bool = true) -> (NucleoSession, NucleoBridge, Recorder) {
         let profile = AgentProfile()
