@@ -44,6 +44,13 @@ Rules a client can rely on:
   the same person sent at once. Offer "try again" with the same question; for a tapped `followUp`, try again
   straight to this endpoint.
 - Send the same `Origin` and `x-bobby-device` headers as a desk read. No account is needed.
+- **Six languages, on every platform.** Send `language` (`en`, `es`, `fr`, `pt`, `it`, `de`) and `locale`. Every
+  text the server returns is in that language and addresses the person informally, as the app does (tú, tu,
+  você in Brazil, du): the reply, the `followUp`, `error.message` and the sentence of a `desk_offer`. Show
+  `error.message` as it comes. Whatever a client adds around this stage itself (a "try again" button, its
+  "did you mean…?" confirmation) must exist in the six languages too; the web's are in
+  `src/lib/companions/web-translations-extra.json`. The rules that decide what a reply may say are written and
+  tested per language (`api/_lib/companion-review.ts`).
 - The answer never states a market figure, a return, a promise or a product to choose; when a model's reply
   does, the server serves a fixed sentence instead (still `kind: "explanation"`). A `followUp` that is not one
   plain question in the person's voice, or that asks what to buy, is sent as null.
