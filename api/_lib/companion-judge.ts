@@ -55,12 +55,12 @@ export interface CompanionVerdict { rejected: Exclude<CompanionRejection, 'shape
  */
 export async function judgeCompanionReply(
   question: string, reply: { text: string; followUp: string | null }, language: AppLanguage,
-  opts: { model: string; locale?: string; usage?: LlmUsage[]; timeoutMs?: number },
+  opts: { model: string; locale?: string; usage?: LlmUsage[]; timeoutMs?: number; /** Where the person's own numbers are read from, when it is more than the question (the exchange on screen). */ numbersFrom?: string },
 ): Promise<CompanionVerdict | null> {
   const spec: ModelSpec = { provider: 'anthropic', model: opts.model, effort: 'low', maxTokens: 700, timeoutMs: opts.timeoutMs ?? 5000 };
   try {
-    const v = Verdict.parse(await completeJson(spec, judgePrompt(language, opts.locale), JSON.stringify({ question, personsNumbers: [...theirNumbers(question)].filter((n) => n !== '0'), reply: reply.text, nextQuestion: reply.followUp ?? '' }), VERDICT_SCHEMA,
-      { endpoint: 'companion-turn', role: 'judge', usage: opts.usage }));
+    const v = Verdict.parse(await completeJson(spec, judgePrompt(language, opts.locale), JSON.stringify({ question, personsNumbers: [...theirNumbers(opts.numbersFrom ?? question)].filter((n) => n !== '0'), reply: reply.text, nextQuestion: reply.followUp ?? '' }), VERDICT_SCHEMA,
+      { endpoint: 'companion-turn', role: 'judge', usage: opts.usage, attempts: 3 }));
     return { rejected: v.promise ? 'guarantee' : v.recommendation || v.instruction || v.label ? 'advice' : v.figure ? 'figure' : null, keepNext: v.nextQuestion === 'keep' };
   } catch {
     return null;

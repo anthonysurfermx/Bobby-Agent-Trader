@@ -32,7 +32,12 @@ Rules a client can rely on:
   `companion_unavailable` (503), and `notes_limit` (429) to an `answer` only. `error.retryable` says whether
   trying again can help.
 - `reply.followUp` is the next question the **person** could ask, in their voice, or null. Tapping it sends it
-  as a new question. It is never a question Bobby asks the person: v0 keeps no conversation.
+  as a new question. It is never a question Bobby asks the person: v0 keeps no conversation. It is sent only
+  when the answer opens something the person will need next, and is null when the answer settles what they
+  asked or when they only said they understood: **null means "show nothing"**, never "show a default". Bobby
+  knowing when to stop is part of the answer. The one exception is the fixed sentence the server serves when a
+  reply cannot be shown: at the start of a conversation it comes with its own first question, and with none
+  when the request carried `previous`.
 - When to call it: the asset search resolved nothing for the question, or it only offered a look-alike guess
   for a whole sentence (the web's rule: a fuzzy match that needs confirmation on a question of four words or
   more). A search that did not answer at all is not "no asset": keep today's message.
@@ -53,7 +58,8 @@ Rules a client can rely on:
 - **`reply.gist`** (optional, at most 120 characters): the first sentence of `reply.text`, when that sentence
   can stand alone. It is always the exact start of `text`, cut by code after the second reader read the whole
   reply. A voice-first client shows it while Bobby says `text`, and the rest (`text` after the gist) when the
-  person asks to read it all. When it is absent, show `text`.
+  person asks to read it all. When it is absent, show `text`. A reply short enough to be shown whole (under 120
+  characters, and not a question) is its own gist: when `gist` equals `text` there is nothing more to open.
 - **`previous`** (optional): `{ question, reply }`, the one exchange still on the person's screen (at most 600
   and 700 characters). It lets "give me an example" refer to something. It is one exchange, never a history,
   and the server stores none of it. Send it only while that answer is on screen.
@@ -71,6 +77,15 @@ Rules a client can rely on:
 - `companion_unavailable` with `retryable: true` also covers storage that could not answer and two turns of
   the same person sent at once. Offer "try again" with the same question; for a tapped `followUp`, try again
   straight to this endpoint.
+- **Trying again.** Make one `requestId` (a UUID) per question the person asks and send that same id whenever
+  that question is sent again: after a failure, or after an answer that never arrived. Keep the question and
+  `previous` on screen through a failure, so the person never has to say it again. A failure the server
+  reports costs the person nothing, and every reply carries the true `allowance`. An answer that was served
+  and lost on the way was counted, and sending it again counts again: the server keeps no result to return
+  (the id is echoed, not remembered). So never tell the person what a failure cost them: show the `allowance`
+  of the last reply the server sent, or none. Before it answers `companion_unavailable` the server has already
+  asked a provider that refused for a moment, or a connection that broke at once, up to three times within
+  the time the turn has.
 - Send the same `Origin` and `x-bobby-device` headers as a desk read. No account is needed.
 - **Six languages, on every platform.** Send `language` (`en`, `es`, `fr`, `pt`, `it`, `de`) and `locale`. Every
   text the server returns is in that language and addresses the person informally, as the app does (tú, tu,

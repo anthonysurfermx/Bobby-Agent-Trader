@@ -379,9 +379,9 @@ async function postJson(url: string, headers: Record<string, string>, body: unkn
 
 export async function completeJson(
   spec: ModelSpec, system: string, user: string, schema: JsonSchemaSpec,
-  opts: { endpoint: string; role?: string; usage?: LlmUsage[] },
+  opts: { endpoint: string; role?: string; usage?: LlmUsage[]; /** Calls made before giving up on a provider that refuses for now (429, 529, 5xx): two unless a caller can wait for a third. With three, a connection that broke is tried again as well. */ attempts?: 2 | 3 },
 ): Promise<unknown> {
-  const started = Date.now();
+  const started = Date.now(), attempts = opts.attempts ?? 2;
   const note = (u: Partial<LlmUsage>) => opts.usage?.push({
     provider: spec.provider, model: spec.model, role: opts.role ?? null, tokensIn: 0, tokensOut: 0, tokensCached: 0, tokensReasoning: 0,
     usd: 0, latencyMs: Date.now() - started, stop: null, ok: false, ...u,
@@ -389,9 +389,13 @@ export async function completeJson(
 
   let res: Response | null = null;
   let providerCode: ProviderRefusal | null = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
     const left = spec.timeoutMs - (Date.now() - started);
     if (left < 2000) break;
+    // Another attempt is worth waiting for only when, after the wait, it still has the two seconds it needs:
+    // decided before sleeping, so no time is spent on a retry the deadline would refuse.
+    const canRetry = () => attempt < attempts - 1 && spec.timeoutMs - (Date.now() - started) - BACKOFF_MS[attempt] >= 2000;
+    const began = Date.now();
     try {
       if (spec.provider === 'openai') {
         const key = process.env.OPENAI_API_KEY;
@@ -417,6 +421,10 @@ export async function completeJson(
       const timeout = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError');
       recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: timeout ? 'timeout' : 'unknown', message: timeout ? 'timeout' : 'transport_error' });
       note({ stop: timeout ? 'timeout' : 'network' });
+      // A connection that broke at once never reached the provider's model. A caller that asked for a third
+      // attempt is one that would rather wait than fail: it tries again. One that broke later may have been
+      // billed, and a timeout has spent its time: neither is tried again here.
+      if (!timeout && attempts > 2 && Date.now() - began < 1000 && canRetry()) { res = null; await sleep(BACKOFF_MS[attempt]); continue; }
       const error = new Error(timeout ? 'Structured model request timed out' : 'Structured model provider unavailable');
       if (timeout) error.name = e instanceof Error ? e.name : 'TimeoutError';
       throw error;
@@ -424,10 +432,10 @@ export async function completeJson(
     providerCode = res.ok ? null : refusalCode(await res.clone().json().catch(() => null));
     // Billing exhaustion cannot recover through a retry or a cheaper-model fallback.
     if (providerCode === 'insufficient_quota' || providerCode === 'billing_hard_limit_reached') break;
-    if (res.ok || !RETRY_STATUS(res.status) || attempt === 1) break;
+    if (res.ok || !RETRY_STATUS(res.status) || !canRetry()) break;
     recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: classifyHttpStatus(res.status), httpStatus: res.status });
     note({ stop: `http_${res.status}` }); // the failed attempt is a call too
-    await sleep(BACKOFF_MS[0]);
+    await sleep(BACKOFF_MS[attempt]);
   }
   if (!res) { note({ stop: 'deadline' }); throw new Error(`${spec.model}: no time left`); }
   if (!res.ok) {

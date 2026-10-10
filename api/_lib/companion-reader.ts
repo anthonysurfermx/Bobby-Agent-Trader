@@ -88,7 +88,7 @@ export async function readCompanionAnswer(
   try {
     read = Reading.parse(await completeJson(spec, readerPrompt(language, opts.locale),
       JSON.stringify({ asked: question.text[language], options: Object.fromEntries(question.options.map((o) => [o.id, o.label[language]])), spoken: question.spoken, answer: text }), readerSchema(question),
-      { endpoint: 'companion-turn', role: 'reader', usage }));
+      { endpoint: 'companion-turn', role: 'reader', usage, attempts: 3 }));
   } catch (error) {
     if (!(error instanceof LlmHttpError) && (usage.at(-1)?.tokensOut ?? 0) > 0) throw new CompanionUnchecked();
     throw error;
