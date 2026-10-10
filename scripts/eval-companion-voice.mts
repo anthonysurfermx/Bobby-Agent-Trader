@@ -2,7 +2,10 @@
 //   · intent: a question that names an asset is explained when it asks what the asset is, and offered as a market
 //     read only when it asks how the asset is doing or for an analysis of it (candidate.exact);
 //   · the sentence in front: how often a reply opens with a sentence a client can show alone (companionGist);
-//   · one exchange of memory: "give me an example" after an answer is about that answer (previous).
+//   · one exchange of memory: "give me an example" after an answer is about that answer (previous);
+//   · results a person can use: a comparison compares and chooses nothing; a question that needs today's data,
+//     or the future, is answered by saying so first; "shorter" shortens and "I get it" ends without an invitation;
+//   · how often a reply comes with a next question at all: Bobby knowing when to stop.
 // It calls the provider and nothing else; no row is read or written. Needs ANTHROPIC_API_KEY; prints no secret.
 //   vercel env run -e production -- npx tsx scripts/eval-companion-voice.mts <out.json> [model] [--lang=es,de]
 import { writeFileSync } from 'node:fs';
@@ -38,27 +41,75 @@ const THREAD: Record<Language, [string, string]> = {
   pt: ['O que é um fundo de índice?', 'Me dá um exemplo'], it: ["Che cos'è un fondo indicizzato?", 'Fammi un esempio'], de: ['Was ist ein Indexfonds?', 'Gib mir ein Beispiel'],
 };
 
+/** [question, candidate or null]: two things to compare, never one to pick. */
+const COMPARE: Record<Language, Array<[string, typeof BTC | null]>> = {
+  es: [['¿Qué diferencia hay entre un ETF y una acción?', null], ['Compárame Bitcoin y Ethereum', BTC], ['¿Qué me conviene más, CETES o dólares?', null]],
+  en: [['What is the difference between an ETF and a stock?', null], ['Compare Bitcoin and Ethereum for me', BTC], ['Which is better for me, bonds or stocks?', null]],
+  fr: [['Quelle est la différence entre un ETF et une action ?', null], ['Compare-moi le Bitcoin et Ethereum', BTC]],
+  pt: [['Qual é a diferença entre um ETF e uma ação?', null], ['Compara o Bitcoin com o Ethereum', BTC]],
+  it: [["Che differenza c'è tra un ETF e un'azione?", null], ['Confrontami Bitcoin ed Ethereum', BTC]],
+  de: [['Was ist der Unterschied zwischen einem ETF und einer Aktie?', null], ['Vergleich mir Bitcoin und Ethereum', BTC]],
+};
+/** Questions nobody can answer from here: today's market, or the future. The first sentence must say so. */
+const NODATA: Record<Language, string[]> = {
+  es: ['¿Va a subir el dólar esta semana?', '¿Cómo está la bolsa hoy?'], en: ['Will the dollar go up this week?', 'How is the stock market doing today?'],
+  fr: ['Le dollar va monter cette semaine ?', "Comment va la bourse aujourd'hui ?"], pt: ['O dólar vai subir esta semana?', 'Como está a bolsa hoje?'],
+  it: ['Il dollaro salirà questa settimana?', 'Come va la borsa oggi?'], de: ['Steigt der Dollar diese Woche?', 'Wie steht die Börse heute?'],
+};
+/** What a first sentence says when it owns up to what it cannot know. Loose on purpose: a person reads the rows. */
+const OWNS_UP: Record<Language, RegExp> = {
+  es: /no (tengo|cuento con|puedo ver|sé)|nadie (lo )?(sabe|puede saber)|no se puede saber|imposible saber/i, en: /(do not|don't|can't|cannot) (have|know|see|tell)|no (current|live|real-time)( market)? data|nobody (knows|can know)|no one (knows|can know)/i,
+  fr: /je n['’]ai pas|personne ne (le )?(sait|peut)|impossible de (le )?savoir|je ne (peux|sais) pas/i, pt: /não (tenho|sei|consigo|posso)|ninguém (sabe|pode saber|consegue)|não dá para saber|impossível saber/i,
+  it: /non (ho|so|posso)|nessuno (lo )?(sa|può)|impossibile saper/i, de: /(ich )?(habe|hab) (hier )?keine|kann (das )?niemand|niemand (kann|weiß)|weiß niemand|lässt sich nicht (sagen|vorhersagen)|kann ich (dir )?(hier )?nicht|keine aktuellen/i,
+};
+/** [what they say after an answer, what it should do]. */
+const PACE: Record<Language, { shorter: string; done: string }> = {
+  es: { shorter: 'Más breve', done: 'Ya lo entendí, gracias' }, en: { shorter: 'Shorter', done: 'Got it, thanks' }, fr: { shorter: 'Plus court', done: "C'est bon, j'ai compris, merci" },
+  pt: { shorter: 'Mais curto', done: 'Já entendi, obrigado' }, it: { shorter: 'Più breve', done: 'Ho capito, grazie' }, de: { shorter: 'Kürzer', done: 'Verstanden, danke' },
+};
+const firstSentence = (text: string) => /^.*?[.!?…](?=\s|$)/s.exec(text)?.[0] ?? text;
+
 const usage: Usage[] = [];
 const rows: Array<Record<string, unknown>> = [];
 const ask = async (language: Language, question: string, extra: Record<string, unknown> = {}) => {
-  const started = Date.now();
+  const started = Date.now(), own: Usage[] = [];
   try {
-    const turn = await runCompanionTurn(question, language, { locale: LOCALE[language], speech: 'plain', usage, model: MODEL, ...extra });
+    const turn = await runCompanionTurn(question, language, { locale: LOCALE[language], speech: 'plain', usage: own, model: MODEL, ...extra });
     return { ...turn, ms: Date.now() - started, gist: turn.aboutCandidate ? null : companionGist(turn.text) };
-  } catch (error) { return { failed: `${(error as Error).name}: ${String((error as Error).message).slice(0, 120)}`, ms: Date.now() - started } as const; }
+  } catch (error) {
+    // The stop of every attempt, so a failure can be named afterwards (an http status, a timeout, the network).
+    return { failed: `${(error as Error).name}: ${String((error as Error).message).slice(0, 120)}`, stops: own.map((row) => `${row.role}:${row.stop}@${row.latencyMs}`), ms: Date.now() - started } as const;
+  } finally { usage.push(...own); }
 };
 
 for (const language of (Object.keys(INTENT) as Language[]).filter((l) => !LANGS || LANGS.includes(l))) {
   const answers = await Promise.all(INTENT[language].map(([question, candidate]) => ask(language, question, { candidate })));
   INTENT[language].forEach(([question, , wantsRead], n) => {
     const a = answers[n] as Record<string, unknown>;
-    rows.push({ part: 'intent', language, question, wantsRead, offered: a.aboutCandidate ?? null, right: a.aboutCandidate === wantsRead, source: a.source ?? null, rejected: a.rejected ?? null, failed: a.failed ?? null, gist: a.gist ?? null, text: a.text ?? null, ms: a.ms });
+    rows.push({ part: 'intent', language, question, wantsRead, offered: a.aboutCandidate ?? null, right: a.aboutCandidate === wantsRead, source: a.source ?? null, rejected: a.rejected ?? null, failed: a.failed ?? null, stops: a.stops ?? null, gist: a.gist ?? null, followUp: a.followUp ?? null, text: a.text ?? null, ms: a.ms });
   });
   const [first, second] = THREAD[language];
   const one = await ask(language, first) as Record<string, unknown>;
   const two = typeof one.text === 'string' ? await ask(language, second, { previous: { question: first, reply: one.text } }) as Record<string, unknown> : { failed: 'no first reply' };
   const alone = await ask(language, second) as Record<string, unknown>;
-  rows.push({ part: 'thread', language, first, firstReply: one.text ?? null, firstGist: one.gist ?? null, second, withPrevious: two.text ?? null, withPreviousRejected: two.rejected ?? null, alone: alone.text ?? null, failed: one.failed ?? two.failed ?? null });
+  rows.push({ part: 'thread', language, first, firstReply: one.text ?? null, firstGist: one.gist ?? null, firstFollowUp: one.followUp ?? null, second, withPrevious: two.text ?? null, withPreviousRejected: two.rejected ?? null, alone: alone.text ?? null, failed: one.failed ?? two.failed ?? null, stops: one.stops ?? two.stops ?? null });
+  const compared = await Promise.all(COMPARE[language].map(([question, candidate]) => ask(language, question, candidate ? { candidate } : {})));
+  COMPARE[language].forEach(([question, candidate], n) => {
+    const a = compared[n] as Record<string, unknown>;
+    rows.push({ part: 'compare', language, question, candidate: candidate?.symbol ?? null, offered: a.aboutCandidate ?? null, source: a.source ?? null, rejected: a.rejected ?? null, gist: a.gist ?? null, followUp: a.followUp ?? null, text: a.text ?? null, failed: a.failed ?? null, stops: a.stops ?? null, ms: a.ms });
+  });
+  const unknowable = await Promise.all(NODATA[language].map((question) => ask(language, question)));
+  NODATA[language].forEach((question, n) => {
+    const a = unknowable[n] as Record<string, unknown>;
+    const opens = typeof a.text === 'string' ? firstSentence(a.text) : null;
+    rows.push({ part: 'nodata', language, question, source: a.source ?? null, rejected: a.rejected ?? null, ownsUp: a.source === 'model' && opens ? OWNS_UP[language].test(opens) : null, opens, followUp: a.followUp ?? null, text: a.text ?? null, failed: a.failed ?? null, stops: a.stops ?? null, ms: a.ms });
+  });
+  if (typeof one.text === 'string') {
+    const previous = { question: first, reply: one.text };
+    const [shorter, done] = await Promise.all([ask(language, PACE[language].shorter, { previous }), ask(language, PACE[language].done, { previous })]) as Array<Record<string, unknown>>;
+    rows.push({ part: 'pace', language, said: PACE[language].shorter, was: one.text.length, now: typeof shorter.text === 'string' ? shorter.text.length : null, right: typeof shorter.text === 'string' && shorter.source === 'model' && shorter.text.length < one.text.length, text: shorter.text ?? null, followUp: shorter.followUp ?? null, failed: shorter.failed ?? null });
+    rows.push({ part: 'pace', language, said: PACE[language].done, now: typeof done.text === 'string' ? done.text.length : null, right: typeof done.text === 'string' && done.source === 'model' && done.followUp === null && done.text.length <= 119 && !/[?¿]/.test(done.text), gistIsWhole: typeof done.text === 'string' && companionGist(done.text) === done.text, text: done.text ?? null, followUp: done.followUp ?? null, failed: done.failed ?? null });
+  }
   console.error(language, 'done');
 }
 
@@ -72,6 +123,13 @@ const summary = {
   readRight: `${intent.filter((r) => r.wantsRead === true && r.right).length}/${intent.filter((r) => r.wantsRead === true).length}`,
   explanationsReplaced: explained.filter((r) => r.source === 'fallback').length,
   explanationsWithGist: `${explained.filter((r) => r.gist).length}/${explained.length}`,
+  // Bobby knowing when to stop: how many explanations come with a next question at all.
+  explanationsWithFollowUp: `${explained.filter((r) => r.followUp).length}/${explained.length}`,
+  comparedNotOffered: `${rows.filter((r) => r.part === 'compare' && r.offered !== true && !r.failed).length}/${rows.filter((r) => r.part === 'compare').length}`,
+  comparisonsReplaced: rows.filter((r) => r.part === 'compare' && r.source === 'fallback').map((r) => `${r.language}:${r.rejected}`),
+  ownsUpFirst: `${rows.filter((r) => r.part === 'nodata' && r.ownsUp).length}/${rows.filter((r) => r.part === 'nodata').length}`,
+  noDataReplaced: rows.filter((r) => r.part === 'nodata' && r.source === 'fallback').map((r) => `${r.language}:${r.rejected}`),
+  paceRight: `${rows.filter((r) => r.part === 'pace' && r.right).length}/${rows.filter((r) => r.part === 'pace').length}`,
   failed: rows.filter((r) => r.failed).length,
 };
 writeFileSync(OUT, JSON.stringify({ summary, rows }, null, 2));
