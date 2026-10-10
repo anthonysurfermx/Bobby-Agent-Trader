@@ -102,12 +102,15 @@ The catalog (`questions.json`):
 - **A tapped option needs no request at all.** The client writes the note itself:
   `{ "field": question.id, "value": option.id, "source": question.source }` (`said`, or `shown` for the
   exercise), and adds the id to `asked`. `spoken` lists values no button offers: only the server's reader
-  returns them, for an answer said aloud or typed.
+  returns them, for an answer said aloud or typed. `labels` has the words for each of them, and `unsure` at
+  the top of the catalog the words for a question with no such button: show every note in the catalog's own
+  words. Both were added without changing the catalog's version.
 
 What a client sends (`request-context.json`):
 
-- `context.version` is 1. `consent` is `{ notice, memory, money }`. `day` is the person's return day, 1 to 60,
-  counted by the client. `asked` lists the ids already put to the person, answered or skipped. `notes` holds at
+- `context.version` is 1. `consent` is `{ notice, memory, money }`. `day` is the person's return day, from 1,
+  counted by the client (a later day than 60 is read as 60). `asked` lists the ids already put to the person,
+  answered or skipped; an id listed twice is one. `notes` holds at
   most 8, one per `field`: `field` is a question id, `value` one of that question's option ids, `spoken` values
   or `unsure`, and `source` is `said`, `confirmed`, `shown` or `inferred`.
 - **Nothing else is accepted: no text, no dates, no identifiers.** An unknown key anywhere in `context`, a
@@ -115,7 +118,11 @@ What a client sends (`request-context.json`):
   server ignores all of it. That never fails the request: the reply is the plain one, with no `personalized`.
 - The server reads a context only when `consent.memory` is true and `consent.notice` is one of `notices`. Notes
   of a `money` question are dropped unless `consent.money` is true, and Bobby does not ask those questions.
-- Nothing of a context or of an answer is kept by the server: not in a log, a usage row, a counter or an error.
+- No note, value, question id or word of an answer is kept by the server: not in a log, a usage row or an
+  error. That a turn used a context, or that an answer was read, is counted as any turn is (a log line with
+  no content, a usage row, a slot of the day).
+- The picture reaches the model only while the second reader is on: it is what refuses a reply that labels
+  the person. With it off the turn is the plain one, `personalized` is false and `checkIn` is still sent.
 
 What comes back when the context was read (`response-explanation-personalized.json`). The three keys are sent
 together on an `explanation`, and are absent from every other reply and whenever the context was not read:
@@ -140,10 +147,11 @@ A spoken or typed answer to Bobby's question (`request-answer.json`, `response-n
 - The reply is `kind: "noted"`. `patch.notes` holds the note to keep (replace any note of that `field`) and
   `patch.asked` the id to add to `asked`. The value is one of that question's values or `unsure`; the server's
   small model can return nothing else, so whatever else the person said is neither kept nor returned.
-  `source` is `said` when the reading was confident and `inferred` when it was a guess: show an inferred note
-  as one to confirm. An answer that fits nothing comes back as `unsure`, `inferred`.
+  `source` is what a tap on that option would be (`said`, or `shown` for the exercise) when the reading was
+  confident, and `inferred` when it was a guess: show an inferred note as one to confirm. An answer that fits nothing comes back as `unsure`, `inferred`.
 - `checkIn` on a `noted` reply is the next question, counting the one just answered. `allowance` is the
   person's day of explanations as it was: noting an answer uses none of it. A person has 12 of these a day
-  (`notes_limit`, HTTP 429 with `Retry-After`), and they count towards the address's and the network's day.
-- If an `answer` request fails for any reason, show the options: a tap needs no server. `error.message` says so
-  in the person's language.
+  (`notes_limit`, HTTP 429 with `Retry-After`), and they count towards the address's, the network's and
+  everyone's day.
+- If an `answer` request fails for any reason, show the options, whatever the message says: a tap needs no
+  server.

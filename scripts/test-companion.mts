@@ -695,6 +695,8 @@ try {
   // The catalog is the clients' file, word for word.
   const CATALOG = fixture('questions.json');
   eq(COMPANION_CATALOG, CATALOG, 'questions.json is the server\'s catalog');
+  ok(COMPANION_CATALOG.questions.every((q) => q.spoken.length === Object.keys(q.labels).length && q.spoken.every((v) => LANGS.every((l) => typeof q.labels[v]?.[l] === 'string' && q.labels[v][l].length > 1)))
+    && LANGS.every((l) => COMPANION_CATALOG.unsure[l].length > 1), 'every value only a spoken answer can produce, and unsure, has words in the six languages');
   eq(JSON.stringify(COMPANION_CATALOG), JSON.stringify(CATALOG), '…with its questions, options and languages in the same order');
   eq(CATALOG.questions.map((q: any) => [q.id, q.day, q.money, q.source]), [['interest', 1, false, 'said'], ['barrier', 1, false, 'said'], ['when', 1, true, 'said'], ['cushion', 1, true, 'said'], ['hurry', 2, true, 'said'], ['fall', 3, true, 'shown'], ['belief', 4, false, 'said'], ['format', 5, false, 'said']],
     'eight questions in the order Bobby asks them: four on day one, then one a day; four are about the person\'s money, and the fall is an exercise');
@@ -732,13 +734,15 @@ try {
     eq([readCompanionContext({ ...FULL, consent }, ON)?.money, readCompanionContext({ ...FULL, consent }, ON)?.notes.map((n) => n.field)], [false, ['interest', 'barrier', 'belief', 'format']], `the second consent ${what}: the notes about their money are dropped, the rest read`);
   // Any other shape is ignored whole. Nothing but the catalog's ids travels: no text, no dates, no identifiers.
   const NOTE = CONTEXT.notes[0];
+  eq([readCompanionContext({ ...CONTEXT, day: 61 }, ON)?.day, readCompanionContext({ ...CONTEXT, day: 400 }, ON)?.day], [60, 60], 'a later day is day sixty: the context is still read');
+  eq(readCompanionContext({ ...CONTEXT, asked: ['interest', 'interest', 'barrier', 'interest'] }, ON)?.asked, ['interest', 'barrier'], 'a question listed twice in asked is one question');
   for (const [what, bad] of [
     ['a note with free text', { ...CONTEXT, notes: [{ ...NOTE, text: 'tengo diabetes y tres hijos' }] }], ['a note with a date', { ...CONTEXT, notes: [{ ...NOTE, at: '2026-10-10' }] }],
     ['a value that is a sentence', { ...CONTEXT, notes: [{ ...NOTE, value: 'my savings are 40,000' }] }], ['a value of another question', { ...CONTEXT, notes: [{ ...NOTE, value: 'under_2y' }] }],
     ['a field that is not a question', { ...CONTEXT, notes: [{ ...NOTE, field: 'income' }] }], ['a source nobody defined', { ...CONTEXT, notes: [{ ...NOTE, source: 'guessed' }] }],
     ['two notes of one question', { ...CONTEXT, notes: [NOTE, { ...NOTE, value: 'companies' }] }], ['nine notes', { ...FULL, notes: [...FULL.notes, NOTE] }], ['notes that are not a list', { ...CONTEXT, notes: { interest: 'crypto' } }],
     ['an identifier', { ...CONTEXT, userId: 'u_123' }], ['a name beside the consent', { ...CONTEXT, consent: { ...CONTEXT.consent, name: 'Ana' } }], ['a conversation', { version: 1, recentConversation: [{ question: 'a', answer: 'b' }] }],
-    ['day zero', { ...CONTEXT, day: 0 }], ['day sixty-one', { ...CONTEXT, day: 61 }], ['half a day', { ...CONTEXT, day: 1.5 }], ['a day in words', { ...CONTEXT, day: '1' }], ['no day', { ...CONTEXT, day: undefined }],
+    ['day zero', { ...CONTEXT, day: 0 }], ['half a day', { ...CONTEXT, day: 1.5 }], ['a day in words', { ...CONTEXT, day: '1' }], ['no day', { ...CONTEXT, day: undefined }],
     ['an asked question nobody wrote', { ...CONTEXT, asked: ['interest', 'salary'] }], ['another version', { ...CONTEXT, version: 2 }], ['a word', 'memory-1'], ['a list', [CONTEXT]], ['nothing', null], ['a number', 1],
   ] as const) eq(readCompanionContext(bad, ON), null, `${what}: the context is ignored whole`);
   eq(readCompanionContext({ version: 1, consent: CONTEXT.consent, day: 1 }, ON), { day: 1, asked: [], money: true, notes: [] }, 'a first day, with nothing asked yet, is a context');
@@ -866,6 +870,12 @@ try {
   const labelled = await quiet(() => turn(ASKING, someone()));
   eq([labelled.value.body.reply, labelled.value.body.personalized, labelled.value.body.checkIn, labelled.value.body.fact], [companionFallback('es'), false, { questionId: 'when' }, null], 'a reply that labels the person is replaced as ever, and the fixed sentence is not called personalized');
   world.judge = () => claude(CLEAN);
+  // Without the second reader nothing refuses a label, so the person's notes do not reach the model at all.
+  process.env.BOBBY_COMPANION_JUDGE = 'off';
+  const readerOff = await quiet(() => turn(ASKING, someone()));
+  eq([JSON.parse(modelCalls()[0].body.messages[0].content), modelCalls()[0].body.system === companionPrompt('es', 'es-MX', 'plain'), readerOff.value.body.personalized, readerOff.value.body.checkIn], [{ question: ASKING.question }, true, false, { questionId: 'when' }],
+    'second reader off: the turn is the plain turn, with no picture, and Bobby\'s next question is still named');
+  delete process.env.BOBBY_COMPANION_JUDGE;
   const unsureOfMoney = await quiet(() => turn({ context: { ...FULL, consent: { notice: 'memory-1', memory: true, money: false } } }, someone()));
   eq([JSON.parse(modelCalls()[0].body.messages[0].content).picture, unsureOfMoney.value.body.personalized, unsureOfMoney.value.body.checkIn], [{ curiousAbout: 'crypto', takesAsTrue: 'market_is_casino', learnsBestWith: 'examples', maybe: { stoppedBy: 'fear_of_loss' } }, true, null],
     'without the second consent nothing about their money reaches the model, and Bobby asks nothing about it');
@@ -888,6 +898,7 @@ try {
   eq([(await ask('when', 'unsure', 'high')).body.patch.notes, (await ask('when', 'unsure', 'low')).body.patch.notes], [[{ field: 'when', value: 'unsure', source: 'said' }], [{ field: 'when', value: 'unsure', source: 'inferred' }]], 'where "I don\'t know" is an option, saying so plainly is something the person said; a guess is inferred');
   eq((await ask('interest', 'unsure', 'high')).body.patch.notes, [{ field: 'interest', value: 'unsure', source: 'inferred' }], 'an answer the reader cannot place is unsure and inferred, however sure it is of that');
   eq((await ask('belief', 'banks_keep_it', 'medium')).body.patch.notes, [{ field: 'belief', value: 'banks_keep_it', source: 'said' }], 'a value no button offers can be read into a spoken answer');
+  eq([(await ask('fall', 'pause', 'high')).body.patch.notes, (await ask('fall', 'pause', 'low')).body.patch.notes], [[{ field: 'fall', value: 'pause', source: 'shown' }], [{ field: 'fall', value: 'pause', source: 'inferred' }]], 'a spoken answer to the exercise is shown in an exercise, as a tap on it is');
   // The next question after an answer counts the one just answered, and the consents.
   eq([(await ask('interest', 'crypto', 'high', { ...CONTEXT, asked: [], notes: [] })).body.checkIn, (await ask('barrier', 'words', 'high', { ...CONTEXT, asked: ['interest'], notes: [], consent: { notice: 'memory-1', memory: true } })).body.checkIn, (await ask('cushion', 'would_not', 'high', { ...CONTEXT, asked: ['interest', 'barrier', 'when'], notes: [] })).body.checkIn],
     [{ questionId: 'barrier' }, null, null], 'after an answer: the next question of the day, none about money without the second consent, and none when the day is done');

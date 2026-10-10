@@ -95,5 +95,6 @@ export async function readCompanionAnswer(
   }
   // Where no button says "I don't know", `unsure` only ever means the answer could not be placed.
   const placed = read.value !== UNSURE || question.options.some((o) => o.id === UNSURE);
-  return { field: question.id, value: read.value, source: placed && read.confidence !== 'low' ? 'said' : 'inferred' };
+  // A confident reading has the provenance a tap on that option has: said, or shown in the exercise.
+  return { field: question.id, value: read.value, source: placed && read.confidence !== 'low' ? question.source : 'inferred' };
 }

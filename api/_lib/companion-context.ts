@@ -1,8 +1,9 @@
 // ============================================================
 // What a person told Bobby, as it travels with a request (context v1): typed notes from the fixed catalog
 // (api/_lib/companion-questions.ts). They are kept on the person's device and sent whole each time. The server
-// keeps none of it: the notes are read for the one turn, and nothing of them is logged, stored, counted or
-// copied into an instruction (scripts/test-companion.mts watches every console line and every storage call).
+// keeps none of it: the notes are read for the one turn, and no note, value, question id or word of an answer
+// is logged, stored or copied into an instruction (scripts/test-companion.mts watches every console line and
+// every storage call). That a context was used, or an answer read, is counted like any other turn.
 //
 // A context is read only when all of these hold:
 //   · the owner turned it on (BOBBY_COMPANION_CONTEXT=on; off by default);
@@ -37,9 +38,10 @@ export const CompanionContext = z.object({
   version: z.literal(CONTEXT_VERSION),
   consent: z.object({ notice: z.string().max(40), memory: z.boolean(), money: z.boolean().default(false) }).strict(),
   /** The person's return day, counted by the client. */
-  day: z.number().int().min(1).max(60),
+  // A person who keeps coming back is on day 60 for good: no question waits for a later day.
+  day: z.number().int().min(1).transform((day) => Math.min(day, 60)),
   /** The questions already put to the person, answered or skipped. */
-  asked: z.array(z.enum(QUESTION_IDS)).max(16).default([]),
+  asked: z.array(z.enum(QUESTION_IDS)).max(64).transform((ids) => [...new Set(ids)]).default([]),
   notes: z.array(CompanionNote).max(8).refine((notes) => new Set(notes.map((note) => note.field)).size === notes.length).default([]),
 }).strict();
 
