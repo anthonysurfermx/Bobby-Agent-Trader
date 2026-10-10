@@ -149,7 +149,7 @@ Generated from the test declarations at I-0. File, declaration name and leading 
 | tests/preparation.test.mjs:13 | 'every companion copy row has six non-empty languages and matching placeholders' | assert.deepEqual(Object.keys(row).sort(), [...langs].sort(), key); assert.ok(typeof row[lang] === 'string' && row[lang].trim(), '${key}/${lang}') |
 | tests/preparation.test.mjs:33 | 'committed iPhone pages are release bundles and embed every shipping source' | assert.equal(JSON.parse(read('Resources/Nucleo/build-info.json')).release, true); assert.ok(!html.includes('window.NUCLEO_FIXTURES='), page) |
 | tests/preparation.test.mjs:48 | 'the screenshot labels match current shipping strings in all six languages' | Shared harness cases / explicit state assertions |
-| tests/preparation.test.mjs:52 | 'the server catalog adds six-language why without changing build-69 question copy' | assert.deepEqual(Object.keys(question.why).sort(), [...langs].sort(), question.id); assert.ok(question.why[lang].trim(), '${question.id}/${lang}') |
+| tests/preparation.test.mjs:52 | 'the bundled server catalog has a non-empty why in all six languages' | assert.deepEqual(Object.keys(question.why).sort(), [...langs].sort(), question.id); assert.ok(question.why[lang].trim(), '${question.id}/${lang}') |
 | tests/presentation-telemetry.test.mjs:15 | 'valid parsed response alone does not claim presentation' | assert.equal(h.calls.length,0) |
 | tests/presentation-telemetry.test.mjs:16 | 'two visible settled frames acknowledge current request once without receipt/content' | assert.equal(h.calls.length,0); assert.equal(h.calls.length,1) |
 | tests/presentation-telemetry.test.mjs:17 | 'hidden/background/sheet and unsettled cards do not acknowledge' | assert.equal(h.calls.length,0,kind) |
@@ -337,3 +337,26 @@ File paths below are relative to ios/Bobby. The declaration names are exact. Eac
 | UITests/CompanionBuild69UITests.swift:81 | testDecliningConsentAsksNothingMore | XCTAssertTrue(app.buttons["companion-consent-no"].waitForExistence(timeout: 20)); app.buttons["companion-consent-no"].tap() |
 | UITests/NucleoStoreScreenshots.swift:5 | testEnglishScreenshots | Delegates to the fixture exercise/helper; see the body for state and capture assertions. |
 | UITests/NucleoStoreScreenshots.swift:6 | testSpanishScreenshots | XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 30)) |
+
+## New I-0 capture and legal guards
+
+The capture driver assertions below describe the build-69 states. Increment 1 updates the affected driver, preserves the saved I-0 images, and generates a separate new evidence set. Snapshot expectations stay locked to written owner approval. Paths below are relative to `ios/Bobby`.
+
+| File / test name | What it asserts |
+| --- | --- |
+| `UITests/RedesignShots.swift` — `test01DailyIdle` | The daily ask pill exists and is hittable. Each successful method attaches its named screenshot. |
+| `UITests/RedesignShots.swift` — `test02Typing` | The typed draft equals the localized question; Send is visible. Each successful method attaches its named screenshot. |
+| `UITests/RedesignShots.swift` — `test03WaitingGeneralQuestion` | The cancel-read control is visible while no answer Close exists. Each successful method attaches its named screenshot. |
+| `UITests/RedesignShots.swift` — `test04EducationalAnswer` | An educational answer has a visible Close and no native memory consent. Each successful method attaches its named screenshot. |
+| `UITests/RedesignShots.swift` — `test05MemoryConsent` | Both native consent actions are visible. Each successful method attaches its named screenshot. |
+| `UITests/RedesignShots.swift` — `test06QuestionFromBobby` | After consent, the first catalog question and crypto option exist. Each successful method attaches its named screenshot. |
+| `UITests/RedesignShots.swift` — `test07AnswerWithNotes` | The answer Close and localized personalized label exist. Each successful method attaches its named screenshot. |
+| `UITests/RedesignShots.swift` — `test08CompanionFailureRetry` | The localized companion Retry control is visible. Each successful method attaches its named screenshot. |
+| `UITests/RedesignShots.swift` — `test09NotesScreen` | Profile → Memory → notes is reachable by scrolling; notes title and interest note exist. Each successful method attaches its named screenshot. |
+| `UITests/RedesignShots.swift` — `test10AmbiguousAssetConfirmation` | A fuzzy ETH question reaches its visible asset confirmation. Each successful method attaches its named screenshot. |
+| `UITests/RedesignShots.swift` — `test11FirstRunReady` | The onboarding BTC starter action is visible and the full-notice action is not hittable. Each successful method attaches its named screenshot. |
+| `UITests/RedesignShots.swift` — `test12FirstRunConsentBeat` | Tapping the starter action exposes the full notice and agreement actions. Each successful method attaches its named screenshot. |
+| `Tests/LegalTextSnapshotTests.swift` — `testRiskNoticeVersionRequiresWrittenOwnerApprovalToChange` | The risk version equals frozen version 6. |
+| `Tests/LegalTextSnapshotTests.swift` — `testAllFourRiskTitlesAndBodiesAreByteForByteUnchangedInSixLanguages` | Four title/body UTF8 byte pairs match the independent snapshot in every language. |
+| `Tests/LegalTextSnapshotTests.swift` — `testMemoryTitleParagraphsButtonsAndDetailsAreByteForByteUnchangedInSixLanguages` | All seven consent entries match independent snapshot bytes in every language. |
+| `Tests/LegalTextSnapshotTests.swift` — `testAcceptedMemoryNoticeIDRequiresWrittenOwnerApprovalToChange` | The notice constant, accepted record and restored record use frozen memory-1. |

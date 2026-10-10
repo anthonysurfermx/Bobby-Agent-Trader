@@ -47,11 +47,18 @@ final class RedesignShots: XCTestCase {
         }
         ready(element)
     }
-    private func type() {
+    private func type(_ text: String? = nil) {
         let web = app.webViews.firstMatch
         ready(pill); pill.tap()
         ready(web.textViews.firstMatch)
-        web.textViews.firstMatch.tap(); web.textViews.firstMatch.typeText(question)
+        web.textViews.firstMatch.tap()
+        // Fresh simulator keyboards can cover the keys with Apple's QuickPath introduction.
+        let intro = app.buttons.matching(NSPredicate(format: "label IN %@", ["Continue", "Continuar", "Weiter", "Continuer", "Continua"])).firstMatch
+        if intro.waitForExistence(timeout: 2) {
+            intro.tap()
+            XCTAssertTrue(intro.waitForNonExistence(timeout: 5))
+        }
+        web.textViews.firstMatch.typeText(text ?? question)
     }
     private func ask() {
         type()
@@ -125,11 +132,9 @@ final class RedesignShots: XCTestCase {
     }
     func test10AmbiguousAssetConfirmation() {
         launch("companion")
-        type()
+        type("Ethereun")
         let field = app.webViews.firstMatch.textViews.firstMatch
-        field.tap()
-        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: question.count))
-        field.typeText("Ethereun")
+        XCTAssertEqual(field.value as? String, "Ethereun")
         app.webViews.firstMatch.buttons[word("app", "type.send")].tap()
         let confirm = app.webViews.firstMatch.buttons.matching(NSPredicate(format: "label CONTAINS 'ETH'")).firstMatch
         ready(confirm)

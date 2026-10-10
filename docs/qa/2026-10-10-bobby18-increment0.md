@@ -24,14 +24,14 @@ Catalog SHA256: `980a3203aa252436ee66943e523f0557462aec8d559d1ed517247a0fb6b93b5
 | Native localization audit | Passed: 1,369 source keys, 1,423 rows |
 | Extra language suites | Initially 10/13; repaired test adapters bring all 13/13 to green |
 
-The baseline UI failures are retained, rather than presented as a green live suite:
+The raw baseline assertion results are retained. Claude's subsequent FROM CLAUDE section identifies this Mac's exhausted address allowance; the final status of the three memory/typed live cases is **not run: address limit**, not a confirmed product failure:
 
 - `testLiveSpanishMemory`: memory consent absent; accessibility evidence contains the daily network-limit response.
 - `testLiveTypedSpanishAnswers`: memory consent absent. The baseline live run also contains the German network-limit response.
 - `testLiveGermanMemory`: the expected next Skip button was absent at line 330. The failure itself did not attach a hierarchy, so its exact cause is not established.
 - `testSpanishCompanionAndMemory`: immediate deletion assertion raced accessibility at line 369. This test now waits for the same element to disappear; the final offline run verifies deletion and memory-off behavior.
 
-No additional live attempts are made after recording those failures. The original live tests stay intact. Baseline summary and failure text are under `_harness/redesign-2026-10-10/`; no result bundle is retained after export.
+No additional live attempts are made after recording those results, as explicitly instructed by Claude, even after the server allowance changes. The original live tests stay intact. Baseline summary and failure text are under `_harness/redesign-2026-10-10/`; no result bundle is retained after export.
 
 ## Final validation
 
