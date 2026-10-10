@@ -89,6 +89,11 @@ enum HarnessCopy {
     static var last24h: String { L.t("Last 24 hours", "Últimas 24 horas") }
     static var boardEmpty: String { L.t("Nothing to show yet.", "Nada que mostrar todavía.") }
     static var boardFoot: String { L.t("Tap one to ask Bobby.", "Toca uno para preguntarle a Bobby.") }
+    static var boardContext: String { L.t("These assets appeared in your reads.", "Estos activos aparecieron en tus lecturas.") }
+    static var boardEmptyNext: String { L.t("Ask about an asset to find it here.", "Pregunta por un activo para retomarlo aquí.") }
+    static var boardNewRead: String { L.t("New analysis · Quick read", "Análisis nuevo · Lectura rápida") }
+    static var boardCheckReads: String { L.t("Check your available reads before a new analysis.", "Comprueba tus lecturas disponibles antes de un análisis nuevo.") }
+    static func resumeButton(symbol: String) -> String { L.t("Revisit \(symbol)", "Retomar \(symbol)") }
     static func rowSpoken(symbol: String, name: String, change: String?) -> String {
         guard let change else { return "\(symbol), \(name)" }
         return "\(symbol), \(name), \(change)"

@@ -119,7 +119,7 @@ struct MemoryView: View {
             "Primero acepta el aviso de riesgo: hasta entonces Bobby no envía nada a sus servidores.")
     }
 
-    static var title: String { L.t("Memory", "Memoria") }
+    static var title: String { L.t("What I remember", "Lo que recuerdo") }
     static var localLabel: String { L.t("On this iPhone", "En este iPhone") }
 
     /// Every word on the face of the screen while there is no account memory to show (nobody signed
@@ -166,7 +166,7 @@ struct MemoryView: View {
             ForEach(s.assets) { asset in assetRow(asset) }
         }
         Rectangle().fill(Theme.warmHair).frame(height: 1)
-        QuietDisclosure(label: L.t("Your preferences", "Tus preferencias"), id: "memory-prefs") {
+        QuietDisclosure(label: L.t("About you", "Sobre ti"), id: "memory-prefs") {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(MemoryPref.allCases) { field in prefPicker(field, current: s.value(field)) }
             }
