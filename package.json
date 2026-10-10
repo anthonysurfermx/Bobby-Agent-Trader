@@ -59,6 +59,7 @@
     "test:desk-thesis": "tsx scripts/test-desk-thesis.mts",
     "test:desk-suggestions": "tsx scripts/test-desk-suggestions.mts",
     "test:agent-engine": "tsx scripts/test-agent-engine.mts",
+    "test:agent-engine-pg": "tsx scripts/test-agent-engine-pg.mts",
     "test:harness-brain": "tsx scripts/test-harness-brain.mts && tsx scripts/test-harness-facts-api.mts",
     "test:invite-link": "tsx scripts/test-invite-link.mts",
     "test:levels-referrals-pg": "tsx scripts/test-levels-referrals-pg.mts",

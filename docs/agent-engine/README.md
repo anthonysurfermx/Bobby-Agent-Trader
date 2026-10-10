@@ -19,7 +19,8 @@ Code: `api/_lib/agent/`, door `api/agent-task.ts`, tests `scripts/test-agent-eng
 ## The parts
 
 - **`types.ts`** the vocabulary: task, step, evidence, figure, analysis, presentation, approval scope.
-- **`store.ts`** `AgentStore`, the whole contract with storage, and two implementations: memory (the tests; every method one critical section) and a JSON file (local development). `agent-engine.sql` in this folder is the same contract as database functions: a **draft, not a migration**.
+- **`store.ts`** `AgentStore`, the whole contract with storage, and two implementations: memory (the tests; every method one critical section) and a JSON file (local development).
+- **`store-pg.ts`** the same contract on Postgres: one database function per method (`agent-engine.sql` in this folder), so one transaction each. `scripts/test-agent-engine-pg.mts` applies that SQL to a **local scratch database** and checks the invariants with real concurrent transactions (twenty copies of a request, ten yeses against one read left, thirty reservations against room for ten, eight claims of one task) and one whole errand through the loop. The SQL is a **draft, not a migration**: nothing applies it anywhere shared.
 - **`state.ts`** a task's state, events and usage, derived from its steps and nothing else.
 - **`provider.ts`** one model call: reserve the worst case, dispatch, exactly one HTTP attempt, settle. Outcomes `ok`, `charged`, `no_charge`, `unknown`. An `unknown` keeps its reservation and blocks a blind second attempt for that task.
 - **`tools.ts`** the registry (`resolve_assets`, `read_assets`), the universe the engine can read with evidence (14 instruments), and the arithmetic.
@@ -45,7 +46,7 @@ Code: `api/_lib/agent/`, door `api/agent-task.ts`, tests `scripts/test-agent-eng
 
 ## What it does not do, and what is missing
 
-- **Durable storage in production.** Needs the functions of `agent-engine.sql` as a migration (the owner's decision) and a store that calls them. Until then the door answers 503 unless a development store is configured.
+- **Durable storage in production.** The store and its SQL exist and pass on a local Postgres; what is missing is the owner's decision to make the SQL a migration (with it: how long a person's question is kept, grants for the service role only, a reconcile job for attempts left `dispatched`), and wiring the door to a PostgREST transport. Until then the door answers 503 unless a development store is configured.
 - **The product's own allowance and money caps.** The engine counts its own reads (6 a day in the development stores) and its own dollar ceiling. Wiring `api/_lib/access.ts` (guest, weekly, Pro) is the next step and decides what "a read" costs here.
 - **Work that outlives a request.** A run stops between steps when it is out of time and the next request continues it. There is no worker or queue: a task advances only when its owner asks again.
 - **More tools.** No holdings or concentration of a fund, no fees, fundamentals, news or calendar, no single-asset analysis through the three-agent desk. Each is a tool with its own evidence contract.
@@ -62,6 +63,10 @@ Code: `api/_lib/agent/`, door `api/agent-task.ts`, tests `scripts/test-agent-eng
 
 ```bash
 npm run test:agent-engine
+```
+
+```bash
+DATABASE_URL=postgres://postgres@127.0.0.1:54329/agent_engine_test npm run test:agent-engine-pg
 ```
 
 ```bash
