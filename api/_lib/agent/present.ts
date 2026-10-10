@@ -18,7 +18,7 @@ import type { Analysis, Figure, Presentation } from './types.js';
 export interface Draft { kind: Presentation['kind']; gist: string; text: string; limitations: string[]; next: string; claims: Array<{ metric: string; top: string }> }
 export type Refusal = { code: 'unknown_figure' | 'figure_without_value' | 'typed_number' | 'bad_placeholder' | 'claim_contradicts_figures' | 'claim_cannot_be_checked' | 'too_long' | 'empty'; detail: string };
 
-const PLACEHOLDER = /\{\{(f:[A-Za-z0-9_~]+|days)\}\}/g;
+const PLACEHOLDER = /\{\{([fd]:[A-Za-z0-9_~]+|days)\}\}/g;
 /** Names a text may contain although they hold digits. */
 const NAMES_WITH_DIGITS = [...new Set(UNIVERSE.flatMap((instrument) => [instrument.name, ...instrument.aliases]).filter((name) => /\d/.test(name)))].sort((a, b) => b.length - a.length);
 const SIGNED = new Set(['return', 'drawdown', 'worst', 'best']);
@@ -31,6 +31,9 @@ export function formatFigure(figure: Figure, language: AppLanguage, locale?: str
   if (figure.unit === 'price') return `${new Intl.NumberFormat(tag, { minimumFractionDigits: 2, maximumFractionDigits: figure.value < 1 ? 6 : 2 }).format(figure.value)}${figure.currency ? ` ${figure.currency}` : ''}`;
   return new Intl.NumberFormat(tag, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(figure.value);
 }
+
+/** A figure's day as a person reads it: "15 de septiembre", "September 15". The year is the window's and is not repeated. */
+export const formatDay = (day: string, language: AppLanguage, locale?: string | null) => new Intl.DateTimeFormat(appLocale(language, locale ?? undefined), { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${day}T00:00:00Z`));
 
 const MARK = '￼';
 /** "Percent" spelled out. Code writes every percent sign, so a model that spells one is stating a number of its own. */
@@ -49,7 +52,7 @@ function refuse(text: string, figures: Map<string, Figure>, question: string): R
     if (match[1] === 'days') continue;
     const figure = figures.get(match[1].slice(2));
     if (!figure) return { code: 'unknown_figure', detail: match[1].slice(2) };
-    if (figure.value === null) return { code: 'figure_without_value', detail: figure.id };
+    if (figure.value === null || (match[1].startsWith('d:') && !figure.day)) return { code: 'figure_without_value', detail: figure.id };
   }
   let own = text.replace(PLACEHOLDER, MARK).normalize('NFKC');
   if (/\{\{|\}\}/.test(own)) return { code: 'bad_placeholder', detail: own.match(/\{\{[^}]{0,30}|[^{]{0,30}\}\}/)?.[0] ?? '' };
@@ -86,7 +89,7 @@ function claimHolds(claim: { metric: string; top: string }, figures: Map<string,
 
 const write = (text: string, figures: Map<string, Figure>, days: number | null, language: AppLanguage, locale?: string | null) =>
   // Plain white space is collapsed; the non-breaking space a language puts between a number and its unit is kept.
-  text.replace(PLACEHOLDER, (_, key: string) => (key === 'days' ? String(days ?? '') : formatFigure(figures.get(key.slice(2))!, language, locale))).replace(/[ \t\r\n]+/g, ' ').trim();
+  text.replace(PLACEHOLDER, (_, key: string) => (key === 'days' ? String(days ?? '') : key.startsWith('d:') ? formatDay(figures.get(key.slice(2))!.day!, language, locale) : formatFigure(figures.get(key.slice(2))!, language, locale))).replace(/[ \t\r\n]+/g, ' ').trim();
 
 const LIMITATION: Record<string, Record<AppLanguage, (subject: string) => string>> = {
   mixed_calendars: {

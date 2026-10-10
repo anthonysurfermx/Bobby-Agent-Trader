@@ -61,7 +61,7 @@ What kind of errand it is decides what you do:
 - "previous" in the input is their last question, your answer to it and the figures behind it. A follow-up about those figures is answered from them, with no new tool call. Use a tool again only if they ask for other assets or another window.
 - The instruments you can read with evidence are: ${UNIVERSE.map((instrument) => `${instrument.name} (${instrument.symbol})`).join(', ')}. Windows: 30 or 60 days. Suggest nothing outside them.
 
-Numbers. You never write a market number. Every figure lives in a tool result (or in "previous") and has an id: to state it, write {{f:ID}} and the app writes the number with its unit. {{days}} writes only the number of days of the window (you write the word for "days"). Never type a digit of your own (the one exception: the lengths of the windows the tool offers, 30 and 60), never compute, never round, never restate a figure in words. A figure whose value is null does not exist: say that it could not be established.
+Numbers. You never write a market number. Every figure lives in a tool result (or in "previous") and has an id: to state it, write {{f:ID}} and the app writes the number with its unit. {{days}} writes only the number of days of the window (you write the word for "days"). A figure that is one day's (the worst day, the best day) carries that day: {{d:ID}} writes its date; never type a date yourself. Never type a digit of your own (the one exception: the lengths of the windows the tool offers, 30 and 60), never compute, never round, never restate a figure in words. A figure whose value is null does not exist: say that it could not be established.
 A comparison answers the dimensions they asked about, says how the assets differed on each, and keeps apart what the figures show from what you make of them. A past window does not say what comes next: never predict. Never recommend or rank an asset, never say which is better or right for them, never tell them what to buy, sell or hold. Say plainly that money can be lost when that matters. Never promise safety or gains. Do not ask about their income, savings or wealth. Never end by asking them something.
 
 Write nothing outside tool calls. Finish by calling the tool "answer" exactly once:
@@ -258,7 +258,7 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   const theirs = parent ? `${parent.question} ${task.question}` : task.question;
   // What a text IS is decided by code: it is an analysis when it cites a figure, or when this task ran a comparison
   // itself (then its sources and limits are shown even if nothing could be cited); otherwise an explanation, read in full.
-  const cites = parsed.success && (/\{\{f:/.test(`${parsed.data.gist} ${parsed.data.text}`) || ownAnalysis(task) !== null);
+  const cites = parsed.success && (/\{\{[fd]:/.test(`${parsed.data.gist} ${parsed.data.text}`) || ownAnalysis(task) !== null);
   const draft: Draft | null = parsed.success ? { ...parsed.data, kind: parsed.data.kind === 'clarification' ? 'clarification' : cites ? 'analysis' : 'explanation' } as Draft : null;
   const shown = draft ? present(draft, draft.kind === 'clarification' ? null : analysis, theirs, task.language, task.locale) : null;
   let presentation: Presentation | null = shown && 'presentation' in shown ? shown.presentation : null;

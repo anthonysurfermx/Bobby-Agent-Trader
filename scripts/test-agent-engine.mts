@@ -509,6 +509,12 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
     ['typed_number:%', 'bad_placeholder:glued: {{…}}%', 'bad_placeholder:glued: 0{{…}}', 'bad_placeholder:glued: n{{…}}'], 'a window length is not a percentage, and nothing may be glued to a placeholder');
   eq([no({ text: 'Bitcoin rindió 10.00 puntos.' }, 'Tengo 1000 pesos. Compara Bitcoin y Ethereum'), no({ text: 'Con tus 1,000 pesos habría cambiado {{f:return_BTC}}.' }, 'Tengo 1000 pesos. Compara Bitcoin y Ethereum'), no({ text: 'Subió 20.25 en el año.' }, '¿Y en 2025? Compara Bitcoin y Ethereum')],
     ['typed_number:10.00', 'shown', 'typed_number:20.25'], 'the person\'s 1000 lets 1,000 through and never 10.00; their 2025 never lets 20.25 through');
+  {
+    const dated = present(draft({ text: 'Bitcoin cambió {{f:return_BTC}}. Su peor día fue el {{d:worst_BTC}}: {{f:worst_BTC}}.' }), crypto, 'q', 'es', 'es-MX') as any;
+    const wd = fig(crypto, 'worst_BTC').day!;
+    ok(dated.presentation.text.includes(`el ${new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${wd}T00:00:00Z`))}:`) && /^\d{4}-\d{2}-\d{2}$/.test(wd) && dated.presentation.figures.includes('worst_BTC') && !dated.presentation.text.includes('{{'), 'a figure that is one day\'s carries its day, and code writes the date in the person\'s language');
+    eq([no({ text: 'Su peor día fue el 15 de septiembre.' }), no({ text: 'Cambió el {{d:return_BTC}}.' }), no({ text: 'Fue el {{d:worst_DOGE}}.' })], ['typed_number:15', 'figure_without_value:return_BTC', 'unknown_figure:worst_DOGE'], 'a date the model types is a number of its own; a figure with no day has no date to write');
+  }
   eq([no({ text: 'Bitcoin subió doce por ciento.' }), no({ text: 'Bitcoin subió １２ puntos.' }), no({ text: 'Subió x² en el periodo.' }), no({ limitations: ['Rindió 7 puntos más.'] }), no({ next: '¿Y si sube 15 más?' })],
     ['typed_number:por ciento', 'typed_number:12', 'typed_number:2', 'typed_number:7', 'typed_number:15'], '"percent" in words, look-alike digits, and numbers in the limitations or the next question are the model\'s own too');
   // An ordering that cannot be checked is not a checked ordering.
@@ -654,6 +660,19 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
     eq([broken.statusCode, broken.body.error.code, Object.keys(broken.body.error)], [503, 'engine_storage_unavailable', ['code']], 'storage that fails is a 503 that says so, with nothing of the failure in it');
     process.env.BOBBY_AGENT_STORE = 'memory';
   } finally { globalThis.fetch = realFetch; __setAgentTestDeps(null); delete process.env.BOBBY_AGENT_ENGINE; delete process.env.BOBBY_AGENT_STORE; }
+}
+
+// ---------- 9. the examples a client builds to are replies of this door ----------
+{
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const dir = new URL('../shared/harness/agent-engine-v1/', import.meta.url);
+  const replies = readdirSync(dir).filter((name) => name.startsWith('response-'));
+  eq(replies.length, 6, 'six example replies');
+  for (const name of replies) {
+    const body = JSON.parse(readFileSync(new URL(name, dir), 'utf8'));
+    eq([Object.keys(body).sort(), body.version, JSON.stringify(body).includes('usd')], [['allowance', 'approval', 'engine', 'error', 'events', 'requestId', 'result', 'state', 'taskId', 'version'], 1, false], `${name} has the keys of the door's view and no provider money`);
+    if (body.result) ok(body.result.text.startsWith(body.result.gist) && !/\{\{/.test(body.result.text) && (body.result.kind !== 'analysis' || body.result.references.every((r: any) => r.quality === 'valid' && /^\d{4}-\d{2}-\d{2}$/.test(r.asOf))), `${name}: the sentence in front starts the text, no placeholder is left, and an analysis names dated evidence`);
+  }
 }
 
 console.log(`agent-engine: ${checks} checks passed`);

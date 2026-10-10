@@ -21,8 +21,8 @@ import type { AppLanguage } from '../../../src/lib/app-language.js';
 
 export const ENGINE_VERSION = 1;
 /** Bumped with any change to the instructions or to a tool's meaning: every run records the pair it ran with. */
-export const PROMPT_VERSION = 'agent-2026-10-10.5';
-export const TOOLSET_VERSION = 'tools-2026-10-10.2';
+export const PROMPT_VERSION = 'agent-2026-10-11.1';
+export const TOOLSET_VERSION = 'tools-2026-10-11.1';
 
 export type TaskState = 'created' | 'running' | 'waiting_approval' | 'completed' | 'failed' | 'cancel_requested' | 'cancelled';
 export type Quality = 'valid' | 'missing' | 'stale' | 'conflicting' | 'error';
@@ -48,6 +48,8 @@ export interface Figure {
   value: number | null; unit: Unit; currency: string | null;
   /** How it was computed, in words a reader can check: the window, the days used, the formula's name. */
   basis: string; from: string | null; to: string | null; days: number | null;
+  /** For a figure that is one day's (the worst day, the best day): which day. Written by code as {{d:id}}. */
+  day?: string | null;
   evidence: string[]; quality: Quality;
 }
 

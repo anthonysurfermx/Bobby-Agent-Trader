@@ -213,8 +213,8 @@ export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<T
       figure('return', m?.totalReturn ?? null, 'percent', '; last close over first close of the window, minus one'),
       figure('volatility', m?.volatility ?? null, 'percent', `; sample standard deviation of the daily changes, not annualised${m && m.volatility === null ? `; needs ${MIN_CHANGES} changes` : ''}`),
       figure('drawdown', m?.maxDrawdown ?? null, 'percent', '; largest fall from a previous high inside the window'),
-      figure('worst', m?.worst?.pct ?? null, 'percent', m?.worst ? `; the day was ${m.worst.day}` : ''),
-      figure('best', m?.best?.pct ?? null, 'percent', m?.best ? `; the day was ${m.best.day}` : ''),
+      { ...figure('worst', m?.worst?.pct ?? null, 'percent', m?.worst ? `; the day was ${m.worst.day}` : ''), day: m?.worst?.day ?? null },
+      { ...figure('best', m?.best?.pct ?? null, 'percent', m?.best ? `; the day was ${m.best.day}` : ''), day: m?.best?.day ?? null },
     );
   }
   // Said only when there is something it is about: a window that gave no figure says nothing of the past either.
@@ -230,7 +230,7 @@ export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<T
   return { evidence, analysis, data: { figures: figures.map(forModel), evidence: evidence.map(({ id, source, instrument, asOf, quality, note }) => ({ id, source, instrument, asOf, quality, note })), limitations, windowDays: args.windowDays } };
 }
 /** A figure as the model sees it: rounded, so it can reason about more and less; it may only cite the id. */
-export const forModel = (figure: Figure) => ({ id: figure.id, metric: figure.metric, subject: figure.subject, value: figure.value === null ? null : Number(figure.value.toFixed(figure.unit === 'ratio' ? 2 : figure.unit === 'price' ? 2 : 1)), unit: figure.unit, basis: figure.basis, quality: figure.quality });
+export const forModel = (figure: Figure) => ({ ...(figure.day ? { day: figure.day } : {}), id: figure.id, metric: figure.metric, subject: figure.subject, value: figure.value === null ? null : Number(figure.value.toFixed(figure.unit === 'ratio' ? 2 : figure.unit === 'price' ? 2 : 1)), unit: figure.unit, basis: figure.basis, quality: figure.quality });
 
 // ---------- the registry ----------
 const Resolve = z.object({ mentions: z.array(z.string().trim().min(1).max(60)).min(1).max(4) }).strict();
