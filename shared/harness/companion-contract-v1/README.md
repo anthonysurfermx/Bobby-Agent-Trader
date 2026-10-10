@@ -9,6 +9,7 @@ checks every file here against the server's own schemas.
 |---|---|
 | `request.json` | What a client sends. `speech` is the dial's choice. |
 | `request-candidate.json` | The same, with the look-alike the asset search offered for the question (`candidate`). |
+| `request-previous.json` | A question that only makes sense after the last one ("give me an example"), with that exchange (`previous`). |
 | `response-explanation.json` | The reply to a question that names no asset. |
 | `response-desk-offer.json` | The reply when the question was about the `candidate` after all: the client asks the person to confirm that asset, as it does today. Only ever sent to a request that carried a `candidate`. |
 | `response-error.json` | A failure the client may retry. Nothing was counted. |
@@ -43,6 +44,19 @@ Rules a client can rely on:
   (`requiresConfirmation` is always true). A `desk_offer` does not use the person's allowance.
 - If the day's explanations are used up (`orientation_limit`) and you hold a look-alike, show your
   confirmation for it rather than the limit: the person may have asked about that asset.
+- **A question that names an asset is not always a request to analyse it.** Send the asset the question names
+  as `candidate` with `exact: true`. "What is Bitcoin?" is then answered as an `explanation` of what it is, in
+  general terms and with no figure; "Analyze Bitcoin", "How is Nvidia doing today?" or the bare name come back
+  as a `desk_offer`. Measured on 2026-10-10 in the six languages: 34 of 34 read right. The person never gets a
+  market read they did not ask for, and never a choice to make before an explanation they did ask for. A client
+  that knows the question is a read (its own chip, a bare ticker) need not ask.
+- **`reply.gist`** (optional, at most 120 characters): the first sentence of `reply.text`, when that sentence
+  can stand alone. It is always the exact start of `text`, cut by code after the second reader read the whole
+  reply. A voice-first client shows it while Bobby says `text`, and the rest (`text` after the gist) when the
+  person asks to read it all. When it is absent, show `text`.
+- **`previous`** (optional): `{ question, reply }`, the one exchange still on the person's screen (at most 600
+  and 700 characters). It lets "give me an example" refer to something. It is one exchange, never a history,
+  and the server stores none of it. Send it only while that answer is on screen.
 - `nextAction` is null in an `explanation`.
 - A tapped `followUp` goes straight back to this endpoint, without the asset search: it is a learning question,
   and a word such as "bitcoin" in it must not open a market read the person did not ask for.
@@ -50,7 +64,10 @@ Rules a client can rely on:
   Wi-Fi, an office): `error.message` says which, so show it as it comes. `allowance` is always the person's own
   and can show turns remaining when it was the network's day that ran out.
 - A turn is counted only when it was answered. `allowance.remaining` is null when the server could not say.
-  The day is the UTC day; `Retry-After` on a 429 says how many seconds remain of it.
+  The day is the UTC day; `Retry-After` on a 429 says how many seconds remain of it: say when in the person's
+  own time ("back at 6 PM") instead of "tomorrow", which is wrong for most of the world's evenings. How many
+  turns a day is the server's (ten on Haiku, five on a dearer model, or the number the owner sets): read it
+  from `allowance`, never assume it.
 - `companion_unavailable` with `retryable: true` also covers storage that could not answer and two turns of
   the same person sent at once. Offer "try again" with the same question; for a tapped `followUp`, try again
   straight to this endpoint.
@@ -89,7 +106,12 @@ Rules for every client, on every platform:
 - **The notes screen ships in the same release as the questions**: the person can see every note and where it
   came from, correct it, delete one or all, and read when it expires. Dates and expiry live on the device.
 - **`Skip` on every question** (`questions.json`, `skip`). Skipping adds the question's id to `asked` and
-  writes no note. Never more than one question on screen.
+  writes no note. Never more than one question on screen, and never one that covers Bobby's reply by itself:
+  a question is an invitation under the reply, opened by the person. `asked` is the client's own list: a client
+  may let a skipped question rest and offer it again later by leaving its id out, and a deleted or expired note
+  makes its question askable again the same way.
+- **Every question says what its answer is for** (`why`, one line under the question). The two money questions
+  of day one say "that money"; their line also says which money is meant.
 - **The six languages.** The question, its options and `Skip` come from the catalog in the person's language,
   word for word.
 - Bobby is educational. No screen labels the person, says what suits them or ranks anything for them, and the
@@ -98,7 +120,8 @@ Rules for every client, on every platform:
 The catalog (`questions.json`):
 
 - Each question has `id`, `day` (the first return day it may be asked), `money` (it is about the person's own
-  money), `source`, `text`, `options` (`id` and `label`) and `spoken`. Asked in the catalog's order.
+  money), `source`, `text`, `why`, `options` (`id` and `label`) and `spoken`. Asked in the catalog's order.
+  `why` was added without changing the catalog's version: a client that does not know it shows nothing there.
 - **A tapped option needs no request at all.** The client writes the note itself:
   `{ "field": question.id, "value": option.id, "source": question.source }` (`said`, or `shown` for the
   exercise), and adds the id to `asked`. `spoken` lists values no button offers: only the server's reader
