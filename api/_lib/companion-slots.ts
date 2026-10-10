@@ -67,6 +67,28 @@ async function insert(key: string, now: number, token: string): Promise<boolean 
   return null;
 }
 
+const dayKeys = (scope: string, id: string, limit: number, now: number) => Array.from({ length: limit }, (_, i) => slotKey(scope, id, now, i + 1));
+/** Which of these keys are held, or null when storage could not answer. */
+async function heldAmong(keys: readonly string[]): Promise<Set<string> | null> {
+  try {
+    const r = await fetch(bobbyRest(`api_cache?cache_key=in.(${keys.join(',')})&select=cache_key`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(TIMEOUT_MS) });
+    if (!r.ok) return null;
+    const rows = await r.json() as Array<{ cache_key?: unknown }>;
+    return Array.isArray(rows) ? new Set(rows.map((row) => String(row.cache_key))) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * How many of its `limit` slots `id` holds today in `scope`, without taking one: what a person has used of an
+ * allowance that the request at hand does not touch. Null when storage could not answer.
+ */
+export async function slotsHeld(scope: string, id: string, limit: number, now = Date.now()): Promise<number | null> {
+  if (!usable(id) || !Number.isInteger(limit) || limit < 1 || limit > 100) return null;
+  return (await heldAmong(dayKeys(scope, id, limit, now)))?.size ?? null;
+}
+
 /**
  * One of the `limit` slots `id` has today in `scope`. The free ones are read first, then tried from a random
  * one on, so that requests arriving together spread over them; a request that loses a slot to another tries
@@ -74,17 +96,9 @@ async function insert(key: string, now: number, token: string): Promise<boolean 
  */
 export async function takeSlot(scope: string, id: string, limit: number, token: string, { tries = 3, now = Date.now(), pick = random }: SlotOptions = {}): Promise<Slot> {
   if (!usable(id) || !usable(token) || !Number.isInteger(limit) || limit < 1 || limit > 100) return { state: 'unavailable' };
-  const keys = Array.from({ length: limit }, (_, i) => slotKey(scope, id, now, i + 1));
-  let held: Set<string>;
-  try {
-    const r = await fetch(bobbyRest(`api_cache?cache_key=in.(${keys.join(',')})&select=cache_key`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(TIMEOUT_MS) });
-    if (!r.ok) return { state: 'unavailable' };
-    const rows = await r.json() as Array<{ cache_key?: unknown }>;
-    if (!Array.isArray(rows)) return { state: 'unavailable' };
-    held = new Set(rows.map((row) => String(row.cache_key)));
-  } catch {
-    return { state: 'unavailable' };
-  }
+  const keys = dayKeys(scope, id, limit, now);
+  const held = await heldAmong(keys);
+  if (!held) return { state: 'unavailable' };
   const free = keys.filter((key) => !held.has(key));
   if (!free.length) return { state: 'full' };
   const from = Math.min(free.length, Math.max(1, Math.trunc(pick(free.length)))) - 1;

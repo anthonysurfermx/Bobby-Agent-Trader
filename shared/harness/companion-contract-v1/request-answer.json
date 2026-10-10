@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "requestId": "c57cadf8-0fe0-4e1d-8468-7b13a311b899",
+  "answer": { "questionId": "when", "text": "como en dos años, para el enganche" },
+  "language": "es",
+  "locale": "es-MX",
+  "context": {
+    "version": 1,
+    "consent": { "notice": "memory-1", "memory": true, "money": true },
+    "day": 1,
+    "asked": ["interest", "barrier"],
+    "notes": [
+      { "field": "interest", "value": "crypto", "source": "said" },
+      { "field": "barrier", "value": "fear_of_loss", "source": "inferred" }
+    ]
+  }
+}

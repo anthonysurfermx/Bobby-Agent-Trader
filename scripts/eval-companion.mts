@@ -2,6 +2,10 @@
 // It calls the provider and nothing else: the database settings are replaced before anything is imported, so no
 // row is read or written anywhere. Needs ANTHROPIC_API_KEY in the environment; prints no secret.
 //   vercel env run -e production -- npx tsx scripts/eval-companion.mts <out.json> [model …] [--only=f,p,i,d]
+// With --context it measures what a person's notes change (context v1) instead: a handful of questions in the
+// six languages, each answered for nobody in particular and for two different people. The notes go to the model
+// as the picture the server builds from them (api/_lib/companion-context.ts); nothing else of the endpoint runs.
+//   vercel env run -e production -- npx tsx scripts/eval-companion.mts <out.json> [model …] --context
 import { writeFileSync } from 'node:fs';
 
 process.env.BOBBY_SUPABASE_URL = 'https://eval.invalid';
@@ -24,7 +28,9 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 }) as typeof fetch;
 
 const { runCompanionTurn } = await import('../api/_lib/companion.ts');
+const { companionPicture } = await import('../api/_lib/companion-context.ts');
 type Usage = import('../api/_lib/llm.ts').LlmUsage;
+type Note = import('../api/_lib/companion-context.ts').CompanionNote;
 
 const OUT = process.argv[2] ?? 'companion-eval.json';
 const MODELS = process.argv.slice(3).filter((arg) => arg.startsWith('claude-')).length ? process.argv.slice(3).filter((arg) => arg.startsWith('claude-')) : ['claude-haiku-5-5', 'claude-sonnet-5-5'];
@@ -108,30 +114,55 @@ const Q: Array<[id: string, language: Language, question: string, candidate?: { 
   ['d09', 'de', 'was hältst du gerade von der simens aktie', { symbol: 'SIE', name: 'Siemens' }, true],
 ];
 
+// --context: the same two questions in each language, and who asks them. `nobody` is the turn as it is without notes.
+const CONTEXT = process.argv.includes('--context');
+const PEOPLE: Record<string, Note[]> = {
+  nobody: [],
+  // New to the words, afraid of losing, and the money is needed soon.
+  anxious: [
+    { field: 'barrier', value: 'fear_of_loss', source: 'said' }, { field: 'when', value: 'under_2y', source: 'said' }, { field: 'cushion', value: 'would_need_it', source: 'confirmed' },
+    { field: 'fall', value: 'pause', source: 'shown' }, { field: 'belief', value: 'market_is_casino', source: 'inferred' }, { field: 'format', value: 'examples', source: 'said' },
+  ],
+  // Curious about crypto and in a hurry: the one who needs to hear about loss plainly.
+  hurried: [
+    { field: 'interest', value: 'crypto', source: 'said' }, { field: 'hurry', value: 'soon', source: 'said' }, { field: 'cushion', value: 'would_not', source: 'said' },
+    { field: 'fall', value: 'continue', source: 'shown' }, { field: 'belief', value: 'crypto_is_fast', source: 'inferred' }, { field: 'format', value: 'steps', source: 'said' },
+  ],
+};
+if (CONTEXT) Q.splice(0, Q.length,
+  ['x01', 'es', 'Nunca he invertido. ¿Por dónde empiezo?'], ['x02', 'es', '¿Qué pasa si el mercado se cae después de que invierta?'],
+  ['x03', 'en', "I've never invested. Where do I start?"], ['x04', 'en', 'What happens if the market falls after I invest?'],
+  ['x05', 'fr', 'Je n’ai jamais investi. Par où commencer ?'], ['x06', 'fr', 'Que se passe-t-il si le marché baisse après mon investissement ?'],
+  ['x07', 'pt', 'Nunca investi. Por onde começo?'], ['x08', 'pt', 'O que acontece se o mercado cair depois que eu investir?'],
+  ['x09', 'it', 'Non ho mai investito. Da dove comincio?'], ['x10', 'it', 'Che cosa succede se il mercato scende dopo che ho investito?'],
+  ['x11', 'de', 'Ich habe noch nie investiert. Wo fange ich an?'], ['x12', 'de', 'Was passiert, wenn der Markt fällt, nachdem ich investiert habe?'],
+);
 if (ONLY) Q.splice(0, Q.length, ...Q.filter(([id]) => ONLY.includes(id[0])));
+const JOBS = Q.flatMap((q) => (CONTEXT ? Object.keys(PEOPLE) : [null]).map((person) => [q, person] as const));
 const rows: Array<Record<string, unknown>> = [];
 for (const model of MODELS) {
   let next = 0;
   const worker = async () => {
     for (;;) {
       const i = next++;
-      if (i >= Q.length) return;
-      const [id, language, question, candidate, about] = Q[i];
+      if (i >= JOBS.length) return;
+      const [[id, language, question, candidate, about], person] = JOBS[i];
+      const picture = person ? companionPicture(PEOPLE[person]) : null;
       const usage: Usage[] = [];
       const started = Date.now();
       try {
-        const turn = await runCompanionTurn(question, language, { locale: LOCALE[language], speech: 'plain', candidate, usage, model });
-        rows.push({ id, model, language, question, ok: true, source: turn.source, rejected: turn.rejected, judge: turn.judge, text: turn.text, followUp: turn.followUp,
-          written: written.get(`${model}\n${JSON.stringify({ question, ...(candidate ? { candidate } : {}) })}`) ?? null, ...(candidate ? { candidate: candidate.symbol, offered: turn.aboutCandidate, expected: about } : {}),
+        const turn = await runCompanionTurn(question, language, { locale: LOCALE[language], speech: 'plain', candidate, usage, model, picture });
+        rows.push({ id, model, language, question, ...(person ? { person, picture } : {}), ok: true, source: turn.source, rejected: turn.rejected, judge: turn.judge, text: turn.text, followUp: turn.followUp,
+          written: written.get(`${model}\n${JSON.stringify({ question, ...(candidate ? { candidate } : {}), ...(picture ? { picture } : {}) })}`) ?? null, ...(candidate ? { candidate: candidate.symbol, offered: turn.aboutCandidate, expected: about } : {}),
           words: turn.text.split(/\s+/).length, ms: Date.now() - started, usd: usage.reduce((a, u) => a + u.usd, 0), tokensIn: usage.reduce((a, u) => a + u.tokensIn, 0), tokensOut: usage.reduce((a, u) => a + u.tokensOut, 0) });
       } catch (error) {
-        rows.push({ id, model, language, question, ok: false, error: error instanceof Error ? error.constructor.name : 'error', ms: Date.now() - started, usd: usage.reduce((a, u) => a + u.usd, 0) });
+        rows.push({ id, model, language, question, ...(person ? { person } : {}), ok: false, error: error instanceof Error ? error.constructor.name : 'error', ms: Date.now() - started, usd: usage.reduce((a, u) => a + u.usd, 0) });
       }
     }
   };
   await Promise.all([worker(), worker(), worker(), worker()]);
 }
-rows.sort((a, b) => String(a.id).localeCompare(String(b.id)) || String(a.model).localeCompare(String(b.model)));
+rows.sort((a, b) => String(a.id).localeCompare(String(b.id)) || String(a.person ?? '').localeCompare(String(b.person ?? '')) || String(a.model).localeCompare(String(b.model)));
 writeFileSync(OUT, JSON.stringify(rows, null, 1));
 for (const model of MODELS) {
   const mine = rows.filter((r) => r.model === model), served = mine.filter((r) => r.ok);
@@ -141,4 +172,9 @@ for (const model of MODELS) {
     `second reader: read ${served.filter((r) => r.judge === 'read').length}, did not answer ${served.filter((r) => r.judge === 'unavailable').length}; with next question ${served.filter((r) => r.followUp).length}; look-alikes read right ${served.filter((r) => 'offered' in r && r.offered === r.expected).length}/${served.filter((r) => 'offered' in r).length}` +
     `${served.filter((r) => 'offered' in r && r.offered !== r.expected).map((r) => ` ${r.id}`).join('')}; words avg ${(sum('words') / Math.max(1, served.length)).toFixed(0)} max ${Math.max(0, ...served.map((r) => Number(r.words)))}; ` +
     `USD per turn ${(sum('usd') / Math.max(1, served.length)).toFixed(5)}; ms p50 ${sorted[Math.floor(sorted.length / 2)] ?? 0} max ${sorted.at(-1) ?? 0}`);
+}
+// With notes: how often a reply written for a person had to be replaced (the second reader refuses one that labels them).
+if (CONTEXT) for (const model of MODELS) for (const person of Object.keys(PEOPLE)) {
+  const theirs = rows.filter((r) => r.model === model && r.person === person && r.ok);
+  console.log(`${model} · ${person}: answered ${theirs.length}/${Q.length}; replaced ${theirs.filter((r) => r.source === 'fallback').map((r) => `${r.id}:${r.rejected}`).join(' ') || 'none'}; words avg ${(theirs.reduce((a, r) => a + Number(r.words), 0) / Math.max(1, theirs.length)).toFixed(0)}`);
 }
