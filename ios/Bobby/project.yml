@@ -111,9 +111,9 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         LSApplicationQueriesSchemes:
           - instagram-stories
-        NSMicrophoneUsageDescription: "Bobby listens only while you hold the button, to hear your question."
+        NSMicrophoneUsageDescription: "Bobby listens only while you hold the button, to hear your question or what you answer to Bobby."
         NSPhotoLibraryAddUsageDescription: "Bobby saves your skin card to Photos only when you tap Save Image."
-        NSSpeechRecognitionUsageDescription: "Bobby turns your spoken question into text: on this iPhone when the language is installed, otherwise through Apple's speech service. Bobby does not store the audio."
+        NSSpeechRecognitionUsageDescription: "Bobby turns your spoken question or answer to Bobby into text: on this iPhone when the language is installed, otherwise through Apple's speech service. Bobby does not store the audio."
         # RevenueCat's PUBLIC iOS SDK key (appl_…), from the build setting below. Empty = purchases are off
         # and the Bobby Pro sheet says it opens soon (§8.4).
         REVENUECAT_IOS_API_KEY: $(REVENUECAT_IOS_API_KEY)
@@ -139,7 +139,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: QZRTV6CMTT
         MARKETING_VERSION: "1.8"
-        CURRENT_PROJECT_VERSION: "66"
+        CURRENT_PROJECT_VERSION: "69"
       configs:
         # RevenueCat PUBLIC SDK keys (meant to ship in the app; not secret keys). Debug uses the dashboard's
         # Test Store key; Release uses the App Store app's public key (RevenueCat → API keys → SDK API keys,

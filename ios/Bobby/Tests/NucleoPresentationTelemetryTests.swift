@@ -32,8 +32,12 @@ final class NucleoPresentationTelemetryTests: XCTestCase {
         config.userContentController.add(recorder, name: "capture")
         let web = WKWebView(frame: CGRect(x: 0, y: 0, width: 390, height: 844), configuration: config)
         web.navigationDelegate = recorder
-        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
-        let previousKey = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows).first { $0.isKeyWindow }
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let scene = try XCTUnwrap(scenes.first { $0.activationState == .foregroundActive } ?? scenes.first)
+        // A detached legacy window can load HTML while WebKit never schedules visible frames.
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        let previousKey = scene.windows.first { $0.isKeyWindow }
         window.rootViewController = UIViewController(); window.rootViewController?.view.addSubview(web)
         window.makeKeyAndVisible()
         defer { web.stopLoading(); config.userContentController.removeAllScriptMessageHandlers(); window.isHidden = true; previousKey?.makeKey() }
@@ -41,7 +45,7 @@ final class NucleoPresentationTelemetryTests: XCTestCase {
         <html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
         <div id="card" style="position:absolute;left:10px;top:200px;width:300px;height:100px;opacity:0">Fixture actual result</div>
         <script>
-        var W=window,D=document,onScreen=true,SHEET=false;
+        var W=window,D=document,onScreen=true,SHEET=false,ST={name:'CARDS'};
         var READ={model:{},reply:{status:'ok'},requestId:'\(id)'};
         var A={cardsOn:true,rev:[{x:1}]},el={cards:[document.getElementById('card')]};
         function canRun(){return !D.hidden && onScreen && !SHEET;}

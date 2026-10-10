@@ -54,6 +54,8 @@ function onAskReply(r, res){
   if (r !== READ) return;
   if (!res || typeof res.status !== 'string') res = { v: 1, status: 'error', code: 'bad_response', message: null };
   r.reply = res;
+  if (res.companionCheckIn) CHECKIN = res.companionCheckIn;
+  if (!paramsCompanion(r.params)) GUIDE_RETRIES = 0;
   if (res.status === 'ok'){
     try { r.model = RMOD.build(res, { lang: LANG, locale: LOCALE, signedIn: !!(SES && SES.signedIn), origin: r.origin }); r.requestId = res.requestId; }
     catch (e){ logErr('model', e); r.model = null; r.reply = { v: 1, status: 'error', code: 'bad_response', message: null }; }
@@ -69,6 +71,7 @@ function onStage(p){
 /* Acknowledgment after two real animation frames with a settled, visible result card.
    Native retains the signed receipt; this trusted page only names the current request UUID. */
 function observePresentedRead(){
+  if (ST.name === 'THESIS_VIEW' || A.viewOnly) return;
   var r = READ;
   if (!r || !r.model || !r.reply || r.reply.status !== 'ok' || !r.requestId || r.presented || !canRun()) return;
   var visible = false;
@@ -360,9 +363,9 @@ function fillThesisCard(th, o){
   el.saveSw.style.setProperty('--sc', css(vc.c, 0.95));
   el.tpill.textContent = th.pill; el.tpill.style.background = css(mixC(C.cardBg, vc.c, 0.2), 0.86); el.tpill.style.border = '.5px solid ' + css(vc.c, 0.5); el.tpill.style.color = vc.css;
   A.saved.set(o.readOnly ? 1 : 0); A.savePress.set(1); A.sweepT = -9; A.xp.set(0); A.xpO.set(0);
-  saveRoll.set(o.readOnly ? th.savedLabel : th.saveLabel, true);
+  saveRoll.set(o.readOnly ? tt('read.saved') : tt('read.save'), true);
   A.saveC = vk;
-  st(el.save, 'display', 'block');
+  st(el.save, 'display', o.readOnly ? 'none' : 'block');
 }
 function setHorizon(hrs){
   HZ = hrs;
@@ -561,3 +564,5 @@ function txSet(text, final, stagger){
   ws.forEach(function(w){ w.hide.to(w.nt < cut ? 0 : 1, 'soft'); });
   A.tx.final = !!final;
 }
+
+function paramsCompanion(params){ return !!(params && params.companion); }

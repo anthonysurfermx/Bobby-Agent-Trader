@@ -97,6 +97,12 @@
     "it": "Circa un anno",
     "de": "Etwa ein Jahr"
   },
+  "About you": {
+    "fr": "À propos de toi",
+    "pt": "Sobre ti",
+    "it": "Su di te",
+    "de": "Über dich"
+  },
   "Accept": {
     "fr": "Accepter",
     "pt": "Aceitar",
@@ -260,6 +266,12 @@
     "pt": "Pergunta primeiro por um ativo.",
     "it": "Chiedi prima di un asset.",
     "de": "Frag zuerst nach einem Wert."
+  },
+  "Ask about an asset to find it here.": {
+    "fr": "Pose une question sur un actif pour le retrouver ici.",
+    "pt": "Pergunta sobre um ativo para o retomares aqui.",
+    "it": "Chiedi di un asset per ritrovarlo qui.",
+    "de": "Frage nach einem Wert, um ihn hier wieder aufzugreifen."
   },
   "Asked once, on {0}.": {
     "fr": "Demandé une fois, le {0}.",
@@ -548,6 +560,12 @@
     "pt": "Alterar",
     "it": "Cambia",
     "de": "Ändern"
+  },
+  "Check your available reads before a new analysis.": {
+    "fr": "Vérifie tes analyses disponibles avant une nouvelle analyse.",
+    "pt": "Confirma as análises disponíveis antes de uma nova análise.",
+    "it": "Controlla le letture disponibili prima di una nuova analisi.",
+    "de": "Prüfe deine verfügbaren Lesungen vor einer neuen Analyse."
   },
   "Check your existing Pro access before starting another purchase.": {
     "fr": "Vérifiez votre accès Pro existant avant un nouvel achat.",
@@ -1187,6 +1205,12 @@
     "it": "Cronologia",
     "de": "Verlauf"
   },
+  "How Bobby speaks": {
+    "fr": "Comment Bobby te parle",
+    "pt": "Como o Bobby fala contigo",
+    "it": "Come ti parla Bobby",
+    "de": "Wie Bobby mit dir spricht"
+  },
   "How does {0} look today?": {
     "fr": "Comment se présente {0} aujourd’hui ?",
     "pt": "Como está {0} hoje?",
@@ -1568,6 +1592,12 @@
     "pt": "Só contas novas, durante a primeira semana.",
     "it": "Solo nuovi account, durante la prima settimana.",
     "de": "Nur neue Konten, in ihrer ersten Woche."
+  },
+  "New analysis · Quick read": {
+    "fr": "Nouvelle analyse · Lecture rapide",
+    "pt": "Nova análise · Leitura rápida",
+    "it": "Nuova analisi · Lettura rapida",
+    "de": "Neue Analyse · Schnelle Lesung"
   },
   "News": {
     "fr": "Actualités",
@@ -2163,6 +2193,12 @@
     "it": "Riesaminata {0}",
     "de": "Zuletzt geprüft {0}"
   },
+  "Revisit {0}": {
+    "fr": "Revoir {0}",
+    "pt": "Retomar {0}",
+    "it": "Riprendi {0}",
+    "de": "{0} erneut ansehen"
+  },
   "Risk notice": {
     "en": "Risk notice",
     "es": "Aviso de riesgo",
@@ -2713,6 +2749,12 @@
     "it": "Prima",
     "de": "Damals"
   },
+  "These assets appeared in your reads.": {
+    "fr": "Ces actifs figuraient dans tes analyses.",
+    "pt": "Estes ativos apareceram nas tuas análises.",
+    "it": "Questi asset erano nelle tue analisi.",
+    "de": "Diese Werte kamen in deinen Analysen vor."
+  },
   "Theses you wrote": {
     "fr": "Thèses que tu as écrites",
     "pt": "Teses que escreveste",
@@ -3014,6 +3056,12 @@
     "pt": "O que o Bobby recorda dos teus ativos e preferências",
     "it": "Ciò che Bobby ricorda dei tuoi asset e preferenze",
     "de": "Was Bobby über deine Anlagen und Vorlieben speichert"
+  },
+  "What I remember": {
+    "fr": "Ce que je retiens",
+    "pt": "O que recordo",
+    "it": "Quello che ricordo",
+    "de": "Was ich mir merke"
   },
   "What changed in {0} since I asked?": {
     "fr": "Qu’est-ce qui a changé pour {0} depuis ma question ?",

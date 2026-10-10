@@ -107,6 +107,7 @@ final class AccountSession: ObservableObject {
     var oauthAuthorization: @MainActor (URL) async throws -> URL = {
         try await WebAuthPresenter.shared.run(url: $0, scheme: "bobbyprotocol")
     }
+    var eraseCompanionNotes: () -> Void = { _ = CompanionContextStore.shared.reset() }
     /// Apple's re-authorization for deletion; tests stand in for the sheet.
     var appleDeletionCode: @MainActor () async throws -> String = { try await AppleDeletionAuthorization.shared.authorize() }
 
@@ -387,6 +388,7 @@ final class AccountSession: ObservableObject {
             }
             guard (200..<300).contains(status) else { return fail(data: data, status: status) }
             // A late deletion response must never sign out a different account.
+            eraseCompanionNotes()
             store?.forgetAccount(deletingUserId)
             DeskMemory.forgetOwner(deletingUserId, defaults: defaults)
             NucleoLedger.forgetOwner(deletingUserId, defaults: defaults)

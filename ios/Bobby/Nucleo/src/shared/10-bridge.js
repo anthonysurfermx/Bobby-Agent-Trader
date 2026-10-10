@@ -16,7 +16,7 @@
   'use strict';
   var V = 1;
   var METHODS = [
-    'session', 'roster', 'suggestions', 'ask', 'cancel', 'read.rendered',
+    'companion.presented', 'companion.answer', 'speaking.choose', 'session', 'roster', 'suggestions', 'ask', 'cancel', 'read.rendered',
     'speech.permission', 'speech.requestPermission', 'speech.start', 'speech.stop',
     'speak', 'previewVoice', 'stopSpeaking', 'setMuted', 'haptic',
     'saveThesis', 'island', 'theses', 'record',
@@ -25,7 +25,7 @@
     'nudge.seen', 'nudge.act'
   ];
   var EVENTS = [
-    'session.changed', 'account.changed', 'consent.withdrawn', 'app.state', 'ask.stage', 'ask.start', 'analysis.level',
+    'companion.checkIn', 'companion.revoked', 'speaking.open', 'session.changed', 'account.changed', 'consent.withdrawn', 'app.state', 'ask.stage', 'ask.start', 'analysis.level',
     'speech.state', 'speech.level', 'speech.partial', 'speech.final', 'speech.error',
     'voice.start', 'voice.level', 'voice.progress', 'voice.word', 'voice.end',
     'thesis.planted', 'native.sheet'

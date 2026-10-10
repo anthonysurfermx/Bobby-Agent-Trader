@@ -69,6 +69,18 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #avatar .mg{position:absolute;inset:0;display:grid;place-items:center;font:300 15px/1 var(--serif);letter-spacing:-.03em;color:var(--ink)}
 #avatar svg{position:absolute;left:-4px;top:-4px;width:40px;height:40px;overflow:visible}
 
+/* Explicit reading controls share the glass palette and remain outside the scroller. */
+#readActions,#readHandback,#readNext{position:absolute;left:30px;width:330px;display:none;text-align:center;z-index:4}
+#readActions,#readHandback{top:688px;gap:8px;align-items:center}
+#readActions button,#readHandback button{flex:1;min-width:0;min-height:44px;padding:8px 10px;border-radius:22px;border:.5px solid var(--line);background:rgba(242,237,228,.04);font:500 14px/18px var(--sans);cursor:pointer}
+#readHandback button:first-child{background:var(--ink);color:var(--bg)}
+#readNext{top:614px}
+#readNext p{height:38px;margin-bottom:8px;font:400 13px/18px var(--sans);color:var(--ink2);text-wrap:balance;display:grid;place-items:center}
+#readNextPrimary{width:330px;min-height:46px;padding:8px 14px;border-radius:23px;background:var(--ink);color:var(--bg);font:500 15px/19px var(--sans);cursor:pointer}
+#readNextPrimary:disabled{opacity:.55;cursor:default}
+#readNext .links{display:flex;justify-content:center;gap:12px;margin-top:3px}
+#readNext .links button{min-height:36px;padding:4px 8px;font:400 13px/18px var(--sans);color:var(--ink2);cursor:pointer}
+
 /* greeting, notes, face text */
 #greet,#note{left:20px;top:512px;width:350px;text-align:center;pointer-events:none}
 #greet .t{font:300 34px/36px var(--serif);letter-spacing:-.035em;white-space:nowrap}
@@ -246,10 +258,40 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 /* a row's value keeps one line whenever it fits; its label wraps in the room that is left */
 .card dt{flex:1 1 0;min-width:0;white-space:normal;line-height:13px;overflow-wrap:anywhere}
 .card dd{flex:none;max-width:64%;padding-left:12px;overflow-wrap:anywhere}
+
+/* The dial surrounds the existing orb; the glass remains untouched. */
+#speakingDial{position:absolute;inset:0;z-index:30;display:none;text-align:center;color:var(--ink);pointer-events:none}
+#speakingDial.on{display:block} #speakingDial button,#speakingDial input{pointer-events:auto}
+#speakingQuestion{position:absolute;top:154px;left:30px;width:330px;font:300 26px/32px var(--serif)}
+#speakingArc{position:absolute;top:423px;left:47px;width:296px;height:63px;overflow:visible;pointer-events:none}
+#speakingRange{position:absolute;top:420px;left:47px;width:296px;height:68px;opacity:.01;cursor:pointer;touch-action:pan-x}
+#speakingRange:focus-visible{opacity:.15;outline:2px solid #A795EF}
+#speakingLabels{position:absolute;top:484px;left:23px;width:344px;display:flex;justify-content:space-between}
+#speakingLabels button{border:0;background:none;color:var(--ink2);font:400 13px/20px var(--sans);padding:12px 2px;min-width:95px}
+#speakingLabels button[aria-pressed=true]{color:#F2EDE4}
+#speakingSample{position:absolute;top:552px;left:34px;width:322px;font:400 17px/25px var(--sans);color:var(--ink2)}
+#speakingConfirm{position:absolute;top:690px;left:70px;width:250px;min-height:48px;border:1px solid #F2EDE433;border-radius:28px;background:transparent;color:#F2EDE4;font:400 16px var(--sans)}
+#speakingSkip{position:absolute;top:750px;left:95px;width:200px;min-height:44px;border:0;background:none;color:var(--ink2);font:400 14px var(--sans)}
+#speakingError{position:absolute;top:659px;left:30px;width:330px;color:#F2EDE4;font:400 13px var(--sans)}
+.speaking-on #pill *,.speaking-on #chipRow *,.speaking-on #hintS,.speaking-on #micGlow,.speaking-on #greet,.speaking-on #pill,.speaking-on #hint,.speaking-on #chips,.speaking-on #avatar,.speaking-on #lvl{visibility:hidden!important;pointer-events:none!important}
+.speaking-greet #greet .t{white-space:normal;font-size:26px;line-height:32px}
+#speakingRefine{position:absolute;top:790px;left:12px;width:366px;display:none;justify-content:center;gap:6px;z-index:30}
+#speakingRefine.on{display:flex} #speakingRefine button{background:#0B0A09;border:1px solid #F2EDE426;border-radius:20px;color:#F2EDE4;font:400 12px var(--sans);padding:12px 8px;min-height:44px}
+
 </style>
 </head>
 <body data-page="app">
 <div id="stage">
+<div id="speakingDial" aria-hidden="true">
+ <div id="speakingQuestion"></div>
+ <svg id="speakingArc" viewBox="0 0 296 63" aria-hidden="true"><path d="M8 8 Q148 100 288 8" fill="none" stroke="#F2EDE438" stroke-width="1"/><circle id="speakingThumb" cx="8" cy="8" r="5" fill="#F2EDE4"/></svg>
+ <input id="speakingRange" type="range" min="0" max="2" step="1" value="0" />
+ <div id="speakingLabels"><button type="button" data-dial="0"></button><button type="button" data-dial="1"></button><button type="button" data-dial="2"></button></div>
+ <div id="speakingSample" aria-live="polite"></div><div id="speakingError" role="alert"></div>
+ <button id="speakingConfirm" type="button"></button><button id="speakingSkip" type="button"></button>
+</div>
+<div id="speakingRefine"><button type="button" data-refine="-1"></button><button type="button" data-refine="0"></button><button type="button" data-refine="1"></button></div>
+
   <div id="amb"></div>
   <div id="pool"></div>
   <canvas id="gl" aria-hidden="true"></canvas>
@@ -402,6 +444,23 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     </article>
     <div id="tpill" class="a"></div>
 
+    <div id="readActions" aria-label="" hidden>
+      <button id="readVoice" type="button" data-hit="read-voice"></button>
+      <button id="readResult" type="button" data-hit="read-result"></button>
+    </div>
+    <div id="readHandback" aria-label="" hidden>
+      <button id="readDetails" type="button" data-hit="read-result"></button>
+      <button id="readSave" type="button" data-hit="read-save"></button>
+    </div>
+    <div id="readNext" hidden>
+      <p id="readNextNote" role="status" aria-live="polite"></p>
+      <button id="readNextPrimary" type="button" data-hit="read-save"></button>
+      <div class="links">
+        <button id="readNew" type="button" data-hit="read-new"></button>
+        <button id="readHome" type="button" data-hit="read-home"></button>
+        <button id="readSummary" type="button" data-hit="read-details"></button>
+      </div>
+    </div>
     <div id="eyebrow" class="a"></div>
     <div id="chipRow" class="a" data-hit="chiprow"></div>
 
@@ -482,7 +541,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   'use strict';
   var V = 1;
   var METHODS = [
-    'session', 'roster', 'suggestions', 'ask', 'cancel', 'read.rendered',
+    'companion.presented', 'companion.answer', 'speaking.choose', 'session', 'roster', 'suggestions', 'ask', 'cancel', 'read.rendered',
     'speech.permission', 'speech.requestPermission', 'speech.start', 'speech.stop',
     'speak', 'previewVoice', 'stopSpeaking', 'setMuted', 'haptic',
     'saveThesis', 'island', 'theses', 'record',
@@ -491,7 +550,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     'nudge.seen', 'nudge.act'
   ];
   var EVENTS = [
-    'session.changed', 'account.changed', 'consent.withdrawn', 'app.state', 'ask.stage', 'ask.start', 'analysis.level',
+    'companion.checkIn', 'companion.revoked', 'speaking.open', 'session.changed', 'account.changed', 'consent.withdrawn', 'app.state', 'ask.stage', 'ask.start', 'analysis.level',
     'speech.state', 'speech.level', 'speech.partial', 'speech.final', 'speech.error',
     'voice.start', 'voice.level', 'voice.progress', 'voice.word', 'voice.end',
     'thesis.planted', 'native.sheet'
@@ -2013,6 +2072,7 @@ function fit(){
   stage.classList.toggle('lbx-x', fitX > 0.5); stage.classList.toggle('lbx-y', fitY > 0.5);
   sizeCanvas();
   if (typeof placeTypeBox === 'function') placeTypeBox();
+  if (typeof guideLayout === 'function') guideLayout();
 }
 function refit(){ if (W.innerWidth !== fitW || W.innerHeight !== fitH){ fit(); dirty = true; } }
 var DEV_DPR = W.devicePixelRatio || 1;
@@ -2475,6 +2535,8 @@ var el = {
   ag: [$('ag0'), $('ag1'), $('ag2')], say: [$('say0'), $('say1')], live: $('live'), meta: $('meta'), tx: $('tx'), bead: $('bead'),
   greet: $('greet'), note: $('note'), ftx: [$('ftx0'), $('ftx1')], meri: [].slice.call($('meri').querySelectorAll('i')), badge: $('meri').querySelector('b'), meriHit: $('meriHit'),
   cards: [$('card0'), $('card1'), $('card2')], save: $('save'), saveSw: $('saveSw'), tpill: $('tpill'),
+  readActions: $('readActions'), readVoice: $('readVoice'), readResult: $('readResult'), readHandback: $('readHandback'), readDetails: $('readDetails'), readSave: $('readSave'),
+  readNext: $('readNext'), readNextNote: $('readNextNote'), readNextPrimary: $('readNextPrimary'), readHome: $('readHome'), readNew: $('readNew'), readSummary: $('readSummary'),
   eyebrow: $('eyebrow'), chipRow: $('chipRow'), perm: $('perm'), wm: $('wm'), close: $('close'), dockQ: $('dockQ'), dockA: $('dockA'), avatar: $('avatar'), xpArc: $('xpArc'),
   hint: $('hint'), hintS: $('hintS'), micGlow: $('micGlow'), pill: $('pill'), ghost: $('ghost'), pause: $('pauseTag'),
   typeBox: $('typeBox'), ta: $('ta'), taSend: $('taSend')
@@ -2549,6 +2611,17 @@ function buildIslaRing(n){
    ===================================================================== */
 var STR = /*STRINGS-BEGIN*/{
   en: {
+    "read.new": 'Another question',
+    "read.skipVoice": "Skip voice",
+    "read.result": "Read analysis",
+    "read.save": 'Save result',
+    "read.saving": "Saving…",
+    "read.saved": "Reading saved",
+    "read.home": "Back to Bobby",
+    "read.summary": "Read summary",
+    "read.saveHelp": 'Save this asset and its verdict.',
+    "read.savedLocal": "Saved on this phone.",
+
     'greet.morning': 'Good morning.', 'greet.afternoon': 'Good afternoon.', 'greet.evening': 'Good evening.',
     'greet.sub.day': 'What are you weighing today?', 'greet.sub.night': 'What are you weighing tonight?',
     'greet.saved': '{symbol} is saved.',
@@ -2562,10 +2635,10 @@ var STR = /*STRINGS-BEGIN*/{
     'type.placeholder': 'Ask about a stock or a crypto…', 'type.send': 'Send question',
     'think.forming': 'Verdict forming',
     'chips.eyebrow': 'You might want to ask',
-    'face.desk': 'Desk', 'face.isla': 'Island', 'face.squad': 'Squad', 'face.theses': 'Saved theses',
+    'face.desk': 'Desk', 'face.isla': 'Island', 'face.squad': 'Squad', "face.theses": "Saved reads",
     'face.isla.status': '{pieces} pieces · {seeds} seeds growing', 'face.isla.chip': 'Visit your island',
     'face.squad.status': '{name} · Level {level} · {streak}-day streak', 'face.squad.statusNew': '{name} · Level {level}', 'face.squad.chip': 'Change companion',
-    'face.theses.one': '1 saved', 'face.theses.many': '{n} saved', 'face.theses.chip': 'Open latest',
+    'face.theses.one': '1 saved', 'face.theses.many': '{n} saved', "face.theses.chip": "Open latest reading",
     'save.evolution': 'Level {n} · {name}', 'save.unlock': 'Unlocked · {name}',
     'voice.failed': 'Bobby’s voice is unavailable. Your analysis is ready to read.',
     'save.stale': 'Account changed · this read was not saved', 'save.failed': 'Could not save this read',
@@ -2579,6 +2652,17 @@ var STR = /*STRINGS-BEGIN*/{
     'aria.account': '{name}. Account and progress', 'aria.accountPlain': 'Account and progress'
   },
   es: {
+    "read.skipVoice": "Saltar voz",
+    "read.result": "Ver análisis",
+    "read.new": "Otra pregunta",
+    "read.save": "Guardar resultado",
+    "read.saving": "Guardando…",
+    "read.saved": "Lectura guardada",
+    "read.home": "Volver a Bobby",
+    "read.summary": "Ver resumen",
+    "read.saveHelp": "Guarda el activo y su veredicto.",
+    "read.savedLocal": "Guardada en este teléfono.",
+
     'greet.morning': 'Buenos días.', 'greet.afternoon': 'Buenas tardes.', 'greet.evening': 'Buenas noches.',
     'greet.sub.day': '¿Qué estás evaluando hoy?', 'greet.sub.night': '¿Qué estás evaluando esta noche?',
     'greet.saved': '{symbol} quedó guardada.',
@@ -2592,10 +2676,10 @@ var STR = /*STRINGS-BEGIN*/{
     'type.placeholder': 'Pregunta por una acción o cripto…', 'type.send': 'Enviar pregunta',
     'think.forming': 'Veredicto en formación',
     'chips.eyebrow': 'Quizá quieras preguntar',
-    'face.desk': 'Escritorio', 'face.isla': 'Isla', 'face.squad': 'Escuadrón', 'face.theses': 'Tesis guardadas',
+    'face.desk': 'Escritorio', 'face.isla': 'Isla', 'face.squad': 'Escuadrón', "face.theses": "Tus lecturas",
     'face.isla.status': '{pieces} piezas · {seeds} semillas creciendo', 'face.isla.chip': 'Visitar Isla',
     'face.squad.status': '{name} · Nivel {level} · racha de {streak} días', 'face.squad.statusNew': '{name} · Nivel {level}', 'face.squad.chip': 'Cambiar compañero',
-    'face.theses.one': '1 guardada', 'face.theses.many': '{n} guardadas', 'face.theses.chip': 'Abrir la última',
+    'face.theses.one': '1 guardada', 'face.theses.many': '{n} guardadas', "face.theses.chip": "Abrir última lectura",
     'save.evolution': 'Nivel {n} · {name}', 'save.unlock': 'Desbloqueado · {name}',
     'voice.failed': 'La voz de Bobby no está disponible. Tu análisis está listo para leer.',
     'save.stale': 'Cambió la cuenta · esta lectura no se guardó', 'save.failed': 'No se pudo guardar esta lectura',
@@ -2610,6 +2694,17 @@ var STR = /*STRINGS-BEGIN*/{
   }
 ,
   fr: {
+    "read.new": 'Autre question',
+    "read.skipVoice": "Passer la voix",
+    "read.result": "Lire l’analyse",
+    "read.save": 'Enregistrer le résultat',
+    "read.saving": "Enregistrement…",
+    "read.saved": "Analyse enregistrée",
+    "read.home": "Revenir à Bobby",
+    "read.summary": "Voir le résumé",
+    "read.saveHelp": 'Enregistre cet actif et son verdict.',
+    "read.savedLocal": "Enregistrée sur ce téléphone.",
+
     "greet.morning": "Bonjour.",
     "greet.afternoon": "Bonjour.",
     "greet.evening": "Bonsoir.",
@@ -2638,7 +2733,7 @@ var STR = /*STRINGS-BEGIN*/{
     "face.desk": "Bureau",
     "face.isla": "Île",
     "face.squad": "Équipe",
-    "face.theses": "Thèses enregistrées",
+    "face.theses": "Tes analyses",
     "face.isla.status": "{pieces} éléments · {seeds} graines en croissance",
     "face.isla.chip": "Visiter ton île",
     "face.squad.status": "{name} · Niveau {level} · série de {streak} jours",
@@ -2646,7 +2741,7 @@ var STR = /*STRINGS-BEGIN*/{
     "face.squad.chip": "Changer de compagnon",
     "face.theses.one": "1 enregistrée",
     "face.theses.many": "{n} enregistrées",
-    "face.theses.chip": "Ouvrir la dernière",
+    "face.theses.chip": "Ouvrir la dernière analyse",
     "save.evolution": "Niveau {n} · {name}",
     "save.unlock": "Débloqué · {name}",
     "voice.failed": "La voix de Bobby est indisponible. Ton analyse est prête à lire.",
@@ -2680,6 +2775,17 @@ var STR = /*STRINGS-BEGIN*/{
     "aria.accountPlain": "Compte et progression"
   },
   pt: {
+    "read.new": 'Outra pergunta',
+    "read.skipVoice": "Pular voz",
+    "read.result": "Ver análise",
+    "read.save": 'Guardar resultado',
+    "read.saving": "Guardando…",
+    "read.saved": "Análise guardada",
+    "read.home": "Voltar ao Bobby",
+    "read.summary": "Ver resumo",
+    "read.saveHelp": 'Guarda o ativo e o veredito.',
+    "read.savedLocal": "Guardada neste telefone.",
+
     "greet.morning": "Bom dia.",
     "greet.afternoon": "Boa tarde.",
     "greet.evening": "Boa noite.",
@@ -2708,7 +2814,7 @@ var STR = /*STRINGS-BEGIN*/{
     "face.desk": "Mesa",
     "face.isla": "Ilha",
     "face.squad": "Equipa",
-    "face.theses": "Teses guardadas",
+    "face.theses": "Tuas análises",
     "face.isla.status": "{pieces} peças · {seeds} sementes a crescer",
     "face.isla.chip": "Visitar a tua ilha",
     "face.squad.status": "{name} · Nível {level} · sequência de {streak} dias",
@@ -2716,7 +2822,7 @@ var STR = /*STRINGS-BEGIN*/{
     "face.squad.chip": "Mudar de companheiro",
     "face.theses.one": "1 guardada",
     "face.theses.many": "{n} guardadas",
-    "face.theses.chip": "Abrir a última",
+    "face.theses.chip": "Abrir última análise",
     "save.evolution": "Nível {n} · {name}",
     "save.unlock": "Desbloqueado · {name}",
     "voice.failed": "A voz do Bobby não está disponível. A tua análise está pronta para ler.",
@@ -2751,6 +2857,17 @@ var STR = /*STRINGS-BEGIN*/{
   }
 ,
   it: {
+    "read.new": 'Un’altra domanda',
+    "read.skipVoice": "Salta la voce",
+    "read.result": "Leggi l’analisi",
+    "read.save": 'Salva risultato',
+    "read.saving": "Salvataggio…",
+    "read.saved": "Analisi salvata",
+    "read.home": "Torna a Bobby",
+    "read.summary": "Vedi il riepilogo",
+    "read.saveHelp": 'Salva questo asset e il suo verdetto.',
+    "read.savedLocal": "Salvata su questo telefono.",
+
     "greet.morning": "Buongiorno.",
     "greet.afternoon": "Buon pomeriggio.",
     "greet.evening": "Buonasera.",
@@ -2779,7 +2896,7 @@ var STR = /*STRINGS-BEGIN*/{
     "face.desk": "Scrivania",
     "face.isla": "Isola",
     "face.squad": "Squadra",
-    "face.theses": "Tesi salvate",
+    "face.theses": "Le tue analisi",
     "face.isla.status": "{pieces} elementi · {seeds} semi in crescita",
     "face.isla.chip": "Visita la tua isola",
     "face.squad.status": "{name} · Livello {level} · serie di {streak} giorni",
@@ -2787,7 +2904,7 @@ var STR = /*STRINGS-BEGIN*/{
     "face.squad.chip": "Cambia compagno",
     "face.theses.one": "1 salvata",
     "face.theses.many": "{n} salvate",
-    "face.theses.chip": "Apri l’ultima",
+    "face.theses.chip": "Apri l’ultima analisi",
     "save.evolution": "Livello {n} · {name}",
     "save.unlock": "Sbloccato · {name}",
     "voice.failed": "La voce di Bobby non è disponibile. La tua analisi è pronta da leggere.",
@@ -2821,6 +2938,17 @@ var STR = /*STRINGS-BEGIN*/{
     "aria.accountPlain": "Account e progressi"
   },
   de: {
+    "read.new": 'Weitere Frage',
+    "read.skipVoice": "Stimme überspringen",
+    "read.result": "Analyse lesen",
+    "read.save": 'Ergebnis speichern',
+    "read.saving": "Wird gespeichert…",
+    "read.saved": "Analyse gespeichert",
+    "read.home": "Zurück zu Bobby",
+    "read.summary": "Zusammenfassung",
+    "read.saveHelp": 'Speichere diesen Vermögenswert und sein Urteil.',
+    "read.savedLocal": "Auf diesem Telefon gespeichert.",
+
     "greet.morning": "Guten Morgen.",
     "greet.afternoon": "Guten Tag.",
     "greet.evening": "Guten Abend.",
@@ -2849,7 +2977,7 @@ var STR = /*STRINGS-BEGIN*/{
     "face.desk": "Schreibtisch",
     "face.isla": "Insel",
     "face.squad": "Team",
-    "face.theses": "Gespeicherte Thesen",
+    "face.theses": "Deine Analysen",
     "face.isla.status": "{pieces} Elemente · {seeds} wachsende Samen",
     "face.isla.chip": "Deine Insel besuchen",
     "face.squad.status": "{name} · Stufe {level} · {streak} Tage in Folge",
@@ -2857,7 +2985,7 @@ var STR = /*STRINGS-BEGIN*/{
     "face.squad.chip": "Begleiter wechseln",
     "face.theses.one": "1 gespeichert",
     "face.theses.many": "{n} gespeichert",
-    "face.theses.chip": "Neueste öffnen",
+    "face.theses.chip": "Letzte Analyse öffnen",
     "save.evolution": "Stufe {n} · {name}",
     "save.unlock": "Freigeschaltet · {name}",
     "voice.failed": "Bobbys Stimme ist nicht verfügbar. Deine Analyse ist bereit zum Lesen.",
@@ -3098,6 +3226,8 @@ function onAskReply(r, res){
   if (r !== READ) return;
   if (!res || typeof res.status !== 'string') res = { v: 1, status: 'error', code: 'bad_response', message: null };
   r.reply = res;
+  if (res.companionCheckIn) CHECKIN = res.companionCheckIn;
+  if (!paramsCompanion(r.params)) GUIDE_RETRIES = 0;
   if (res.status === 'ok'){
     try { r.model = RMOD.build(res, { lang: LANG, locale: LOCALE, signedIn: !!(SES && SES.signedIn), origin: r.origin }); r.requestId = res.requestId; }
     catch (e){ logErr('model', e); r.model = null; r.reply = { v: 1, status: 'error', code: 'bad_response', message: null }; }
@@ -3113,6 +3243,7 @@ function onStage(p){
 /* Acknowledgment after two real animation frames with a settled, visible result card.
    Native retains the signed receipt; this trusted page only names the current request UUID. */
 function observePresentedRead(){
+  if (ST.name === 'THESIS_VIEW' || A.viewOnly) return;
   var r = READ;
   if (!r || !r.model || !r.reply || r.reply.status !== 'ok' || !r.requestId || r.presented || !canRun()) return;
   var visible = false;
@@ -3404,9 +3535,9 @@ function fillThesisCard(th, o){
   el.saveSw.style.setProperty('--sc', css(vc.c, 0.95));
   el.tpill.textContent = th.pill; el.tpill.style.background = css(mixC(C.cardBg, vc.c, 0.2), 0.86); el.tpill.style.border = '.5px solid ' + css(vc.c, 0.5); el.tpill.style.color = vc.css;
   A.saved.set(o.readOnly ? 1 : 0); A.savePress.set(1); A.sweepT = -9; A.xp.set(0); A.xpO.set(0);
-  saveRoll.set(o.readOnly ? th.savedLabel : th.saveLabel, true);
+  saveRoll.set(o.readOnly ? tt('read.saved') : tt('read.save'), true);
   A.saveC = vk;
-  st(el.save, 'display', 'block');
+  st(el.save, 'display', o.readOnly ? 'none' : 'block');
 }
 function setHorizon(hrs){
   HZ = hrs;
@@ -3606,6 +3737,8 @@ function txSet(text, final, stagger){
   A.tx.final = !!final;
 }
 
+function paramsCompanion(params){ return !!(params && params.companion); }
+
 /* ---- app/60-fsm.js ---- */
 /* =====================================================================
    11. The state machine (ARCHITECTURE.md §3.2). Each prototype beat is a
@@ -3655,6 +3788,13 @@ function dockOut(){
 }
 var EVENING_HOUR = { es: 20, pt: 20 };   /* "Buenas tardes" / "Boa tarde" run until 20:00; the other four languages turn to the evening at 18:00 */
 function setGreeting(){
+  if (typeof dialGreeting !== "undefined" && dialGreeting){
+    var question = dialWords()[5]; lineSet(A.greet, question, "", el.greetT, el.greetS);
+    att(el.greetT, 'role', 'heading'); att(el.greetT, 'aria-level', '1'); att(el.greetT, 'aria-label', question);
+    Array.prototype.forEach.call(el.greetT.querySelectorAll('span'), function(word){ word.setAttribute('aria-hidden', 'true'); });
+    return;
+  }
+  if (el.greetT && el.greetT.removeAttribute){ ['role','aria-level','aria-label'].forEach(function(k){ el.greetT.removeAttribute(k); }); el.greetT._a = {}; }
   var h = SES && fin(SES.localHour) ? SES.localHour : new Date().getHours();
   var k = (h >= 5 && h < 12) ? 'morning' : (h >= 12 && h < (EVENING_HOUR[LANG] || 18)) ? 'afternoon' : 'evening';
   var sub = LEDGER.length ? tt('greet.saved', { symbol: LEDGER[0].symbol }) : tt(k === 'evening' ? 'greet.sub.night' : 'greet.sub.day');
@@ -3726,10 +3866,12 @@ function dissolveThink(){
 }
 /* everything a read put on screen goes back where it came from (cards before the sphere moves) */
 function clearRead(){
+  GUIDE_EPOCH++;
+  if (typeof guidePanel !== "undefined") guidePanel.style.display = "none";
   chipsHide();
   var hadCards = A.cardsOn || A.rev.some(function(v){ return v.x > 0.01; });
   if (hadCards){ [2, 0, 1].forEach(function(i, k){ A.rev[i].to(0, 'ret', null, 0.15 + k * 0.04); }); }
-  A.cardsOn = false; A.pullOn = false; A.commit = false; A.viewOnly = false; A.tp.on = false;
+  A.cardsOn = false; A.pullOn = false; A.commit = false; A.viewOnly = false; A.savedReadCard = false; A.tp.on = false;
   dockOut();
   if (A.vCond.t > 0 || A.vCond.x > 0.01){ A.vCond.tween(0, 0.28, E.lin, 0.35); A.ringFill.tween(0, 0.35, E.data, 0.35); A.convO.tween(0, 0.2, E.fade, 0.35); A.ringO.tween(0, 0.12, E.fade, 0.65); }
   if (A.chartT0 < 1e8 && A.chartExit > 1e8) A.chartExit = clk;
@@ -3753,6 +3895,7 @@ function readShowing(){ return A.cardsOn || A.vCond.t > 0 || U.flood.t > 0 || A.
 function routeReply(r){
   var s = r.reply.status;
   if (s === 'ok'){ go('THINK_WAIT'); return; }
+  if (s === 'companion' || s === 'companion_error'){ go('COMPANION', { reply: r.reply }); return; }
   if (s === 'confirm'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG, { locale:LOCALE }) }); return; }
   /* a level refusal or a premium read that did not finish: one calm line, and a chip the user taps (never silent) */
   if (s === 'level_notice'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG, { locale:LOCALE }) }); return; }
@@ -3816,7 +3959,7 @@ STATES.WAKE = {
     cue(0.55, function(){ meriIn(); });
     cue(0.70, function(){ A.pillY.to(0, 'soft'); A.pillO.tween(1, 0.3, E.fade); });
     cue(0.85, function(){ S.lean.to(4, BODY.gaze); S.lean.to(0, BODY.gaze, null, 0.26); });
-    cue(0.90, function(){ go('IDLE'); });
+    cue(0.90, function(){ go(SES && SES.riskAccepted && SES.speaking && SES.speaking.offer ? 'SPEAKING_DIAL' : 'IDLE'); });
   },
   down: function(h, p){ if (h === 'pill' || h === 'surface') return STATES.IDLE.down(h, p); return null; }
 };
@@ -4016,6 +4159,7 @@ STATES.LISTENING = {
     if (ST.name !== 'LISTENING') return;
     text = String(text || '').replace(/\s+/g, ' ').trim();
     this.finalWait = 0;
+    if (guideResumeOptions(text)) { txReset(); return; }
     if (!text){ txReset(); go('IDLE', { hint: 'hint.empty', restoreGreet: true }); return; }
     txSet(text, true);
     go('SENDING', { question: text, origin: 'speech' });
@@ -4048,7 +4192,7 @@ STATES.TYPING = {
     if (!this.d.fromRead) chipsHide();
     A.type.p.set(0); A.type.p.to(1, 'emit'); A.type.o.tween(1, 0.2, E.fade);
     A.pillO.tween(0, 0.16, E.fade);
-    el.ta.value = SPEECH.draft || ''; SPEECH.draft = ''; el.ta.placeholder = tt('type.placeholder'); att(el.taSend, 'aria-label', tt('type.send')); taAutosize();
+    el.ta.value = SPEECH.draft || ''; SPEECH.draft = ''; el.ta.placeholder = GUIDE_INPUT_CHECKIN ? guideWords().answerPlaceholder : tt('type.placeholder'); att(el.taSend, 'aria-label', GUIDE_INPUT_CHECKIN ? guideWords().answerSend : tt('type.send')); if (GUIDE_INPUT_CHECKIN) el.ta.maxLength = 400; else el.ta.removeAttribute('maxlength'); taAutosize();
     showTypeBox(true);
   },
   exit: function(){ A.type.p.to(0, 'ret'); A.type.o.tween(0, 0.16, E.fade); A.pillO.tween(1, 0.2, E.fade); try { el.ta.blur(); } catch (e) {} at(0.2, function(){ if (ST.name !== 'TYPING') showTypeBox(false); }); },
@@ -4056,10 +4200,11 @@ STATES.TYPING = {
     if (ST.name !== 'TYPING' || TB.composing) return;
     var q = el.ta.value.replace(/\s+/g, ' ').trim();
     if (!q){ this.cancel(); return; }
+    if (guideResumeOptions(q)) return;
     var params = this.d.followUpOf ? { followUpOf: this.d.followUpOf, question: q } : { question: q };
     go('SENDING', { question: q, params: params, origin: 'type', fromRead: !!this.d.fromRead });
   },
-  cancel: function(){ if (ST.name !== 'TYPING') return; if (this.d.fromRead) go('RETURNING'); else go('IDLE', { restoreGreet: true }); },
+  cancel: function(){ if (ST.name !== 'TYPING') return; if (guideResumeOptions()) return; if (this.d.fromRead) go('RETURNING'); else go('IDLE', { restoreGreet: true }); },
   down: function(h){ return tapG(function(){ if (!el.ta.value.trim()) STATES.TYPING.cancel(); else try { el.ta.blur(); } catch (e) {} }); }
 };
 
@@ -4156,7 +4301,7 @@ STATES.THINK_RESOLVE = {
     /* Allow both bounded persona requests and the native failure event to finish. */
     else if (clk - VOICE.reqT > VOICE_WAIT){ bcall('stopSpeaking').catch(noop); goSilent(); go('TALK_EVIDENCE'); }
   },
-  down: function(h){ if (h === 'close') return tapG(function(){ go('RETURNING'); }); return null; }
+  down: function(h){ var action = readActionDown(h); if (action) return action; if (h === 'close') return tapG(function(){ go('RETURNING'); }); return null; }
 };
 function prepRead(m){
   var res = READ.reply;
@@ -4178,12 +4323,12 @@ function prepRead(m){
   A.rev.forEach(function(v){ v.set(0); }); A.trk.set(0); A.cardIdx = 0; A.commit = false;
 }
 function speakRead(){
-  var r = READ; if (!r || !r.model) return;
+  var r = READ; if (!r || !r.model || r.voiceSkipped) return;
   VOICE.id = r.requestId; VOICE.started = false; VOICE.ended = false; VOICE.silent = false; VOICE.reqT = clk; VOICE.lvl = 0; VOICE.at = -9;
   bcall('speak', { id: r.requestId, text: r.model.spoken.text }).then(function(res){
     if (READ !== r || VOICE.id !== r.requestId) return;
     if (!res || res.status !== 'queued') goSilent();
-  }, function(){ if (READ === r) goSilent(); });
+  }, function(){ if (READ === r && VOICE.id === r.requestId) goSilent(); });
 }
 function goSilent(){ VOICE.silent = true; VOICE.ended = true; }
 var VOICE_WAIT = 45;   /* s from speak() to voice.start before the read goes on silently */
@@ -4208,9 +4353,65 @@ function preVerdict(){
   U.filR.tween(0, 0.45, E.inhale, 0.50);
   A.capY.to(592, 'soft', null, 0.30);
 }
+/* Presentation controls only apply to a completed read. They stop narration, never the analysis or its receipt. */
+function readResultReady(){
+  return !!(READ && READ.reply && READ.reply.status === 'ok' && READ.model && READ.requestId &&
+    ['THINK_RESOLVE', 'TALK_EVIDENCE', 'TALK_CHART', 'VERDICT', 'HANDBACK'].indexOf(ST.name) >= 0);
+}
+function stopReadVoice(r){
+  var stopped = r.voiceSkipped;
+  r.voiceSkipped = true;
+  /* Invalidate before native emits voice.end: a queued start/progress can no longer restart the clock. */
+  VOICE.id = null; VOICE.started = false; VOICE.ended = true; VOICE.silent = true; VOICE.lvl = 0; VOICE.at = -9;
+  K.on = false; K.t = K.end + 0.5;
+  if (!stopped) bcall('stopSpeaking').catch(noop);
+}
+function settleReadResult(m){
+  VERD = VC[m.verdict.key] || VC.wait;
+  dissolveThink(); PREV.on = true; PREV.imp = true; gulpCanon(false);
+  A.sat.forEach(function(s){ s.p.to(0, 'ret'); }); A.orbO.to(0); U.compOn.to(0); U.compDepth.to(1);
+  U.filA.to(0); U.filR.to(0); U.braid.to(0); U.swirl.to(0);
+  S.cy.to(210, 'soft'); S.r.to(72, 'soft'); S.pull.to(0, BODY.gulp);
+  U.glow.to(1); U.flood.cfg = UT(0.48); U.flood.to(1.1); U.scrim.to(0.9);
+  U.energy.to(0.3); U.irid.to(0.35); U.wflow.to(0.12); U.breathK.to(1);
+  TINT.amt.to(0); TINT.wash.to(0); ambientCanon(true);
+  A.vCond.to(1); A.ringO.to(1); A.ringFill.to(m.ring.mode === 'conviction' ? clamp(m.ring.pct / 100, 0, 1) : 1);
+  A.convO.to(m.ring.mode === 'conviction' ? 1 : 0); A.ringOff.to(14, 'soft'); A.pctPos.to(0, 'soft');
+  if (m.chart){ A.chartT0 = clk - 6; A.chartExit = 1e9; A.nowS.set(1); }
+  capsOff(); A.metaPin = 54; A.metaDrop.set(0); A.capY.to(592, 'soft');
+  A.qText = READ.question; A.qT0 = clk - 10; A.dockO.to(1); A.closeO.to(1); A.wmO.to(0); dockAsset();
+  att(el.sphereA, 'aria-label', m.aria);
+}
+function skipReadVoice(){
+  if (!readResultReady()) return false;
+  var r = READ;
+  if (r.voiceSkipped && ST.name === 'HANDBACK') return true;
+  stopReadVoice(r); settleReadResult(r.model);
+  go('HANDBACK', { voiceSkipped: true });
+  return true;
+}
+function showReadResult(){
+  if (!readResultReady()) return false;
+  var r = READ;
+  stopReadVoice(r); settleReadResult(r.model);
+  chipsHide(); hint('');
+  if (A.chartT0 < 1e8) A.chartExit = clk;
+  A.metaO.tween(0, 0.17, E.fade);
+  A.cardsOn = true; A.pullOn = false; A.commit = true; A.viewOnly = false;
+  A.cardIdx = 0; A.trk.set(0); A.dscr.set(0);
+  A.rev.forEach(function(v, i){ v.set(i < A.nCards ? 1 : 0); });
+  go('CARDS', { result: true });
+  return true;
+}
+function readActionDown(h, pressV){
+  if ((h !== 'read-voice' && h !== 'read-result') || !readResultReady()) return null;
+  var r = READ;
+  return tapG(function(){ if (READ === r){ if (h === 'read-voice') skipReadVoice(); else showReadResult(); } }, pressV);
+}
 function talkDown(h){
+  var action = readActionDown(h); if (action) return action;
   if (h === 'close') return tapG(function(){ go('RETURNING'); });
-  if (h === 'pill' && A.mode === 'stop') return tapG(function(){ bcall('stopSpeaking').catch(noop); goSilent(); pillMode('mic'); }, A.press);
+  if (h === 'pill' && A.mode === 'stop') return readActionDown('read-voice', A.press);
   return null;
 }
 STATES.TALK_EVIDENCE = {
@@ -4276,18 +4477,19 @@ STATES.VERDICT = {
    was already there (§3.5). No save is needed first. ---------- */
 STATES.HANDBACK = {
   enter: function(prev, d){
-    if (!d.restored){ sag(); at(0.55, sag); }
+    if (!d.restored && !d.voiceSkipped){ sag(); at(0.55, sag); }
     A.metaO.tween(1, 0.3, E.fade); A.metaY.set(6); A.metaY.to(0, 'emit');
     var vp = SES && SES.hints ? (SES.hints.verdictPull || 0) : 0;
     if (vp < 3){ hint(tt('hint.pull')); if (!HINTED.verdictPull){ HINTED.verdictPull = true; markHint('verdictPull'); } } else hint('');
     pillMode(idleMode()); this.idleT = clk; A.commit = false;
     /* the voice is done: after the second sag its last line goes back into the glass and the row is born in its place
        (at once when the glass is only being put back: a restored read, a pull that was let go) */
-    if (d.restored) readChips(); else cue(1.0, readChips);
+    if (d.restored || d.voiceSkipped) readChips(); else cue(1.0, readChips);
   },
-  tick: function(){ if (clk - this.idleT > 90) go('RETURNING'); },
+  tick: noop,
   down: function(h, p, hitEl){
     this.idleT = clk;
+    var action = readActionDown(h) || postReadActionDown(h); if (action) return action;
     if (h === 'close') return tapG(function(){ go('RETURNING'); });
     if (h === 'pill') return pillDown(p, true);
     if (h === 'avatar') return avatarG();
@@ -4304,6 +4506,8 @@ function readChips(){
     A.metaPin = h; A.metaDrop.set(0); A.metaDrop.to(54 - h, 'soft');
     capsOff();
   }
+  if (r.reply && r.reply.companionConsentPending) bcall('companion.presented').catch(noop);
+  if (CHECKIN && CHECKIN.question) { companionCheckIn(CHECKIN); return; }
   chipsShow(RMOD.followUps(r.model, SUGG || {}, LANG), false, true);
 }
 /* the row lies where a pull usually starts: a finger that goes down on a chip still pulls the cards, sideways it
@@ -4363,9 +4567,28 @@ function pullRelease(vy){
   S.cy.to(158, 'soft'); S.r.to(44, 'soft'); A.ringOff.to(10, 'soft'); A.pctPos.to(1, 'soft');
   U.energy.to(0.18); U.wflow.to(0.04); U.breathK.to(0.5);
 }
+function postReadActionDown(h){
+  if (['HANDBACK', 'CARDS', 'SAVING', 'FOLLOWUPS', 'THESIS_VIEW'].indexOf(ST.name) < 0) return null;
+  var read = READ, generation = GEN, state = ST.name;
+  function current(){ return GEN === generation && ST.name === state && READ === read; }
+  if (h === 'read-home') return tapG(function(){ if (!current()) return; if (ST.name === 'THESIS_VIEW') STATES.THESIS_VIEW.leave(); else go('RETURNING'); });
+  if (ST.name === 'THESIS_VIEW' || !read || !read.model) return null;
+  if (h === 'read-save' || h === 'save'){
+    if (read.savePending || (read.save && read.save.status === 'saved')) return null;
+    return tapG(function(){
+      if (!current() || read.savePending || (read.save && read.save.status === 'saved')) return;
+      if (ST.name === 'HANDBACK') showReadResult(); go('SAVING');
+    }, A.savePress);
+  }
+  if (h === 'read-new') return tapG(function(){ if (!current() || read.savePending) return; openTyping({ followUpOf: read.requestId, fromRead: true }); });
+  if (h === 'read-details') return tapG(function(){ if (!current()) return; A.cardIdx = 0; A.trk.to(0, 'glide'); A.dscr.to(0, 'glide'); });
+  if (h === 'read-next') return tapG(function(){ if (!current()) return; var c = readNextAction(); if (c) chipAct(c); });
+  return null;
+}
 function cardsDown(h, p, hitEl){
+  var action = postReadActionDown(h); if (action) return action;
   if (h === 'close') return tapG(function(){ go('RETURNING'); });
-  if (h === 'save') return A.saved.t > 0.5 ? null : tapG(function(){ go('SAVING'); }, A.savePress);
+  if (h === 'save' || h === 'read-save') return null;
   if (h === 'hz') return tapG(function(){ setHorizon(+hitEl.getAttribute('data-h')); tick('selection'); });
   if (h === 'islaGo') return tapG(function(){ openNative('isla'); });
   if (h === 'pill') return pillDown(p, true);
@@ -4396,7 +4619,7 @@ function cardTrackG(scrollable){
   };
 }
 STATES.CARDS = {
-  enter: function(prev, d){ if (prev === 'PULLING') pullRelease(d.vy); att(el.sphereA, 'aria-label', tt('aria.cards')); pillMode(idleMode()); },
+  enter: function(prev, d){ GUIDE_EPOCH++; guidePanel.style.display = 'none'; if (prev === 'PULLING' || d.result) pullRelease(d.vy); att(el.sphereA, 'aria-label', tt('aria.cards')); pillMode(idleMode()); },
   down: cardsDown
 };
 
@@ -4404,25 +4627,28 @@ STATES.CARDS = {
 STATES.SAVING = {
   enter: function(){
     var r = READ, m = r.model;
-    A.savePress.to(1, 'emit'); saveRoll.set(m.thesis.savedLabel); A.saved.tween(1, 0.24, E.fade); A.sweepT = clk; tick('success');
+    r.savePending = true; r.save = null;
+    A.savePress.to(1, 'emit'); saveRoll.set(tt('read.saving'));
     A.lnO.tween(0, 0.16, E.fade); op(el.card1.hz, 0);   /* the horizon is chosen: its selector leaves the row to the XP chip */
     var params = { requestId: r.requestId }; if (m.thesis.horizon.show) params.horizonHours = HZ;
     bcall('saveThesis', params).then(function(res){ onSaved(r, res); }, function(){ onSaved(r, { status: 'failed' }); });
-    cue(1.8, function(){ go('FOLLOWUPS'); });
+    /* Stay here until native confirms the write; a slow or failed save cannot show a saved state. */
   },
   down: cardsDown
 };
 function onSaved(r, res){
   if (READ !== r) return;
-  r.save = res;
+  r.savePending = false; r.save = res || { status: 'failed' };
   var m = r.model;
   if (!res || res.status !== 'saved'){
     /* the card goes back to what it showed before the press: the horizon selector, or the note where there is none */
     var hz = m.thesis.horizon.show;
     saveRoll.set(m.thesis.saveLabel); A.saved.tween(0, 0.24, E.fade); A.lnO.tween(hz ? 0 : 1, 0.2, E.fade); op(el.card1.hz, hz ? 1 : 0);
     hint(tt(res && res.status === 'stale' ? 'save.stale' : 'save.failed')); tick('warning');
+    if (ST.name === 'SAVING') go('CARDS');
     return;
   }
+  saveRoll.set(m.thesis.savedLabel); A.saved.tween(1, 0.24, E.fade); A.sweepT = clk; tick('success');
   SAVED = res;
   if (res.thesis){ LEDGER = [res.thesis].concat(LEDGER.filter(function(t){ return t.id !== res.thesis.id; })).slice(0, 20); }
   if (SES){ SES.xp = res.xp; if (res.level) SES.level = res.level; if (fin(res.streak)) SES.streak = res.streak; setXpArc(SES.level && SES.level.progress); }
@@ -4432,7 +4658,8 @@ function onSaved(r, res){
     : (res.unlocks && res.unlocks.length ? tt('save.unlock', { name: res.unlocks[0].name }) : '');
   if (line) hint(line);
   A.tp.on = true; A.tp.u.set(0); A.tp.u.tween(1, 0.52, E.inhale, 0.6);
-  at(0.6 + 0.52, function(){ gulp(0.04); tick('soft'); A.tp.on = false; A.badge.set(0); });
+  at(0.6 + 0.52, function(){ if (READ !== r) return; gulp(0.04); tick('soft'); A.tp.on = false; A.badge.set(0); });
+  if (ST.name === 'SAVING') go('FOLLOWUPS');
 }
 
 /* ---------- FOLLOWUPS: B9 — chips born from the pill; each sent chip is a paid desk read ---------- */
@@ -4474,14 +4701,15 @@ function chipAct(c){
   if (a.question){ go('SENDING', { question: a.question, params: { question: a.question, chip: true }, origin: 'chip', cx: cx, cy: cy, fromRead: !a.starter }); }
 }
 STATES.FOLLOWUPS = {
-  enter: function(){ chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow()); },
-  tick: function(){ if (inState() > 45) go('RETURNING'); },
+  enter: function(){ chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow()); if (CHECKIN && CHECKIN.question) companionCheckIn(CHECKIN); },
+  tick: noop,
   down: cardsDown
 };
 
 /* ---------- RETURNING: B10 — cards retract before the sphere moves; the verdict evaporates; the tint returns ---------- */
 STATES.RETURNING = {
   enter: function(prev, d){
+    GUIDE_INPUT_CHECKIN = false; CHECKIN = null;
     var hadVerdict = A.vCond.t > 0 || U.flood.t > 0, hadCards = clearRead();
     var k = hadCards ? 0.80 : hadVerdict ? 0.55 : 0.25;
     txReset(); showTypeBox(false);
@@ -4664,19 +4892,28 @@ function faceAction(id){
 /* ---------- THESIS_VIEW: a saved thesis, read-only, poured from the sphere ---------- */
 STATES.THESIS_VIEW = {
   enter: function(prev, d){
+    /* Every entry point opens a dated snapshot, never the previous live read's receipt. */
+    clearRead(); READ = null;
     this.back = d.back || 'IDLE';
     var v = RMOD.thesisView(d.thesis, LANG, { locale:LOCALE, signedIn: !!(SES && SES.signedIn) });
     v.when = whenLabel(d.thesis.asOf, Date.parse(d.thesis.savedAt));
+    if (v.debate) fillCards({ debate: v.debate, thesis: v, verdict: v.verdict, meta: v.meta });
     fillThesisCard(v, { verdict: v.verdict.key, readOnly: true });
     el.card1.ln.textContent = v.line; A.lnO.set(1);
-    A.nCards = 1; A.viewOnly = true; A.cardsOn = true; A.trk.set(-340); A.rev[0].set(0); A.rev[2].set(0); A.rev[1].set(0); A.rev[1].to(1, 'glide');
+    A.nCards = 1; A.viewOnly = true; A.savedReadCard = !!v.debate; A.cardsOn = true; A.cardIdx = v.debate ? 0 : 1;
+    A.trk.set(v.debate ? 0 : -340); A.dscr.set(0); A.rev.forEach(function(r){ r.set(0); }); A.rev[A.cardIdx].to(1, 'glide');
     if (lineShown(A.greet)) greetOut(); if (A.ftxCur >= 0){ var o = A.ftx[A.ftxCur]; o.o.tween(0, 0.17, E.fade); o.so.tween(0, 0.17, E.fade); o.co.tween(0, 0.12, E.fade); }
     meriOut(); A.satG.o.tween(0, 0.17, E.fade); hint('');
     moveSphere(158, 44, true); U.energy.to(0.18); U.breathK.to(0.5); U.faceOn.to(0);
     A.wmO.tween(0, 0.16, E.fade); A.closeO.tween(1, 0.24, E.fade, 0.1);
   },
-  exit: function(){ A.rev[1].to(0, 'ret'); A.cardsOn = false; A.viewOnly = false; A.closeO.tween(0, 0.16, E.fade); A.wmO.tween(1, 0.16, E.fade, 0.04); moveSphere(340, 120, true); U.energy.to(0.35); U.breathK.to(1); },
-  down: function(h){ return tapG(function(){ STATES.THESIS_VIEW.leave(); }); },
+  exit: function(){ A.rev.forEach(function(r){ r.to(0, 'ret'); }); A.cardsOn = false; A.viewOnly = false; A.savedReadCard = false; A.closeO.tween(0, 0.16, E.fade); A.wmO.tween(1, 0.16, E.fade, 0.04); moveSphere(340, 120, true); U.energy.to(0.35); U.breathK.to(1); },
+  down: function(h, p){
+    if (h === 'close' || h === 'read-home') return postReadActionDown('read-home');
+    if (h === 'pill') return pillDown(p, false);
+    if (h === 'scroll' && A.savedReadCard) return cardTrackG(true);
+    return null;
+  },
   leave: function(){
     var back = this.back; go('IDLE', { restoreGreet: back !== 'FACES' });
     if (back === 'FACES'){ A.th.to(Math.ceil(A.th.x / TAU - 1e-6) * TAU, 'glide'); A.fIdx = 0; faceText(0, -1); meriIn(); }
@@ -4713,6 +4950,178 @@ var ARIA = { BOOT: 'aria.waking', WAKE: 'aria.waking', IDLE: 'aria.idle', PRE_PE
   SIGNIN_GATE: 'aria.noVerdict', PRO_GATE: 'aria.noVerdict', FACES: 'aria.faces', THESIS_VIEW: 'aria.cards', SAVING: 'aria.cards', FOLLOWUPS: 'aria.cards' };
 function ariaState(){ var k = ARIA[ST.name]; if (k) att(el.sphereA, 'aria-label', tt(k)); }
 
+/* ---- app/65-companion.js ---- */
+/* Educational replies share the sphere, but never enter the verdict, save or market-read states. */
+var GUIDE = null, CHECKIN = null, GUIDE_RETRIES = 0, GUIDE_BUSY = false, GUIDE_INPUT_CHECKIN = false, GUIDE_EPOCH = 0, GUIDE_ANSWER_ERROR = '';
+var guidePanel = mk('section'), guideReply = mk('p'), guideMark = mk('small'), guideFact = mk('p'), guideQuestion = mk('p'), guideOptions = mk('div'), guideActions = mk('div');
+guidePanel.id = 'companionPanel'; guidePanel.setAttribute('aria-live', 'polite'); guidePanel.style.cssText = 'position:absolute;left:24px;top:360px;bottom:118px;width:342px;z-index:18;display:none;flex-direction:column;gap:10px;touch-action:none;pointer-events:auto;color:var(--ink);font:16px/1.5 var(--sans)';
+var guideNarrative = mk('div'); guideNarrative.style.cssText = 'min-height:0;overflow-y:auto;overscroll-behavior:contain;flex:1';
+guideReply.style.cssText = 'font-size:17px;line-height:1.5;white-space:pre-wrap;margin:0';
+guideMark.style.cssText = 'display:block;font-size:11px;color:var(--ink3);margin-top:8px';
+guideFact.id = 'companion-fact'; guideFact.setAttribute('role','note');
+guideFact.style.cssText = 'font-size:13px;line-height:1.5;white-space:pre-wrap;color:var(--ink2);border:1px solid var(--hair);border-radius:14px;padding:14px;background:rgba(242,237,228,.04);margin:12px 0 0';
+guideQuestion.style.cssText = 'font-size:17px;line-height:1.45;margin:0;flex:none';
+guideOptions.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;gap:6px;flex:none';
+guideActions.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;gap:6px;flex:none';
+[guideReply,guideMark,guideFact].forEach(function(e){ guideNarrative.appendChild(e); });
+[guideNarrative,guideQuestion,guideOptions,guideActions].forEach(function(e){ guidePanel.appendChild(e); }); uiEl.appendChild(guidePanel);
+function guideWords(){ return SES && SES.companionPilot && SES.companionPilot.strings || {}; }
+function guideButton(host, text, action, id, primary){
+  var b = mk('button', null, text); b.type = 'button'; b.id = id;
+  b.style.cssText = 'min-height:44px;width:100%;text-align:left;padding:10px 14px;border-radius:16px;white-space:normal;overflow-wrap:anywhere;line-height:1.4;font-size:14px;background:' + (primary ? 'rgba(242,237,228,.10)' : 'transparent') + ';border:1px solid var(--hair)';
+  b._guideAction = action; host.appendChild(b); return b;
+}
+/* The stage owns gestures. Keep this scrollable text panel's gestures inside it, including VoiceOver clicks. */
+var guidePointer = null;
+guidePanel.addEventListener('pointerdown', function(e){
+  var answer = e.target.closest('#companion-answer-input');
+  if (answer) {
+    e.stopPropagation(); if (e.cancelable) e.preventDefault();
+    if (GUIDE_BUSY) return;
+    PTR.id = e.pointerId; PTR.realT = performance.now();
+    try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+    var point = toStage(e.clientX, e.clientY); inDown(point[0], point[1], answer); return;
+  }
+  e.stopPropagation(); if (e.cancelable) e.preventDefault();
+  guidePointer = { y:e.clientY, top:guideNarrative.scrollTop, button:e.target.closest('button'), moved:false, id:e.pointerId };
+  try { guidePanel.setPointerCapture(e.pointerId); } catch (_) {}
+});
+guidePanel.addEventListener('pointermove', function(e){
+  e.stopPropagation(); if (!guidePointer) return;
+  var delta = (e.clientY - guidePointer.y) / (fitS || 1);
+  if (Math.abs(delta) > 7) guidePointer.moved = true;
+  if (guidePointer.moved) guideNarrative.scrollTop = guidePointer.top - delta;
+});
+guidePanel.addEventListener('pointerup', function(e){
+  e.stopPropagation();
+  if (PTR.id === e.pointerId && GUIDE_INPUT_CHECKIN) { PTR.id = null; var point = toStage(e.clientX,e.clientY); inUp(point[0],point[1]); return; }
+  var p = guidePointer; guidePointer = null;
+  if (p && !p.moved && p.button && !p.button.disabled && p.button._guideAction) p.button._guideAction();
+});
+guidePanel.addEventListener('pointercancel', function(){ guidePointer = null; });
+guidePanel.addEventListener('click', function(e){
+  e.stopPropagation(); if (e.detail !== 0) return;
+  var b = e.target.closest('button'); if (b && !b.disabled && b._guideAction) b._guideAction();
+});
+function guideAsk(question, retry){
+  if (GUIDE_BUSY) return;
+  if (retry) GUIDE_RETRIES++; else GUIDE_RETRIES = 0;
+  CHECKIN = null;
+  go('SENDING', { params:{question:question,companion:true}, question:question, origin:'person', cx:195,cy:660 });
+}
+function guideRender(){
+  if (!GUIDE) return;
+  var words = guideWords(), question = CHECKIN && CHECKIN.question;
+  guideReply.textContent = GUIDE_ANSWER_ERROR || GUIDE.text || GUIDE.message || '';
+  guideMark.textContent = !GUIDE_ANSWER_ERROR && GUIDE.personalized ? words.personalized || '' : '';
+  guideFact.textContent = '';
+  if (GUIDE.fact && typeof GUIDE.fact.text === 'string' && typeof GUIDE.fact.source === 'string' && typeof GUIDE.fact.year === 'string') {
+    guideFact.textContent = GUIDE.fact.text + '\n' + GUIDE.fact.source + ' · ' + GUIDE.fact.year;
+  }
+  guideFact.style.display = guideFact.textContent ? 'block' : 'none';
+  guideQuestion.textContent = question ? question.text : '';
+  guideActions.style.flexDirection = question ? 'row' : 'column';
+  guideOptions.textContent = ''; guideActions.textContent = '';
+  if (question){
+    (question.options || []).forEach(function(option){
+      guideButton(guideOptions, option.label, function(){ guideAnswer(question.id,option.id); }, 'companion-option-' + option.id, true);
+    });
+    var answer = guideButton(guideActions, words.answerThis || '', function(){ GUIDE_INPUT_CHECKIN = true; openTyping({fromRead:true}); }, 'companion-answer-input', false);
+    answer.setAttribute('data-hit', 'companion-answer'); answer.setAttribute('aria-description', words.answerHint || '');
+    guideButton(guideActions, words.skip || '', function(){ guideAnswer(question.id,null); }, 'companion-skip', false);
+  } else if (GUIDE.status === 'companion_error') {
+    if (GUIDE.retryable && GUIDE_RETRIES < 1) guideButton(guideActions, words.retry || '', function(){ guideAsk(READ.question,true); }, 'companion-retry', true);
+  } else if (GUIDE.followUp) {
+    guideButton(guideActions, GUIDE.followUp, function(){ guideAsk(GUIDE.followUp,false); }, 'companion-follow-up', true);
+  }
+  if (!question) guideButton(guideActions, words.close || '', function(){ CHECKIN = null; GUIDE_RETRIES = 0; go('RETURNING'); }, 'companion-close', false);
+  guidePanel.style.display = 'flex';
+  guideLayout();
+}
+/* Reserve the microphone's whole strip. Actions never scroll with a long reply.
+   Five-option check-ins borrow space from the sphere, with physical 44pt tap targets. */
+function guideLayout(){
+  if (!GUIDE || guidePanel.style.display === 'none') return;
+  var scale = Math.max(0.5, fitS || 1), type = SES && SES.companionPilot && SES.companionPilot.textScale || 1;
+  var font = type / scale;
+  guideReply.style.fontSize = (17 * font) + 'px';
+  guideQuestion.style.fontSize = (17 * font) + 'px';
+  guideMark.style.fontSize = (11 * font) + 'px';
+  guideFact.style.fontSize = (13 * font) + 'px';
+  Array.prototype.forEach.call(guidePanel.querySelectorAll('button'), function(b){
+    b.style.fontSize = (14 * font) + 'px'; b.style.minHeight = (44 / scale) + 'px';
+  });
+  var question = CHECKIN && CHECKIN.question;
+  guideQuestion.style.display = question ? 'block' : 'none';
+  guideOptions.style.display = question ? 'flex' : 'none';
+  var fixed = guideActions.offsetHeight + (question ? guideQuestion.offsetHeight + guideOptions.offsetHeight + 20 : 10);
+  var narrative = Math.min(guideNarrative.scrollHeight, (question ? 64 : 250) / scale);
+  var top = Math.max(148, Math.min(464, 726 - fixed - narrative - 10));
+  guidePanel.style.top = top + 'px';
+  if (ST.name === 'COMPANION') {
+    var radius = Math.max(28, Math.min(110, (top - 142) / 2));
+    moveSphere(top - radius - 24, radius);
+  }
+}
+function guideAnswer(id,value,text){
+  if (GUIDE_BUSY) return; GUIDE_BUSY = true; var epoch = GUIDE_EPOCH;
+  Array.prototype.forEach.call(guidePanel.querySelectorAll('button'), function(b){ b.disabled = true; });
+  var params = {questionId:id}; if (text != null) params.text = text; else if (value != null) params.value = value;
+  bcall('companion.answer',params).then(function(result){
+    GUIDE_BUSY = false; if (epoch !== GUIDE_EPOCH) return;
+    if (result && result.status === 'cancelled') return;
+    if (result && !result.message) { CHECKIN = result; GUIDE_ANSWER_ERROR = ''; }
+    else GUIDE_ANSWER_ERROR = result && result.message || guideWords().answerFailed || '';
+    if (result && result.explanation) { guideAsk(result.explanation, false); return; }
+    if ((!CHECKIN || !CHECKIN.question) && ST.name !== 'COMPANION') {
+      guidePanel.style.display = 'none';
+      if (ST.name === 'HANDBACK') readChips(); else if (ST.name === 'FOLLOWUPS') chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow());
+      return;
+    }
+    if (GUIDE) GUIDE.companionCheckIn = CHECKIN;
+    guideRender();
+    guideNarrative.scrollTop = 0;
+  },function(){ GUIDE_BUSY = false; if (epoch === GUIDE_EPOCH) { GUIDE_ANSWER_ERROR = guideWords().answerFailed || ''; guideRender(); } });
+}
+function companionCheckIn(payload){
+  if (!payload || !payload.question) { CHECKIN = null; if (ST.name === 'COMPANION') guideRender(); return; }
+  CHECKIN = payload; GUIDE_ANSWER_ERROR = '';
+  if (ST.name === 'COMPANION') { guideRender(); return; }
+  /* A market reply keeps its own cards. The check-in lives beside it and leaves when that reply leaves. */
+  if (['HANDBACK','FOLLOWUPS'].indexOf(ST.name) >= 0){
+    chipsHide(); GUIDE = { status:'companion', text:'' }; guideRender();
+  }
+}
+STATES.COMPANION = {
+  enter:function(prev,data){
+    if (prev !== 'TYPING' && prev !== 'LISTENING') GUIDE_ANSWER_ERROR = '';
+    GUIDE = data.reply || GUIDE; CHECKIN = data.reply ? (GUIDE.companionCheckIn || null) : CHECKIN;
+    dissolveThink(); glassHome(); moveSphere(320,110); hint(''); pillMode(idleMode()); att(el.sphereA,'aria-label',tt('aria.speaking'));
+    guideRender(); guideNarrative.scrollTop = 0; if (GUIDE.companionConsentPending) bcall('companion.presented').catch(noop);
+    if (GUIDE.status === 'companion' && GUIDE.requestId && GUIDE.text && !GUIDE.spoken){
+      GUIDE.spoken = true; VOICE.id = GUIDE.requestId; VOICE.started = false; VOICE.ended = false; VOICE.reqT = clk;
+      kInit(GUIDE.text);
+      bcall('speak',{id:GUIDE.requestId,text:GUIDE.text}).then(function(reply){
+        if (reply && reply.status !== 'queued') { VOICE.ended = true; if (ST.name === 'COMPANION') pillMode(idleMode()); }
+      }).catch(function(){ VOICE.ended = true; });
+    }
+  },
+  exit:function(){ GUIDE_EPOCH++; guidePanel.style.display = 'none'; if (VOICE.id && !VOICE.ended) bcall('stopSpeaking').catch(noop); VOICE.id=null; K.on=false; },
+  tick:noop,
+  on:function(name){ if (name === 'voice.start') pillMode('stop'); else if (name === 'voice.end') pillMode(idleMode()); },
+  down:function(hit,p){ if (hit === 'pill'){ if (VOICE.started && !VOICE.ended) return tapG(function(){ bcall('stopSpeaking').catch(noop); VOICE.ended=true; pillMode(idleMode()); }); GUIDE_INPUT_CHECKIN=false; return pillDown(p,true); } if (hit === 'close') return tapG(function(){ CHECKIN=null;go('RETURNING'); }); return null; }
+};
+
+function guideResumeOptions(text){
+  if (!GUIDE_INPUT_CHECKIN || !GUIDE || !CHECKIN || !CHECKIN.question) return false;
+  GUIDE_INPUT_CHECKIN = false;
+  var id = CHECKIN.question.id;
+  GUIDE.companionCheckIn = CHECKIN;
+  go('COMPANION',{reply:GUIDE}); guideNarrative.scrollTop = 0;
+  if (text) guideAnswer(id, null, text);
+  return true;
+}
+
 /* ---- app/70-input.js ---- */
 /* =====================================================================
    12. Input is real (§3.1): pointer events drive the pill hold, the pull,
@@ -4730,7 +5139,8 @@ function inDown(x, y, hitEl){
   var h = hitEl ? hitEl.getAttribute('data-hit') : 'surface', s = STATES[ST.name];
   PTR.g = null;
   if (!S) return;
-  try { PTR.g = s && s.down ? (s.down(h, PTR, hitEl) || null) : null; } catch (e) { logErr('down', e); }
+  if (h === 'pill') GUIDE_INPUT_CHECKIN = false;
+  try { if (h === 'companion-answer' && CHECKIN && CHECKIN.question) { GUIDE_INPUT_CHECKIN = true; PTR.g = pillDown(PTR, true); } else PTR.g = s && s.down ? (s.down(h, PTR, hitEl) || null) : null; } catch (e) { logErr('down', e); }
   dirty = true;
 }
 function inMove(x, y){
@@ -4915,6 +5325,7 @@ var TETHER_A = [-140 * DEG, -40 * DEG, 90 * DEG], AG_DOT = [[22.5, 195], [367.5,
 function rimMask(x, y, cy, r){ var d = Math.sqrt((x - 195) * (x - 195) + (y - cy) * (y - cy)); return sstep(r - 4, r + 12, d); }
 
 function render(){
+  if (typeof dialRefine === "function") dialRefine();
   if (!S){ return; }
   var i, k;
   var cy = S.cy.x + S.lean.x + S.sag.x, r = S.r.x * (1 + S.gulp.x + tickScale());
@@ -5037,7 +5448,7 @@ function render(){
   if (inGlass._r !== igr || inGlass._cy !== igc){ inGlass._r = igr; inGlass._cy = igc; inGlass.style.clipPath = 'circle(' + igr + 'px at 195px ' + igc + 'px)'; }
   renderHeader(); renderGreet(); renderMeri(cy, r); hintRoll.render(); swipeRoll.render();
   renderPill(); renderTranscript(cy, r); renderAgents(cy, r); renderSats(cy, r); renderChart(cy, r);
-  renderCaption(cy, r); renderVerdict(L0, r); renderCards(cy, r); renderChips(); renderFaces(cy, r, th); renderPerm(cy, r);
+  renderCaption(cy, r); renderVerdict(L0, r); renderCards(cy, r); renderChips(); renderReadActions(); renderFaces(cy, r, th); renderPerm(cy, r);
   if (TB.shown || A.type.o.x > 0.002) placeTypeBox();
   if (HARNESS) renderGhost();
 }
@@ -5389,7 +5800,7 @@ function renderVerdict(L0, rNow){
 /* ---------- cards: poured from the bottom rim ---------- */
 function renderCards(cy, r){
   for (var i = 0; i < 3; i++){
-    var c = el.cards[i], rv = A.rev[i].x, show = A.viewOnly ? i === 1 : i < A.nCards;
+    var c = el.cards[i], rv = A.rev[i].x, show = A.viewOnly ? i === (A.savedReadCard ? 0 : 1) : i < A.nCards;
     if (!show || (rv < 0.001 && !A.cardsOn)){ op(c, 0); continue; }
     var x = 30 + i * 340 + A.trk.x, dx = Math.abs(x - 30), act = 1 - Math.min(1, dx / 340);
     var sc = 1 - 0.06 * (1 - act), o = 0.6 + 0.4 * act;
@@ -5427,6 +5838,48 @@ function renderCards(cy, r){
     op(el.tpill, (1 - sstep(0.65, 1, u)) * rimMask(px, py, cy, r) * clamp(u * 8, 0, 1));
   } else { op(el.tpill, 0); el.tpill._w = 0; }
 }
+/* A completed reading always has an explicit next step. Native confirmation owns the saved promise. */
+function readNextAction(){
+  if (!READ || !READ.model || !READ.save || READ.save.status !== 'saved') return null;
+  var list = RMOD.followUps(READ.model, SUGG || {}, LANG);
+  for (var i = 0; i < list.length; i++){
+    var a = list[i].action;
+    if (a && a.followUpOf && a.question && !a.paywall && !a.signIn){
+      list[i].x = 30; list[i].y = 660; list[i].w = 330; list[i].h = 46; return list[i];
+    }
+  }
+  return null;
+}
+function readSavedNote(r){ return tt('read.savedLocal'); }
+function readControlShown(node, visible, display){
+  node.hidden = !visible; st(node, 'display', visible ? display : 'none');
+}
+function renderReadActions(){
+  var ready = readResultReady(), voice = ready && ST.name !== 'HANDBACK';
+  var handback = ready && ST.name === 'HANDBACK';
+  var stored = ST.name === 'THESIS_VIEW';
+  var panel = stored || (!!READ && !!READ.model && ['CARDS', 'SAVING', 'FOLLOWUPS'].indexOf(ST.name) >= 0);
+  readControlShown(el.readActions, voice, 'flex'); readControlShown(el.readHandback, handback, 'flex'); readControlShown(el.readNext, panel, 'block');
+  el.readVoice.textContent = tt('read.skipVoice'); el.readResult.textContent = tt('read.result');
+  el.readDetails.textContent = tt('read.result'); el.readSave.textContent = tt('read.save');
+  el.readNew.textContent = tt('read.new'); el.readHome.textContent = tt('read.home'); el.readSummary.textContent = tt('read.summary');
+  if (panel){
+    var r = READ, saved = !stored && r.save && r.save.status === 'saved', pending = !stored && !!r.savePending;
+    var next = saved ? readNextAction() : null;
+    el.readNextNote.textContent = stored ? '' : pending ? tt('read.saving') : saved ? readSavedNote(r) :
+      r.save && r.save.status !== 'saved' ? tt(r.save.status === 'stale' ? 'save.stale' : 'save.failed') : tt('read.saveHelp');
+    el.readNextPrimary.textContent = stored ? tt('read.home') : pending ? tt('read.saving') : saved ? (next ? next.label : tt('read.home')) : tt('read.save');
+    el.readNextPrimary.disabled = pending;
+    att(el.readNextPrimary, 'data-hit', stored || (saved && !next) ? 'read-home' : saved ? 'read-next' : 'read-save');
+    readControlShown(el.readNew, !stored && !pending, 'block');
+    readControlShown(el.readHome, !stored && (!saved || !!next), 'block');
+    readControlShown(el.readSummary, !stored && A.cardIdx !== 0, 'block');
+  }
+  /* The contextual next question is rendered in the primary action after saving; the idle row keeps its own layout. */
+  st(el.chipRow, 'visibility', panel ? 'hidden' : 'visible'); st(el.eyebrow, 'visibility', panel ? 'hidden' : 'visible');
+  st(el.hint, 'visibility', panel || handback || voice ? 'hidden' : 'visible');
+}
+
 /* ---------- chips born from the pill ---------- */
 function renderChipList(list){
   for (var i = 0; i < list.length; i++){
@@ -5654,6 +6107,17 @@ function frame(now){
    ===================================================================== */
 var MOCK_CLOCKED = false, SCRIPT = null, G = { x: 195, y: 790, vis: 0, press: 0 };
 var SCRIPTS = {
+  'read-result': { mic: 'granted', steps: [
+    { wait: 'IDLE', after: 1.0 }, { say: 'Should I buy NVIDIA right now?' },
+    { hold: '#pill', dur: 3.3 }, { wait: 'THINK_RESOLVE', after: 0.2 },
+    { tap: '#readResult' }, { wait: 'CARDS', after: 1.5 }
+  ] },
+  'read-saved': { mic: 'granted', steps: [
+    { wait: 'IDLE', after: 1.0 }, { say: 'Should I buy NVIDIA right now?' },
+    { hold: '#pill', dur: 3.3 }, { wait: 'THINK_RESOLVE', after: 0.2 },
+    { tap: '#readResult' }, { wait: 'CARDS', after: 1.5 },
+    { tap: '#readNextPrimary' }, { wait: 'FOLLOWUPS', after: 1.5 }
+  ] },
   'read-nvda': { mic: 'granted', steps: [
     { wait: 'IDLE', after: 1.0 },
     { say: 'Should I buy NVIDIA right now?' },
@@ -5803,6 +6267,68 @@ function harnessFreeze(t){
   return runSteps(Math.round(t / H)).then(function(){ return compLoadP || null; }).then(function(){ HBUSY = false; FROZEN = true; render(); return hashFrame(); });
 }
 
+/* ---- app/93-speaking-dial.js ---- */
+/* One preference, the existing orb, and no extra model request. */
+var DIAL_VALUES = ['plain', 'terms', 'technical'];
+var DIAL_WORDS = {
+ es: ['¿Cómo quieres que te hable?', ['Sencillo','Con términos','Técnico'], ['Subió muy rápido en las últimas horas. Hay un techo cerca, donde antes dejó de subir.','Subió muy rápido (sobrecompra). Hay un techo cerca, donde antes dejó de subir (resistencia).','Sobrecomprado en 1H, bajo resistencia. Falta confirmación.'], 'Así está bien','Empezar ahora','¿Qué quieres entender hoy?', ['Más sencillo','Así está bien','Más técnico']],
+ en: ['How should I talk to you?', ['Plain','With terms','Technical'], ['It rose fast in the last hours. There is a ceiling nearby, where it stopped rising before.','It rose fast (overbought). There is a ceiling nearby, where it stopped rising before (resistance).','Overbought on 1H, under resistance. No confirmation yet.'], 'That works','Start now','What do you want to understand today?', ['Simpler','That works','More technical']],
+ fr: ['Comment veux-tu que je te parle ?', ['Simple','Avec les termes','Technique'], ['Le prix a vite monté. Un plafond proche a déjà freiné sa hausse.','Le prix a vite monté (surachat). Un plafond est proche (résistance).','Surachat en 1H, sous résistance. Confirmation manquante.'], 'Ça me va','Commencer','Que veux-tu comprendre aujourd’hui ?', ['Plus simple','Ça me va','Plus technique']],
+ pt: ['Como queres que fale contigo?', ['Simples','Com termos','Técnico'], ['Subiu depressa. Está perto de um teto onde já deixou de subir.','Subiu depressa (sobrecompra). Está perto de um teto (resistência).','Sobrecomprado em 1H, sob resistência. Falta confirmação.'], 'Está bem assim','Começar agora','O que queres entender hoje?', ['Mais simples','Está bem assim','Mais técnico']],
+ it: ['Come vuoi che ti parli?', ['Semplice','Con termini','Tecnico'], ['È salito rapidamente. Un tetto vicino ha già fermato la salita.','È salito rapidamente (ipercomprato). C’è un tetto vicino (resistenza).','Ipercomprato su 1H, sotto resistenza. Manca conferma.'], 'Va bene così','Inizia ora','Cosa vuoi capire oggi?', ['Più semplice','Va bene così','Più tecnico']],
+ de: ['Wie soll ich mit dir sprechen?', ['Einfach','Mit Begriffen','Technisch'], ['Der Kurs stieg schnell. Eine nahe Grenze stoppte ihn schon einmal.','Der Kurs stieg schnell (überkauft). Eine Grenze ist nah (Widerstand).','Überkauft auf 1H, unter Widerstand. Bestätigung fehlt.'], 'So passt es','Jetzt starten','Was möchtest du heute verstehen?', ['Einfacher','So passt es','Technischer']]
+};
+var dial = D.getElementById('speakingDial'), dialIndex = 0, dialBusy = false, dialOwner = null, dialGreeting = false;
+function dialWords(){ return DIAL_WORDS[LANG] || DIAL_WORDS.en; }
+function dialPaint(index){
+ dialIndex = clamp(Math.round(index), 0, 2); var w = dialWords();
+ D.getElementById('speakingQuestion').textContent = w[0];
+ var range = D.getElementById('speakingRange'); range.value = dialIndex; range.setAttribute('aria-label', w[0]); range.setAttribute('aria-valuetext', w[1][dialIndex]);
+ D.getElementById('speakingSample').textContent = w[2][dialIndex];
+ D.getElementById('speakingConfirm').textContent = w[3]; D.getElementById('speakingSkip').textContent = w[4];
+ Array.prototype.forEach.call(dial.querySelectorAll('[data-dial]'), function(b, i){ b.textContent = w[1][i]; b.setAttribute('aria-pressed', String(i === dialIndex)); });
+ var thumb = D.getElementById('speakingThumb'); thumb.setAttribute('cx', [8,148,288][dialIndex]); thumb.setAttribute('cy', [8,54,8][dialIndex]);
+ var mode = RM ? 'set' : 'to'; U.energy[mode]([.25,.45,.7][dialIndex]); U.swirl[mode]([0,.15,.35][dialIndex]); U.wflow[mode]([.12,.22,.35][dialIndex]); dirty = true;
+}
+function dialSave(index, feedback){
+ if (dialBusy || !SES || !SES.speaking) return; dialBusy = true;
+ var owner = feedback ? SES.speaking.owner : dialOwner, gen = OWNER_GEN;
+ bcall('speaking.choose', { value: DIAL_VALUES[index], owner: owner, feedback: !!feedback }).then(function(s){
+  if (gen !== OWNER_GEN) return;
+  applySession(s, false); dialBusy = false;
+  if (ST.name === 'SPEAKING_DIAL'){ dialGreeting = true; stage.classList.add('speaking-greet'); go('RETURNING'); }
+  dialRefine();
+ }, function(){ dialBusy = false; if (gen === OWNER_GEN) D.getElementById('speakingError').textContent = LANG === 'es' ? 'Inténtalo de nuevo' : 'Try again'; });
+}
+STATES.SPEAKING_DIAL = {
+ enter: function(){
+  dialOwner = SES.speaking.owner; dialBusy = false; chipsHide(); greetOut(); meriOut(); hint('');
+  stage.classList.add('speaking-on'); dial.classList.add('on'); dial.setAttribute('aria-hidden','false'); D.getElementById('speakingRange').focus();
+  S.cy[RM ? 'set' : 'to'](302); S.r[RM ? 'set' : 'to'](112); U.faceOn.to(0); U.presence.to(0); tintHome();
+  D.getElementById('speakingError').textContent = ''; dialPaint(Math.max(0, DIAL_VALUES.indexOf(SES.speaking.value)));
+  bcall('speak', { id: 'speaking-dial', text: dialWords()[0] }).catch(noop);
+ },
+ exit: function(){ dial.classList.remove('on'); dial.setAttribute('aria-hidden','true'); stage.classList.remove('speaking-on'); bcall('stopSpeaking').catch(noop); tintHome(); U.energy.to(.35); U.swirl.to(0); U.wflow.to(.18); },
+ down: function(){ return null; },
+ on: function(name, p){ if (name === 'app.state' && p && p.state === 'background') bcall('stopSpeaking').catch(noop); }
+};
+['pointerdown','pointermove','pointerup','touchstart','touchmove','touchend','click'].forEach(function(k){ dial.addEventListener(k, function(e){ e.stopPropagation(); }); });
+D.getElementById('speakingRange').addEventListener('input', function(e){ if (!dialBusy) dialPaint(+e.target.value); });
+Array.prototype.forEach.call(dial.querySelectorAll('[data-dial]'), function(b){ b.addEventListener('click', function(){ if (!dialBusy) dialPaint(+b.getAttribute('data-dial')); }); });
+D.getElementById('speakingConfirm').addEventListener('click', function(){ dialSave(dialIndex, false); });
+D.getElementById('speakingSkip').addEventListener('click', function(){ dialSave(0, false); });
+var refineVisible = null, refineLanguage = null;
+function dialRefine(){
+ var row = D.getElementById('speakingRefine'), show = !!(SES && SES.speaking && SES.speaking.refine && ST.name === 'HANDBACK');
+ if (show === refineVisible && LANG === refineLanguage) return;
+ refineVisible = show; refineLanguage = LANG;
+ row.classList.toggle('on', show); row.setAttribute('aria-hidden', String(!show));
+ if (show) Array.prototype.forEach.call(row.querySelectorAll('button'), function(b,i){ b.textContent = dialWords()[6][i]; });
+}
+var refineRow = D.getElementById('speakingRefine');
+['pointerdown','pointermove','pointerup','touchstart','touchmove','touchend','click'].forEach(function(k){ refineRow.addEventListener(k, function(e){ e.stopPropagation(); }); });
+Array.prototype.forEach.call(refineRow.querySelectorAll('button'), function(b){ b.addEventListener('click', function(){ var n = Math.max(0, DIAL_VALUES.indexOf(SES.speaking.value)); dialSave(clamp(n + +b.getAttribute('data-refine'),0,2),true); }); });
+
 /* ---- app/99-boot.js ---- */
 /* =====================================================================
    19. Boot: wire the bridge events, ask for the session, then wake.
@@ -5829,6 +6355,7 @@ function applySession(s, first){
   if (s.analysisLevel) lvlApply(s.analysisLevel);
   var prevId = SES && SES.companion ? SES.companion.id : null;
   SES = s;
+  if (typeof guideLayout === 'function') guideLayout();
   SES.mic = SES.mic || { state: 'undetermined', onDevice: true };
   var oldLang = LANG, oldLocale = LOCALE;
   LANG = NucleoLocale.language(s.language); LOCALE = NucleoLocale.locale(LANG, s.locale || s.speechLocale || s.localeRegion);
@@ -5903,10 +6430,13 @@ function wire(){
     /* the last read was spent, or reads came back: the idle row loses or regains its one-tap chips at once */
     if (oneTapOff() !== walled && ST.name === 'IDLE') showIdleSuggestions(); else nudgeSync();
   });
-  BR.on('account.changed', accountChanged);
+  BR.on('speaking.open', function(){ if (SES && SES.speaking && SES.riskAccepted && ['IDLE','HANDBACK','CARDS','FOLLOWUPS','THESIS_VIEW','FACES'].indexOf(ST.name) >= 0){ clearRead(); glassHome(); go('SPEAKING_DIAL'); } });
+  BR.on('account.changed', function(p){ dialBusy = false; dialGreeting = false; stage.classList.remove('speaking-greet'); accountChanged(p); });
   BR.on('consent.withdrawn', consentWithdrawn);
   BR.on('app.state', function(p){ if (p && p.state === 'background'){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
+  BR.on('companion.checkIn', companionCheckIn);
+  BR.on('companion.revoked', function(){ GUIDE_EPOCH++; CHECKIN = null; GUIDE_INPUT_CHECKIN = false; GUIDE_ANSWER_ERROR = ''; if (GUIDE) { GUIDE.personalized = false; GUIDE.companionCheckIn = null; } if (ST.name === 'COMPANION') guideRender(); else { guidePanel.style.display = 'none'; if (ST.name === 'HANDBACK') readChips(); } });
   /* the read native starts is not the person's own question: startRead() notes it while askStart runs (§3.5) */
   BR.on('ask.start', function(p){ ASK_ORIGIN = 'followUp'; try { askStart(p); } finally { ASK_ORIGIN = null; } });
   BR.on('analysis.level', lvlApply);

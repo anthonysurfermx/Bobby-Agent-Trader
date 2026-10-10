@@ -168,6 +168,7 @@ final class MemoryCenter: ObservableObject {
     var currentGeneration: () -> UUID = { AccountSession.shared.generation }
     var riskAccepted: () -> Bool = { UserDefaults.standard.integer(forKey: "agent.riskNoticeVersion") >= RiskNotice.currentVersion }
     var now: () -> Date = { Date() }
+    var eraseCompanionNotes: () -> Void = { _ = CompanionContextStore.shared.reset() }
     /// The consent text this build shows. Tests raise it to stand for a reworded sheet.
     var consentVersion = MemoryConsent.currentVersion
     /// This center's consent store: the record the capture gate reads and the sheet writes.
@@ -361,6 +362,7 @@ final class MemoryCenter: ObservableObject {
         guard let user = currentUser(), !saving else { return false }
         let generation = currentGeneration()
         notice = nil
+        eraseCompanionNotes()
         DeskMemory.forgetWatchlist(owner: user, defaults: defaults)
         ThesisBook(defaults: defaults).deleteAll(owner: user)
         // 1.8: what the harness learned on this phone goes too, with the follow-ups it planned. A no

@@ -389,7 +389,7 @@ struct AccountSheet: View {
         // What Bobby remembers about this account: see, correct, pause or delete it.
         ProfileRow(label: L.t("Memory", "Memoria"),
                    detail: L.t("What Bobby remembers about your assets and preferences", "Lo que Bobby recuerda de tus activos y preferencias"),
-                   action: { route = .memory }) { ProfileIcon(symbol: "brain") }
+                   action: { if let onOpenRoute { onOpenRoute(.memory) } else { route = .memory } }) { ProfileIcon(symbol: "brain") }
             .accessibilityIdentifier("account-memory")
         ProfileRow(label: L.t("Risk notice", "Aviso de riesgo"),
                    detail: L.t("What Bobby is and is not", "Lo que Bobby es y lo que no"),
@@ -623,7 +623,7 @@ struct AccountSheet: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
         case .memory:
-            MemoryView(riskAccepted: profile.acceptedRiskNotice) { route = nil }
+            MemoryView(riskAccepted: profile.acceptedRiskNotice, onClose: { route = nil })
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)

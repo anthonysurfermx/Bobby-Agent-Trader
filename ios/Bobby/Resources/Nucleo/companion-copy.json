@@ -1,0 +1,316 @@
+{
+  "consent": {
+    "es": [
+      "¿Quieres que Bobby recuerde lo que le cuentas?",
+      "Bobby es una IA y usa modelos de Anthropic (Estados Unidos). Si aceptas, un resumen corto de tus respuestas viaja con cada pregunta para explicarte mejor.",
+      "Te hará algunas preguntas, también sobre tu dinero (por ejemplo, cuándo podrías necesitarlo). Puedes omitir cualquiera.",
+      "Los apuntes se guardan en este dispositivo. Puedes verlos, corregirlos o borrarlos cuando quieras. Bobby funciona igual sin esto.",
+      "Sí, recuerda",
+      "Ahora no",
+      "Más detalles"
+    ],
+    "en": [
+      "Do you want Bobby to remember what you tell it?",
+      "Bobby is an AI and uses models from Anthropic (United States). If you accept, a short summary of your answers travels with each question so it can explain things better for you.",
+      "It will ask you a few questions, some about your money (for example, when you might need it). You can skip any of them.",
+      "The notes are kept on this device. You can see, correct or delete them whenever you want. Bobby works the same without this.",
+      "Yes, remember",
+      "Not now",
+      "More details"
+    ],
+    "fr": [
+      "Veux-tu que Bobby se souvienne de ce que tu lui dis ?",
+      "Bobby est une IA et utilise des modèles d'Anthropic (États-Unis). Si tu acceptes, un court résumé de tes réponses accompagne chaque question pour mieux t'expliquer.",
+      "Il te posera quelques questions, y compris sur ton argent (par exemple, quand tu pourrais en avoir besoin). Tu peux passer n'importe laquelle.",
+      "Les notes restent sur cet appareil. Tu peux les voir, les corriger ou les supprimer quand tu veux. Bobby fonctionne pareil sans cela.",
+      "Oui, souviens-toi",
+      "Pas maintenant",
+      "Plus de détails"
+    ],
+    "pt": [
+      "Quer que o Bobby lembre do que você conta?",
+      "O Bobby é uma IA e usa modelos da Anthropic (Estados Unidos). Se você aceitar, um resumo curto das suas respostas vai junto com cada pergunta para explicar melhor.",
+      "Ele vai fazer algumas perguntas, inclusive sobre o seu dinheiro (por exemplo, quando você pode precisar dele). Você pode pular qualquer uma.",
+      "As anotações ficam neste aparelho. Você pode ver, corrigir ou apagar quando quiser. O Bobby funciona igual sem isso.",
+      "Sim, lembre",
+      "Agora não",
+      "Mais detalhes"
+    ],
+    "it": [
+      "Vuoi che Bobby ricordi quello che gli racconti?",
+      "Bobby è un'IA e usa modelli di Anthropic (Stati Uniti). Se accetti, un breve riassunto delle tue risposte viaggia con ogni domanda per spiegarti meglio.",
+      "Ti farà alcune domande, anche sul tuo denaro (per esempio, quando potrebbe servirti). Puoi saltarne qualsiasi.",
+      "Gli appunti restano su questo dispositivo. Puoi vederli, correggerli o cancellarli quando vuoi. Bobby funziona allo stesso modo anche senza.",
+      "Sì, ricorda",
+      "Non ora",
+      "Più dettagli"
+    ],
+    "de": [
+      "Soll Bobby sich merken, was du ihm erzählst?",
+      "Bobby ist eine KI und nutzt Modelle von Anthropic (USA). Wenn du zustimmst, geht eine kurze Zusammenfassung deiner Antworten mit jeder Frage mit, damit Bobby dir besser erklären kann.",
+      "Bobby stellt dir ein paar Fragen, auch zu deinem Geld (zum Beispiel, wann du es brauchen könntest). Du kannst jede überspringen.",
+      "Die Notizen bleiben auf diesem Gerät. Du kannst sie jederzeit ansehen, korrigieren oder löschen. Bobby funktioniert auch ohne das genauso.",
+      "Ja, merk es dir",
+      "Jetzt nicht",
+      "Mehr Details"
+    ]
+  },
+  "texts": {
+    "unavailable": {
+      "es": "No pude completar la explicación. Puedes intentarlo de nuevo.",
+      "en": "I could not finish the explanation. You can try again.",
+      "fr": "Je n'ai pas pu terminer l'explication. Tu peux réessayer.",
+      "pt": "Não consegui terminar a explicação. Você pode tentar de novo.",
+      "it": "Non sono riuscito a completare la spiegazione. Puoi riprovare.",
+      "de": "Ich konnte die Erklärung nicht abschließen. Du kannst es noch einmal versuchen."
+    },
+    "retry": {
+      "es": "Intentar de nuevo",
+      "en": "Try again",
+      "fr": "Réessayer",
+      "pt": "Tentar de novo",
+      "it": "Riprova",
+      "de": "Erneut versuchen"
+    },
+    "skip": {
+      "es": "Omitir",
+      "en": "Skip",
+      "fr": "Passer",
+      "pt": "Pular",
+      "it": "Salta",
+      "de": "Überspringen"
+    },
+    "close": {
+      "es": "Volver a Bobby",
+      "en": "Back to Bobby",
+      "fr": "Revenir à Bobby",
+      "pt": "Voltar ao Bobby",
+      "it": "Torna a Bobby",
+      "de": "Zurück zu Bobby"
+    },
+    "personalized": {
+      "es": "Usa tus apuntes",
+      "en": "Uses your notes",
+      "fr": "Utilise tes notes",
+      "pt": "Usa suas anotações",
+      "it": "Usa i tuoi appunti",
+      "de": "Nutzt deine Notizen"
+    },
+    "notesTitle": {
+      "es": "Lo que Bobby entendió de ti",
+      "en": "What Bobby understood about you",
+      "fr": "Ce que Bobby a compris de toi",
+      "pt": "O que o Bobby entendeu de você",
+      "it": "Quello che Bobby ha capito di te",
+      "de": "Was Bobby von dir verstanden hat"
+    },
+    "correct": {
+      "es": "Corregir",
+      "en": "Correct",
+      "fr": "Corriger",
+      "pt": "Corrigir",
+      "it": "Correggi",
+      "de": "Korrigieren"
+    },
+    "delete": {
+      "es": "Borrar este apunte",
+      "en": "Delete this note",
+      "fr": "Supprimer cette note",
+      "pt": "Apagar esta anotação",
+      "it": "Elimina questo appunto",
+      "de": "Diese Notiz löschen"
+    },
+    "deleteAll": {
+      "es": "Borrar todos los apuntes",
+      "en": "Delete all notes",
+      "fr": "Supprimer toutes les notes",
+      "pt": "Apagar todas as anotações",
+      "it": "Elimina tutti gli appunti",
+      "de": "Alle Notizen löschen"
+    },
+    "memory": {
+      "es": "Recordar en este dispositivo",
+      "en": "Remember on this device",
+      "fr": "Se souvenir sur cet appareil",
+      "pt": "Lembrar neste aparelho",
+      "it": "Ricorda su questo dispositivo",
+      "de": "Auf diesem Gerät merken"
+    },
+    "said": {
+      "es": "Lo dijiste",
+      "en": "You said it",
+      "fr": "Tu l’as dit",
+      "pt": "Você disse",
+      "it": "Lo hai detto",
+      "de": "Du hast es gesagt"
+    },
+    "confirmed": {
+      "es": "Lo confirmaste",
+      "en": "You confirmed it",
+      "fr": "Tu l’as confirmé",
+      "pt": "Você confirmou",
+      "it": "Lo hai confermato",
+      "de": "Du hast es bestätigt"
+    },
+    "shown": {
+      "es": "En un ejercicio",
+      "en": "In an exercise",
+      "fr": "Dans un exercice",
+      "pt": "Em um exercício",
+      "it": "In un esercizio",
+      "de": "In einer Übung"
+    },
+    "inferred": {
+      "es": "Bobby lo dedujo, por confirmar",
+      "en": "Bobby inferred it, awaiting confirmation",
+      "fr": "Bobby l’a déduit, à confirmer",
+      "pt": "O Bobby deduziu, a confirmar",
+      "it": "Bobby lo ha dedotto, da confermare",
+      "de": "Bobby hat es abgeleitet, noch zu bestätigen"
+    },
+    "empty": {
+      "es": "Aún no hay apuntes.",
+      "en": "No notes yet.",
+      "fr": "Pas encore de notes.",
+      "pt": "Ainda não há anotações.",
+      "it": "Ancora nessun appunto.",
+      "de": "Noch keine Notizen."
+    },
+    "retention": {
+      "es": "Dinero y deducciones: 7 días. Otros apuntes: 30 días. Leerlos no renueva el plazo.",
+      "en": "Money and inferred notes: 7 days. Other notes: 30 days. Reading does not renew them.",
+      "fr": "Argent et déductions : 7 jours. Autres notes : 30 jours. Les lire ne prolonge pas le délai.",
+      "pt": "Dinheiro e deduções: 7 dias. Outras anotações: 30 dias. Ler não renova o prazo.",
+      "it": "Denaro e deduzioni: 7 giorni. Altri appunti: 30 giorni. Leggerli non rinnova la scadenza.",
+      "de": "Geld und abgeleitete Notizen: 7 Tage. Andere Notizen: 30 Tage. Lesen verlängert die Frist nicht."
+    },
+    "expires": {
+      "es": "Caduca",
+      "en": "Expires",
+      "fr": "Expire",
+      "pt": "Expira",
+      "it": "Scade",
+      "de": "Läuft ab"
+    },
+    "storageError": {
+      "es": "No pude guardar los apuntes. Intenta de nuevo.",
+      "en": "I could not save the notes. Try again.",
+      "fr": "Je n'ai pas pu enregistrer les notes. Réessaie.",
+      "pt": "Não consegui salvar as anotações. Tente de novo.",
+      "it": "Non ho potuto salvare gli appunti. Riprova.",
+      "de": "Ich konnte die Notizen nicht speichern. Versuche es erneut."
+    },
+    "answerFailed": {
+      "es": "No pude anotarlo. Puedes elegir una de las opciones.",
+      "en": "I could not note that. You can pick one of the options.",
+      "fr": "Je n’ai pas pu le noter. Tu peux choisir une des options.",
+      "pt": "Não consegui anotar. Você pode escolher uma das opções.",
+      "it": "Non sono riuscito ad annotarlo. Puoi scegliere una delle opzioni.",
+      "de": "Das konnte ich nicht notieren. Du kannst eine der Optionen wählen."
+    },
+    "answerPlaceholder": {
+      "es": "Tu respuesta a Bobby",
+      "en": "Your answer to Bobby",
+      "fr": "Ta réponse à Bobby",
+      "pt": "Sua resposta ao Bobby",
+      "it": "La tua risposta a Bobby",
+      "de": "Deine Antwort an Bobby"
+    },
+    "answerSend": {
+      "es": "Enviar respuesta",
+      "en": "Send answer",
+      "fr": "Envoyer la réponse",
+      "pt": "Enviar resposta",
+      "it": "Invia risposta",
+      "de": "Antwort senden"
+    },
+    "exerciseExplanation": {
+      "es": "Elegí «{choice}». ¿Qué significa una caída así?",
+      "en": "I chose “{choice}”. What does a drop like that mean?",
+      "fr": "J’ai choisi « {choice} ». Que signifie une baisse comme ça ?",
+      "pt": "Escolhi “{choice}”. O que significa uma queda assim?",
+      "it": "Ho scelto «{choice}». Che cosa significa un calo così?",
+      "de": "Ich habe „{choice}“ gewählt. Was bedeutet so ein Rückgang?"
+    },
+    "deviceNotes": {
+      "en": "These notes stay on this device when you sign out.",
+      "es": "Estas notas se quedan en este dispositivo cuando cierras sesión.",
+      "de": "Diese Notizen bleiben beim Abmelden auf diesem Gerät.",
+      "fr": "Ces notes restent sur cet appareil quand tu te déconnectes.",
+      "pt": "Estas notas ficam neste dispositivo quando você sai da conta.",
+      "it": "Queste note restano su questo dispositivo quando esci dal tuo account."
+    },
+    "offTitle": {
+      "es": "¿Apagar y borrar tus apuntes?",
+      "en": "Turn off memory and delete your notes?",
+      "fr": "Désactiver et supprimer tes notes ?",
+      "pt": "Desativar e apagar suas anotações?",
+      "it": "Disattivare e cancellare i tuoi appunti?",
+      "de": "Ausschalten und deine Notizen löschen?"
+    },
+    "offBody": {
+      "es": "Se borrarán todos tus apuntes de este dispositivo. Bobby dejará de recordarlos.",
+      "en": "All your notes on this device will be deleted. Bobby will stop remembering them.",
+      "fr": "Toutes tes notes sur cet appareil seront supprimées. Bobby cessera de les mémoriser.",
+      "pt": "Todas as suas anotações neste aparelho serão apagadas. O Bobby deixará de lembrá-las.",
+      "it": "Tutti i tuoi appunti su questo dispositivo verranno cancellati. Bobby smetterà di ricordarli.",
+      "de": "Alle deine Notizen auf diesem Gerät werden gelöscht. Bobby wird sie sich nicht mehr merken."
+    },
+    "offConfirm": {
+      "es": "Apagar y borrar mis apuntes",
+      "en": "Turn off and delete my notes",
+      "fr": "Désactiver et supprimer mes notes",
+      "pt": "Desativar e apagar minhas anotações",
+      "it": "Disattiva e cancella i miei appunti",
+      "de": "Ausschalten und meine Notizen löschen"
+    },
+    "offCancel": {
+      "es": "Dejarlo encendido",
+      "en": "Keep it on",
+      "fr": "Laisser activé",
+      "pt": "Manter ativado",
+      "it": "Lascia attivo",
+      "de": "Eingeschaltet lassen"
+    },
+    "deleteTitle": {
+      "es": "¿Borrar todos tus apuntes?",
+      "en": "Delete all your notes?",
+      "fr": "Supprimer toutes tes notes ?",
+      "pt": "Apagar todas as suas anotações?",
+      "it": "Cancellare tutti i tuoi appunti?",
+      "de": "Alle deine Notizen löschen?"
+    },
+    "deleteBody": {
+      "es": "Se borrarán todos tus apuntes de este dispositivo. La memoria seguirá encendida.",
+      "en": "All your notes on this device will be deleted. Memory will stay on.",
+      "fr": "Toutes tes notes sur cet appareil seront supprimées. La mémoire restera activée.",
+      "pt": "Todas as suas anotações neste aparelho serão apagadas. A memória continuará ativada.",
+      "it": "Tutti i tuoi appunti su questo dispositivo verranno cancellati. La memoria resterà attiva.",
+      "de": "Alle deine Notizen auf diesem Gerät werden gelöscht. Die Erinnerungsfunktion bleibt eingeschaltet."
+    },
+    "deleteCancel": {
+      "es": "Conservar mis apuntes",
+      "en": "Keep my notes",
+      "fr": "Garder mes notes",
+      "pt": "Manter minhas anotações",
+      "it": "Conserva i miei appunti",
+      "de": "Meine Notizen behalten"
+    },
+    "answerThis": {
+      "es": "Responder esta pregunta",
+      "en": "Answer this question",
+      "fr": "Répondre à cette question",
+      "pt": "Responder a esta pergunta",
+      "it": "Rispondi a questa domanda",
+      "de": "Diese Frage beantworten"
+    },
+    "answerHint": {
+      "es": "Toca para escribir; mantén para responder hablando",
+      "en": "Tap to type; hold to speak your answer",
+      "fr": "Touche pour écrire ; maintiens pour répondre à voix haute",
+      "pt": "Toque para escrever; segure para responder falando",
+      "it": "Tocca per scrivere; tieni premuto per rispondere a voce",
+      "de": "Tippen zum Schreiben; gedrückt halten, um deine Antwort zu sprechen"
+    }
+  }
+}
