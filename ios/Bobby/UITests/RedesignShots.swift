@@ -80,6 +80,18 @@ final class RedesignShots: XCTestCase {
     private func shot(_ name: String) {
         // Let the existing motion settle; capture current behavior without freezing the product FSM.
         Thread.sleep(forTimeInterval: 1)
+        // Newly booted phones may announce Apple Intelligence over an otherwise passing scene.
+        // Wait for this system banner; do not tap or swipe the app to hide it.
+        let system = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let banners = system.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] 'Apple Intellig'"))
+        if let banner = banners.allElementsBoundByIndex.first(where: {
+            $0.isHittable && $0.frame.maxY < app.windows.firstMatch.frame.height * 0.4
+        }) {
+            let clear = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                !banner.exists || !banner.isHittable
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [clear], timeout: 15), .completed)
+        }
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "redesign-" + name
         attachment.lifetime = .keepAlways
