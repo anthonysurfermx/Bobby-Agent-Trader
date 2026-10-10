@@ -14,6 +14,7 @@ struct MemoryView: View {
     @ObservedObject var center: MemoryCenter = .shared
     /// R11: nothing reaches the network before the risk notice is accepted.
     let riskAccepted: Bool
+    var onEducationalNotes: (() -> Void)? = nil
     /// Shown as its own sheet (a close button); pushed from the briefing settings it has a back button.
     var onSpeaking: (() -> Void)? = nil
     var onClose: (() -> Void)? = nil
@@ -42,6 +43,12 @@ struct MemoryView: View {
                     }
                 }
                 .padding(.trailing, -7)
+                if let onEducationalNotes {
+                    Button(CompanionCopy.text("notesTitle"), action: onEducationalNotes)
+                        .quietFont(15, .regular).foregroundStyle(Theme.cream)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.vertical, 18).accessibilityIdentifier("memory-educational-notes")
+                }
                 if let onSpeaking {
                     Button(L.t("How Bobby speaks", "Cómo te habla Bobby"), action: onSpeaking)
                         .quietFont(15, .regular).foregroundStyle(Theme.cream)

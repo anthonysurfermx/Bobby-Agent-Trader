@@ -7,7 +7,7 @@
 import Foundation
 
 enum NucleoFixtures {
-    static let scenarios: Set<String> = ["default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline",
+    static let scenarios: Set<String> = ["companion", "companion-plain", "companion-off", "companion-error", "companion-limit", "companion-mismatch", "companion-offer", "default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline",
                                          "signin_required", "subscription_required",
                                          "levels", "upgrade_required", "level_exhausted", "budget_paused"]
     /// Analysis levels (DEBUG QA): `levels` answers a premium desk with a synthesis, a second round, scenarios,
@@ -168,7 +168,41 @@ enum NucleoFixtures {
         let json = body.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
 
         switch url.path {
+        case "/api/companion-turn":
+            guard scenario.hasPrefix("companion") && scenario != "companion-off" else { return (Self.json(404, ["error": "off"]), quick) }
+            if method == "GET" {
+                return (Self.json(405, ["companion": ["context": scenario != "companion-plain", "catalog": scenario == "companion-mismatch" ? 2 : 1, "notices": ["memory-1"]]]), quick)
+            }
+            let language = json["language"] as? String ?? "en"
+            let text: [String: String] = [
+                "es": "Invertir significa poner dinero en algo cuyo valor puede cambiar. Puedes empezar entendiendo los conceptos, sin elegir todavía un producto.",
+                "en": "Investing means putting money into something whose value can change. You can start by understanding the concepts, without choosing a product yet.",
+                "fr": "Investir, c’est mettre de l’argent dans quelque chose dont la valeur peut changer. Tu peux commencer par comprendre les notions, sans choisir un produit.",
+                "pt": "Investir é colocar dinheiro em algo cujo valor pode mudar. Você pode começar entendendo os conceitos, sem escolher um produto ainda.",
+                "it": "Investire significa mettere denaro in qualcosa il cui valore può cambiare. Puoi iniziare capendo i concetti, senza scegliere ancora un prodotto.",
+                "de": "Investieren bedeutet, Geld in etwas zu stecken, dessen Wert sich ändern kann. Du kannst zuerst die Begriffe verstehen, ohne schon ein Produkt zu wählen."]
+            let follow: [String: String] = ["es": "¿Cómo funciona una acción?", "en": "How does a stock work?", "fr": "Comment fonctionne une action ?", "pt": "Como funciona uma ação?", "it": "Come funziona un’azione?", "de": "Wie funktioniert eine Aktie?"]
+            if scenario == "companion-error" || scenario == "companion-limit" {
+                return (Self.json(scenario == "companion-limit" ? 429 : 503,
+                    ["version": 1, "kind": "error", "error": ["code": scenario == "companion-limit" ? "orientation_limit" : "companion_unavailable",
+                        "message": CompanionCopy.text("unavailable"), "retryable": scenario != "companion-limit"]]), quick)
+            }
+            if scenario == "companion-offer", let candidate = json["candidate"] as? [String: Any], let symbol = candidate["symbol"] as? String {
+                return (Self.json(200, ["version": 1, "kind": "desk_offer", "nextAction": ["symbol": symbol, "requiresConfirmation": true]]), quick)
+            }
+            let context = json["context"] as? [String: Any]
+            return (Self.json(200, ["version": 1, "kind": "explanation", "requestId": json["requestId"] ?? NSNull(),
+                "reply": ["text": text[language] ?? text["en"]!, "followUp": follow[language] ?? follow["en"]!],
+                "personalized": context != nil, "checkIn": NSNull(), "fact": NSNull(),
+                "nextAction": NSNull(), "allowance": ["kind": "orientation", "consumed": 1, "remaining": 4]]), quick)
         case "/api/bobby-asset-search":
+            if scenario.hasPrefix("companion") && param("browse") != "1" {
+                if let q = json["q"] as? String, q.lowercased().contains("ethereun") {
+                    return (Self.json(200, ["resolved": ["symbol": "ETH", "assetClass": "crypto", "aliases": ["Ethereum"]],
+                        "resolution": ["needsConfirmation": true, "matchKind": "fuzzy"]]), quick)
+                }
+                return (Self.json(200, ["resolved": NSNull(), "results": [Any]()]), quick)
+            }
             if param("browse") == "1" { return (Self.json(200, ["ok": true, "browse": [String: Any](), "movers": [Any]()]), quick) }
             guard method == "POST", let q = json["q"] as? String, let rule = assetSearchRule(query: q), let name = rule["raw"] as? String
             else { return (Self.json(400, ["error": "q required"]), quick) }

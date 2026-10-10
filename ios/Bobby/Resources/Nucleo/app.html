@@ -541,7 +541,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   'use strict';
   var V = 1;
   var METHODS = [
-    'speaking.choose', 'session', 'roster', 'suggestions', 'ask', 'cancel', 'read.rendered',
+    'companion.presented', 'companion.answer', 'speaking.choose', 'session', 'roster', 'suggestions', 'ask', 'cancel', 'read.rendered',
     'speech.permission', 'speech.requestPermission', 'speech.start', 'speech.stop',
     'speak', 'previewVoice', 'stopSpeaking', 'setMuted', 'haptic',
     'saveThesis', 'island', 'theses', 'record',
@@ -550,7 +550,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     'nudge.seen', 'nudge.act'
   ];
   var EVENTS = [
-    'speaking.open', 'session.changed', 'account.changed', 'consent.withdrawn', 'app.state', 'ask.stage', 'ask.start', 'analysis.level',
+    'companion.checkIn', 'companion.revoked', 'speaking.open', 'session.changed', 'account.changed', 'consent.withdrawn', 'app.state', 'ask.stage', 'ask.start', 'analysis.level',
     'speech.state', 'speech.level', 'speech.partial', 'speech.final', 'speech.error',
     'voice.start', 'voice.level', 'voice.progress', 'voice.word', 'voice.end',
     'thesis.planted', 'native.sheet'
@@ -3225,6 +3225,8 @@ function onAskReply(r, res){
   if (r !== READ) return;
   if (!res || typeof res.status !== 'string') res = { v: 1, status: 'error', code: 'bad_response', message: null };
   r.reply = res;
+  if (res.companionCheckIn) CHECKIN = res.companionCheckIn;
+  if (!paramsCompanion(r.params)) GUIDE_RETRIES = 0;
   if (res.status === 'ok'){
     try { r.model = RMOD.build(res, { lang: LANG, locale: LOCALE, signedIn: !!(SES && SES.signedIn), origin: r.origin }); r.requestId = res.requestId; }
     catch (e){ logErr('model', e); r.model = null; r.reply = { v: 1, status: 'error', code: 'bad_response', message: null }; }
@@ -3734,6 +3736,8 @@ function txSet(text, final, stagger){
   A.tx.final = !!final;
 }
 
+function paramsCompanion(params){ return !!(params && params.companion); }
+
 /* ---- app/60-fsm.js ---- */
 /* =====================================================================
    11. The state machine (ARCHITECTURE.md §3.2). Each prototype beat is a
@@ -3861,6 +3865,8 @@ function dissolveThink(){
 }
 /* everything a read put on screen goes back where it came from (cards before the sphere moves) */
 function clearRead(){
+  GUIDE_EPOCH++;
+  if (typeof guidePanel !== "undefined") guidePanel.style.display = "none";
   chipsHide();
   var hadCards = A.cardsOn || A.rev.some(function(v){ return v.x > 0.01; });
   if (hadCards){ [2, 0, 1].forEach(function(i, k){ A.rev[i].to(0, 'ret', null, 0.15 + k * 0.04); }); }
@@ -3888,6 +3894,7 @@ function readShowing(){ return A.cardsOn || A.vCond.t > 0 || U.flood.t > 0 || A.
 function routeReply(r){
   var s = r.reply.status;
   if (s === 'ok'){ go('THINK_WAIT'); return; }
+  if (s === 'companion' || s === 'companion_error'){ go('COMPANION', { reply: r.reply }); return; }
   if (s === 'confirm'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG, { locale:LOCALE }) }); return; }
   /* a level refusal or a premium read that did not finish: one calm line, and a chip the user taps (never silent) */
   if (s === 'level_notice'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG, { locale:LOCALE }) }); return; }
@@ -4151,6 +4158,7 @@ STATES.LISTENING = {
     if (ST.name !== 'LISTENING') return;
     text = String(text || '').replace(/\s+/g, ' ').trim();
     this.finalWait = 0;
+    if (guideResumeOptions()) { txReset(); return; }
     if (!text){ txReset(); go('IDLE', { hint: 'hint.empty', restoreGreet: true }); return; }
     txSet(text, true);
     go('SENDING', { question: text, origin: 'speech' });
@@ -4191,10 +4199,11 @@ STATES.TYPING = {
     if (ST.name !== 'TYPING' || TB.composing) return;
     var q = el.ta.value.replace(/\s+/g, ' ').trim();
     if (!q){ this.cancel(); return; }
+    if (guideResumeOptions()) return;
     var params = this.d.followUpOf ? { followUpOf: this.d.followUpOf, question: q } : { question: q };
     go('SENDING', { question: q, params: params, origin: 'type', fromRead: !!this.d.fromRead });
   },
-  cancel: function(){ if (ST.name !== 'TYPING') return; if (this.d.fromRead) go('RETURNING'); else go('IDLE', { restoreGreet: true }); },
+  cancel: function(){ if (ST.name !== 'TYPING') return; if (guideResumeOptions()) return; if (this.d.fromRead) go('RETURNING'); else go('IDLE', { restoreGreet: true }); },
   down: function(h){ return tapG(function(){ if (!el.ta.value.trim()) STATES.TYPING.cancel(); else try { el.ta.blur(); } catch (e) {} }); }
 };
 
@@ -4496,6 +4505,8 @@ function readChips(){
     A.metaPin = h; A.metaDrop.set(0); A.metaDrop.to(54 - h, 'soft');
     capsOff();
   }
+  if (r.reply && r.reply.companionConsentPending) bcall('companion.presented').catch(noop);
+  if (CHECKIN && CHECKIN.question) { companionCheckIn(CHECKIN); return; }
   chipsShow(RMOD.followUps(r.model, SUGG || {}, LANG), false, true);
 }
 /* the row lies where a pull usually starts: a finger that goes down on a chip still pulls the cards, sideways it
@@ -4607,7 +4618,7 @@ function cardTrackG(scrollable){
   };
 }
 STATES.CARDS = {
-  enter: function(prev, d){ if (prev === 'PULLING' || d.result) pullRelease(d.vy); att(el.sphereA, 'aria-label', tt('aria.cards')); pillMode(idleMode()); },
+  enter: function(prev, d){ GUIDE_EPOCH++; guidePanel.style.display = 'none'; if (prev === 'PULLING' || d.result) pullRelease(d.vy); att(el.sphereA, 'aria-label', tt('aria.cards')); pillMode(idleMode()); },
   down: cardsDown
 };
 
@@ -4689,7 +4700,7 @@ function chipAct(c){
   if (a.question){ go('SENDING', { question: a.question, params: { question: a.question, chip: true }, origin: 'chip', cx: cx, cy: cy, fromRead: !a.starter }); }
 }
 STATES.FOLLOWUPS = {
-  enter: function(){ chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow()); },
+  enter: function(){ chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow()); if (CHECKIN && CHECKIN.question) companionCheckIn(CHECKIN); },
   tick: noop,
   down: cardsDown
 };
@@ -4697,6 +4708,7 @@ STATES.FOLLOWUPS = {
 /* ---------- RETURNING: B10 — cards retract before the sphere moves; the verdict evaporates; the tint returns ---------- */
 STATES.RETURNING = {
   enter: function(prev, d){
+    GUIDE_INPUT_CHECKIN = false; CHECKIN = null;
     var hadVerdict = A.vCond.t > 0 || U.flood.t > 0, hadCards = clearRead();
     var k = hadCards ? 0.80 : hadVerdict ? 0.55 : 0.25;
     txReset(); showTypeBox(false);
@@ -4936,6 +4948,124 @@ var ARIA = { BOOT: 'aria.waking', WAKE: 'aria.waking', IDLE: 'aria.idle', PRE_PE
   RETURNING: 'aria.idle', CONFIRM_ASSET: 'aria.noVerdict', UNKNOWN_ASSET: 'aria.noVerdict', RISK_GATE: 'aria.noVerdict',
   SIGNIN_GATE: 'aria.noVerdict', PRO_GATE: 'aria.noVerdict', FACES: 'aria.faces', THESIS_VIEW: 'aria.cards', SAVING: 'aria.cards', FOLLOWUPS: 'aria.cards' };
 function ariaState(){ var k = ARIA[ST.name]; if (k) att(el.sphereA, 'aria-label', tt(k)); }
+
+/* ---- app/65-companion.js ---- */
+/* Educational replies share the sphere, but never enter the verdict, save or market-read states. */
+var GUIDE = null, CHECKIN = null, GUIDE_RETRIES = 0, GUIDE_BUSY = false, GUIDE_INPUT_CHECKIN = false, GUIDE_EPOCH = 0;
+var guidePanel = mk('section'), guideReply = mk('p'), guideMark = mk('small'), guideFact = mk('p'), guideQuestion = mk('p'), guideOptions = mk('div'), guideActions = mk('div');
+guidePanel.id = 'companionPanel'; guidePanel.setAttribute('aria-live', 'polite'); guidePanel.style.cssText = 'position:absolute;left:24px;top:464px;width:342px;max-height:282px;overflow-y:auto;z-index:18;display:none;padding:8px 0 18px;overscroll-behavior:contain;touch-action:none;pointer-events:auto;color:var(--ink);font:16px/1.5 var(--sans)';
+guideReply.style.cssText = 'font-size:17px;line-height:1.5;white-space:pre-wrap';
+guideMark.style.cssText = 'display:block;font-size:11px;color:var(--ink3);margin-top:8px';
+guideFact.style.cssText = 'font-size:13px;color:var(--ink2);border-left:1px solid var(--line);padding-left:12px;margin-top:16px';
+guideQuestion.style.cssText = 'font-size:17px;line-height:1.45;margin-top:20px';
+guideOptions.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;gap:7px;margin-top:12px';
+guideActions.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin-top:16px';
+[guideReply,guideMark,guideFact,guideQuestion,guideOptions,guideActions].forEach(function(e){ guidePanel.appendChild(e); }); uiEl.appendChild(guidePanel);
+function guideWords(){ return SES && SES.companionPilot && SES.companionPilot.strings || {}; }
+function guideButton(host, text, action, id, primary){
+  var b = mk('button', null, text); b.type = 'button'; b.id = id;
+  b.style.cssText = 'min-height:44px;width:100%;text-align:left;padding:10px 14px;border-radius:16px;white-space:normal;overflow-wrap:anywhere;line-height:1.4;font-size:14px;background:' + (primary ? 'rgba(242,237,228,.10)' : 'transparent') + ';border:1px solid var(--hair)';
+  b._guideAction = action; host.appendChild(b); return b;
+}
+/* The stage owns gestures. Keep this scrollable text panel's gestures inside it, including VoiceOver clicks. */
+var guidePointer = null;
+guidePanel.addEventListener('pointerdown', function(e){
+  e.stopPropagation(); if (e.cancelable) e.preventDefault();
+  guidePointer = { y:e.clientY, top:guidePanel.scrollTop, button:e.target.closest('button'), moved:false, id:e.pointerId };
+  try { guidePanel.setPointerCapture(e.pointerId); } catch (_) {}
+});
+guidePanel.addEventListener('pointermove', function(e){
+  e.stopPropagation(); if (!guidePointer) return;
+  var delta = (e.clientY - guidePointer.y) / (fitS || 1);
+  if (Math.abs(delta) > 7) guidePointer.moved = true;
+  if (guidePointer.moved) guidePanel.scrollTop = guidePointer.top - delta;
+});
+guidePanel.addEventListener('pointerup', function(e){
+  e.stopPropagation(); var p = guidePointer; guidePointer = null;
+  if (p && !p.moved && p.button && !p.button.disabled && p.button._guideAction) p.button._guideAction();
+});
+guidePanel.addEventListener('pointercancel', function(){ guidePointer = null; });
+guidePanel.addEventListener('click', function(e){
+  e.stopPropagation(); if (e.detail !== 0) return;
+  var b = e.target.closest('button'); if (b && !b.disabled && b._guideAction) b._guideAction();
+});
+function guideAsk(question, retry){
+  if (GUIDE_BUSY) return;
+  if (retry) GUIDE_RETRIES++; else GUIDE_RETRIES = 0;
+  CHECKIN = null;
+  go('SENDING', { params:{question:question,companion:true}, question:question, origin:'person', cx:195,cy:660 });
+}
+function guideRender(){
+  if (!GUIDE) return;
+  var words = guideWords(), question = CHECKIN && CHECKIN.question;
+  guideReply.textContent = GUIDE.text || GUIDE.message || '';
+  guideMark.textContent = GUIDE.personalized ? words.personalized || '' : '';
+  guideFact.textContent = '';
+  if (GUIDE.fact && typeof GUIDE.fact.text === 'string' && typeof GUIDE.fact.source === 'string' && typeof GUIDE.fact.year === 'string') {
+    guideFact.textContent = GUIDE.fact.text + '\n' + GUIDE.fact.source + ' · ' + GUIDE.fact.year;
+  }
+  guideFact.style.display = guideFact.textContent ? 'block' : 'none';
+  guideQuestion.textContent = question ? question.text : '';
+  guideOptions.textContent = ''; guideActions.textContent = '';
+  if (question){
+    (question.options || []).forEach(function(option){
+      guideButton(guideOptions, option.label, function(){ guideAnswer(question.id,option.id); }, 'companion-option-' + option.id, true);
+    });
+    guideButton(guideActions, words.skip || '', function(){ guideAnswer(question.id,null); }, 'companion-skip', false);
+  } else if (GUIDE.status === 'companion_error') {
+    if (GUIDE.retryable && GUIDE_RETRIES < 1) guideButton(guideActions, words.retry || '', function(){ guideAsk(READ.question,true); }, 'companion-retry', true);
+  } else if (GUIDE.followUp) {
+    guideButton(guideActions, GUIDE.followUp, function(){ guideAsk(GUIDE.followUp,false); }, 'companion-follow-up', true);
+  }
+  guideButton(guideActions, words.close || '', function(){ CHECKIN = null; GUIDE_RETRIES = 0; go('RETURNING'); }, 'companion-close', false);
+  guidePanel.style.display = 'block';
+}
+function guideAnswer(id,value){
+  if (GUIDE_BUSY) return; GUIDE_BUSY = true; var epoch = GUIDE_EPOCH;
+  Array.prototype.forEach.call(guidePanel.querySelectorAll('button'), function(b){ b.disabled = true; });
+  var params = {questionId:id}; if (value != null) params.value = value;
+  bcall('companion.answer',params).then(function(result){
+    GUIDE_BUSY = false; if (epoch !== GUIDE_EPOCH) return;
+    if (result && !result.message) CHECKIN = result;
+    else if (result && result.message) guideMark.textContent = result.message;
+    if ((!CHECKIN || !CHECKIN.question) && ST.name !== 'COMPANION') {
+      guidePanel.style.display = 'none';
+      if (ST.name === 'HANDBACK') readChips(); else if (ST.name === 'FOLLOWUPS') chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow());
+      return;
+    }
+    guideRender();
+    guidePanel.scrollTop = guideQuestion.offsetTop;
+  },function(){ GUIDE_BUSY = false; if (epoch === GUIDE_EPOCH) guideRender(); });
+}
+function companionCheckIn(payload){
+  if (!payload || !payload.question) { CHECKIN = null; if (ST.name === 'COMPANION') guideRender(); return; }
+  CHECKIN = payload;
+  if (ST.name === 'COMPANION') { guideRender(); return; }
+  /* A market reply keeps its own cards. The check-in lives beside it and leaves when that reply leaves. */
+  if (['HANDBACK','FOLLOWUPS'].indexOf(ST.name) >= 0){
+    chipsHide(); GUIDE = { status:'companion', text:'' }; guideRender();
+  }
+}
+STATES.COMPANION = {
+  enter:function(prev,data){
+    GUIDE = data.reply || GUIDE; CHECKIN = GUIDE.companionCheckIn || CHECKIN;
+    dissolveThink(); glassHome(); moveSphere(320,110); hint(''); pillMode(idleMode()); att(el.sphereA,'aria-label',tt('aria.speaking'));
+    guideRender(); guidePanel.scrollTop = 0; if (GUIDE.companionConsentPending) bcall('companion.presented').catch(noop);
+    if (GUIDE.status === 'companion' && GUIDE.requestId && GUIDE.text && !GUIDE.spoken){
+      GUIDE.spoken = true; VOICE.id = GUIDE.requestId; VOICE.started = false; VOICE.ended = false; VOICE.reqT = clk;
+      kInit(GUIDE.text);
+      bcall('speak',{id:GUIDE.requestId,text:GUIDE.text}).then(function(reply){
+        if (reply && reply.status !== 'queued') { VOICE.ended = true; if (ST.name === 'COMPANION') pillMode(idleMode()); }
+      }).catch(function(){ VOICE.ended = true; });
+    }
+  },
+  exit:function(){ GUIDE_EPOCH++; guidePanel.style.display = 'none'; if (VOICE.id && !VOICE.ended) bcall('stopSpeaking').catch(noop); VOICE.id=null; K.on=false; },
+  tick:noop,
+  on:function(name){ if (name === 'voice.start') pillMode('stop'); else if (name === 'voice.end') pillMode(idleMode()); },
+  down:function(hit,p){ if (hit === 'pill'){ if (VOICE.started && !VOICE.ended) return tapG(function(){ bcall('stopSpeaking').catch(noop); VOICE.ended=true; pillMode(idleMode()); }); GUIDE_INPUT_CHECKIN=!!(CHECKIN && CHECKIN.question); return pillDown(p,true); } if (hit === 'close') return tapG(function(){ CHECKIN=null;go('RETURNING'); }); return null; }
+};
+
+function guideResumeOptions(){ if (!GUIDE_INPUT_CHECKIN || !GUIDE || !CHECKIN || !CHECKIN.question) return false; GUIDE_INPUT_CHECKIN=false; go('COMPANION',{reply:GUIDE}); guidePanel.scrollTop=guideQuestion.offsetTop; return true; }
 
 /* ---- app/70-input.js ---- */
 /* =====================================================================
@@ -6248,6 +6378,8 @@ function wire(){
   BR.on('consent.withdrawn', consentWithdrawn);
   BR.on('app.state', function(p){ if (p && p.state === 'background'){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
+  BR.on('companion.checkIn', companionCheckIn);
+  BR.on('companion.revoked', function(){ GUIDE_EPOCH++; CHECKIN = null; if (GUIDE) GUIDE.personalized = false; if (ST.name === 'COMPANION') guideRender(); else { guidePanel.style.display = 'none'; if (ST.name === 'HANDBACK') readChips(); } });
   /* the read native starts is not the person's own question: startRead() notes it while askStart runs (§3.5) */
   BR.on('ask.start', function(p){ ASK_ORIGIN = 'followUp'; try { askStart(p); } finally { ASK_ORIGIN = null; } });
   BR.on('analysis.level', lvlApply);

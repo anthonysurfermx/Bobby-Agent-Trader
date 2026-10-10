@@ -102,6 +102,8 @@ function wire(){
   BR.on('consent.withdrawn', consentWithdrawn);
   BR.on('app.state', function(p){ if (p && p.state === 'background'){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
+  BR.on('companion.checkIn', companionCheckIn);
+  BR.on('companion.revoked', function(){ GUIDE_EPOCH++; CHECKIN = null; if (GUIDE) GUIDE.personalized = false; if (ST.name === 'COMPANION') guideRender(); else { guidePanel.style.display = 'none'; if (ST.name === 'HANDBACK') readChips(); } });
   /* the read native starts is not the person's own question: startRead() notes it while askStart runs (§3.5) */
   BR.on('ask.start', function(p){ ASK_ORIGIN = 'followUp'; try { askStart(p); } finally { ASK_ORIGIN = null; } });
   BR.on('analysis.level', lvlApply);

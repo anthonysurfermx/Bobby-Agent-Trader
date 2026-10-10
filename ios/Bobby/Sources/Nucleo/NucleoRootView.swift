@@ -189,6 +189,14 @@ private struct NucleoStage: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
+        case .companionConsent:
+            CompanionConsentView(store: session.companionContext, finished: session.companionConsentFinished)
+                .presentationDetents([.large]).presentationBackground(Theme.nucleoSurface)
+        case .companionNotes:
+            CompanionNotesView(store: session.companionContext,
+                questionsAvailable: { session.companionContext.allows(session.companionPilot.capability) },
+                onClose: { session.sheet = nil })
+                .presentationDetents([.large]).presentationBackground(Theme.nucleoSurface)
         case .memoryConsent:
             MemoryConsentSheet { session.sheet = nil }
                 .presentationDetents([.medium, .large])
@@ -206,7 +214,7 @@ private struct NucleoStage: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
         case .memory:
-            MemoryView(riskAccepted: session.profile.acceptedRiskNotice, onSpeaking: { session.openSpeakingDial() }, onClose: { session.sheet = nil })
+            MemoryView(riskAccepted: session.profile.acceptedRiskNotice, onEducationalNotes: { session.switchSheet(to: .companionNotes) }, onSpeaking: { session.openSpeakingDial() }, onClose: { session.sheet = nil })
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)

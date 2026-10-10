@@ -124,6 +124,8 @@ function dissolveThink(){
 }
 /* everything a read put on screen goes back where it came from (cards before the sphere moves) */
 function clearRead(){
+  GUIDE_EPOCH++;
+  if (typeof guidePanel !== "undefined") guidePanel.style.display = "none";
   chipsHide();
   var hadCards = A.cardsOn || A.rev.some(function(v){ return v.x > 0.01; });
   if (hadCards){ [2, 0, 1].forEach(function(i, k){ A.rev[i].to(0, 'ret', null, 0.15 + k * 0.04); }); }
@@ -151,6 +153,7 @@ function readShowing(){ return A.cardsOn || A.vCond.t > 0 || U.flood.t > 0 || A.
 function routeReply(r){
   var s = r.reply.status;
   if (s === 'ok'){ go('THINK_WAIT'); return; }
+  if (s === 'companion' || s === 'companion_error'){ go('COMPANION', { reply: r.reply }); return; }
   if (s === 'confirm'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG, { locale:LOCALE }) }); return; }
   /* a level refusal or a premium read that did not finish: one calm line, and a chip the user taps (never silent) */
   if (s === 'level_notice'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG, { locale:LOCALE }) }); return; }
@@ -414,6 +417,7 @@ STATES.LISTENING = {
     if (ST.name !== 'LISTENING') return;
     text = String(text || '').replace(/\s+/g, ' ').trim();
     this.finalWait = 0;
+    if (guideResumeOptions()) { txReset(); return; }
     if (!text){ txReset(); go('IDLE', { hint: 'hint.empty', restoreGreet: true }); return; }
     txSet(text, true);
     go('SENDING', { question: text, origin: 'speech' });
@@ -454,10 +458,11 @@ STATES.TYPING = {
     if (ST.name !== 'TYPING' || TB.composing) return;
     var q = el.ta.value.replace(/\s+/g, ' ').trim();
     if (!q){ this.cancel(); return; }
+    if (guideResumeOptions()) return;
     var params = this.d.followUpOf ? { followUpOf: this.d.followUpOf, question: q } : { question: q };
     go('SENDING', { question: q, params: params, origin: 'type', fromRead: !!this.d.fromRead });
   },
-  cancel: function(){ if (ST.name !== 'TYPING') return; if (this.d.fromRead) go('RETURNING'); else go('IDLE', { restoreGreet: true }); },
+  cancel: function(){ if (ST.name !== 'TYPING') return; if (guideResumeOptions()) return; if (this.d.fromRead) go('RETURNING'); else go('IDLE', { restoreGreet: true }); },
   down: function(h){ return tapG(function(){ if (!el.ta.value.trim()) STATES.TYPING.cancel(); else try { el.ta.blur(); } catch (e) {} }); }
 };
 
@@ -759,6 +764,8 @@ function readChips(){
     A.metaPin = h; A.metaDrop.set(0); A.metaDrop.to(54 - h, 'soft');
     capsOff();
   }
+  if (r.reply && r.reply.companionConsentPending) bcall('companion.presented').catch(noop);
+  if (CHECKIN && CHECKIN.question) { companionCheckIn(CHECKIN); return; }
   chipsShow(RMOD.followUps(r.model, SUGG || {}, LANG), false, true);
 }
 /* the row lies where a pull usually starts: a finger that goes down on a chip still pulls the cards, sideways it
@@ -870,7 +877,7 @@ function cardTrackG(scrollable){
   };
 }
 STATES.CARDS = {
-  enter: function(prev, d){ if (prev === 'PULLING' || d.result) pullRelease(d.vy); att(el.sphereA, 'aria-label', tt('aria.cards')); pillMode(idleMode()); },
+  enter: function(prev, d){ GUIDE_EPOCH++; guidePanel.style.display = 'none'; if (prev === 'PULLING' || d.result) pullRelease(d.vy); att(el.sphereA, 'aria-label', tt('aria.cards')); pillMode(idleMode()); },
   down: cardsDown
 };
 
@@ -952,7 +959,7 @@ function chipAct(c){
   if (a.question){ go('SENDING', { question: a.question, params: { question: a.question, chip: true }, origin: 'chip', cx: cx, cy: cy, fromRead: !a.starter }); }
 }
 STATES.FOLLOWUPS = {
-  enter: function(){ chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow()); },
+  enter: function(){ chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow()); if (CHECKIN && CHECKIN.question) companionCheckIn(CHECKIN); },
   tick: noop,
   down: cardsDown
 };
@@ -960,6 +967,7 @@ STATES.FOLLOWUPS = {
 /* ---------- RETURNING: B10 — cards retract before the sphere moves; the verdict evaporates; the tint returns ---------- */
 STATES.RETURNING = {
   enter: function(prev, d){
+    GUIDE_INPUT_CHECKIN = false; CHECKIN = null;
     var hadVerdict = A.vCond.t > 0 || U.flood.t > 0, hadCards = clearRead();
     var k = hadCards ? 0.80 : hadVerdict ? 0.55 : 0.25;
     txReset(); showTypeBox(false);

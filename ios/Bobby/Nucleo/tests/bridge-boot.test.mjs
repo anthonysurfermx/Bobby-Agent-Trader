@@ -695,3 +695,56 @@ test('failed persistence keeps the dial open and allows retry',async()=>{
  app.nodes.get('speakingConfirm').listeners.click();await flush();assert.equal(app.context.nucleo.state(),'SPEAKING_DIAL');
  assert.equal(app.nodes.get('speakingError').textContent,'Try again');assert.equal(app.session.speaking.value,null);
 });
+
+
+async function companionReply(app, reply) {
+  tap(app, app.nodes.get('pill')); app.nodes.get('ta').value = 'What is investing?';
+  app.nodes.get('taSend').listeners.click();
+  await flush(); app.advance(1.2); await flush(); app.answer(reply);
+  await flush(); app.advance(1); await flush();
+  assert.equal(app.context.nucleo.state(),'COMPANION');
+}
+const companionPanel = app => app.nodes.get('ui').children.find(node => node.id === 'companionPanel');
+const guideActionsOf = app => companionPanel(app).children.at(-1);
+
+test('a catalog question takes the chip row after a market reply and revocation restores it', async () => {
+  const app = await idle({ seed: s => { s.companionPilot = { strings: { close:'Close',skip:'Skip' } }; } });
+  await personRead(app, okRead({ companionCheckIn:{ question:{id:'interest',text:'Interest?',options:[{id:'crypto',label:'Crypto'}]} } }));
+  assert.equal(companionPanel(app).style.display,'block');
+  assert.equal(companionPanel(app).children[3].textContent,'Interest?');
+  assert.deepEqual(rowOf(app),[]);
+  app.context.nucleoBridge.emit('companion.revoked',{});
+  assert.equal(companionPanel(app).style.display,'none');
+  assert.ok(rowOf(app).length > 0);
+  assert.deepEqual(app.errors,[]);
+});
+
+test('companion text stays out of market cards and a follow-up always routes directly', async () => {
+  const app = await idle({ seed: s => { s.companionPilot = { strings: { close:'Close',retry:'Try again',skip:'Skip',personalized:'Uses your notes' } }; } });
+  await companionReply(app,{ v:1,status:'companion',requestId:'90d2564c-6064-4275-95cd-5a3c7c0b5b56',text:'Learning explanation',followUp:'How does bitcoin work?' });
+  assert.equal(app.context.nucleo.read().status,'companion');
+  assert.equal(app.context.nucleo.read().symbol,null);
+  assert.equal(companionPanel(app).children[0].textContent,'Learning explanation');
+  guideActionsOf(app).children[0]._guideAction();
+  await flush();
+  assert.deepEqual(asksOf(app).at(-1),{question:'How does bitcoin work?',companion:true});
+  assert.deepEqual(app.errors,[]);
+});
+
+test('companion retries once and a revoked note removes the mark and check-in', async () => {
+  const app = await idle({ seed: s => { s.companionPilot = { strings: { close:'Close',retry:'Try again',skip:'Skip',personalized:'Uses your notes' } }; } });
+  await companionReply(app,{v:1,status:'companion_error',message:'Try again later.',retryable:true});
+  assert.equal(guideActionsOf(app).children.length,2);
+  guideActionsOf(app).children[0]._guideAction();
+  await flush(); app.advance(1.2); await flush();
+  app.answer({v:1,status:'companion_error',message:'Try again later.',retryable:true});
+  await flush(); app.advance(1); await flush();
+  assert.equal(guideActionsOf(app).children.length,1,'only the exit after one retry');
+  // A new typed question starts a new turn and may use the accepted notes.
+  await companionReply(app,{v:1,status:'companion',text:'Explanation',personalized:true,companionCheckIn:{question:{id:'interest',text:'Interest?',options:[{id:'crypto',label:'Crypto'}]}}});
+  assert.equal(companionPanel(app).children[1].textContent,'Uses your notes');
+  app.context.nucleoBridge.emit('companion.revoked',{});
+  assert.equal(companionPanel(app).children[1].textContent,'');
+  assert.equal(companionPanel(app).children[3].textContent,'');
+  assert.deepEqual(app.errors,[]);
+});

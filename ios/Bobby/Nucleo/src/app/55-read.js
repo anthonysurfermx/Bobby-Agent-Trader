@@ -54,6 +54,8 @@ function onAskReply(r, res){
   if (r !== READ) return;
   if (!res || typeof res.status !== 'string') res = { v: 1, status: 'error', code: 'bad_response', message: null };
   r.reply = res;
+  if (res.companionCheckIn) CHECKIN = res.companionCheckIn;
+  if (!paramsCompanion(r.params)) GUIDE_RETRIES = 0;
   if (res.status === 'ok'){
     try { r.model = RMOD.build(res, { lang: LANG, locale: LOCALE, signedIn: !!(SES && SES.signedIn), origin: r.origin }); r.requestId = res.requestId; }
     catch (e){ logErr('model', e); r.model = null; r.reply = { v: 1, status: 'error', code: 'bad_response', message: null }; }
@@ -562,3 +564,5 @@ function txSet(text, final, stagger){
   ws.forEach(function(w){ w.hide.to(w.nt < cut ? 0 : 1, 'soft'); });
   A.tx.final = !!final;
 }
+
+function paramsCompanion(params){ return !!(params && params.companion); }

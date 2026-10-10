@@ -71,7 +71,7 @@ final class NucleoBridge: NSObject, WKScriptMessageHandlerWithReply {
     static let maxEnvelopeBytes = 64 * 1024
     static let methods: Set<String> = {
         var methods: Set<String> = [
-            "speaking.choose", "session", "roster", "suggestions", "ask", "cancel", "read.rendered",
+            "companion.presented", "companion.answer", "speaking.choose", "session", "roster", "suggestions", "ask", "cancel", "read.rendered",
             "speech.permission", "speech.requestPermission", "speech.start", "speech.stop",
             "speak", "previewVoice", "stopSpeaking", "setMuted", "haptic",
             "saveThesis", "island", "theses", "record",

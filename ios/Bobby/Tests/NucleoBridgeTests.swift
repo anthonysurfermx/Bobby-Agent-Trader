@@ -773,4 +773,57 @@ final class NucleoBridgeTests: XCTestCase {
         XCTAssertEqual(items.first?.id, "t24")
         XCTAssertEqual(ledger.items(owner: "someone").count, 0)
     }
+
+    func testCompanionTapsUseNoNetworkAndDoNotCreateDeskReads() async throws {
+        NucleoFixtures.setScenario("companion")
+        let (session, bridge, _) = make()
+        session.companionContext.choose(true)
+        let reply = await result(bridge, "ask", ["question": "What does investing mean?"])
+        XCTAssertEqual(reply["status"] as? String, "companion")
+        XCTAssertEqual(reply["personalized"] as? Bool, true)
+        XCTAssertEqual(((reply["companionCheckIn"] as? [String: Any])?["question"] as? [String: Any])?["id"] as? String, "interest")
+        XCTAssertNil(session.desk.pendingRead())
+        XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("desk-debate") || $0.contains("voice-tool") })
+        let before = NucleoFixtures.log.count
+        let next = await result(bridge, "companion.answer", ["questionId": "interest", "value": "crypto"])
+        XCTAssertEqual((next["question"] as? [String: Any])?["id"] as? String, "barrier")
+        let skipped = await result(bridge, "companion.answer", ["questionId": "barrier"])
+        XCTAssertEqual((skipped["question"] as? [String: Any])?["id"] as? String, "when")
+        XCTAssertEqual(NucleoFixtures.log.count, before, "a tap or skip has no server request")
+        XCTAssertEqual(session.companionContext.state.notes.count, 1)
+        XCTAssertEqual(session.companionContext.state.asked, ["interest", "barrier"])
+        _ = await result(bridge, "ask", ["question": "How does bitcoin work?", "companion": true])
+        XCTAssertEqual(NucleoFixtures.log.filter { $0.contains("bobby-asset-search") }.count, 1, "follow-up skips the asset search")
+        XCTAssertEqual(NucleoFixtures.log.filter { $0.contains("GET") && $0.contains("companion-turn") }.count, 1)
+        session.teardown()
+    }
+
+    func testCompanionOfferAndLimitLeaveTheGuessUnspentUntilConfirmation() async {
+        for scenario in ["companion-offer", "companion-limit"] {
+            NucleoFixtures.setScenario(scenario); NucleoFixtures.clearLog()
+            let (session, bridge, _) = make()
+            let reply = await result(bridge, "ask", ["question": "qué opinas de ethereun hoy"])
+            XCTAssertEqual(reply["status"] as? String, "confirm")
+            XCTAssertEqual((reply["asset"] as? [String: Any])?["symbol"] as? String, "ETH")
+            XCTAssertNotNil(reply["token"] as? String)
+            XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("desk-debate") || $0.contains("candles") })
+            session.teardown()
+        }
+    }
+
+    func testCompanionOffAndFailedSearchKeepOldBehavior() async {
+        NucleoFixtures.setScenario("companion-off")
+        let (session, bridge, _) = make()
+        let reply = await result(bridge, "ask", ["question": "What does investing mean?"])
+        XCTAssertEqual(reply["status"] as? String, "unknown_asset")
+        XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("POST") && $0.contains("companion-turn") })
+        session.teardown()
+        NucleoFixtures.setScenario("offline"); NucleoFixtures.clearLog()
+        let (offline, offlineBridge, _) = make()
+        let failed = await result(offlineBridge, "ask", ["question": "What does investing mean?"])
+        XCTAssertEqual(failed["code"] as? String, "network")
+        XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("companion-turn") })
+        offline.teardown()
+    }
+
 }

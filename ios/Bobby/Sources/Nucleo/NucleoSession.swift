@@ -45,11 +45,11 @@ enum NucleoPage: Equatable {
 /// open from a nudge tap or the profile, never from a page call.
 enum NucleoRoute: String, Identifiable, CaseIterable {
     case squad, locker, isla, account, riskNotice, paywall, levels, invite, briefing
-    case credits, theses, thesisEditor, thesisReview, memory, memoryConsent, reminders, briefingSettings, followUp, languageSettings
+    case credits, theses, thesisEditor, thesisReview, memory, memoryConsent, reminders, briefingSettings, followUp, languageSettings, companionConsent, companionNotes
     var id: String { rawValue }
 
     static let nativeOnly: Set<NucleoRoute> = [.paywall, .invite, .briefing, .credits, .theses, .thesisEditor, .thesisReview,
-                                               .memory, .memoryConsent, .reminders, .briefingSettings, .followUp, .languageSettings]
+                                               .memory, .memoryConsent, .reminders, .briefingSettings, .followUp, .languageSettings, .companionConsent, .companionNotes]
     static let openable: Set<String> = Set(allCases.filter { !nativeOnly.contains($0) }.map(\.rawValue))
 }
 
@@ -123,6 +123,10 @@ final class NucleoSession: ObservableObject {
     private(set) var currentPage: String?
     private var cancellables = Set<AnyCancellable>()
     private var suggestionsCache: (at: Date, value: [String: Any])?
+    let companionPilot = CompanionPilot()
+    let companionContext: CompanionContextStore
+    private var companionAwaitingConsent = false
+    private var companionQuestionId: String?
     private var vocabularyTask: Task<Void, Never>?
     private var bootSynced = false
     private var levelsRequested = false
@@ -144,6 +148,11 @@ final class NucleoSession: ObservableObject {
          harnessIntent: HarnessIntent? = nil,
          harness: HarnessCenter? = nil) {
         self.fixtures = fixtures
+        if fixtures || BobbyApp.isUnitTestHost {
+            var data: Data?
+            companionContext = CompanionContextStore(read: { data }, write: { data = $0; return true })
+        } else { companionContext = .shared }
+        companionContext.opened()
         self.briefingIntent = briefingIntent ?? .shared
         self.newsIntent = newsIntent ?? .shared
         self.reminderIntent = reminderIntent ?? .shared
@@ -157,8 +166,27 @@ final class NucleoSession: ObservableObject {
         let speech = self.speech
         self.defaults = defaults
         SpeakingDial(defaults: defaults).prepare(existing: profile.onboarded)
+#if DEBUG
+        if (fixtures || ProcessInfo.processInfo.arguments.contains("-qa-companion-live")) && ProcessInfo.processInfo.arguments.contains("-qa-companion") {
+            SpeakingDial(defaults: defaults).choose("plain", owner: nil)
+        }
+#endif
         desk = NucleoDesk(profile: profile, companions: companions, ledger: ledger, fixtures: fixtures)
         nucleoVoice = NucleoVoice(voice: voice)
+        desk.pilot = companionPilot
+        companionPilot.revision = { [weak self] in self?.companionContext.revision ?? UUID() }
+        companionPilot.context = { [weak self] in
+            guard let self else { return nil }
+            return self.companionContext.wire(capability: self.companionPilot.capability)
+        }
+        desk.decorateAnswer = { [weak self] result in self?.companionDelivered(result) ?? result }
+        companionContext.changed = { [weak self] in
+            guard let self else { return }
+            if !self.companionContext.accepted {
+                _ = self.desk.cancel(); self.voice.stop(); self.nucleoVoice.stop()
+                self.emit("companion.revoked", [:])
+            }
+        }
         desk.speakingLevel = { [weak self] in guard let self else { return nil }; return SpeakingDial(defaults: self.defaults).value(self.fixtures ? nil : self.desk.userID()) }
         if fixtures {
             // Fixture mode is always the signed-out path: no ProgressSync, no island, no Apple, no bearer.
@@ -258,6 +286,24 @@ final class NucleoSession: ObservableObject {
             return sessionChanged()
         case "ask":
             return try await desk.ask(p)
+        case "companion.presented":
+            if companionAwaitingConsent && !companionContext.decided && companionContext.allows(companionPilot.capability) {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.companionAwaitingConsent, self.profile.acceptedRiskNotice,
+                          !self.companionContext.decided, !self.desk.isBusy, self.sheet == nil else { return }
+                    _ = self.openNative(.companionConsent)
+                }
+            }
+            return ["status": "ok"]
+        case "companion.answer":
+            let id = try p.string("questionId", maxLength: 32)!
+            guard companionContext.allows(companionPilot.capability), companionQuestionId == id, companionContext.next(preferred: id)?.id == id else {
+                throw NucleoFault.invalid("no current check-in")
+            }
+            let value = try p.string("value", required: false, maxLength: 64)
+            companionContext.answer(id, value: value)
+            if companionContext.storageError { return ["message": CompanionCopy.text("storageError")] }
+            return companionCheckIn()
         case "cancel":
             return desk.cancel()
         case "read.rendered":
@@ -392,6 +438,7 @@ final class NucleoSession: ObservableObject {
             "pendingRead": desk.pendingRead() ?? NSNull(), "fixtures": fixtures, "platform": "ios", "appVersion": appVersion,
             "analysisLevel": NucleoLevelCenter.shared.level.pageJSON,
             "speaking": SpeakingDial(defaults: defaults).json(fixtures ? nil : AccountSession.shared.session?.userId),
+            "companionPilot": ["strings": CompanionCopy.json],
             "nudge": currentNudge().map { $0.json as Any } ?? NSNull(),
         ]
         // Bobby never invites someone into a wall: when the phone KNOWS the next read is refused, the
@@ -709,6 +756,7 @@ final class NucleoSession: ObservableObject {
     private func bootOnce() {
         guard profile.acceptedRiskNotice else { return }
         let consent = consentGeneration
+        Task { [weak self] in _ = await self?.companionPilot.probe() }
         if vocabularyTask == nil {
             vocabularyTask = Task { [weak self] in
                 let words = await BobbyAPI.dictationVocabulary()
@@ -1120,9 +1168,41 @@ final class NucleoSession: ObservableObject {
         sessionChanged()
     }
 
+    private func companionDelivered(_ reply: [String: Any]) -> [String: Any] {
+        guard ["ok", "companion"].contains(reply["status"] as? String ?? ""), companionContext.allows(companionPilot.capability) else { return reply }
+        var result = reply
+        if companionContext.accepted {
+            companionContext.answered()
+            let preferred = reply["checkIn"] as? String
+            result["companionCheckIn"] = companionCheckIn(preferred: preferred)
+        } else if !companionContext.decided {
+            companionAwaitingConsent = true
+            result["companionConsentPending"] = true
+        }
+        return result
+    }
+
+    func companionCheckIn(preferred: String? = nil) -> [String: Any] {
+        guard companionContext.allows(companionPilot.capability) else {
+            companionQuestionId = nil
+            return ["question": NSNull(), "strings": CompanionCopy.json]
+        }
+        let question = companionContext.next(preferred: preferred)
+        companionQuestionId = question?.id
+        return ["question": question.map { $0.json as Any } ?? NSNull(), "strings": CompanionCopy.json]
+    }
+
+    func companionConsentFinished(_ accepted: Bool) {
+        if accepted && companionAwaitingConsent { companionContext.answered() }
+        companionAwaitingConsent = false
+        sheet = nil
+        emit("companion.checkIn", companionCheckIn())
+    }
+
     // MARK: - Lifecycle
 
     func appBecameActive() {
+        companionContext.opened()
         emit("app.state", ["state": "active"])
         if signedIn { Task { await AccountSession.shared.checkAppleCredential() } }
         sessionChanged()
