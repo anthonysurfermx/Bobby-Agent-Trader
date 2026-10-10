@@ -12,7 +12,7 @@
 //      (`companion_paused`): unknown is closed here;
 //   2. the companion's own spend today, read from its own ledger surface, must be readable and under its own
 //      daily amount (BOBBY_COMPANION_DAILY_USD, 3): a free feature never uses up the budget of a paid one;
-//   3. a slot of the person's day (ten turns on Haiku, five on a dearer model; per install, or per address
+//   3. a slot of the person's day (ten turns on Haiku, five on a dearer model, or BOBBY_COMPANION_TURNS; per install, or per address
 //      when the client sent no install id);
 //   4. a slot of the address's day, four allowances, so rotating install ids buys nothing, and a slot of its
 //      network's day (a /24, sixteen allowances), so neither does a small range of addresses;
@@ -50,7 +50,7 @@ import { deviceHash } from './_lib/access.js';
 import { DESK_QUESTION_MAX } from './_lib/desk-debate.js';
 import { llmCaps, llmSpend, logLlmUsage } from './_lib/llm-usage.js';
 import type { LlmUsage } from './_lib/llm.js';
-import { COMPANION_VERSION, CompanionRequest, CompanionUnchecked, companionAllowance, companionDailyCeiling, companionDailyUsd, companionEnabled, companionModel, runCompanionTurn } from './_lib/companion.js';
+import { COMPANION_VERSION, CompanionRequest, CompanionUnchecked, companionAllowance, companionDailyCeiling, companionDailyUsd, companionEnabled, companionGist, companionModel, runCompanionTurn } from './_lib/companion.js';
 import { companionCapabilities, companionContextEnabled, companionPicture, nextCheckIn, readCompanionContext } from './_lib/companion-context.js';
 import { companionJudgeModel } from './_lib/companion-judge.js';
 import { NOTES_A_DAY, companionAnswer, companionReaderModel, readCompanionAnswer } from './_lib/companion-reader.js';
@@ -197,8 +197,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         checkIn: nextCheckIn({ ...answer.context, asked: [...answer.context.asked, note.field] }), allowance: { kind: 'orientation', ...before },
       });
     }
-    const { question, speech, candidate } = ask!;
-    const turn = await runCompanionTurn(question, language, { locale, speech, candidate, usage, model, picture });
+    const { question, speech, candidate, previous } = ask!;
+    const turn = await runCompanionTurn(question, language, { locale, speech, candidate, previous, usage, model, picture });
     // The person's notes shaped the answer: there were some, and the model's own reply is the one served.
     const personalized = picture !== null && turn.source === 'model' && !turn.aboutCandidate;
     console.error(JSON.stringify({ route: 'companion-turn', event: 'turn', source: turn.source, rejected: turn.rejected, judge: turn.judge, offer: turn.aboutCandidate, followUp: turn.followUp !== null, language, speech: speech ?? 'plain', model, ...(context ? { personalized } : {}), ms: Date.now() - started }));
@@ -211,9 +211,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         nextAction: { type: 'open_desk', symbol: candidate.symbol.toUpperCase(), question, requiresConfirmation: true }, allowance: { kind: 'orientation', ...before },
       });
     }
+    const gist = companionGist(turn.text);
     return res.status(200).json({
       version: COMPANION_VERSION, requestId: echoed, kind: 'explanation',
-      reply: { text: turn.text, followUp: turn.followUp }, nextAction: null,
+      // The first sentence, when it can stand alone: what the client shows while Bobby speaks. Always the start of `text`.
+      reply: { text: turn.text, followUp: turn.followUp, ...(gist ? { gist } : {}) }, nextAction: null,
       // Only when the person's context was read. The question Bobby would ask next is chosen by code; no fact card yet.
       ...(context ? { personalized, checkIn: nextCheckIn(context), fact: null } : {}),
       allowance: { kind: 'orientation', consumed: mine.used, remaining: limit - mine.used },

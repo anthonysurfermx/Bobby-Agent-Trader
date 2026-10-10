@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "requestId": "0b6f7c1e-2a51-4e6b-9c1d-7f3e5a9d2c44",
+  "question": "Ponme un ejemplo",
+  "language": "es",
+  "locale": "es-MX",
+  "speech": "plain",
+  "previous": {
+    "question": "¿Qué es un fondo indexado?",
+    "reply": "Un fondo indexado copia a todo un mercado en vez de elegir empresas una por una. Junta el dinero de muchas personas y su valor sube y baja, así que puedes perder dinero."
+  }
+}
