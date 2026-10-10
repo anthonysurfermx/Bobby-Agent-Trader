@@ -10,6 +10,40 @@ final class CompanionContextTests: XCTestCase {
     }
     private let live = CompanionPilot.Capability(enabled: true, context: true, catalog: 1, notices: ["memory-1"])
 
+    func testCatalogWhyIsLocalizedAndCarriedToThePageWithoutChangingQuestionCopy() throws {
+        let old = UserDefaults.standard.string(forKey: L.preferenceKey)
+        defer {
+            if let old { UserDefaults.standard.set(old, forKey: L.preferenceKey) }
+            else { UserDefaults.standard.removeObject(forKey: L.preferenceKey) }
+        }
+        for question in CompanionCatalog.questions {
+            let why = try XCTUnwrap(question.why)
+            XCTAssertEqual(Set(why.keys), Set(["en", "es", "fr", "pt", "it", "de"]))
+            for language in why.keys {
+                UserDefaults.standard.set(language, forKey: L.preferenceKey)
+                XCTAssertFalse(try XCTUnwrap(why[language]).isEmpty)
+                XCTAssertEqual(question.json["why"] as? String, why[language])
+                XCTAssertEqual(question.json["text"] as? String, question.text[language])
+            }
+        }
+    }
+
+    func testBuild69CatalogWithoutWhyStillLoadsAndOmitsItOnTheWire() throws {
+        let url = try XCTUnwrap(Bundle.main.url(forResource: "Nucleo", withExtension: nil))
+        var root = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url.appendingPathComponent("companion-questions.json"))) as? [String: Any])
+        var questions = try XCTUnwrap(root["questions"] as? [[String: Any]])
+        for index in questions.indices { questions[index].removeValue(forKey: "why") }
+        root["questions"] = questions
+        let old = try JSONDecoder().decode(CompanionCatalog.Catalog.self, from: JSONSerialization.data(withJSONObject: root))
+        XCTAssertEqual(old.version, 1)
+        XCTAssertEqual(old.questions.count, 8)
+        for question in old.questions {
+            XCTAssertNil(question.why)
+            XCTAssertNil(question.json["why"])
+            XCTAssertFalse(question.title.isEmpty)
+        }
+    }
+
     func testInstallResetRemovesConsentAndNotesButNormalLaunchKeepsThem() {
         let suite = "companion.install.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

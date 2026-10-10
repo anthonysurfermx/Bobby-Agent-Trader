@@ -33,7 +33,11 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources:
-      - Tests
+      - path: Tests
+        excludes: [Snapshots]
+      - path: Tests/Snapshots
+        type: folder
+        buildPhase: resources
       # Núcleo golden bridge replies (ARCHITECTURE.md §4.2), read by NucleoBridgeTests.
       - path: Nucleo/fixtures/ask
         type: folder
@@ -139,7 +143,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: QZRTV6CMTT
         MARKETING_VERSION: "1.8"
-        CURRENT_PROJECT_VERSION: "69"
+        CURRENT_PROJECT_VERSION: "70"
       configs:
         # RevenueCat PUBLIC SDK keys (meant to ship in the app; not secret keys). Debug uses the dashboard's
         # Test Store key; Release uses the App Store app's public key (RevenueCat → API keys → SDK API keys,

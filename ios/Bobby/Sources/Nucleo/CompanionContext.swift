@@ -9,6 +9,8 @@ struct CompanionQuestion: Codable, Identifiable, Equatable {
     let money: Bool
     let source: String
     let text: [String: String]
+    /// Additive server metadata; build 69 catalogs remain decodable. Not rendered in I-0.
+    let why: [String: String]?
     let options: [Option]
     let spoken: [String]
     let labels: [String: [String: String]]?
@@ -20,7 +22,11 @@ struct CompanionQuestion: Codable, Identifiable, Equatable {
     }
     func label(_ value: String) -> String? { catalogLabel(value) ?? (accepts(value) ? title : nil) }
     func needsConfirmation(_ value: String) -> Bool { accepts(value) && catalogLabel(value) == nil }
-    var json: [String: Any] { ["id": id, "text": title, "options": options.map { ["id": $0.id, "label": $0.label[L.language] ?? $0.label["en"] ?? ""] }] }
+    var json: [String: Any] {
+        var result: [String: Any] = ["id": id, "text": title, "options": options.map { ["id": $0.id, "label": $0.label[L.language] ?? $0.label["en"] ?? ""] }]
+        if let reason = why?[L.language] ?? why?["en"] { result["why"] = reason }
+        return result
+    }
 }
 
 enum CompanionCatalog {

@@ -37,6 +37,7 @@ class Node {
   closest(selector) { if (selector === '[data-hit]') return this.hit ? this : null; if (selector === '#typeBox') return ['ta', 'taSend', 'typeIn', 'typeSend', 'typeBox'].includes(this.id) ? this : null; return null; }
   contains(node) { return node === this || node.doc === this.doc; }
   setAttribute(key, value) { this.attributes[key] = String(value); }
+  removeAttribute(key) { delete this.attributes[key]; }
   getAttribute(key) { return key === 'data-hit' ? this.hit : (this.attributes[key] ?? null); }
   getBoundingClientRect() { return { left: 147, top: 742, width: 96, height: 56 }; }
   setPointerCapture() {}
@@ -59,7 +60,7 @@ function world(surface, page, language, { consent = true, mic = 'denied', deferP
     performance: { now: () => now }, setTimeout(handler, ms) { uiTimers.push({ due: now + ms, handler }); },
     clk: 1, T: 1, last: 0, QUE: [], GEN: 0, fitS: 1, fitX: 0, fitY: 0, FIT: 1, FIT_X: 0, FIT_Y: 0,
     A: anim(), S: anim(), U: anim(), ME: { tint: '', label: '' }, VC: { wait: {} }, PI: Math.PI, TAU: Math.PI * 2, E: {}, BODY: {}, C: {},
-    STATES: {}, ENTER: {}, SPEECH: {}, CALLS: 0, OWNER_GEN: 0, READ: null, READ_SEQ: 0, READS_DONE: 0, LEDGER: [], SAVED: null, ISLAND: null, ROSTER: null, SUGG: null, CHOSEN_ART: null,
+    STATES: {}, ENTER: {}, SPEECH: {}, CALLS: 0, OWNER_GEN: 0, READ: null, READ_SEQ: 0, READS_DONE: 0, ASK_ORIGIN: null, LEDGER: [], SAVED: null, ISLAND: null, ROSTER: null, SUGG: null, CHOSEN_ART: null,
     el: { pill, ta, taSend: send, typeBox, tx: $('tx'), dockA: $('dockA'), sphereA: $('sphereA'), avatar: $('avatar'), close: $('close'), permH: $('permH'), permP: $('permP'), permBtn: $('permBtn'), agNm: [0,1,2].map(x => $('agNm'+x)), agSt: [0,1,2].map(x => $('agSt'+x)), cioSw: $('cioSw') },
     txIn: $('txIn'), txEl: $('tx'), rbodyEl: $('rbody'), CARDS: [], cardD: null, DSCROLL: { max: 0 }, RISK_LAYOUT: null,
     clamp: (v,a,b) => Math.max(a,Math.min(b,v)), c01: v => Math.max(0,Math.min(1,v)), lerp: (a,b,t) => a+(b-a)*t, fin: Number.isFinite, f1: String, f3: String,
@@ -77,6 +78,14 @@ function world(surface, page, language, { consent = true, mic = 'denied', deferP
   run(source(base + page + '/40-strings.js')); c.LANG=language; c.LOCALE={en:'en-US',es:'es-MX',fr:'fr-FR',pt:'pt-PT',it:'it-IT',de:'de-DE'}[language];
   if (page === 'app') {
     const core=source(base+'app/10-core.js'), reads=source(base+'app/55-read.js');
+    // Companion presentation is outside this market-input adapter. Keep the
+    // shipping routing predicate and explicit inert presentation hooks.
+    if (surface === 'native') {
+      run(fn(reads, 'paramsCompanion'));
+      Object.assign(c, { CHECKIN:null, GUIDE:null, GUIDE_RETRIES:0, GUIDE_EPOCH:0, GUIDE_INPUT_CHECKIN:false,
+        GUIDE_ANSWER_ERROR:'', guidePanel:$('companionPanel'), companionCheckIn(){}, guideResumeOptions:()=>false,
+        guideWords:()=>({}), guideRender(){}, dialBusy:false, dialGreeting:false });
+    }
     run(['at','cue','runQue'].map(name=>fn(core,name)).join('\n'));
     run(['bcall','startRead','onAskReply','onStage','txWordNew','txKill','txReset','txText','txSet'].map(name=>fn(reads,name)).join('\n'));
     run(source(base+'app/60-fsm.js'));
@@ -126,7 +135,7 @@ for(const surface of ['native','web']) for(const page of ['app','onboarding']) f
   const label=`${surface}/${page}/${language}`;
   for(const value of [text,text.normalize('NFD'),`  \t${text}\n\r  `,`${text} 🧑🏽‍💻 👩‍👩‍👧‍👧`,'NVIDIA <script>alert("éßã")</script> & "quotes"']){
     const w=world(surface,page,language);w.type();w.write(value,'insertFromPaste');const entered=w.ta.emit('keydown',{key:'Enter'});w.advance(2200);
-    check(`${label}: pasted Unicode reaches actual ask once`,()=>{assert.ok(entered.prevented);assert.equal(w.asks().length,1);const expected=page==='app'?value.replace(/\s+/g,' ').trim():value.trim();assert.equal(w.asks()[0].params.question,expected);assert.deepEqual(w.errors,[]);});
+    check(`${label}: pasted Unicode reaches actual ask once`,()=>{assert.deepEqual(w.errors,[]);assert.ok(entered.prevented);assert.equal(w.asks().length,1);const expected=page==='app'?value.replace(/\s+/g,' ').trim():value.trim();assert.equal(w.asks()[0].params.question,expected);assert.deepEqual(w.errors,[]);});
   }
   const placeholder=world(surface,page,language);placeholder.type();
   check(`${label}: typing labels use selected language`,()=>{assert.equal(placeholder.ta.placeholder||placeholder.ta.attributes.placeholder,page==='app'?placeholder.c.tt('type.placeholder'):placeholder.c.Ls('type.placeholder'));assert.equal(placeholder.send.attributes['aria-label'],page==='app'?placeholder.c.tt('type.send'):placeholder.c.Ls('type.send'));});

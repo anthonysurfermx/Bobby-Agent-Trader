@@ -366,13 +366,13 @@ final class CompanionBuild69UITests: XCTestCase {
         reach(app.buttons["companion-delete-interest"], app, up: true)
         shot(app, "build69-\(language)-tier2-corrected\(suffix)")
         app.buttons["companion-delete-interest"].tap()
-        XCTAssertFalse(app.staticTexts["companion-note-interest"].exists)
+        XCTAssertTrue(app.staticTexts["companion-note-interest"].waitForNonExistence(timeout: 10))
         shot(app, "build69-\(language)-tier2-deleted\(suffix)")
         let toggle = app.switches["companion-memory-toggle"]
         reach(toggle, app, up: false)
         toggle.tap()
         XCTAssertTrue(app.buttons["companion-delete-confirm"].waitForExistence(timeout: 10)); app.buttons["companion-delete-confirm"].tap()
-        XCTAssertFalse(app.staticTexts["companion-note-when"].exists)
+        XCTAssertTrue(app.staticTexts["companion-note-when"].waitForNonExistence(timeout: 10))
         shot(app, "build69-\(language)-tier2-memory-off\(suffix)")
         app.terminate()
     }

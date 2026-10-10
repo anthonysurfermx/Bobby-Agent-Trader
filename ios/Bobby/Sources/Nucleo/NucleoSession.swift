@@ -162,6 +162,13 @@ final class NucleoSession: ObservableObject {
 #endif
         }
 #if DEBUG
+        // Deterministic screenshot state, only when the offline fixture transport is active.
+        if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-redesign-notes") {
+            companionContext.choose(true)
+            companionContext.answered()
+            for id in ["interest", "barrier", "when", "cushion"] { companionContext.answer(id, value: nil) }
+            companionContext.answer("interest", value: "crypto")
+        }
         if fixtures && (ProcessInfo.processInfo.arguments.contains("-qa-companion-day3") || ProcessInfo.processInfo.arguments.contains("-qa-companion-day4")) {
             let now = Date()
             let day4 = ProcessInfo.processInfo.arguments.contains("-qa-companion-day4")

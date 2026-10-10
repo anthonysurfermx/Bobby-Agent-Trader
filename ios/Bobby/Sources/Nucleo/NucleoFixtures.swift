@@ -7,7 +7,7 @@
 import Foundation
 
 enum NucleoFixtures {
-    static let scenarios: Set<String> = ["companion", "companion-fact", "companion-answer-error", "companion-exercise", "companion-belief", "companion-plain", "companion-off", "companion-error", "companion-limit", "companion-mismatch", "companion-offer", "default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline",
+    static let scenarios: Set<String> = ["companion-waiting", "companion", "companion-fact", "companion-answer-error", "companion-exercise", "companion-belief", "companion-plain", "companion-off", "companion-error", "companion-limit", "companion-mismatch", "companion-offer", "default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline",
                                          "signin_required", "subscription_required",
                                          "levels", "upgrade_required", "level_exhausted", "budget_paused"]
     /// Analysis levels (DEBUG QA): `levels` answers a premium desk with a synthesis, a second round, scenarios,
@@ -171,7 +171,7 @@ enum NucleoFixtures {
         case "/api/companion-turn":
             guard scenario.hasPrefix("companion") && scenario != "companion-off" else { return (Self.json(404, ["error": "off"]), quick) }
             if method == "GET" {
-                return (Self.json(405, ["companion": ["context": scenario != "companion-plain", "catalog": scenario == "companion-mismatch" ? 2 : 1, "notices": ["memory-1"]]]), quick)
+                return (Self.json(405, ["companion": ["context": !["companion-plain", "companion-waiting"].contains(scenario), "catalog": scenario == "companion-mismatch" ? 2 : 1, "notices": ["memory-1"]]]), quick)
             }
             if let answer = json["answer"] as? [String: Any], let id = answer["questionId"] as? String,
                let text = answer["text"] as? String, let question = CompanionCatalog.question(id) {
@@ -227,7 +227,7 @@ enum NucleoFixtures {
             return (Self.json(200, ["version": 1, "kind": "explanation", "requestId": json["requestId"] ?? NSNull(),
                 "reply": ["text": text[language] ?? text["en"]!, "followUp": follow[language] ?? follow["en"]!],
                 "personalized": context != nil, "checkIn": NSNull(), "fact": NSNull(),
-                "nextAction": NSNull(), "allowance": ["kind": "orientation", "consumed": 1, "remaining": 4]]), quick)
+                "nextAction": NSNull(), "allowance": ["kind": "orientation", "consumed": 1, "remaining": 4]]), scenario == "companion-waiting" ? 35 : quick)
         case "/api/bobby-asset-search":
             if scenario.hasPrefix("companion") && param("browse") != "1" {
                 if let q = json["q"] as? String, q.lowercased().contains("ethereun") {
