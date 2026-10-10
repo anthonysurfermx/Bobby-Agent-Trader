@@ -83,12 +83,14 @@ final class RedesignShots: XCTestCase {
         // Newly booted phones may announce Apple Intelligence over an otherwise passing scene.
         // Wait for this system banner; do not tap or swipe the app to hide it.
         let system = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let banners = system.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] 'Apple Intellig'"))
-        if let banner = banners.allElementsBoundByIndex.first(where: {
-            $0.isHittable && $0.frame.maxY < app.windows.firstMatch.frame.height * 0.4
-        }) {
+        let predicate = NSPredicate(format: "label CONTAINS[c] 'Apple Intel'")
+        let height = app.windows.firstMatch.frame.height
+        let candidates = system.descendants(matching: .any).matching(predicate).allElementsBoundByIndex
+            + app.descendants(matching: .any).matching(predicate).allElementsBoundByIndex
+        if let banner = candidates.first(where: { $0.frame.maxY > 0 && $0.frame.maxY < height * 0.4 }) {
+            // Notification text need not be hittable even while its banner visibly covers the app.
             let clear = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-                !banner.exists || !banner.isHittable
+                !banner.exists || banner.frame.maxY <= 0 || banner.frame.minY >= height
             }, object: nil)
             XCTAssertEqual(XCTWaiter.wait(for: [clear], timeout: 15), .completed)
         }
