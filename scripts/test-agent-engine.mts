@@ -132,6 +132,7 @@ eq(refused({ text: 'Bitcoin cambió {{f:return_DOGE}}.' }), 'unknown_figure', 'a
 eq(refused({ text: 'Bitcoin cambió {{f:return_BTC}} {{precio}}.' }), 'bad_placeholder', 'a placeholder that is not one is refused');
 eq(refused({ text: 'Bitcoin cambió {{f:return_BTC}}. Con tus 1,000 pesos habría pasado lo mismo en proporción.' }, 'Tengo 1,000 pesos. Compara Bitcoin y Ethereum'), 'shown', 'the person\'s own number is theirs to hear back');
 eq(refused({ text: 'Bitcoin cambió {{f:return_BTC}}; el S&P 500 es otra cosa.' }), 'shown', 'a name that holds digits is a name');
+eq([refused({ next: '¿Y en una ventana de 60 días?' }), refused({ next: '¿Y en una ventana de 90 días?' })], ['shown', 'typed_number'], 'the lengths of the windows the tool offers may be written; any other number may not');
 const fell = refDrawdown(btc30) < refDrawdown(eth30) ? 'BTC' : 'ETH', other = fell === 'BTC' ? 'ETH' : 'BTC';
 eq([refused({ claims: [{ metric: 'drawdown', top: fell }] }), refused({ claims: [{ metric: 'drawdown', top: other }] })], ['shown', 'claim_contradicts_figures'], 'an ordering the text commits to must be the one the figures show: the larger fall is the most negative');
 const upper = refReturn(btc30) > refReturn(eth30) ? 'BTC' : 'ETH';
@@ -274,6 +275,14 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   script = [() => answer({ kind: 'explanation', gist: 'Eso no lo puedo establecer aquí.', text: 'Eso no lo puedo establecer aquí. No tengo una herramienta que lea qué contiene cada uno ni cuánto pesa cada parte; lo que sí tengo es cómo se movieron sus precios.', limitations: ['No hay datos de composición ni de concentración.'] })];
   const conc = await ask(deps, 'ana', '¿Y cuál tiene más concentración?', 'r4', true);
   eq([taskResult(conc)!.presentation.kind, taskResult(conc)!.presentation.limitations, taskResult(conc)!.presentation.figures, taskUsage(conc).toolCalls, store.readsTaken()], ['explanation', ['No hay datos de composición ni de concentración.'], [], 0, 1], 'what no tool can establish is said as a limit, with no figure and no read');
+  eq([taskResult(conc)!.analysis?.subjects, taskView(conc, clock, 5).result?.analysis], [['BTC', 'ETH'], null], 'the analysis on the table stays with the thread for the next follow-up, and is not handed to a client with an answer that did not use it');
+
+  // An honest "I cannot establish that" that still cites one figure it does have is an analysis: the reader calling
+  // that number a figure does not throw the answer away (found on the first real run, 2026-10-10).
+  verdicts = ['figure'];
+  script = [() => answer({ kind: 'explanation', gist: 'No puedo establecer aquí la concentración.', text: 'No puedo establecer aquí la concentración. Lo que sí muestran las cifras es que sus cambios diarios se parecieron: {{f:corr_BTC_ETH}} en estos {{days}} días.', limitations: ['No tengo datos de composición.'] })];
+  const honest = await ask(deps, 'ana', '¿Y cuál está más concentrado?', 'r4b', true);
+  eq([taskResult(honest)!.presentation.kind, taskResult(honest)!.presentation.composedByCode, taskResult(honest)!.presentation.figures, taskResult(honest)!.presentation.limitations.at(-1), taskResult(honest)!.presentation.references.length], ['analysis', false, ['corr_BTC_ETH'], 'No tengo datos de composición.', 2], 'a text that cites a figure is an analysis whatever the model called it, and is served with its evidence');
 
   // 4.4 Coming back: the result is read, nobody is called, nothing is used.
   const callsBefore = calls.length, readsBefore = store.readsTaken(), committed = await store.committed('agent');
@@ -445,6 +454,41 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   await runTask(second, 'ana', begun.task.id);
   const third = new FileAgentStore(path, 6), stored = taskResult((await third.get('ana', begun.task.id))!)!;
   ok(stored.presentation.kind === 'analysis' && stored.analysis!.evidence.every((item) => item.source === 'yahoo' && item.currency === 'USD' && item.asOf === LAST) && stored.presentation.text.includes('60 días') && third.readsTaken() === 1, 'and a third one reads the finished result, its evidence and the one read it used');
+}
+
+// ---------- 8. the door ----------
+{
+  const { default: handler, __setAgentTestDeps } = await import('../api/agent-task.ts');
+  const response = () => ({ statusCode: 200, body: null as any, headers: {} as Record<string, string>, setHeader(k: string, v: string) { this.headers[k.toLowerCase()] = v; }, status(n: number) { this.statusCode = n; return this; }, json(v: unknown) { this.body = v; return this; } });
+  const send = async (method: 'GET' | 'POST', payload: Record<string, unknown> | null, device = 'device-agent-0000000001', query: Record<string, string> = {}, origin = 'https://bobbyprotocol.xyz') => {
+    const res = response();
+    await handler({ method, query, headers: { origin, 'x-forwarded-for': '10.50.0.1', 'x-bobby-device': device }, body: payload } as never, res as never);
+    return res;
+  };
+  const askBody = (over: Record<string, unknown> = {}) => ({ op: 'ask', version: 1, requestId: '5a5a5a5a-0000-4000-8000-000000000001', sessionId: 'session-0001', question: 'Compara Bitcoin y Ethereum', language: 'es', locale: 'es-MX', ...over });
+  delete process.env.BOBBY_AGENT_ENGINE;
+  const realFetch = globalThis.fetch; let fetched = 0;
+  globalThis.fetch = (async () => { fetched++; throw new Error('no network in this test'); }) as typeof fetch;
+  try {
+    eq([(await send('POST', askBody())).statusCode, (await send('GET', null, undefined, { id: 'task_' + 'a'.repeat(32) })).statusCode, fetched], [404, 404, 0], 'off: the door does not exist and nothing is fetched');
+    process.env.BOBBY_AGENT_ENGINE = 'on';
+    eq([(await send('POST', askBody())).body.error.code, (await send('POST', askBody(), undefined, {}, 'https://evil.example')).statusCode], ['engine_storage_unavailable', 403], 'on with no store configured: an errand that could be lost is not accepted; a foreign origin is refused');
+    process.env.BOBBY_AGENT_STORE = 'memory';
+    __setAgentTestDeps({ call: async (request) => { calls.push(structuredClone(request)); return script.shift()!(request); }, read: async () => 'pass', tools, now: () => clock });
+    script = [() => turn([use('compare_assets', { symbols: ['BTC', 'ETH'], windowDays: 30 }, 'u_door')])];
+    const asked = await send('POST', askBody({ owner: 'someone-else', model: 'claude-opus-9', limits: { maxRounds: 99 }, plan: 'pro' }));
+    eq([asked.statusCode, asked.body.state, asked.body.approval.assets, asked.body.approval.consumption, asked.body.allowance, asked.body.engine.model, asked.headers['cache-control']], [200, 'waiting_approval', ['BTC', 'ETH'], { reads: 1 }, { kind: 'reads', remaining: 6 }, 'claude-sonnet-5-5', 'no-store'], 'an errand through the door: it waits for the person; a body cannot name an owner, a model, a plan or a limit');
+    const id = asked.body.taskId as string;
+    eq([(await send('GET', null, undefined, { id })).body.state, (await send('GET', null, 'device-agent-0000000002', { id })).statusCode, (await send('POST', { op: 'approve', taskId: id, digest: asked.body.approval.digest }, 'device-agent-0000000002')).statusCode, (await send('POST', { op: 'cancel', taskId: id }, 'device-agent-0000000002')).statusCode], ['waiting_approval', 404, 404, 409], 'another install reads nothing, approves nothing and cancels nothing');
+    eq([(await send('POST', askBody({ question: 'Compara Bitcoin y Solana' }))).body.error.code, (await send('POST', { op: 'approve', taskId: id, digest: 'f'.repeat(64) })).body.error.code, (await send('POST', { op: 'approve', taskId: id })).body.error.code], ['request_id_reused', 'approval_mismatch', 'invalid_request'], 'the same request id with other words, a yes to another scope and a yes with no scope are refused');
+    script = [() => answer({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}} en {{days}} días.' })];
+    const approved = await send('POST', { op: 'approve', taskId: id, digest: asked.body.approval.digest });
+    eq([approved.body.state, approved.body.result.kind, approved.body.result.analysis.evidence.length, approved.body.allowance.remaining, JSON.stringify(approved.body).includes('usd')], ['completed', 'analysis', 2, 5, false], 'the yes runs it: the answer, its evidence, one read used, and no provider money in what a client is told');
+    const before = calls.length;
+    const replay = await send('POST', askBody()), back = await send('GET', null, undefined, { id });
+    eq([replay.body.taskId, replay.body.result.text === approved.body.result.text, back.body.result.text === approved.body.result.text, calls.length - before, back.body.allowance.remaining, (await send('POST', { op: 'cancel', taskId: id })).statusCode], [id, true, true, 0, 5, 409], 'coming back, by id or by sending the request again, returns the stored answer with no call and no read; a finished errand cannot be cancelled');
+    eq([(await send('POST', { op: 'ask' })).statusCode, (await send('GET', null, undefined, { id: '../../etc/passwd' })).statusCode, (await send('POST', askBody({ requestId: 'not-a-uuid' }))).statusCode], [400, 400, 400], 'anything outside the contract is refused');
+  } finally { globalThis.fetch = realFetch; __setAgentTestDeps(null); delete process.env.BOBBY_AGENT_ENGINE; delete process.env.BOBBY_AGENT_STORE; }
 }
 
 console.log(`agent-engine: ${checks} checks passed`);

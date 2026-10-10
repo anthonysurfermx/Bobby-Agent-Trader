@@ -50,14 +50,14 @@ What kind of errand it is decides what you do:
 - The errand needs something no tool gives you (what a fund holds, how concentrated it is, fees, earnings, news, a forecast, what to do): say plainly that you cannot establish that here, and say what you can establish. Never fill the gap from memory.
 - "previous" in the input is their last question, your answer to it and the figures behind it. A follow-up about those figures is answered from them, with no new tool call. Use a tool again only if they ask for other assets or another window.
 
-Numbers. You never write a market number. Every figure lives in a tool result (or in "previous") and has an id: to state it, write {{f:ID}} and the app writes the number with its unit. {{days}} writes the length of the window. Never type a digit of your own, never compute, never round, never restate a figure in words. A figure whose value is null does not exist: say that it could not be established.
+Numbers. You never write a market number. Every figure lives in a tool result (or in "previous") and has an id: to state it, write {{f:ID}} and the app writes the number with its unit. {{days}} writes the length of the window. Never type a digit of your own (the one exception: the lengths of the windows the tool offers, 30 and 60), never compute, never round, never restate a figure in words. A figure whose value is null does not exist: say that it could not be established.
 A comparison answers the dimensions they asked about, says how the assets differed on each, and keeps apart what the figures show from what you make of them. A past window does not say what comes next: never predict. Never recommend or rank an asset, never say which is better or right for them, never tell them what to buy, sell or hold. Say plainly that money can be lost when that matters. Never promise safety or gains. Do not ask about their income, savings or wealth. Never end by asking them something.
 
-Finish by calling the tool "answer" exactly once:
+Write nothing outside tool calls. Finish by calling the tool "answer" exactly once:
 - gist: one sentence of at most 14 words that carries the whole idea and stands on its own (it may hold placeholders).
 - text: the whole answer, starting with that same sentence; at most 90 words for an analysis, 60 for an explanation, 25 for a clarification; one short paragraph, the way you would say it aloud: no list, no heading, no emoji.
 - claims: for an analysis, every ordering your text states, as {metric, top}: metric is the figure's metric (return, volatility, drawdown, worst, best) and top is the symbol your text says had the larger change, moved more, fell further, had the worse worst day or the better best day. Empty when your text states none.
-- limitations: short sentences for what you could not establish and that matters to the errand; empty when there is none.
+- limitations: short sentences for what you could not establish and that matters to the errand; empty when there is none. Do not put there that a past window says nothing about the future, nor anything the tool already lists under its own limitations (different calendars, a series that could not be read): the app adds those sentences itself.
 - next: one question this person would most naturally ask you next, in their own voice, at most 12 words, never about what to buy or sell; an empty string when the answer is complete.`;
 }
 
@@ -225,8 +225,10 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   const repairs = task.steps.filter((step) => step.kind === 'tool_refused' && step.data.tool === 'answer').length;
   const parsed = Answer.safeParse(input);
   const theirs = parent ? `${parent.question} ${task.question}` : task.question;
-  const draft: Draft | null = parsed.success ? { ...parsed.data, kind: parsed.data.kind } as Draft : null;
-  // A text that cites figures is an analysis whatever it called itself; one with no analysis behind it cannot cite any.
+  // What a text IS is decided by code: it is an analysis when it cites a figure, or when this task ran a comparison
+  // itself (then its sources and limits are shown even if nothing could be cited); otherwise an explanation, read in full.
+  const cites = parsed.success && (/\{\{f:/.test(`${parsed.data.gist} ${parsed.data.text}`) || ownAnalysis(task) !== null);
+  const draft: Draft | null = parsed.success ? { ...parsed.data, kind: parsed.data.kind === 'clarification' ? 'clarification' : cites ? 'analysis' : 'explanation' } as Draft : null;
   const shown = draft ? present(draft, draft.kind === 'clarification' ? null : analysis, theirs, task.language, task.locale) : null;
   let presentation: Presentation | null = shown && 'presentation' in shown ? shown.presentation : null;
   if (!presentation) {
@@ -240,7 +242,8 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   if (presentation.kind !== 'clarification' && !presentation.composedByCode) {
     verdict = await deps.read({ task: task.id, question: task.question, text: presentation.text, next: presentation.next, language: task.language, locale: task.locale });
     if (await stopped()) return true;
-    const figuresAreEvidence = presentation.kind === 'analysis' && verdict === 'figure';
+    // An evidenced number is the point of an analysis. A text that cites none has no such excuse.
+    const figuresAreEvidence = presentation.kind === 'analysis' && presentation.figures.length > 0 && verdict === 'figure';
     if (verdict !== 'pass' && !figuresAreEvidence) {
       if (verdict === 'unchecked' && presentation.kind !== 'analysis') { await write('error', { code: 'unchecked' }); return true; }
       // The model's words cannot be shown: an analysis is told by code from its figures, an explanation by the fixed sentence.
@@ -248,7 +251,8 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
         : { kind: 'explanation', gist: companionFallback(task.language, true).text, text: companionFallback(task.language, true).text, figures: [], references: [], limitations: [], next: null, composedByCode: true };
     }
   }
-  await write('answer', { result: { presentation, analysis: presentation.kind === 'analysis' ? analysis : null }, reader: verdict });
+  // The analysis on the table stays with the thread: a follow-up that cited no figure still hands it to the next one.
+  await write('answer', { result: { presentation, analysis }, reader: verdict });
   return true;
 }
 
@@ -297,7 +301,8 @@ export function taskView(task: Task, now: number, remaining: number | null) {
   return {
     version: ENGINE_VERSION, taskId: task.id, requestId: task.requestId, state, events: taskEvents(task),
     approval: state === 'waiting_approval' ? waitingApproval(task) : null,
-    result: result ? { ...result.presentation, analysis: result.analysis ? { subjects: result.analysis.subjects, windowDays: result.analysis.windowDays, figures: result.analysis.figures, evidence: result.analysis.evidence } : null } : null,
+    // A client is given the analysis only with an answer that rests on it.
+    result: result ? { ...result.presentation, analysis: result.analysis && result.presentation.kind === 'analysis' ? { subjects: result.analysis.subjects, windowDays: result.analysis.windowDays, figures: result.analysis.figures, evidence: result.analysis.evidence } : null } : null,
     error: taskError(task) ? { code: taskError(task), retryable: state === 'failed' } : null,
     allowance: { kind: 'reads' as const, remaining },
     engine: { model: task.model, prompt: task.promptVersion, tools: task.toolsetVersion },

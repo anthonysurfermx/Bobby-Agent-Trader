@@ -21,7 +21,7 @@ import type { AppLanguage } from '../../../src/lib/app-language.js';
 
 export const ENGINE_VERSION = 1;
 /** Bumped with any change to the instructions or to a tool's meaning: every run records the pair it ran with. */
-export const PROMPT_VERSION = 'agent-2026-10-10.1';
+export const PROMPT_VERSION = 'agent-2026-10-10.3';
 export const TOOLSET_VERSION = 'tools-2026-10-10.1';
 
 export type TaskState = 'created' | 'running' | 'waiting_approval' | 'completed' | 'failed' | 'cancel_requested' | 'cancelled';

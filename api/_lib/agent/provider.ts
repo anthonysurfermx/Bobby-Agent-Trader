@@ -19,6 +19,8 @@ import { modelCost, modelPrice } from '../llm.js';
 import type { AgentStore, Budget, ReserveRefusal } from './store.js';
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+/** What the provider charges to write an input token to its five-minute cache, over the plain input price. */
+const CACHE_WRITE = 1.25;
 
 export interface WireTool { name: string; description: string; input_schema: Record<string, unknown> }
 export type Block = { type: 'text'; text: string } | { type: 'tool_use'; id: string; name: string; input: unknown };
@@ -44,7 +46,8 @@ export function worstCaseUsd(request: Pick<ModelRequest, 'model' | 'system' | 'm
   const chars = request.system.length + JSON.stringify(request.messages).length + JSON.stringify(request.tools).length;
   const tokensIn = Math.ceil(chars / 3) + 400;
   const [pIn, , pOut] = modelPrice(request.model, tokensIn);
-  return Number(((tokensIn * pIn + request.maxTokens * pOut) / 1e6).toFixed(6));
+  // Input at the price of writing it to the provider's cache, which is the dearest an input token can be.
+  return Number(((tokensIn * pIn * CACHE_WRITE + request.maxTokens * pOut) / 1e6).toFixed(6));
 }
 
 /** The real provider: one request, classified. Injectable everywhere it is used. */
@@ -57,7 +60,9 @@ export const callAnthropicOnce: CallModel = async (request) => {
     res = await fetch(ANTHROPIC_URL, {
       method: 'POST', signal: AbortSignal.timeout(request.timeoutMs),
       headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: request.model, max_tokens: request.maxTokens, system: request.system, messages: request.messages, tools: request.tools }),
+      // The instructions and the tools are the same in every call of a task: marked so the provider keeps them
+      // for a few minutes and the second and third calls pay a tenth for them.
+      body: JSON.stringify({ model: request.model, max_tokens: request.maxTokens, system: [{ type: 'text', text: request.system, cache_control: { type: 'ephemeral' } }], messages: request.messages, tools: request.tools }),
     });
   } catch (error) {
     const timeout = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
@@ -69,9 +74,9 @@ export const callAnthropicOnce: CallModel = async (request) => {
   }
   let data: { model?: string; stop_reason?: string; content?: Array<Record<string, unknown>>; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } };
   try { data = await res.json() as typeof data; } catch { return { ok: false, outcome: 'unknown', code: 'unreadable_body', status: 200, latencyMs: Date.now() - started }; }
-  const fresh = (data.usage?.input_tokens ?? 0) + (data.usage?.cache_creation_input_tokens ?? 0), cached = data.usage?.cache_read_input_tokens ?? 0, out = data.usage?.output_tokens ?? 0;
-  const usage: Usage = { tokensIn: fresh + cached, tokensOut: out, latencyMs: Date.now() - started };
-  const usd = modelCost(request.model, fresh, cached, out);
+  const plain = data.usage?.input_tokens ?? 0, written = data.usage?.cache_creation_input_tokens ?? 0, cached = data.usage?.cache_read_input_tokens ?? 0, out = data.usage?.output_tokens ?? 0;
+  const usage: Usage = { tokensIn: plain + written + cached, tokensOut: out, latencyMs: Date.now() - started };
+  const usd = modelCost(request.model, plain, cached, out) + written * modelPrice(request.model, plain + written + cached)[0] * CACHE_WRITE / 1e6;
   const blocks: Block[] = [];
   for (const part of Array.isArray(data.content) ? data.content : []) {
     if (part.type === 'text' && typeof part.text === 'string') blocks.push({ type: 'text', text: part.text });

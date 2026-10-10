@@ -12,7 +12,7 @@
 // ============================================================
 import { appLocale, type AppLanguage } from '../../../src/lib/app-language.js';
 import { theirNumbers } from '../companion-review.js';
-import { UNIVERSE, instrumentName } from './tools.js';
+import { UNIVERSE, WINDOWS, instrumentName } from './tools.js';
 import type { Analysis, Figure, Presentation } from './types.js';
 
 export interface Draft { kind: Presentation['kind']; gist: string; text: string; limitations: string[]; next: string; claims: Array<{ metric: string; top: string }> }
@@ -48,7 +48,8 @@ function refuse(text: string, figures: Map<string, Figure>, theirs: Set<string>)
     if (figure.value === null) return { code: 'figure_without_value', detail: figure.id };
   }
   if (/\{\{|\}\}/.test(text.replace(PLACEHOLDER, ''))) return { code: 'bad_placeholder', detail: text.replace(PLACEHOLDER, '').match(/\{\{[^}]{0,30}|[^{]{0,30}\}\}/)?.[0] ?? '' };
-  for (const typed of typedNumbers(text)) if (!theirs.has(typed.replace(/[.,]/g, '')) && !theirs.has(typed)) return { code: 'typed_number', detail: typed };
+  // The lengths of the windows the tool offers are not market numbers: "and over 60 days?" may be written.
+  for (const typed of typedNumbers(text)) if (!theirs.has(typed.replace(/[.,]/g, '')) && !theirs.has(typed) && !WINDOWS.some((days) => String(days) === typed)) return { code: 'typed_number', detail: typed };
   return null;
 }
 
