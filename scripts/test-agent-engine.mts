@@ -648,6 +648,11 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
     const replay = await send('POST', askBody()), back = await send('GET', null, undefined, { id });
     eq([replay.body.taskId, replay.body.result.text === approved.body.result.text, back.body.result.text === approved.body.result.text, calls.length - before, back.body.allowance.remaining, (await send('POST', { op: 'cancel', taskId: id })).statusCode], [id, true, true, 0, 5, 409], 'coming back, by id or by sending the request again, returns the stored answer with no call and no read; a finished errand cannot be cancelled');
     eq([(await send('POST', { op: 'ask' })).statusCode, (await send('GET', null, undefined, { id: '../../etc/passwd' })).statusCode, (await send('POST', askBody({ requestId: 'not-a-uuid' }))).statusCode], [400, 400, 400], 'anything outside the contract is refused');
+    // Storage that stops answering in the middle of anything: 503, never a guess and never a 500 with a stack.
+    process.env.BOBBY_AGENT_STORE = '/dev/null/not-a-directory/store.json';
+    const broken = await send('POST', askBody({ requestId: '5a5a5a5a-0000-4000-8000-000000000009' }));
+    eq([broken.statusCode, broken.body.error.code, Object.keys(broken.body.error)], [503, 'engine_storage_unavailable', ['code']], 'storage that fails is a 503 that says so, with nothing of the failure in it');
+    process.env.BOBBY_AGENT_STORE = 'memory';
   } finally { globalThis.fetch = realFetch; __setAgentTestDeps(null); delete process.env.BOBBY_AGENT_ENGINE; delete process.env.BOBBY_AGENT_STORE; }
 }
 

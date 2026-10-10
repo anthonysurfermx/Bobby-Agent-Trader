@@ -52,6 +52,11 @@ const Act = z.object({ op: z.enum(['approve', 'deny', 'cancel']), taskId: z.stri
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store');
+  // Storage that cannot answer is never guessed around: whatever it was doing, the door says so and the errand stays as the store last recorded it.
+  try { return await door(req, res); } catch { console.error(JSON.stringify({ route: 'agent-task', event: 'storage_failed' })); return res.status(503).json({ version: ENGINE_VERSION, error: { code: 'engine_storage_unavailable' } }); }
+}
+
+async function door(req: VercelRequest, res: VercelResponse) {
   if (!agentEngineOn()) return res.status(404).json({ error: 'Not found' });
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed', engine: { version: ENGINE_VERSION } });
   if (!requestOriginHost(req.headers)) return res.status(403).json({ error: 'Origin not allowed' });
