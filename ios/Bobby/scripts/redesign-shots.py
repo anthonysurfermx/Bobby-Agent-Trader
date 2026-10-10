@@ -77,6 +77,8 @@ def main():
                   '-disableAutomaticPackageResolution', '-skipPackageUpdates', '-parallel-testing-enabled', 'NO',
                   '-collect-test-diagnostics', 'never']
         args.output.mkdir(parents=True, exist_ok=True)
+        sha = run(['git', '-C', ROOT, 'rev-parse', 'HEAD'], stdout=subprocess.PIPE).stdout.strip()
+        dirty = run(['git', '-C', ROOT, 'status', '--porcelain'], stdout=subprocess.PIPE).stdout.strip()
         # Leave signing enabled: an unsigned simulator binary breaks the memory Keychain.
         with (args.output / 'build.log').open('w') as log:
             run(common + ['-destination', f'platform=iOS Simulator,id={phones[selected[0]]}', 'build-for-testing'], stdout=log, stderr=subprocess.STDOUT)
@@ -104,6 +106,8 @@ def main():
                 run(['xcrun', 'simctl', 'status_bar', udid, 'override', '--time', '9:41', '--dataNetwork', 'wifi', '--wifiMode', 'active', '--wifiBars', '3', '--batteryState', 'charged', '--batteryLevel', '100'])
                 result = folder / 'result.xcresult'
                 command = ['xcodebuild', '-xctestrun', plan, '-destination', f'platform=iOS Simulator,id={udid}',
+                           '-derivedDataPath', args.derived_data, '-clonedSourcePackagesDirPath', args.package_cache,
+                           '-disableAutomaticPackageResolution', '-skipPackageUpdates',
                            '-parallel-testing-enabled', 'NO', '-collect-test-diagnostics', 'never', '-resultBundlePath', result,
                            '-testLanguage', args.language, '-testRegion', LOCALES[args.language].split('_')[1]]
                 command += ['-only-testing:' + (t if t.startswith('BobbyUITests/') else 'BobbyUITests/' + t) for t in tests]
@@ -133,8 +137,6 @@ def main():
                             named.append((target.name, test['testIdentifier']))
                     if not named: raise RuntimeError('No screenshot attachments exported')
                     (folder / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
-                sha = run(['git', '-C', ROOT, 'rev-parse', 'HEAD'], stdout=subprocess.PIPE).stdout.strip()
-                dirty = run(['git', '-C', ROOT, 'status', '--porcelain'], stdout=subprocess.PIPE).stdout.strip()
                 index = [f'# {DEVICES[key][0]} · {args.language} · {args.text_size}', '',
                          f'Captured: {datetime.datetime.now(datetime.timezone.utc).isoformat()}',
                          f'Source: `{sha}`' + (' plus working-tree changes' if dirty else ''),
