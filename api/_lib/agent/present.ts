@@ -64,7 +64,8 @@ function claimHolds(claim: { metric: string; top: string }, figures: Map<string,
 }
 
 const write = (text: string, figures: Map<string, Figure>, days: number | null, language: AppLanguage, locale?: string | null) =>
-  text.replace(PLACEHOLDER, (_, key: string) => (key === 'days' ? String(days ?? '') : formatFigure(figures.get(key.slice(2))!, language, locale))).replace(/\s+/g, ' ').trim();
+  // Plain white space is collapsed; the non-breaking space a language puts between a number and its unit is kept.
+  text.replace(PLACEHOLDER, (_, key: string) => (key === 'days' ? String(days ?? '') : formatFigure(figures.get(key.slice(2))!, language, locale))).replace(/[ \t\r\n]+/g, ' ').trim();
 
 const LIMITATION: Record<string, Record<AppLanguage, (subject: string) => string>> = {
   mixed_calendars: {
@@ -138,5 +139,8 @@ export function present(draft: Draft, analysis: Analysis | null, question: strin
   // The analysis's own limits are always on the answer, in code's words; the model's come after them.
   const fixed = draft.kind === 'analysis' ? limitationsInWords(analysis, language) : [];
   const limitations = [...fixed, ...draft.limitations.map((line) => write(line, figures, days, language, locale)).filter((line) => line && !fixed.includes(line))].slice(0, 5);
-  return { ok: true, presentation: { kind: draft.kind, gist: front, text: written.startsWith(front) ? written : `${front} ${written}`, figures: used, references: draft.kind === 'analysis' ? references(analysis, used) : [], limitations, next: next ? write(next, figures, days, language, locale) : null, composedByCode: false } };
+  // The sentence in front is always the exact start of the text, as in the companion's contract. When the model's
+  // gist is not how its text begins, the text's own first sentence stands in front: nothing is said twice.
+  const opening = written.startsWith(front) ? front : (/^.{12,200}?[.!?…](?=\s|$)/su.exec(written)?.[0] ?? written.slice(0, 200));
+  return { ok: true, presentation: { kind: draft.kind, gist: opening, text: written, figures: used, references: draft.kind === 'analysis' ? references(analysis, used) : [], limitations, next: next ? write(next, figures, days, language, locale) : null, composedByCode: false } };
 }

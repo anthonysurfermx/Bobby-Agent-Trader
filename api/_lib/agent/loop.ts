@@ -28,7 +28,7 @@ import { composeByCode, present, type Draft } from './present.js';
 import { agentModel, callAnthropicOnce, reservedCall, type Block, type CallModel, type Message, type WireTool } from './provider.js';
 import { taskError, taskEvents, taskResult, taskState } from './state.js';
 import { isFinal, waitingApproval, type AgentStore, type Begin, type Budget } from './store.js';
-import { TOOLS, forModel, type ToolContext } from './tools.js';
+import { TOOLS, UNIVERSE, forModel, type ToolContext } from './tools.js';
 import { DEFAULT_LIMITS, ENGINE_VERSION, PROMPT_VERSION, TOOLSET_VERSION, type Analysis, type ApprovalScope, type Limits, type Presentation, type StepKind, type Task } from './types.js';
 
 export type Verdict = 'pass' | 'advice' | 'guarantee' | 'figure' | 'unchecked';
@@ -49,8 +49,9 @@ What kind of errand it is decides what you do:
 - You cannot tell which things they mean, a name resolves to nothing, or they named fewer than two things to compare: ask one short question, kind "clarification". Do not guess.
 - The errand needs something no tool gives you (what a fund holds, how concentrated it is, fees, earnings, news, a forecast, what to do): say plainly that you cannot establish that here, and say what you can establish. Never fill the gap from memory.
 - "previous" in the input is their last question, your answer to it and the figures behind it. A follow-up about those figures is answered from them, with no new tool call. Use a tool again only if they ask for other assets or another window.
+- The instruments you can read with evidence are: ${UNIVERSE.map((instrument) => `${instrument.name} (${instrument.symbol})`).join(', ')}. Windows: 30 or 60 days. Suggest nothing outside them.
 
-Numbers. You never write a market number. Every figure lives in a tool result (or in "previous") and has an id: to state it, write {{f:ID}} and the app writes the number with its unit. {{days}} writes the length of the window. Never type a digit of your own (the one exception: the lengths of the windows the tool offers, 30 and 60), never compute, never round, never restate a figure in words. A figure whose value is null does not exist: say that it could not be established.
+Numbers. You never write a market number. Every figure lives in a tool result (or in "previous") and has an id: to state it, write {{f:ID}} and the app writes the number with its unit. {{days}} writes only the number of days of the window (you write the word for "days"). Never type a digit of your own (the one exception: the lengths of the windows the tool offers, 30 and 60), never compute, never round, never restate a figure in words. A figure whose value is null does not exist: say that it could not be established.
 A comparison answers the dimensions they asked about, says how the assets differed on each, and keeps apart what the figures show from what you make of them. A past window does not say what comes next: never predict. Never recommend or rank an asset, never say which is better or right for them, never tell them what to buy, sell or hold. Say plainly that money can be lost when that matters. Never promise safety or gains. Do not ask about their income, savings or wealth. Never end by asking them something.
 
 Write nothing outside tool calls. Finish by calling the tool "answer" exactly once:

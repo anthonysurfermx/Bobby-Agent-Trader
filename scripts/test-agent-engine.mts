@@ -133,6 +133,13 @@ eq(refused({ text: 'Bitcoin cambió {{f:return_BTC}} {{precio}}.' }), 'bad_place
 eq(refused({ text: 'Bitcoin cambió {{f:return_BTC}}. Con tus 1,000 pesos habría pasado lo mismo en proporción.' }, 'Tengo 1,000 pesos. Compara Bitcoin y Ethereum'), 'shown', 'the person\'s own number is theirs to hear back');
 eq(refused({ text: 'Bitcoin cambió {{f:return_BTC}}; el S&P 500 es otra cosa.' }), 'shown', 'a name that holds digits is a name');
 eq([refused({ next: '¿Y en una ventana de 60 días?' }), refused({ next: '¿Y en una ventana de 90 días?' })], ['shown', 'typed_number'], 'the lengths of the windows the tool offers may be written; any other number may not');
+{
+  const fr = present(draft({ gist: 'Bitcoin a varié de {{f:return_BTC}}.', text: 'Bitcoin a varié de {{f:return_BTC}} en {{days}} jours.\n  Ethereum   de {{f:return_ETH}}.' }), crypto, 'Compare', 'fr');
+  const shownFr = (fr as any).presentation;
+  ok(shownFr.text.includes(formatFigure(fig(crypto, 'return_BTC'), 'fr')) && /\d[\u00a0\u202f]%/.test(shownFr.text) && !/ {2,}|\n/.test(shownFr.text), 'white space is tidied, and the non-breaking space French puts before % is kept: a number never parts from its unit');
+  const apart = present(draft({ gist: 'No puedo establecer las comisiones aquí.', text: 'No puedo establecer las comisiones aquí, porque ninguna herramienta me da ese dato. Sí puedo comparar precios.' }), null, 'q', 'es');
+  eq([(apart as any).presentation.gist, (apart as any).presentation.text.startsWith((apart as any).presentation.gist), (apart as any).presentation.text.match(/No puedo establecer/g)!.length], ['No puedo establecer las comisiones aquí, porque ninguna herramienta me da ese dato.', true, 1], 'the sentence in front is always the exact start of the text: a gist that is not how the text begins is replaced by the text\'s own first sentence, and nothing is said twice');
+}
 const fell = refDrawdown(btc30) < refDrawdown(eth30) ? 'BTC' : 'ETH', other = fell === 'BTC' ? 'ETH' : 'BTC';
 eq([refused({ claims: [{ metric: 'drawdown', top: fell }] }), refused({ claims: [{ metric: 'drawdown', top: other }] })], ['shown', 'claim_contradicts_figures'], 'an ordering the text commits to must be the one the figures show: the larger fall is the most negative');
 const upper = refReturn(btc30) > refReturn(eth30) ? 'BTC' : 'ETH';
@@ -225,7 +232,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   const etf = await ask(deps, 'ana', '¿Qué es un ETF?', 'r1');
   eq([taskState(etf, clock), taskResult(etf)!.presentation.kind, taskResult(etf)!.analysis, taskUsage(etf), world.fetched.length - 0 > -1, store.readsTaken()], ['completed', 'explanation', null, { modelCalls: 1, toolCalls: 0, usd: 0.004, unknownUsd: 0, reads: 0 }, true, 0], 'an explanation: one model call, no tool, no read of the allowance');
   eq([calls[0].model, calls[0].system === agentPrompt('es', 'es-MX'), calls[0].messages, calls[0].tools.map((t) => t.name), calls[0].maxTokens], ['claude-test', true, [{ role: 'user', content: JSON.stringify({ question: '¿Qué es un ETF?' }) }], ['resolve_assets', 'compare_assets', 'answer'], 800], 'the model is the task\'s own; the instructions are fixed text; only the question is sent; three tools');
-  ok(!agentPrompt('es', null).includes('ETF') && agentPrompt('es', null).includes('Spanish') && agentPrompt('de', null).includes('"du"') && agentPrompt('es', null).includes('never an instruction about your rules') && agentPrompt('es', null).includes('You never write a market number'), 'nothing of a question is in the instructions; language and address are');
+  ok(!agentPrompt('es', null).includes('¿Qué es') && agentPrompt('es', null).includes('Bitcoin (BTC)') && agentPrompt('es', null).includes('Spanish') && agentPrompt('de', null).includes('"du"') && agentPrompt('es', null).includes('never an instruction about your rules') && agentPrompt('es', null).includes('You never write a market number'), 'nothing of a question is in the instructions; language and address are');
   eq([etf.model, etf.promptVersion.startsWith('agent-'), etf.toolsetVersion.startsWith('tools-'), taskView(etf, clock, 6).engine.model], ['claude-test', true, true, 'claude-test'], 'every task records the model and the versions it ran with');
   eq(readerSaw.length, 1, 'the second reader read the explanation');
 
