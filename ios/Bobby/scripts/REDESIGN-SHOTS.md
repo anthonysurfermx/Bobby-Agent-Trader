@@ -19,7 +19,7 @@ Both `Bobby-Redesign-SE3` and `Bobby-Redesign-17Pro` are created when missing. O
 
 Each device writes `<device>-<lang>` (or `-plus1`) under the requested output root, with numbered PNGs, manifest.json, test.log and index.md. build.log is shared at the root. Existing PNG output is refused to avoid mixing evidence. Export completes before result bundles are removed; simulator cleanup runs on errors too. A failing UI assertion makes the command fail even if attachments export.
 
-The index begins with **Visual review: pending**. Look at each full capture, record any inherited clipping/misleading wording, then replace that line with the review time and outcome before moving the run into its saved baseline folder. These are build-69 reference states, not assertions that every existing layout already meets the redesign's future stage-to-points guarantees.
+The UI driver waits for visible Apple Intelligence notification text before attaching a screenshot and dismisses the fresh keyboard introduction. The index begins with **Visual review: pending**. Look at each full capture, record any inherited clipping/misleading wording, then replace that line with the review time and outcome before moving the run into its saved baseline folder. These are build-69 reference states, not assertions that every existing layout already meets the redesign's future stage-to-points guarantees.
 
 | Attachment | Offline fixture / entry |
 | --- | --- |

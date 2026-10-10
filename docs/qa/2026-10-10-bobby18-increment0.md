@@ -46,8 +46,14 @@ No additional live attempts are made after recording those results, as explicitl
 | ESLint | Passed |
 | Native localization audit | Passed: 1,369 source keys, 1,423 rows |
 | Signature / app metadata | `codesign --verify --strict` passed; 1.8 / 70 |
-| RedesignShots | Pending es/de × SE3/17 Pro, default text size |
+| Extra capture tooling | 3/3 passed: PT/+1 idle and educational answer, EN/default typing; all3 reviewed |
+| RedesignShots | 48/48 passed: es/de × SE3/17 Pro × twelve states, default text size; all48 final PNGs personally reviewed |
 
 ## Capture evidence
 
-Pending visual review and promotion to `_harness/redesign-2026-10-10/shots-i0/`. Every run retains named PNGs, an index, summary, log and export manifest. Result bundles and throwaway simulators are removed after export. Only one simulator is booted at a time; the shared DerivedData and SourcePackages caches are reused with package resolution disabled. No archive, Apple upload, deployment or live purchase is part of this increment.
+Saved under `_harness/redesign-2026-10-10/shots-i0/`: `iphone-se3-es`, `iphone-17-pro-es`, `iphone-se3-de`, and `iphone-17-pro-de`. The root index links all48 reviewed PNGs; `png-sha256.json` pins their bytes. All runs use iOS26.1. Spanish capture inputs were `a633b8b5`; German full-class inputs were `d96aec01`. German02/06 were recaptured on both devices (4/4 passed) at `1bc13117` to remove two transient Apple Intelligence notifications found during visual review. Their indices preserve both full-class and retake provenance; contaminated originals stay outside the baseline. Later changes concern capture-driver robustness and documentation only. Every run retains named PNGs, an index, summary, log and export manifest. Result bundles and throwaway simulators are removed after export. Only one simulator is booted at a time; the shared DerivedData and SourcePackages caches are reused with package resolution disabled. No archive, Apple upload, deployment or live purchase is part of this increment.
+
+
+Visual review preserves existing build-69 issues for comparison: the waiting scene uses asset-search wording for a general question (and overlaps the Pro header); the prior answer clips underneath a new question from Bobby; the first-run disclosure fades within its scroll region. The native memory-consent paragraphs and both buttons fit on all four default-size references. These observations are not new regressions or I-0 layout fixes.
+
+The extra tooling smoke validates Portuguese, +1 text size and comma-separated test selectors; English typing checks that the system keyboard introduction cannot accidentally select the app's hidden Continue action. Its three reviewed captures are saved in `_harness/redesign-2026-10-10/tool-smoke-final-i0/`, outside the required baseline.
