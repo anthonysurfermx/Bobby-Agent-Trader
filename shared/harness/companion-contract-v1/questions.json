@@ -30,6 +30,14 @@
         "it": "C'è qualcosa che ti incuriosisce?",
         "de": "Gibt es etwas, das dich neugierig macht?"
       },
+      "why": {
+        "en": "So my examples are about what already interests you.",
+        "es": "Para ponerte ejemplos de lo que ya te interesa.",
+        "fr": "Pour te donner des exemples sur ce qui t'intéresse déjà.",
+        "pt": "Para te dar exemplos do que já te interessa.",
+        "it": "Per farti esempi su ciò che già ti interessa.",
+        "de": "Damit meine Beispiele zu dem passen, was dich schon interessiert."
+      },
       "options": [
         {
           "id": "companies",
@@ -131,6 +139,14 @@
         "pt": "O que te segurou até hoje?",
         "it": "Che cosa ti ha frenato finora?",
         "de": "Was hat dich bisher abgehalten?"
+      },
+      "why": {
+        "en": "So I start with what holds you back the most.",
+        "es": "Para empezar por lo que más te frena.",
+        "fr": "Pour commencer par ce qui te freine le plus.",
+        "pt": "Para começar pelo que mais te trava.",
+        "it": "Per partire da ciò che ti frena di più.",
+        "de": "Damit ich bei dem anfange, was dich am meisten bremst."
       },
       "options": [
         {
@@ -234,6 +250,14 @@
         "it": "Quando pensi che ti servirà quel denaro?",
         "de": "Wann, glaubst du, brauchst du das Geld?"
       },
+      "why": {
+        "en": "I mean the money you might invest. The time frame changes which risks matter.",
+        "es": "Hablo del dinero que pensarías invertir. El plazo cambia qué riesgos importan.",
+        "fr": "Je parle de l'argent que tu penserais placer. L'horizon change les risques qui comptent.",
+        "pt": "Falo do dinheiro que você pensaria em investir. O prazo muda quais riscos importam.",
+        "it": "Parlo dei soldi che penseresti di investire. L'orizzonte cambia quali rischi contano.",
+        "de": "Ich meine das Geld, das du anlegen würdest. Der Zeitraum verändert, welche Risiken zählen."
+      },
       "options": [
         {
           "id": "under_2y",
@@ -296,6 +320,14 @@
         "it": "Se domani arrivasse una spesa imprevista, ti servirebbe quel denaro?",
         "de": "Wenn morgen eine unerwartete Ausgabe käme, bräuchtest du dieses Geld?"
       },
+      "why": {
+        "en": "I mean the money you might invest. If you might need it tomorrow, I explain things differently.",
+        "es": "Hablo del dinero que pensarías invertir. Si podrías necesitarlo mañana, se explica distinto.",
+        "fr": "Je parle de l'argent que tu penserais placer. Si tu peux en avoir besoin demain, je l'explique autrement.",
+        "pt": "Falo do dinheiro que você pensaria em investir. Se puder precisar dele amanhã, a explicação muda.",
+        "it": "Parlo dei soldi che penseresti di investire. Se potrebbero servirti domani, la spiegazione cambia.",
+        "de": "Ich meine das Geld, das du anlegen würdest. Wenn du es morgen brauchen könntest, erkläre ich anders."
+      },
       "options": [
         {
           "id": "would_need_it",
@@ -347,6 +379,14 @@
         "it": "Tra quanto vorresti vedere risultati?",
         "de": "Wie schnell möchtest du Ergebnisse sehen?"
       },
+      "why": {
+        "en": "So I can explain what tends to move fast and what takes time.",
+        "es": "Para explicarte qué suele moverse rápido y qué toma tiempo.",
+        "fr": "Pour t'expliquer ce qui bouge vite et ce qui prend du temps.",
+        "pt": "Para te explicar o que costuma se mexer rápido e o que leva tempo.",
+        "it": "Per spiegarti cosa di solito si muove in fretta e cosa richiede tempo.",
+        "de": "Damit ich erkläre, was sich meist schnell bewegt und was Zeit braucht."
+      },
       "options": [
         {
           "id": "soon",
@@ -397,6 +437,14 @@
         "pt": "Só de brincadeira: 100 vira 80. O que você faria?",
         "it": "Solo per gioco: 100 diventa 80. Che cosa faresti?",
         "de": "Nur zum Spiel: Aus 100 werden 80. Was würdest du tun?"
+      },
+      "why": {
+        "en": "There is no right answer. It helps me explain what a drop means.",
+        "es": "No hay respuesta correcta. Me ayuda a explicarte qué significa una caída.",
+        "fr": "Il n'y a pas de bonne réponse. Ça m'aide à t'expliquer ce qu'est une baisse.",
+        "pt": "Não há resposta certa. Me ajuda a te explicar o que significa uma queda.",
+        "it": "Non c'è una risposta giusta. Mi aiuta a spiegarti cosa significa un calo.",
+        "de": "Es gibt keine richtige Antwort. Es hilft mir zu erklären, was ein Rückgang bedeutet."
       },
       "options": [
         {
@@ -459,6 +507,14 @@
         "pt": "O que você sempre ouviu sobre dinheiro ou investir e dá como certo?",
         "it": "Che cosa hai sempre sentito sul denaro o sugli investimenti che dai per vero?",
         "de": "Was hast du über Geld oder Geldanlage immer gehört und hältst es für wahr?"
+      },
+      "why": {
+        "en": "So I can show you what the data says about it.",
+        "es": "Para mostrarte qué dicen los datos sobre eso.",
+        "fr": "Pour te montrer ce que disent les données là-dessus.",
+        "pt": "Para te mostrar o que os dados dizem sobre isso.",
+        "it": "Per mostrarti cosa dicono i dati al riguardo.",
+        "de": "Damit ich dir zeige, was die Daten dazu sagen."
       },
       "options": [
         {
@@ -595,6 +651,14 @@
         "pt": "Como eu te explico melhor?",
         "it": "Come ti spiego meglio?",
         "de": "Wie erkläre ich es dir am besten?"
+      },
+      "why": {
+        "en": "So I explain the way that works for you.",
+        "es": "Para explicarte como mejor te funcione.",
+        "fr": "Pour t'expliquer de la façon qui te convient.",
+        "pt": "Para te explicar do jeito que funciona melhor para você.",
+        "it": "Per spiegarti nel modo che funziona per te.",
+        "de": "Damit ich so erkläre, wie es für dich passt."
       },
       "options": [
         {
