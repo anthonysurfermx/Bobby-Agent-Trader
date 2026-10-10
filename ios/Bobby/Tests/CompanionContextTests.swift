@@ -96,6 +96,35 @@ final class CompanionContextTests: XCTestCase {
         XCTAssertNil(s.wire(capability: wrong))
     }
 
+    func testMoneyQuestionsWaitForRepliesAfterTapSkipOrTypedAnswer() {
+        let s = store(); s.choose(true); s.answered()
+        s.answer("interest", value: "crypto")
+        XCTAssertEqual(s.next(afterAnswer: true)?.id, "barrier")
+        s.answer("barrier", value: nil)
+        XCTAssertNil(s.next(afterAnswer: true))
+        XCTAssertEqual(s.next()?.id, "when")
+        XCTAssertFalse(s.state.asked.contains("when"))
+        XCTAssertTrue(s.apply(["notes": [["field": "when", "value": "2_to_7y", "source": "said"]], "asked": ["when"]], for: "when"))
+        XCTAssertNil(s.next(preferred: "cushion", afterAnswer: true))
+        XCTAssertEqual(s.next()?.id, "cushion")
+        s.answer("cushion", value: nil)
+        XCTAssertNil(s.next())
+    }
+
+    func testTypedFallKeepsExerciseProvenanceAndCatalogLabelsCoverEveryValue() {
+        let s = store(), now = Date()
+        s.choose(true, now: now.addingTimeInterval(-2 * 86400))
+        s.opened(now: now.addingTimeInterval(-86400)); s.opened(now: now); s.answered()
+        XCTAssertTrue(s.apply(["notes": [["field": "fall", "value": "pause", "source": "shown"]], "asked": ["fall"]], for: "fall"))
+        XCTAssertEqual(s.state.notes.first?.source, "shown")
+        for question in CompanionCatalog.questions {
+            for value in question.spoken + ["unsure"] {
+                XCTAssertFalse(question.needsConfirmation(value), question.id + ":" + value)
+                XCTAssertNotEqual(question.label(value), question.title)
+            }
+        }
+    }
+
     func testTapSkipCorrectionDeletionAndExpiry() {
         let s = store(); let now = Date()
         s.choose(true, now: now); s.answered(now: now)

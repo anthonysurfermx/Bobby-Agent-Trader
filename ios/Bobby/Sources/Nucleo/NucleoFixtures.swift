@@ -7,7 +7,7 @@
 import Foundation
 
 enum NucleoFixtures {
-    static let scenarios: Set<String> = ["companion", "companion-fact", "companion-answer-error", "companion-exercise", "companion-plain", "companion-off", "companion-error", "companion-limit", "companion-mismatch", "companion-offer", "default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline",
+    static let scenarios: Set<String> = ["companion", "companion-fact", "companion-answer-error", "companion-exercise", "companion-belief", "companion-plain", "companion-off", "companion-error", "companion-limit", "companion-mismatch", "companion-offer", "default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline",
                                          "signin_required", "subscription_required",
                                          "levels", "upgrade_required", "level_exhausted", "budget_paused"]
     /// Analysis levels (DEBUG QA): `levels` answers a premium desk with a synthesis, a second round, scenarios,
@@ -183,13 +183,14 @@ enum NucleoFixtures {
                 switch id {
                 case "interest": value = "crypto"
                 case "when": value = "2_to_7y"
+                case "belief": value = "banks_keep_it"
                 default: value = text == "???" ? "unsure" : question.options[0].id
                 }
                 let context = json["context"] as? [String: Any] ?? [:]
                 let asked = (context["asked"] as? [String] ?? []) + [id]
                 let next = CompanionCatalog.questions.first { $0.day <= (context["day"] as? Int ?? 1) && !asked.contains($0.id) }
                 return (Self.json(200, ["version": 1, "kind": "noted",
-                    "patch": ["notes": [["field": id, "value": value, "source": text == "???" ? "inferred" : "said"]], "asked": [id]],
+                    "patch": ["notes": [["field": id, "value": value, "source": text == "???" ? "inferred" : (id == "fall" ? "shown" : "said")]], "asked": [id]],
                     "checkIn": next.map { ["questionId": $0.id] as Any } ?? NSNull(),
                     "allowance": ["kind": "orientation", "consumed": 1, "remaining": 4]]), quick)
             }

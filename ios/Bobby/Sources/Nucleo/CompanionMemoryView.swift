@@ -59,6 +59,7 @@ struct CompanionNotesView: View {
     let onClose: () -> Void
     @State private var showingConsent = false
     @State private var correcting: CompanionQuestion?
+    @State private var pendingDeletion: NotesDeletion?
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
@@ -71,7 +72,7 @@ struct CompanionNotesView: View {
                         .accessibilityLabel(CompanionCopy.text("close"))
                 }
                 Toggle(CompanionCopy.text("memory"), isOn: Binding(get: { store.accepted }, set: { yes in
-                    if yes { showingConsent = true } else { store.choose(false) }
+                    if yes { showingConsent = true } else { pendingDeletion = .memoryOff }
                 })).accessibilityIdentifier("companion-memory-toggle")
                 Text(CompanionCopy.text("retention")).font(.footnote).foregroundStyle(Theme.warmMuted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -93,6 +94,7 @@ struct CompanionNotesView: View {
                                         .accessibilityIdentifier("companion-correct-\(note.field)")
                                 }
                                 Button(CompanionCopy.text("delete"), role: .destructive) { store.delete(note.field) }
+                                    .foregroundStyle(Theme.down)
                                     .accessibilityIdentifier("companion-delete-\(note.field)")
                             }.frame(minHeight: 44)
                             Divider()
@@ -100,8 +102,8 @@ struct CompanionNotesView: View {
                     }
                 }
                 if !store.state.notes.isEmpty {
-                    Button(CompanionCopy.text("deleteAll"), role: .destructive) { store.deleteAll() }
-                        .frame(minHeight: 44).accessibilityIdentifier("companion-delete-all")
+                    Button(CompanionCopy.text("deleteAll"), role: .destructive) { pendingDeletion = .allNotes }
+                        .foregroundStyle(Theme.down).frame(minHeight: 44).accessibilityIdentifier("companion-delete-all")
                 }
                 if store.storageError { Text(CompanionCopy.text("storageError")).font(.footnote) }
             }.padding(24).foregroundStyle(Theme.cream)
@@ -111,6 +113,16 @@ struct CompanionNotesView: View {
         .sheet(isPresented: $showingConsent) {
             CompanionConsentView(store: store) { _ in showingConsent = false }
                 .presentationDetents([.large]).presentationBackground(Theme.nucleoSurface)
+        }
+        .sheet(item: $pendingDeletion) { deletion in
+            NotesDeletionSheet(store: store, deletion: deletion) { confirmed in
+                if confirmed {
+                    if deletion == .memoryOff { store.choose(false) } else { store.deleteAll() }
+                    if store.storageError { return }
+                }
+                pendingDeletion = nil
+            }
+            .presentationDetents([.medium, .large]).presentationBackground(Theme.nucleoSurface)
         }
         .sheet(item: $correcting) { question in
             CompanionCorrectionView(store: store, question: question) { correcting = nil }
@@ -137,5 +149,47 @@ private struct CompanionCorrectionView: View {
                 if store.storageError { Text(CompanionCopy.text("storageError")) }
             }.padding(24).foregroundStyle(Theme.cream)
         }.background(Theme.nucleoSurface.ignoresSafeArea())
+    }
+}
+
+private enum NotesDeletion: String, Identifiable {
+    case memoryOff, allNotes
+    var id: String { rawValue }
+}
+
+private struct NotesDeletionSheet: View {
+    @ObservedObject var store: CompanionContextStore
+    let deletion: NotesDeletion
+    let finished: (Bool) -> Void
+    var body: some View {
+        let off = deletion == .memoryOff
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text(CompanionCopy.text(off ? "offTitle" : "deleteTitle"))
+                    .font(.title2).fixedSize(horizontal: false, vertical: true)
+                Text(CompanionCopy.text(off ? "offBody" : "deleteBody"))
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(CompanionCopy.text(off ? "offConfirm" : "deleteAll"), role: .destructive) { finished(true) }
+                    .buttonStyle(NotesDeletionChoiceStyle(destructive: true))
+                    .accessibilityIdentifier("companion-delete-confirm")
+                Button(CompanionCopy.text(off ? "offCancel" : "deleteCancel")) { finished(false) }
+                    .buttonStyle(NotesDeletionChoiceStyle(destructive: false))
+                    .accessibilityIdentifier("companion-delete-cancel")
+                if store.storageError { Text(CompanionCopy.text("storageError")).font(.footnote) }
+            }.foregroundStyle(Theme.cream).padding(24)
+        }.background(Theme.nucleoSurface.ignoresSafeArea())
+    }
+}
+
+private struct NotesDeletionChoiceStyle: ButtonStyle {
+    let destructive: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.font(.body)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .padding(.vertical, 8)
+            .background(Theme.warmFill, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.warmHair))
+            .foregroundStyle(destructive ? Theme.down : Theme.cream)
+            .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }

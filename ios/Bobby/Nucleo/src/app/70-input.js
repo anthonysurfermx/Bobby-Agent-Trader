@@ -14,7 +14,8 @@ function inDown(x, y, hitEl){
   var h = hitEl ? hitEl.getAttribute('data-hit') : 'surface', s = STATES[ST.name];
   PTR.g = null;
   if (!S) return;
-  try { PTR.g = s && s.down ? (s.down(h, PTR, hitEl) || null) : null; } catch (e) { logErr('down', e); }
+  if (h === 'pill') GUIDE_INPUT_CHECKIN = false;
+  try { if (h === 'companion-answer' && CHECKIN && CHECKIN.question) { GUIDE_INPUT_CHECKIN = true; PTR.g = pillDown(PTR, true); } else PTR.g = s && s.down ? (s.down(h, PTR, hitEl) || null) : null; } catch (e) { logErr('down', e); }
   dirty = true;
 }
 function inMove(x, y){

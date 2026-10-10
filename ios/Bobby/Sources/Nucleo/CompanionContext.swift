@@ -56,7 +56,7 @@ enum CompanionCopy {
         return rows?[L.language] ?? rows?["en"] ?? []
     }
     static var json: [String: Any] {
-        let keys = ["retry", "skip", "close", "personalized", "answerFailed", "answerPlaceholder", "answerSend", "exerciseExplanation"]
+        let keys = ["retry", "skip", "close", "personalized", "answerFailed", "answerPlaceholder", "answerSend", "exerciseExplanation", "answerThis", "answerHint"]
         return Dictionary(uniqueKeysWithValues: keys.map { ($0, text($0)) })
     }
 }
@@ -155,11 +155,12 @@ final class CompanionContextStore: ObservableObject {
     var mayAskToday: Bool {
         accepted && state.answeredOn.map { Calendar.current.isDateInToday($0) } == true
     }
-    func next(preferred: String? = nil, now: Date = Date()) -> CompanionQuestion? {
+    func next(preferred: String? = nil, afterAnswer: Bool = false, now: Date = Date()) -> CompanionQuestion? {
         guard mayAskToday else { return nil }
         let eligible = CompanionCatalog.questions.filter { question in question.day <= state.day && !state.asked.contains(question.id) && !state.notes.contains(where: { $0.field == question.id }) }
-        if let preferred, let match = eligible.first(where: { $0.id == preferred }) { return match }
-        return eligible.first
+        let question = preferred.flatMap { id in eligible.first { $0.id == id } } ?? eligible.first
+        // Stop the chain at money; do not jump ahead to a later question.
+        return afterAnswer && question?.money == true ? nil : question
     }
     func answer(_ id: String, value: String?, source: String? = nil, now: Date = Date()) {
         guard accepted, let question = CompanionCatalog.question(id), question.day <= state.day else { return }

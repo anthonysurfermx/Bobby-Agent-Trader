@@ -4974,6 +4974,14 @@ function guideButton(host, text, action, id, primary){
 /* The stage owns gestures. Keep this scrollable text panel's gestures inside it, including VoiceOver clicks. */
 var guidePointer = null;
 guidePanel.addEventListener('pointerdown', function(e){
+  var answer = e.target.closest('#companion-answer-input');
+  if (answer) {
+    e.stopPropagation(); if (e.cancelable) e.preventDefault();
+    if (GUIDE_BUSY) return;
+    PTR.id = e.pointerId; PTR.realT = performance.now();
+    try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+    var point = toStage(e.clientX, e.clientY); inDown(point[0], point[1], answer); return;
+  }
   e.stopPropagation(); if (e.cancelable) e.preventDefault();
   guidePointer = { y:e.clientY, top:guideNarrative.scrollTop, button:e.target.closest('button'), moved:false, id:e.pointerId };
   try { guidePanel.setPointerCapture(e.pointerId); } catch (_) {}
@@ -4985,7 +4993,9 @@ guidePanel.addEventListener('pointermove', function(e){
   if (guidePointer.moved) guideNarrative.scrollTop = guidePointer.top - delta;
 });
 guidePanel.addEventListener('pointerup', function(e){
-  e.stopPropagation(); var p = guidePointer; guidePointer = null;
+  e.stopPropagation();
+  if (PTR.id === e.pointerId && GUIDE_INPUT_CHECKIN) { PTR.id = null; var point = toStage(e.clientX,e.clientY); inUp(point[0],point[1]); return; }
+  var p = guidePointer; guidePointer = null;
   if (p && !p.moved && p.button && !p.button.disabled && p.button._guideAction) p.button._guideAction();
 });
 guidePanel.addEventListener('pointercancel', function(){ guidePointer = null; });
@@ -5010,11 +5020,14 @@ function guideRender(){
   }
   guideFact.style.display = guideFact.textContent ? 'block' : 'none';
   guideQuestion.textContent = question ? question.text : '';
+  guideActions.style.flexDirection = question ? 'row' : 'column';
   guideOptions.textContent = ''; guideActions.textContent = '';
   if (question){
     (question.options || []).forEach(function(option){
       guideButton(guideOptions, option.label, function(){ guideAnswer(question.id,option.id); }, 'companion-option-' + option.id, true);
     });
+    var answer = guideButton(guideActions, words.answerThis || '', function(){ GUIDE_INPUT_CHECKIN = true; openTyping({fromRead:true}); }, 'companion-answer-input', false);
+    answer.setAttribute('data-hit', 'companion-answer'); answer.setAttribute('aria-description', words.answerHint || '');
     guideButton(guideActions, words.skip || '', function(){ guideAnswer(question.id,null); }, 'companion-skip', false);
   } else if (GUIDE.status === 'companion_error') {
     if (GUIDE.retryable && GUIDE_RETRIES < 1) guideButton(guideActions, words.retry || '', function(){ guideAsk(READ.question,true); }, 'companion-retry', true);
@@ -5065,6 +5078,7 @@ function guideAnswer(id,value,text){
       if (ST.name === 'HANDBACK') readChips(); else if (ST.name === 'FOLLOWUPS') chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow());
       return;
     }
+    if (GUIDE) GUIDE.companionCheckIn = CHECKIN;
     guideRender();
     guideNarrative.scrollTop = 0;
   },function(){ GUIDE_BUSY = false; if (epoch === GUIDE_EPOCH) { GUIDE_ANSWER_ERROR = guideWords().answerFailed || ''; guideRender(); } });
@@ -5081,7 +5095,7 @@ function companionCheckIn(payload){
 STATES.COMPANION = {
   enter:function(prev,data){
     if (prev !== 'TYPING' && prev !== 'LISTENING') GUIDE_ANSWER_ERROR = '';
-    GUIDE = data.reply || GUIDE; CHECKIN = GUIDE.companionCheckIn || CHECKIN;
+    GUIDE = data.reply || GUIDE; CHECKIN = data.reply ? (GUIDE.companionCheckIn || null) : CHECKIN;
     dissolveThink(); glassHome(); moveSphere(320,110); hint(''); pillMode(idleMode()); att(el.sphereA,'aria-label',tt('aria.speaking'));
     guideRender(); guideNarrative.scrollTop = 0; if (GUIDE.companionConsentPending) bcall('companion.presented').catch(noop);
     if (GUIDE.status === 'companion' && GUIDE.requestId && GUIDE.text && !GUIDE.spoken){
@@ -5095,7 +5109,7 @@ STATES.COMPANION = {
   exit:function(){ GUIDE_EPOCH++; guidePanel.style.display = 'none'; if (VOICE.id && !VOICE.ended) bcall('stopSpeaking').catch(noop); VOICE.id=null; K.on=false; },
   tick:noop,
   on:function(name){ if (name === 'voice.start') pillMode('stop'); else if (name === 'voice.end') pillMode(idleMode()); },
-  down:function(hit,p){ if (hit === 'pill'){ if (VOICE.started && !VOICE.ended) return tapG(function(){ bcall('stopSpeaking').catch(noop); VOICE.ended=true; pillMode(idleMode()); }); GUIDE_INPUT_CHECKIN=!!(CHECKIN && CHECKIN.question); return pillDown(p,true); } if (hit === 'close') return tapG(function(){ CHECKIN=null;go('RETURNING'); }); return null; }
+  down:function(hit,p){ if (hit === 'pill'){ if (VOICE.started && !VOICE.ended) return tapG(function(){ bcall('stopSpeaking').catch(noop); VOICE.ended=true; pillMode(idleMode()); }); GUIDE_INPUT_CHECKIN=false; return pillDown(p,true); } if (hit === 'close') return tapG(function(){ CHECKIN=null;go('RETURNING'); }); return null; }
 };
 
 function guideResumeOptions(text){
@@ -5125,7 +5139,8 @@ function inDown(x, y, hitEl){
   var h = hitEl ? hitEl.getAttribute('data-hit') : 'surface', s = STATES[ST.name];
   PTR.g = null;
   if (!S) return;
-  try { PTR.g = s && s.down ? (s.down(h, PTR, hitEl) || null) : null; } catch (e) { logErr('down', e); }
+  if (h === 'pill') GUIDE_INPUT_CHECKIN = false;
+  try { if (h === 'companion-answer' && CHECKIN && CHECKIN.question) { GUIDE_INPUT_CHECKIN = true; PTR.g = pillDown(PTR, true); } else PTR.g = s && s.down ? (s.down(h, PTR, hitEl) || null) : null; } catch (e) { logErr('down', e); }
   dirty = true;
 }
 function inMove(x, y){

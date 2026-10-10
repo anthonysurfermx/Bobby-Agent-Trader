@@ -81,12 +81,12 @@
       "de": "Überspringen"
     },
     "close": {
-      "es": "Cerrar",
-      "en": "Close",
-      "fr": "Fermer",
-      "pt": "Fechar",
-      "it": "Chiudi",
-      "de": "Schließen"
+      "es": "Volver a Bobby",
+      "en": "Back to Bobby",
+      "fr": "Revenir à Bobby",
+      "pt": "Voltar ao Bobby",
+      "it": "Torna a Bobby",
+      "de": "Zurück zu Bobby"
     },
     "personalized": {
       "es": "Usa tus apuntes",
@@ -113,12 +113,12 @@
       "de": "Korrigieren"
     },
     "delete": {
-      "es": "Borrar",
-      "en": "Delete",
-      "fr": "Supprimer",
-      "pt": "Apagar",
-      "it": "Elimina",
-      "de": "Löschen"
+      "es": "Borrar este apunte",
+      "en": "Delete this note",
+      "fr": "Supprimer cette note",
+      "pt": "Apagar esta anotação",
+      "it": "Elimina questo appunto",
+      "de": "Diese Notiz löschen"
     },
     "deleteAll": {
       "es": "Borrar todos los apuntes",
@@ -239,6 +239,78 @@
       "fr": "Ces notes restent sur cet appareil quand tu te déconnectes.",
       "pt": "Estas notas ficam neste dispositivo quando você sai da conta.",
       "it": "Queste note restano su questo dispositivo quando esci dal tuo account."
+    },
+    "offTitle": {
+      "es": "¿Apagar y borrar tus apuntes?",
+      "en": "Turn off memory and delete your notes?",
+      "fr": "Désactiver et supprimer tes notes ?",
+      "pt": "Desativar e apagar suas anotações?",
+      "it": "Disattivare e cancellare i tuoi appunti?",
+      "de": "Ausschalten und deine Notizen löschen?"
+    },
+    "offBody": {
+      "es": "Se borrarán todos tus apuntes de este dispositivo. Bobby dejará de recordarlos.",
+      "en": "All your notes on this device will be deleted. Bobby will stop remembering them.",
+      "fr": "Toutes tes notes sur cet appareil seront supprimées. Bobby cessera de les mémoriser.",
+      "pt": "Todas as suas anotações neste aparelho serão apagadas. O Bobby deixará de lembrá-las.",
+      "it": "Tutti i tuoi appunti su questo dispositivo verranno cancellati. Bobby smetterà di ricordarli.",
+      "de": "Alle deine Notizen auf diesem Gerät werden gelöscht. Bobby wird sie sich nicht mehr merken."
+    },
+    "offConfirm": {
+      "es": "Apagar y borrar mis apuntes",
+      "en": "Turn off and delete my notes",
+      "fr": "Désactiver et supprimer mes notes",
+      "pt": "Desativar e apagar minhas anotações",
+      "it": "Disattiva e cancella i miei appunti",
+      "de": "Ausschalten und meine Notizen löschen"
+    },
+    "offCancel": {
+      "es": "Dejarlo encendido",
+      "en": "Keep it on",
+      "fr": "Laisser activé",
+      "pt": "Manter ativado",
+      "it": "Lascia attivo",
+      "de": "Eingeschaltet lassen"
+    },
+    "deleteTitle": {
+      "es": "¿Borrar todos tus apuntes?",
+      "en": "Delete all your notes?",
+      "fr": "Supprimer toutes tes notes ?",
+      "pt": "Apagar todas as suas anotações?",
+      "it": "Cancellare tutti i tuoi appunti?",
+      "de": "Alle deine Notizen löschen?"
+    },
+    "deleteBody": {
+      "es": "Se borrarán todos tus apuntes de este dispositivo. La memoria seguirá encendida.",
+      "en": "All your notes on this device will be deleted. Memory will stay on.",
+      "fr": "Toutes tes notes sur cet appareil seront supprimées. La mémoire restera activée.",
+      "pt": "Todas as suas anotações neste aparelho serão apagadas. A memória continuará ativada.",
+      "it": "Tutti i tuoi appunti su questo dispositivo verranno cancellati. La memoria resterà attiva.",
+      "de": "Alle deine Notizen auf diesem Gerät werden gelöscht. Die Erinnerungsfunktion bleibt eingeschaltet."
+    },
+    "deleteCancel": {
+      "es": "Conservar mis apuntes",
+      "en": "Keep my notes",
+      "fr": "Garder mes notes",
+      "pt": "Manter minhas anotações",
+      "it": "Conserva i miei appunti",
+      "de": "Meine Notizen behalten"
+    },
+    "answerThis": {
+      "es": "Responder esta pregunta",
+      "en": "Answer this question",
+      "fr": "Répondre à cette question",
+      "pt": "Responder a esta pergunta",
+      "it": "Rispondi a questa domanda",
+      "de": "Diese Frage beantworten"
+    },
+    "answerHint": {
+      "es": "Toca para escribir; mantén para responder hablando",
+      "en": "Tap to type; hold to speak your answer",
+      "fr": "Touche pour écrire ; maintiens pour répondre à voix haute",
+      "pt": "Toque para escrever; segure para responder falando",
+      "it": "Tocca per scrivere; tieni premuto per rispondere a voce",
+      "de": "Tippen zum Schreiben; gedrückt halten, um deine Antwort zu sprechen"
     }
   }
 }

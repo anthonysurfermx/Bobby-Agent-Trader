@@ -56,7 +56,10 @@ class Element {
   getTotalLength() { return 300; }
   getPointAtLength() { return { x: 0, y: 0 }; }
   getContext() { return null; } // Exercise the engine's supported no-WebGL fallback.
-  closest(selector) { return selector === '[data-hit]' && this.attributes['data-hit'] ? this : null; }
+  closest(selector) {
+    if (selector === '[data-hit]' && this.attributes['data-hit'] || selector === '#' + this.id || selector === 'button' && this._guideAction) return this;
+    return this.parentNode?.closest(selector) || null;
+  }
   contains() { return true; }
   focus() {}
   blur() {}
@@ -764,13 +767,16 @@ for (const input of ['type','speech']) test(`${input}: Bobby's answer uses the c
   // Move past the first question before speaking: resuming must not restore the stale interest question.
   companionPanel(app).children[2].children[0]._guideAction(); await flush();
   if (input === 'type') {
-    tap(app,app.nodes.get('pill')); app.nodes.get('ta').value='in three years';
+    const answer=guideActionsOf(app).children[0];
+    companionPanel(app).listeners.pointerdown({target:answer,clientX:100,clientY:650,pointerId:1,preventDefault(){},stopPropagation(){}});
+    app.nodes.get('stage').listeners.pointerup({target:answer,clientX:100,clientY:650,pointerId:1,preventDefault(){}});
+    app.nodes.get('ta').value='in three years';
     app.nodes.get('taSend').listeners.click();
   } else {
     app.session.mic.state='granted';
     app.context.nucleoBridge.emit('session.changed',{...app.session}); await flush();
-    const pill=app.nodes.get('pill');
-    app.nodes.get('stage').listeners.pointerdown({target:pill,clientX:220,clientY:800,pointerId:1,button:0,preventDefault(){}});
+    const pill=guideActionsOf(app).children[0];
+    companionPanel(app).listeners.pointerdown({target:pill,clientX:220,clientY:800,pointerId:1,button:0,preventDefault(){},stopPropagation(){}});
     await flush(); app.advance(0.5);
     app.nodes.get('stage').listeners.pointerup({target:pill,clientX:220,clientY:800,pointerId:1,preventDefault(){}});
     app.context.nucleoBridge.emit('speech.final',{text:'in three years'});
@@ -780,11 +786,43 @@ for (const input of ['type','speech']) test(`${input}: Bobby's answer uses the c
   assert.equal(asksOf(app).length,1,'only the initial explanation spent a turn');
   assert.equal(app.context.nucleo.state(),'COMPANION'); assert.deepEqual(app.errors,[]);
 });
+for (const input of ['type','speech']) test(`${input}: a personal question beside a check-in stays a question`, async () => {
+  const app=await idle(); app.session.companionPilot={strings:{skip:'Skip',close:'Back to Bobby',answerThis:'Answer this question'}};
+  await companionReply(app,{status:'companion',text:'Explanation',companionCheckIn:{question:{id:'interest',text:'Interest?',options:[{id:'crypto',label:'Crypto'}]}}});
+  if (input === 'type') {
+    tap(app,app.nodes.get('pill')); app.nodes.get('ta').value='What does investing mean?'; app.nodes.get('taSend').listeners.click();
+  } else {
+    app.session.mic.state='granted'; app.context.nucleoBridge.emit('session.changed',{...app.session}); await flush();
+    const pill=app.nodes.get('pill');
+    app.nodes.get('stage').listeners.pointerdown({target:pill,clientX:220,clientY:800,pointerId:1,button:0,preventDefault(){}});
+    await flush(); app.advance(0.5);
+    app.nodes.get('stage').listeners.pointerup({target:pill,clientX:220,clientY:800,pointerId:1,preventDefault(){}});
+    app.context.nucleoBridge.emit('speech.final',{text:'What does investing mean?'});
+  }
+  await flush();
+  assert.equal(app.calls.filter(c=>c.method==='companion.answer').length,0);
+  assert.equal(asksOf(app).at(-1).question,'What does investing mean?');
+  app.answer({status:'companion',text:'Another reply',companionCheckIn:{question:{id:'interest',text:'Interest?',options:[]}}});
+  await flush(); app.advance(3);
+  assert.equal(companionPanel(app).children[1].textContent,'Interest?'); assert.deepEqual(app.errors,[]);
+});
+test('cancelling a held answer leaves the main microphone asking a personal question', async () => {
+  const app=await idle();app.session.companionPilot={strings:{skip:'Skip',close:'Back',answerThis:'Answer this question'}};
+  await companionReply(app,{status:'companion',text:'Explanation',companionCheckIn:{question:{id:'interest',text:'Interest?',options:[]}}});
+  app.session.mic.state='granted';app.context.nucleoBridge.emit('session.changed',{...app.session});await flush();
+  const answer=guideActionsOf(app).children[0];
+  companionPanel(app).listeners.pointerdown({target:answer,clientX:220,clientY:650,pointerId:1,preventDefault(){},stopPropagation(){}});
+  await flush();app.advance(0.5);
+  app.nodes.get('stage').listeners.pointercancel({pointerId:1});await flush();
+  tap(app,app.nodes.get('pill'));app.nodes.get('ta').value='What is a share?';app.nodes.get('taSend').listeners.click();await flush();
+  assert.equal(app.calls.filter(c=>c.method==='companion.answer').length,0);
+  assert.equal(asksOf(app).at(-1).question,'What is a share?');assert.deepEqual(app.errors,[]);
+});
 test('a failed answer keeps the choices and the localized line; a local exercise choice asks its explanation', async () => {
   let result={message:'Pick an option.'};
   const app=await idle({companionAnswer:()=>result});app.session.companionPilot={strings:{skip:'Skip',close:'Close'}};
   await companionReply(app,{status:'companion',text:'Explanation',companionCheckIn:{question:{id:'fall',text:'What would you do?',options:[{id:'pause',label:'Stop'}]}}});
-  tap(app,app.nodes.get('pill'));app.nodes.get('ta').value='my answer';app.nodes.get('taSend').listeners.click();await flush();
+  tap(app,guideActionsOf(app).children[0]);app.nodes.get('ta').value='my answer';app.nodes.get('taSend').listeners.click();await flush();
   assert.equal(companionPanel(app).children[0].children[0].textContent,'Pick an option.');
   assert.equal(companionPanel(app).children[2].children[0].textContent,'Stop');
   result={question:null,explanation:'I chose Stop. What does a fall mean?'};

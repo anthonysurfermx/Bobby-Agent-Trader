@@ -162,13 +162,16 @@ final class NucleoSession: ObservableObject {
 #endif
         }
 #if DEBUG
-        if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-companion-day3") {
+        if fixtures && (ProcessInfo.processInfo.arguments.contains("-qa-companion-day3") || ProcessInfo.processInfo.arguments.contains("-qa-companion-day4")) {
             let now = Date()
-            companionContext.choose(true, now: now.addingTimeInterval(-2 * 86400))
+            let day4 = ProcessInfo.processInfo.arguments.contains("-qa-companion-day4")
+            companionContext.choose(true, now: now.addingTimeInterval(Double(day4 ? -3 : -2) * 86400))
+            if day4 { companionContext.opened(now: now.addingTimeInterval(-2 * 86400)) }
             companionContext.opened(now: now.addingTimeInterval(-86400))
             companionContext.opened(now: now)
             companionContext.answered(now: now)
             for id in ["interest", "barrier", "when", "cushion", "hurry"] { companionContext.answer(id, value: nil) }
+            if ProcessInfo.processInfo.arguments.contains("-qa-companion-day4") { companionContext.answer("fall", value: nil) }
         }
 #endif
         companionContext.opened()
@@ -329,12 +332,12 @@ final class NucleoSession: ObservableObject {
                     if companionContext.storageError { return ["message": CompanionCopy.text("storageError")] }
                     return CompanionPilot.answerFailure()
                 }
-                return companionCheckIn(preferred: reply["checkIn"] as? String)
+                return companionCheckIn(preferred: reply["checkIn"] as? String, afterAnswer: true)
             }
             let value = try p.string("value", required: false, maxLength: 64)
             companionContext.answer(id, value: value)
             if companionContext.storageError { return ["message": CompanionCopy.text("storageError")] }
-            var next = companionCheckIn()
+            var next = companionCheckIn(afterAnswer: true)
             if id == "fall", let value, let label = CompanionCatalog.question(id)?.label(value) {
                 next["explanation"] = CompanionCopy.text("exerciseExplanation").replacingOccurrences(of: "{choice}", with: label)
             }
@@ -1217,12 +1220,12 @@ final class NucleoSession: ObservableObject {
         return result
     }
 
-    func companionCheckIn(preferred: String? = nil) -> [String: Any] {
+    func companionCheckIn(preferred: String? = nil, afterAnswer: Bool = false) -> [String: Any] {
         guard companionContext.allows(companionPilot.capability) else {
             companionQuestionId = nil
             return ["question": NSNull(), "strings": CompanionCopy.json]
         }
-        let question = companionContext.next(preferred: preferred)
+        let question = companionContext.next(preferred: preferred, afterAnswer: afterAnswer)
         companionQuestionId = question?.id
         return ["question": question.map { $0.json as Any } ?? NSNull(), "strings": CompanionCopy.json]
     }
