@@ -28,7 +28,7 @@ import { providerUrl } from '../../asset-fact.js';
 import { parseOkxDaily, parseYahooDaily, validateBars, type AssetClass, type BarSeries, type DailyBar } from '../harness/bars.js';
 import type { Analysis, ApprovalScope, Evidence, Figure, Quality } from './types.js';
 
-export interface ToolContext { now: () => Date; /** One provider request; null on any transport or HTTP failure. */ fetchJson: (url: string) => Promise<unknown | null> }
+export interface ToolContext { now: () => Date; /** One provider request; null on any transport or HTTP failure. */ fetchJson: (url: string) => Promise<unknown | null>; /** The wait before a source that did not answer is asked the one more time (400 ms unless set). */ retryMs?: number }
 export interface ToolOutput { evidence: Evidence[]; data: Record<string, unknown>; analysis?: Analysis }
 export interface Tool<A = unknown> {
   name: string; description: string; metered: boolean;
@@ -135,8 +135,11 @@ interface Read { instrument: Instrument; url: string; series: BarSeries | null; 
 
 async function readSeries(instrument: Instrument, ctx: ToolContext): Promise<Read> {
   const url = providerUrl(instrument.symbol, instrument.assetClass), now = ctx.now();
-  const json = await ctx.fetchJson(url);
-  if (json === null) return { instrument, url, series: null, bars: null, quality: 'error', note: 'the source did not answer' };
+  // A public source that does not answer once often answers the second time: asked twice, never more. The person
+  // already said yes and a read is theirs to lose only when nothing comes back.
+  let json = await ctx.fetchJson(url);
+  if (json === null) { await new Promise((done) => setTimeout(done, ctx.retryMs ?? 400)); json = await ctx.fetchJson(url); }
+  if (json === null) return { instrument, url, series: null, bars: null, quality: 'error', note: 'the source did not answer, twice' };
   // Crypto is read as the spot pair against USDT, and says so in `currency`.
   const series = instrument.assetClass === 'equity' ? parseYahooDaily(json, instrument.symbol, now) : parseOkxDaily(json, `${instrument.symbol}-USDT`, now);
   if (!series) return { instrument, url, series: null, bars: null, quality: 'missing', note: 'the source returned nothing the reader understands' };
@@ -147,7 +150,7 @@ async function readSeries(instrument: Instrument, ctx: ToolContext): Promise<Rea
 
 export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<ToolOutput> {
   const now = ctx.now(), reads = await Promise.all(args.symbols.map((symbol) => readSeries(BY_SYMBOL.get(symbol)!, ctx)));
-  const limitations: string[] = ['past_window_only'];
+  const limitations: string[] = [];
   const evidence: Evidence[] = reads.map((read) => ({
     id: `ev_${read.instrument.symbol}`, tool: 'read_assets', source: read.series?.source ?? (read.instrument.assetClass === 'equity' ? 'yahoo' : 'okx'), url: read.url,
     instrument: read.instrument.assetClass === 'crypto' ? `${read.instrument.symbol}-USDT spot` : read.instrument.symbol,
@@ -185,6 +188,8 @@ export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<T
       figure('best', m?.best?.pct ?? null, 'percent', m?.best ? `; the day was ${m.best.day}` : ''),
     );
   }
+  // Said only when there is something it is about: a window that gave no figure says nothing of the past either.
+  if (used.size) limitations.unshift('past_window_only');
   const symbols = [...used.keys()];
   for (let i = 0; i < symbols.length; i++) for (let j = i + 1; j < symbols.length; j++) {
     const a = used.get(symbols[i])!.filter((bar) => common.has(bar.day)), b = used.get(symbols[j])!.filter((bar) => common.has(bar.day));

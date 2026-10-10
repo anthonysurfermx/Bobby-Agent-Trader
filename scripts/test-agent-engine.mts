@@ -53,6 +53,7 @@ const wave = (start: number, n: number, drift: number, swing: number, phase = 0)
 const BTC = wave(60000, 60, 0.002, 0.03), ETH = wave(2500, 60, -0.001, 0.05, 1), SPY = wave(500, 63, 0.001, 0.01), QQQ = wave(450, 63, 0.0015, 0.02, 2);
 const world = { fetched: [] as string[], down: new Set<string>(), series: { BTC: () => okx(BTC), ETH: () => okx(ETH), SOL: () => okx(wave(150, 60, 0, 0.04)), SPY: () => yahoo('SPY', SPY), QQQ: () => yahoo('QQQ', QQQ), NVDA: () => yahoo('NVDA', wave(120, 63, 0.002, 0.03)) } as Record<string, () => unknown> };
 const tools = {
+  retryMs: 1,
   now: () => new Date(NOW),
   fetchJson: async (url: string) => {
     world.fetched.push(url);
@@ -98,9 +99,15 @@ eq(fig(mixed, 'return_BTC').days, fig(mixed, 'return_SPY').days, 'both are measu
 ok(fig(mixed, 'return_BTC').days! < 29 && /days both traded/.test(fig(mixed, 'return_BTC').basis), 'which are fewer than the calendar days, and the figure says so');
 // A series that cannot be trusted gives no number, and never a zero.
 world.down.add('ETH');
+const asksBefore = world.fetched.length;
 const half = await analysisOf(['BTC', 'ETH'], 30);
 eq([half.evidence[1].quality, fig(half, 'return_ETH').value, fig(half, 'return_ETH').quality, half.limitations.includes('no_series:ETH'), half.figures.some((figure) => figure.metric === 'correlation')], ['error', null, 'error', true, false], 'a source that does not answer: evidence says error, the figure is null, the limitation names it, no pair figure exists');
+
 near(fig(half, 'return_BTC').value, refReturn(btc30), '…and the other instrument is still measured');
+eq([world.fetched.length - asksBefore, half.evidence[1].note], [3, 'the source did not answer, twice'], 'a source that does not answer is asked once more, and no more');
+let flaky = 1; world.series.SOL = () => (flaky-- > 0 ? null : okx(wave(150, 60, 0, 0.04)));
+eq((await analysisOf(['BTC', 'SOL'], 30)).evidence[1].quality, 'valid', 'a source that answers the second time gives its series');
+world.series.SOL = () => okx(wave(150, 60, 0, 0.04));
 world.down.clear();
 world.series.ETH = () => okx(ETH, '2026-10-05');
 eq([(await analysisOf(['BTC', 'ETH'], 30)).evidence[1].quality, fig(await analysisOf(['BTC', 'ETH'], 30), 'return_ETH').value], ['stale', null], 'a series that stopped three days ago is stale: no figure from it');
@@ -357,7 +364,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   eq(store.readsTaken(), 1, '(the read is taken with the yes)');
   await runTask(deps, 'ana', t4.id);
   const r4 = (await store.get('ana', t4.id))!;
-  eq([store.readsTaken(), r4.steps.find((s) => s.kind === 'tool_call')!.data.refunded, taskResult(r4)!.presentation.references.map((r) => r.quality), taskResult(r4)!.presentation.limitations.length], [0, true, ['error', 'error'], 3], 'no evidence came back: the read is the person\'s again, and the answer shows which sources failed');
+  eq([store.readsTaken(), r4.steps.find((s) => s.kind === 'tool_call')!.data.refunded, taskUsage(r4).reads, taskResult(r4)!.presentation.references.map((r) => r.quality), taskResult(r4)!.presentation.limitations.length], [0, true, 0, ['error', 'error'], 2], 'no evidence came back: the read is the person\'s again (and the task says it used none), and the answer names the two series it could not read and nothing about a window it never saw');
   world.down.clear();
   // The model types a number: asked once to correct it, then code tells the comparison.
   script = [cmp, () => answer({ kind: 'analysis', gist: 'Bitcoin subió 12%.', text: 'Bitcoin subió 12% y Ethereum menos.' }), () => answer({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}.' })];

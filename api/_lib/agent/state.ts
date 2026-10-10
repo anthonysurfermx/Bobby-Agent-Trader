@@ -34,11 +34,12 @@ export function taskEvents(task: Pick<Task, 'steps'>): AgentEvent[] {
 
 /** What the person consumed and what the providers were asked, as the steps recorded it. */
 export function taskUsage(task: Pick<Task, 'steps'>): { modelCalls: number; toolCalls: number; usd: number; unknownUsd: number; reads: number } {
-  let modelCalls = 0, toolCalls = 0, usd = 0, unknownUsd = 0, reads = 0;
+  // `reads` is what the person ended up using: a read given back (no evidence came) is not counted.
+  let modelCalls = 0, toolCalls = 0, usd = 0, unknownUsd = 0, reads = 0, given = 0;
   for (const step of task.steps) {
     if (step.kind === 'model_call') { modelCalls++; if (step.data.outcome === 'unknown') unknownUsd += Number(step.data.reservedUsd ?? 0); else usd += Number(step.data.usd ?? 0); }
-    else if (step.kind === 'tool_call') toolCalls++;
-    else if (step.kind === 'approval_granted') reads += Number((step.data.scope as ApprovalScope | undefined)?.consumption.reads ?? 0);
+    else if (step.kind === 'tool_call') { toolCalls++; if (step.data.refunded === true) reads -= given; }
+    else if (step.kind === 'approval_granted') { given = Number((step.data.scope as ApprovalScope | undefined)?.consumption.reads ?? 0); reads += given; }
   }
   return { modelCalls, toolCalls, usd: Number(usd.toFixed(6)), unknownUsd: Number(unknownUsd.toFixed(6)), reads };
 }
