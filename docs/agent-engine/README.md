@@ -9,7 +9,7 @@ Code: `api/_lib/agent/`, door `api/agent-task.ts`, tests `scripts/test-agent-eng
 | Errand | What happens | Uses |
 |---|---|---|
 | "¿Qué es un ETF?" | One model call answers directly; the companion's second reader reads it. Naming an asset starts no tool. | nothing of the allowance |
-| "Compara Bitcoin y Ethereum" | `resolve_assets` (free), then the model asks for `compare_assets`. The task stops and shows the person the assets, the window and "uses 1 read". | nothing until the yes |
+| "Compara Bitcoin y Ethereum" | `resolve_assets` (free), then the model asks for `read_assets`. The task stops and shows the person the assets, the window and "uses 1 read". | nothing until the yes |
 | the person says yes | The server runs exactly the approved call: daily bars from the same sources as `/api/asset-fact`, the harness's strict reader, arithmetic in code. The model writes sentences with `{{f:id}}`; code writes the numbers. | 1 read |
 | "¿Y cuál cayó más?" | Answered from the figures of the result on the table. No tool, no fetch. | nothing |
 | "¿Y cuál tiene más concentración?" | No tool gives that: Bobby says it cannot establish it here, and what it can. | nothing |
@@ -22,7 +22,7 @@ Code: `api/_lib/agent/`, door `api/agent-task.ts`, tests `scripts/test-agent-eng
 - **`store.ts`** `AgentStore`, the whole contract with storage, and two implementations: memory (the tests; every method one critical section) and a JSON file (local development). `agent-engine.sql` in this folder is the same contract as database functions: a **draft, not a migration**.
 - **`state.ts`** a task's state, events and usage, derived from its steps and nothing else.
 - **`provider.ts`** one model call: reserve the worst case, dispatch, exactly one HTTP attempt, settle. Outcomes `ok`, `charged`, `no_charge`, `unknown`. An `unknown` keeps its reservation and blocks a blind second attempt for that task.
-- **`tools.ts`** the registry (`resolve_assets`, `compare_assets`), the universe the engine can read with evidence (14 instruments), and the arithmetic.
+- **`tools.ts`** the registry (`resolve_assets`, `read_assets`), the universe the engine can read with evidence (14 instruments), and the arithmetic.
 - **`present.ts`** placeholders to numbers, the checks on a draft, and a code-written comparison in six languages for when the model's words cannot be shown.
 - **`loop.ts`** the one agent: instructions, the resumable loop, approval, limits, the second reader, the client's view.
 

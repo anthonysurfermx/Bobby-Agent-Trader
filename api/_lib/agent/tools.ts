@@ -8,8 +8,9 @@
 // Tools of this version (TOOLSET_VERSION):
 //   · resolve_assets  free. Which instruments a mention means, inside the universe the engine can read
 //     with evidence. Deterministic, no network: an alias table, exact after folding case and accents.
-//   · compare_assets  METERED: one read of the person's allowance, asked for before it runs. Daily bars
-//     of two or three instruments over one window, read by the strict reader of the harness
+//   · read_assets  METERED: one read of the person's allowance, asked for before it runs. Daily bars
+//     of one, two or three instruments over one window (the model gives names as the person wrote them; the
+//     server turns them into symbols, and a name it cannot read is refused before the person is asked anything), read by the strict reader of the harness
 //     (api/_lib/harness/bars.ts: the same provider request as /api/asset-fact, so there is one source and one
 //     as-of per instrument), then compared by code.
 // What the engine cannot establish is not here on purpose: a fund's holdings or concentration, fees,
@@ -32,9 +33,11 @@ export interface ToolOutput { evidence: Evidence[]; data: Record<string, unknown
 export interface Tool<A = unknown> {
   name: string; description: string; metered: boolean;
   schema: z.ZodType<A>; wire: Record<string, unknown>;
-  /** What the person is asked to approve, for a metered tool. */
-  scope?: (args: A) => Omit<ApprovalScope, 'digest'>;
-  run: (args: A, ctx: ToolContext) => Promise<ToolOutput>;
+  /** Turns what the model wrote into what will run (names into symbols), or says why it cannot: checked by the server before anything is asked of the person. */
+  prepare?: (args: A) => { ok: true; args: unknown } | { ok: false; reason: string; detail: string };
+  /** What the person is asked to approve, for a metered tool. Given the prepared arguments. */
+  scope?: (args: any) => Omit<ApprovalScope, 'digest'>;
+  run: (args: any, ctx: ToolContext) => Promise<ToolOutput>;
 }
 
 // ---------- the universe: what the engine can read with evidence ----------
@@ -112,10 +115,22 @@ function windowSound(bars: DailyBar[], assetClass: AssetClass): boolean {
   return true;
 }
 
-// ---------- compare_assets ----------
+// ---------- read_assets ----------
 export const WINDOWS = [30, 60] as const;
-const Compare = z.object({ symbols: z.array(z.string().regex(/^[A-Z]{2,6}$/)).min(2).max(3).refine((list) => new Set(list).size === list.length && list.every((symbol) => BY_SYMBOL.has(symbol)), 'unknown or repeated symbol'), windowDays: z.union([z.literal(30), z.literal(60)]) }).strict();
-type CompareArgs = z.infer<typeof Compare>;
+const Read = z.object({ assets: z.array(z.string().trim().min(1).max(60)).min(1).max(3), windowDays: z.union([z.literal(30), z.literal(60)]) }).strict();
+/** What runs after the server resolved the names. */
+export interface ReadArgs { symbols: string[]; windowDays: 30 | 60 }
+type CompareArgs = ReadArgs;
+function prepareRead(args: z.infer<typeof Read>): { ok: true; args: ReadArgs } | { ok: false; reason: string; detail: string } {
+  const symbols: string[] = [];
+  for (const mention of args.assets) {
+    const hit = resolveMention(mention);
+    if (!hit) return { ok: false, reason: 'unknown_asset', detail: mention.slice(0, 40) };
+    if (symbols.includes(hit.symbol)) return { ok: false, reason: 'same_asset_twice', detail: hit.symbol };
+    symbols.push(hit.symbol);
+  }
+  return { ok: true, args: { symbols, windowDays: args.windowDays } };
+}
 interface Read { instrument: Instrument; url: string; series: BarSeries | null; bars: DailyBar[] | null; quality: Quality; note: string | null }
 
 async function readSeries(instrument: Instrument, ctx: ToolContext): Promise<Read> {
@@ -130,11 +145,11 @@ async function readSeries(instrument: Instrument, ctx: ToolContext): Promise<Rea
   return { instrument, url, series, bars: valid.bars, quality: 'valid', note: null };
 }
 
-export async function compareAssets(args: CompareArgs, ctx: ToolContext): Promise<ToolOutput> {
+export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<ToolOutput> {
   const now = ctx.now(), reads = await Promise.all(args.symbols.map((symbol) => readSeries(BY_SYMBOL.get(symbol)!, ctx)));
   const limitations: string[] = ['past_window_only'];
   const evidence: Evidence[] = reads.map((read) => ({
-    id: `ev_${read.instrument.symbol}`, tool: 'compare_assets', source: read.series?.source ?? (read.instrument.assetClass === 'equity' ? 'yahoo' : 'okx'), url: read.url,
+    id: `ev_${read.instrument.symbol}`, tool: 'read_assets', source: read.series?.source ?? (read.instrument.assetClass === 'equity' ? 'yahoo' : 'okx'), url: read.url,
     instrument: read.instrument.assetClass === 'crypto' ? `${read.instrument.symbol}-USDT spot` : read.instrument.symbol,
     asOf: read.bars?.at(-1)?.day ?? null, retrievedAt: now.toISOString(), unit: 'price', scale: 1, currency: read.series?.currency ?? null, quality: read.quality, note: read.note,
   }));
@@ -177,7 +192,7 @@ export async function compareAssets(args: CompareArgs, ctx: ToolContext): Promis
     const r = ma && mb && ma.changes.length >= MIN_CHANGES ? correlation(ma.changes, mb.changes) : null;
     figures.push({ id: `corr_${symbols[i]}_${symbols[j]}`, metric: 'correlation', subject: `${symbols[i]}~${symbols[j]}`, value: r, unit: 'ratio', currency: null, basis: `correlation of the daily changes on the ${ma?.changes.length ?? 0} days both traded${r === null ? `; needs ${MIN_CHANGES}` : ''}`, from: ma?.first.day ?? null, to: ma?.last.day ?? null, days: ma?.changes.length ?? null, evidence: [`ev_${symbols[i]}`, `ev_${symbols[j]}`], quality: r === null ? 'missing' : 'valid' });
   }
-  const analysis: Analysis = { kind: 'comparison', subjects: args.symbols, windowDays: args.windowDays, figures, evidence, limitations, computedAt: now.toISOString() };
+  const analysis: Analysis = { kind: args.symbols.length > 1 ? 'comparison' : 'single', subjects: args.symbols, windowDays: args.windowDays, figures, evidence, limitations, computedAt: now.toISOString() };
   return { evidence, analysis, data: { figures: figures.map(forModel), evidence: evidence.map(({ id, source, instrument, asOf, quality, note }) => ({ id, source, instrument, asOf, quality, note })), limitations, windowDays: args.windowDays } };
 }
 /** A figure as the model sees it: rounded, so it can reason about more and less; it may only cite the id. */
@@ -188,7 +203,7 @@ const Resolve = z.object({ mentions: z.array(z.string().trim().min(1).max(60)).m
 export const TOOLS: Record<string, Tool<any>> = {
   resolve_assets: {
     name: 'resolve_assets', metered: false, schema: Resolve,
-    description: 'Says which instruments the person means. Give each name or ticker exactly as they wrote it. Free. Returns, for each, the symbol to use with other tools, or that it is not an instrument Bobby can read with evidence.',
+    description: 'Says which instruments the person means, when you are not sure. Give each name or ticker exactly as they wrote it. Free. You do not need it before read_assets, which takes names. Returns, for each, the instrument or that it is not one Bobby can read with evidence.',
     wire: { type: 'object', additionalProperties: false, required: ['mentions'], properties: { mentions: { type: 'array', minItems: 1, maxItems: 4, items: { type: 'string' } } } },
     run: async (args: z.infer<typeof Resolve>) => ({
       evidence: [],
@@ -198,12 +213,12 @@ export const TOOLS: Record<string, Tool<any>> = {
       },
     }),
   },
-  compare_assets: {
-    name: 'compare_assets', metered: true, schema: Compare,
-    description: 'Reads the daily closes of two or three instruments (symbols from resolve_assets) over the last 30 or 60 days and compares them by code: change over the window, how much each moved day to day, its largest fall from a high, its worst and best day, and how alike their daily changes were. Uses one read of the person\'s allowance: the app asks them before it runs. Returns figures with ids; cite a figure only by its id.',
-    wire: { type: 'object', additionalProperties: false, required: ['symbols', 'windowDays'], properties: { symbols: { type: 'array', minItems: 2, maxItems: 3, items: { type: 'string' } }, windowDays: { type: 'integer', enum: [30, 60] } } },
-    scope: (args: CompareArgs) => ({ action: 'compare_assets', assets: [...args.symbols], windowDays: args.windowDays, depth: 'standard', consumption: { reads: 1 } }),
-    run: compareAssets,
+  read_assets: {
+    name: 'read_assets', metered: true, schema: Read, prepare: prepareRead,
+    description: 'Reads the daily closes of one, two or three instruments over the last 30 or 60 days and measures them by code: change over the window, how much each moved day to day, its largest fall from a high, its worst and best day and, for two or three, how alike their daily changes were. Give each instrument by the name or ticker the person wrote. Uses one read of the person\'s allowance: the app asks them before it runs. Returns figures with ids; cite a figure only by its id.',
+    wire: { type: 'object', additionalProperties: false, required: ['assets', 'windowDays'], properties: { assets: { type: 'array', minItems: 1, maxItems: 3, items: { type: 'string' } }, windowDays: { type: 'integer', enum: [30, 60] } } },
+    scope: (args: ReadArgs) => ({ action: 'read_assets', assets: [...args.symbols], windowDays: args.windowDays, depth: 'standard', consumption: { reads: 1 } }),
+    run: readAssets,
   },
 };
 export const instrumentName = (symbol: string) => BY_SYMBOL.get(symbol)?.name ?? symbol;

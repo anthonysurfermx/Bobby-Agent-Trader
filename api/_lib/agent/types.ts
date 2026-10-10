@@ -21,8 +21,8 @@ import type { AppLanguage } from '../../../src/lib/app-language.js';
 
 export const ENGINE_VERSION = 1;
 /** Bumped with any change to the instructions or to a tool's meaning: every run records the pair it ran with. */
-export const PROMPT_VERSION = 'agent-2026-10-10.4';
-export const TOOLSET_VERSION = 'tools-2026-10-10.1';
+export const PROMPT_VERSION = 'agent-2026-10-10.5';
+export const TOOLSET_VERSION = 'tools-2026-10-10.2';
 
 export type TaskState = 'created' | 'running' | 'waiting_approval' | 'completed' | 'failed' | 'cancel_requested' | 'cancelled';
 export type Quality = 'valid' | 'missing' | 'stale' | 'conflicting' | 'error';
@@ -53,7 +53,8 @@ export interface Figure {
 
 /** The full analysis, kept before anything is shortened. The presentation may not change a field of it. */
 export interface Analysis {
-  kind: 'comparison';
+  /** One instrument over a window, or two or three against each other. */
+  kind: 'single' | 'comparison';
   subjects: string[]; windowDays: number;
   figures: Figure[]; evidence: Evidence[];
   /** What could not be established, in machine words: the presentation must say each one that matters. */
@@ -79,7 +80,7 @@ export interface Presentation {
 
 /** What a metered action would do and use, shown to the person before it runs and bound to their yes. */
 export interface ApprovalScope {
-  action: 'compare_assets';
+  action: 'read_assets';
   assets: string[]; windowDays: number; depth: 'standard';
   consumption: { reads: number };
   /** sha256 of the canonical form of the fields above together with the task and its owner. */
