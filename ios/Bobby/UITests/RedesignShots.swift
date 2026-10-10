@@ -53,10 +53,18 @@ final class RedesignShots: XCTestCase {
         ready(web.textViews.firstMatch)
         web.textViews.firstMatch.tap()
         // Fresh simulator keyboards can cover the keys with Apple's QuickPath introduction.
-        let intro = app.buttons.matching(NSPredicate(format: "label IN %@", ["Continue", "Continuar", "Weiter", "Continuer", "Continua"])).firstMatch
-        if intro.waitForExistence(timeout: 2) {
+        // The fresh evidence phones use the system's English introduction, independently of app language.
+        // Never match the app's hidden, translated Continue action (for example Weiter).
+        let introButtons = app.buttons.matching(NSPredicate(format: "label == 'Continue'"))
+        _ = introButtons.firstMatch.waitForExistence(timeout: 2)
+        if let intro = introButtons.allElementsBoundByIndex.first(where: {
+            $0.isHittable && $0.frame.minY > app.windows.firstMatch.frame.height * 0.7
+        }) {
             intro.tap()
-            XCTAssertTrue(intro.waitForNonExistence(timeout: 5))
+            let gone = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+                !intro.exists || !intro.isHittable
+            }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed)
         }
         web.textViews.firstMatch.typeText(text ?? question)
     }
