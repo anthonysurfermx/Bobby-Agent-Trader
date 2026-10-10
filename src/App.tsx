@@ -85,8 +85,6 @@ const AgenticWorldPage = lazy(() => import('@/pages/AgenticWorldPage'));
 const AgenticLeaderboardPage = lazy(() => import('@/pages/AgenticLeaderboardPage'));
 const PolymarketTrackerPage = lazy(() => import('@/pages/PolymarketTrackerPage'));
 const ConsensusPage = lazy(() => import('@/pages/ConsensusPage'));
-const ClawTraderPage = lazy(() => import('@/pages/ClawTraderPage'));
-const ClawTraderChatPage = lazy(() => import('@/pages/ClawTraderChatPage'));
 const BobbyAgentTraderPage = lazy(() => import('@/pages/BobbyAgentTraderPage'));
 const CompanionDeskPage = lazy(() => import('@/pages/CompanionDeskPage'));
 const BobbyAnalyticsPage = lazy(() => import('@/pages/BobbyAnalyticsPage'));
@@ -832,20 +830,13 @@ const router = createBrowserRouter(
             },
             // Forum moved outside MainLayout — uses KineticShell
             {
+              // Claw Trader was retired (2026-10-09): it sized a bet from a budget and a risk level; old links land on the desk.
               path: 'agentic-world/claw-trader',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <ClawTraderPage />
-                </Suspense>
-              ),
+              element: <Navigate to="/desk" replace />,
             },
             {
               path: 'agentic-world/claw-trader-chat',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <ClawTraderChatPage />
-                </Suspense>
-              ),
+              element: <Navigate to="/desk" replace />,
             },
 
             // ==========================================

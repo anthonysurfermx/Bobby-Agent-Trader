@@ -283,17 +283,6 @@ export function AgentRadarLanding({ onSwitchToAdvanced }: Props) {
             <AgentDashboard
               advisorName={profile?.advisorName}
               scanIntervalHours={profile?.scanIntervalHours}
-              onCycleComplete={() => {
-                if (profile?.walletAddress) {
-                  setTypewriterDone(false);
-                  fetchGreetings(profile.walletAddress).then(g => {
-                    setGreetings(g);
-                    if (g.length > 0) {
-                      seenGreetingRef.current = g[0].id;
-                    }
-                  });
-                }
-              }}
             />
           </div>
         </div>

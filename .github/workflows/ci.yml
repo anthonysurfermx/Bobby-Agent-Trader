@@ -44,6 +44,8 @@ jobs:
       - run: npm run test:desk-levels
       # 1.8: the thesis review, and the proof that a question without a thesis is answered byte for byte as before.
       - run: npm run test:desk-thesis
+      - run: npm run test:desk-plain-words
+      - run: npm run test:companion
       # The web desk: a question Bobby wrote is never offered beside a swap card, a wallet pill or a swap sheet.
       - run: npm run test:desk-suggestions
       - run: npm run test:user-memory

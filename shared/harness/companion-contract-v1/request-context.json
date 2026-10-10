@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "requestId": "5252cefe-fb15-4c8f-93cc-c6f26e54b58d",
+  "question": "¿Qué es un ETF?",
+  "language": "es",
+  "locale": "es-MX",
+  "speech": "plain",
+  "context": {
+    "version": 1,
+    "consent": { "notice": "memory-1", "memory": true, "money": true },
+    "day": 1,
+    "asked": ["interest", "barrier"],
+    "notes": [
+      { "field": "interest", "value": "crypto", "source": "said" },
+      { "field": "barrier", "value": "fear_of_loss", "source": "inferred" }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "requestId": "5f0d8a7e-9d2f-4a55-8f0b-3c2f6f0f5b11",
+  "kind": "desk_offer",
+  "reply": {
+    "text": "Parece que la pregunta es sobre ETH.",
+    "followUp": null
+  },
+  "nextAction": {
+    "type": "open_desk",
+    "symbol": "ETH",
+    "question": "qué opinas de ethereun hoy",
+    "requiresConfirmation": true
+  },
+  "allowance": {
+    "kind": "orientation",
+    "consumed": 2,
+    "remaining": 8
+  }
+}

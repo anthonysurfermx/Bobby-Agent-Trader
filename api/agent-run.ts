@@ -32,10 +32,7 @@ import {
 import { callLlm, type LlmResult } from './_lib/llm.js';
 import { appTextModel, hasAppTextBackend, type AppTextTier } from './_lib/app-model.js';
 import { resolveAppRequestTier } from './_lib/app-model-access.js';
-import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
-import { getClientIpKey } from './_lib/rate-limit.js';
 import { isInternalRequest, requireInternalAuth } from './_lib/request-security.js';
-import { walletSessionFromRequest } from './_lib/wallet-session.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 import { buildCycleRow, cycleProvenance, type CycleProvenance } from './_lib/cycle-provenance.js';
 import { requireWritesOpen } from './_lib/control.js';
@@ -984,7 +981,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Auth check for cron (skip for manual)
   const isManual = req.query.manual === 'true';
   const walletAddress = isManual ? String(req.query.wallet || '') : '';
   // Edge-stamped country; tokenized stocks refuse calldata without it (US exclusion).
@@ -995,35 +991,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const hasOperatorAuth = isInternalRequest(req);
   // BP-09: decided once, from the authorisation, for every cycle row this run writes.
   const provenance = cycleProvenance(isManual, walletAddress, !isManual || hasOperatorAuth);
-  if (!isManual && !requireInternalAuth(req, res)) return;
+  // Every run needs the internal secret, a manual one too: a cycle returns
+  // BUY decisions with a dollar size, and no public page may hand those to a person.
+  if (!requireInternalAuth(req, res)) return;
   if (walletAddress && !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
     return res.status(400).json({ error: 'Invalid wallet address' });
-  }
-  // A manual run that builds swap calldata for a wallet must be asked for by
-  // THAT wallet (session token), not by anyone naming an address (review 2026-09-03).
-  if (isManual && walletAddress && !hasOperatorAuth) {
-    const session = walletSessionFromRequest(req);
-    if (!session || session.wallet !== walletAddress.toLowerCase()) {
-      return res.status(401).json({ error: 'Sign in with this wallet to run a cycle for it' });
-    }
-  }
-
-  // Manual runs stay public (UI "analyze" button) but each one costs
-  // 3 LLM calls — cap them per IP and globally across all instances.
-  if (isManual && !hasOperatorAuth) {
-    const ip = getClientIpKey(req);
-    const [ipLimit, globalLimit] = await Promise.all([
-      checkPersistentLimit('agent-run-manual', ip, 3, 60 * 60),
-      checkPersistentLimit('agent-run-manual', 'global', 12, 60 * 60),
-    ]);
-    if (ipLimit.limited || globalLimit.limited) {
-      const resetAt = ipLimit.limited ? ipLimit.resetAt : globalLimit.resetAt;
-      res.setHeader('Retry-After', String(Math.max(1, Math.ceil((resetAt - Date.now()) / 1000))));
-      return res.status(429).json({
-        ok: false,
-        error: 'Manual cycle limit reached. Bobby runs on his own schedule — check back soon.',
-      });
-    }
   }
 
   const startMs = Date.now();
@@ -1031,7 +1003,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Circuit breaker: halt on sustained losses. Only an authenticated
   // operator (Bearer CRON_SECRET) may force-bypass with ?force=true;
-  // unauthenticated manual runs and cron always respect it.
+  // cron always respects it.
   // The breaker is a per-wallet brake on that wallet's realized losses. Cron
   // cycles trade for nobody, so no wallet's losses may stop the shared
   // analysis; only manual cycles with a wallet consult it.
