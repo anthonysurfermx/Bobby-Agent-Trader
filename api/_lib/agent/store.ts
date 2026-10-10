@@ -26,7 +26,7 @@ import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from '
 import { dirname } from 'node:path';
 import type { ApprovalScope, Step, StepKind, Task } from './types.js';
 
-export type Begin = { state: 'new' | 'replay'; task: Task } | { state: 'mismatch' };
+export type Begin = { state: 'new' | 'replay'; task: Task } | { state: 'mismatch' | 'crowded' };
 export type Approve = { state: 'granted' | 'already'; remaining: number | null } | { state: 'not_found' | 'not_waiting' | 'mismatch' | 'limit' };
 export type ReserveRefusal = 'not_configured' | 'task_cap' | 'budget_exhausted' | 'work_unresolved';
 export type Reserve = { ok: true; attemptId: string } | { ok: false; code: ReserveRefusal };
@@ -69,12 +69,16 @@ export function waitingApproval(task: Pick<Task, 'steps'>): ApprovalScope | null
   return scope;
 }
 
-interface State { tasks: Record<string, Task>; keys: Record<string, string>; reads: Record<string, { task: string; owner: string; day: string; units: number }>; attempts: Record<string, Attempt>; seq: number }
+interface State { tasks: Record<string, Task>; keys: Record<string, string>; reads: Record<string, { task: string; owner: string; address: string | null; day: string; units: number }>; attempts: Record<string, Attempt>; seq: number }
 
 export class MemoryAgentStore implements AgentStore {
   protected state: State = { tasks: {}, keys: {}, reads: {}, attempts: {}, seq: 0 };
-  /** Reads a person may use in a UTC day. null: no allowance is enforced (the caller decides that, never the client). */
-  constructor(protected readonly readsPerDay: number | null = 6) {}
+  /**
+   * Reads a person may use in a UTC day; null: no allowance is enforced (the caller decides that, never the client).
+   * An address (the network a request came from) may use four times that and start `tasksPerAddress` errands a day:
+   * an owner is derived from a header a caller chooses, so the owner's own allowance is no bound by itself.
+   */
+  constructor(protected readonly readsPerDay: number | null = 6, protected readonly tasksPerAddress = 120) {}
   protected changed(): void { /* the file store writes here */ }
   protected load(): void { /* the file store reads here: two processes may share one file */ }
 
@@ -87,6 +91,8 @@ export class MemoryAgentStore implements AgentStore {
       return task.bodyDigest === input.bodyDigest ? { state: 'replay', task: clone(task) } : { state: 'mismatch' };
     }
     if (this.state.tasks[input.id]) return { state: 'mismatch' };
+    const today = new Date(now).toISOString().slice(0, 10);
+    if (input.address && Object.values(this.state.tasks).filter((task) => task.address === input.address && task.createdAt.slice(0, 10) === today).length >= this.tasksPerAddress) return { state: 'crowded' };
     const task: Task = { ...clone(input), steps: [{ n: 1, at: new Date(now).toISOString(), kind: 'received', data: clone(received) }], lease: null, fence: 0 };
     this.state.tasks[task.id] = task;
     this.state.keys[key] = task.id;
@@ -110,8 +116,11 @@ export class MemoryAgentStore implements AgentStore {
   async claim(id: string, worker: string, leaseMs: number, now: number): Promise<{ fence: number; task: Task } | null> {
     this.load();
     const task = this.state.tasks[id];
-    if (!task || isFinal(task) || waitingApproval(task)) return null;
+    if (!task || isFinal(task)) return null;
     if (task.lease && task.lease.until > now) return null;
+    // A cancel that was accepted while a runner held the task, and that the runner never completed, is completed here.
+    if (task.steps.some((step) => step.kind === 'cancel_requested')) { this.endCancelled(task, now, 'store'); this.changed(); return null; }
+    if (waitingApproval(task)) return null;
     task.fence += 1;
     task.lease = { worker, until: now + leaseMs, fence: task.fence };
     this.changed();
@@ -123,6 +132,9 @@ export class MemoryAgentStore implements AgentStore {
     const task = this.state.tasks[id];
     // A runner that lost its lease, or a task that already ended, writes nothing: a late result has nowhere to go.
     if (!task || !task.lease || task.lease.fence !== fence || isFinal(task)) return null;
+    // The person's cancel and a runner's result can cross: the runner looked, the cancel was accepted, the result
+    // arrives here. Decided in this critical section, not by the runner's earlier look: the cancel wins.
+    if ((kind === 'answer' || kind === 'approval_requested' || kind === 'cancelled') && task.steps.some((step) => step.kind === 'cancel_requested')) { this.endCancelled(task, now, 'runner'); this.changed(); return null; }
     const step: Step = { n: task.steps.length + 1, at: new Date(now).toISOString(), kind, data: clone(data) };
     task.steps.push(step);
     this.changed();
@@ -132,7 +144,10 @@ export class MemoryAgentStore implements AgentStore {
   async release(id: string, fence: number): Promise<void> {
     this.load();
     const task = this.state.tasks[id];
-    if (task?.lease?.fence === fence) { task.lease = null; this.changed(); }
+    if (task?.lease?.fence !== fence) return;
+    task.lease = null;
+    if (!isFinal(task) && task.steps.some((step) => step.kind === 'cancel_requested')) this.endCancelled(task, Date.parse(task.steps.at(-1)!.at), 'store');
+    this.changed();
   }
 
   async approve(owner: string, id: string, digest: string, now: number): Promise<Approve> {
@@ -142,7 +157,7 @@ export class MemoryAgentStore implements AgentStore {
     const granted = task.steps.findLast((step) => step.kind === 'approval_granted');
     if (granted && granted.data.digest === digest && !waitingApproval(task)) return { state: 'already', remaining: this.left(owner, now) };
     const scope = waitingApproval(task);
-    if (!scope || isFinal(task)) return { state: 'not_waiting' };
+    if (!scope || isFinal(task) || task.steps.some((step) => step.kind === 'cancel_requested')) return { state: 'not_waiting' };
     if (scope.digest !== digest) return { state: 'mismatch' };
     // The person's read and the grant are one fact: neither exists without the other.
     const day = new Date(now).toISOString().slice(0, 10);
@@ -150,8 +165,10 @@ export class MemoryAgentStore implements AgentStore {
       if (this.readsPerDay !== null) {
         const used = Object.values(this.state.reads).filter((read) => read.owner === owner && read.day === day).reduce((sum, read) => sum + read.units, 0);
         if (used + scope.consumption.reads > this.readsPerDay) return { state: 'limit' };
+        const around = task.address ? Object.values(this.state.reads).filter((read) => read.address === task.address && read.day === day).reduce((sum, read) => sum + read.units, 0) : 0;
+        if (around + scope.consumption.reads > this.readsPerDay * 4) return { state: 'limit' };
       }
-      this.state.reads[id] = { task: id, owner, day, units: scope.consumption.reads };
+      this.state.reads[id] = { task: id, owner, address: task.address ?? null, day, units: scope.consumption.reads };
     }
     task.steps.push({ n: task.steps.length + 1, at: new Date(now).toISOString(), kind: 'approval_granted', data: { digest, scope: clone(scope) } });
     this.changed();
@@ -171,13 +188,23 @@ export class MemoryAgentStore implements AgentStore {
     this.load();
     const task = this.state.tasks[id];
     if (!task || task.owner !== owner || isFinal(task)) return false;
-    const at = new Date(now).toISOString();
-    if (task.steps.some((step) => step.kind === 'cancel_requested')) return true;
-    task.steps.push({ n: task.steps.length + 1, at, kind: 'cancel_requested', data: {} });
-    // Nobody is running it: it is cancelled now. A runner in flight sees the request at its next step.
-    if (!task.lease || task.lease.until <= now) { task.lease = null; task.steps.push({ n: task.steps.length + 1, at, kind: 'cancelled', data: { by: 'store' } }); }
-    this.changed();
+    const asked = task.steps.some((step) => step.kind === 'cancel_requested');
+    const idle = !task.lease || task.lease.until <= now;
+    if (!asked) task.steps.push({ n: task.steps.length + 1, at: new Date(now).toISOString(), kind: 'cancel_requested', data: {} });
+    // Nobody is running it (or whoever was never came back): it is cancelled now. A runner in flight sees the
+    // request at its next step, and its release() or the next claim() completes it if it does not.
+    if (idle) this.endCancelled(task, now, 'store');
+    if (!asked || idle) this.changed();
     return true;
+  }
+
+  /** Writes `cancelled`. A read taken for a metered action that never ran asked no source: it goes back in the same critical section. */
+  protected endCancelled(task: Task, now: number, by: string): void {
+    task.lease = null;
+    const ran = task.steps.some((step) => step.kind === 'tool_call' && step.data.metered === true);
+    const givenBack = !ran && Boolean(this.state.reads[task.id]);
+    if (givenBack) delete this.state.reads[task.id];
+    task.steps.push({ n: task.steps.length + 1, at: new Date(now).toISOString(), kind: 'cancelled', data: { by, ...(givenBack ? { readGivenBack: true } : {}) } });
   }
 
   async refund(id: string): Promise<void> {

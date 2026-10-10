@@ -24,7 +24,6 @@
 //   · The window is the same for every instrument and is stated in every figure's basis.
 // ============================================================
 import { z } from 'zod';
-import { providerUrl } from '../../asset-fact.js';
 import { parseOkxDaily, parseYahooDaily, validateBars, type AssetClass, type BarSeries, type DailyBar } from '../harness/bars.js';
 import type { Analysis, ApprovalScope, Evidence, Figure, Quality } from './types.js';
 
@@ -39,6 +38,8 @@ export interface Tool<A = unknown> {
   scope?: (args: any) => Omit<ApprovalScope, 'digest'>;
   run: (args: any, ctx: ToolContext) => Promise<ToolOutput>;
 }
+
+export const WINDOWS = [30, 60] as const;
 
 // ---------- the universe: what the engine can read with evidence ----------
 interface Instrument { symbol: string; name: string; kind: 'crypto' | 'equity' | 'etf'; assetClass: AssetClass; aliases: readonly string[] }
@@ -61,11 +62,14 @@ export const UNIVERSE: readonly Instrument[] = [
 const BY_SYMBOL = new Map(UNIVERSE.map((instrument) => [instrument.symbol, instrument]));
 const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[¿?¡!.,;:"“”«»()]/g, ' ').replace(/\s+/g, ' ').trim();
 /** Words that may stand around a name without changing which instrument it is. */
-const AROUND = /^(el|la|los|las|le|les|il|lo|der|die|das|den|o|a|os|as|the|de|del|du|di|von|acciones? de|accion de|shares? of|stock|aktie|action|azioni di|acoes da|acoes de)\s+|\s+(stock|shares|acciones|etf|aktie|aktien)$/g;
+const AROUND = /^(el|la|los|las|le|les|il|lo|der|die|das|den|o|a|os|as|the|de|del|du|di|von|acciones? de|accion de|shares? of|stock|aktie|action|azioni di|acoes da|acoes de)\s+|^l['’]\s*|^\$|\s+(stock|shares|acciones|aktie|aktien)$/g;
 export function resolveMention(mention: string): Instrument | null {
   let text = fold(mention);
   for (let n = 0; n < 3; n++) text = text.replace(AROUND, '').trim();
   if (!text) return null;
+  // "Nombre (TICKER)" or "TICKER (nombre)", as the engine itself writes them: both sides must be the same instrument.
+  const paired = /^(.+?)\s*\(([^()]+)\)$/.exec(mention.trim());
+  if (paired) { const a = resolveMention(paired[1]), b = resolveMention(paired[2]); if (a && a === b) return a; }
   return UNIVERSE.find((instrument) => instrument.symbol.toLowerCase() === text || instrument.aliases.includes(text) || fold(instrument.name) === text) ?? null;
 }
 
@@ -116,7 +120,6 @@ function windowSound(bars: DailyBar[], assetClass: AssetClass): boolean {
 }
 
 // ---------- read_assets ----------
-export const WINDOWS = [30, 60] as const;
 const Read = z.object({ assets: z.array(z.string().trim().min(1).max(60)).min(1).max(3), windowDays: z.union([z.literal(30), z.literal(60)]) }).strict();
 /** What runs after the server resolved the names. */
 export interface ReadArgs { symbols: string[]; windowDays: 30 | 60 }
@@ -133,8 +136,15 @@ function prepareRead(args: z.infer<typeof Read>): { ok: true; args: ReadArgs } |
 }
 interface Read { instrument: Instrument; url: string; series: BarSeries | null; bars: DailyBar[] | null; quality: Quality; note: string | null }
 
+/** Rows asked of the coin source: the longest window, the day still forming, and the days a fund's last session can lag a coin's. */
+export const COIN_ROWS = Math.max(...WINDOWS) + 10;
+/** The engine's own requests: the sources of /api/asset-fact, asked for enough days to cover the longest window. */
+export const sourceUrl = (instrument: Pick<Instrument, 'symbol' | 'assetClass'>) => (instrument.assetClass === 'equity'
+  ? `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(instrument.symbol)}?range=6mo&interval=1d&events=split`
+  : `https://www.okx.com/api/v5/market/candles?instId=${encodeURIComponent(`${instrument.symbol}-USDT`)}&bar=1Dutc&limit=${COIN_ROWS}`);
+
 async function readSeries(instrument: Instrument, ctx: ToolContext): Promise<Read> {
-  const url = providerUrl(instrument.symbol, instrument.assetClass), now = ctx.now();
+  const url = sourceUrl(instrument), now = ctx.now();
   // A public source that does not answer once often answers the second time: asked twice, never more. The person
   // already said yes and a read is theirs to lose only when nothing comes back.
   let json = await ctx.fetchJson(url);
@@ -142,7 +152,9 @@ async function readSeries(instrument: Instrument, ctx: ToolContext): Promise<Rea
   if (json === null) return { instrument, url, series: null, bars: null, quality: 'error', note: 'the source did not answer, twice' };
   // Crypto is read as the spot pair against USDT, and says so in `currency`.
   const series = instrument.assetClass === 'equity' ? parseYahooDaily(json, instrument.symbol, now) : parseOkxDaily(json, `${instrument.symbol}-USDT`, now);
-  if (!series) return { instrument, url, series: null, bars: null, quality: 'missing', note: 'the source returned nothing the reader understands' };
+  // A currency is three to five capital letters. Anything else in that field is a source's free text: it would be
+  // written beside a number and read as Bobby's own words, so the whole series is not understood.
+  if (!series || !/^[A-Z]{3,5}$/.test(series.currency ?? '')) return { instrument, url, series: null, bars: null, quality: 'missing', note: 'the source returned nothing the reader understands' };
   const valid = validateBars(series, now);
   if ('reason' in valid) return { instrument, url, series, bars: null, quality: valid.reason === 'stale' ? 'stale' : valid.reason === 'too_few' ? 'missing' : 'error', note: `series refused: ${valid.reason}` };
   return { instrument, url, series, bars: valid.bars, quality: 'valid', note: null };
@@ -154,31 +166,48 @@ export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<T
   const evidence: Evidence[] = reads.map((read) => ({
     id: `ev_${read.instrument.symbol}`, tool: 'read_assets', source: read.series?.source ?? (read.instrument.assetClass === 'equity' ? 'yahoo' : 'okx'), url: read.url,
     instrument: read.instrument.assetClass === 'crypto' ? `${read.instrument.symbol}-USDT spot` : read.instrument.symbol,
-    asOf: read.bars?.at(-1)?.day ?? null, retrievedAt: now.toISOString(), unit: 'price', scale: 1, currency: read.series?.currency ?? null, quality: read.quality, note: read.note,
+    asOf: null, retrievedAt: now.toISOString(), unit: 'price', scale: 1, currency: read.series?.currency ?? null, quality: read.quality, note: read.note,
   }));
-  // One window for all: the last `windowDays` calendar days ending at the earliest "last completed bar" of those read.
+  const refuse = (read: Read, quality: Quality, note: string) => { read.bars = null; read.quality = quality; read.note = note; const item = evidence.find((entry) => entry.id === `ev_${read.instrument.symbol}`)!; item.quality = quality; item.note = note; };
+  // One window for all: the last `windowDays` calendar days ending at the earliest "last completed bar" of the
+  // series still standing. Each series is judged ALONE first, on its own days and by its own rules (does it reach
+  // back the whole window? is it sound inside it?): one refused here shapes nothing of the others. Refusing one
+  // can move the window's end, so the judging is repeated until nothing changes.
+  let end: string | null = null, start: string | null = null;
+  const inWindow = (read: Read) => read.bars!.filter((bar) => bar.day >= start! && bar.day <= end!);
+  for (let pass = 0; pass <= reads.length; pass++) {
+    const standing = reads.filter((read) => read.bars);
+    end = standing.length ? standing.map((read) => read.bars!.at(-1)!.day).sort()[0] : null;
+    start = end ? new Date(dayMs(end) - (args.windowDays - 1) * 86_400_000).toISOString().slice(0, 10) : null;
+    let changed = false;
+    for (const read of standing) {
+      const own = inWindow(read), first = own[0]?.day;
+      // A coin trades every day: its first day is the window's first. A fund may open the window on a weekend or a holiday: up to four days later.
+      const reaches = first !== undefined && (dayMs(first) - dayMs(start!)) / 86_400_000 <= (read.instrument.assetClass === 'crypto' ? 0 : 4);
+      if (!reaches) { refuse(read, 'missing', 'the series does not reach back the whole window'); changed = true; }
+      else if (!windowSound(own, read.instrument.assetClass)) { refuse(read, 'error', 'series refused: the window has a gap or an impossible move'); changed = true; }
+    }
+    if (!changed) break;
+  }
   const usable = reads.filter((read) => read.bars);
-  const end = usable.length ? usable.map((read) => read.bars!.at(-1)!.day).sort()[0] : null;
-  const start = end ? new Date(dayMs(end) - (args.windowDays - 1) * 86_400_000).toISOString().slice(0, 10) : null;
   const mixed = new Set(usable.map((read) => read.instrument.assetClass)).size > 1;
   if (mixed) limitations.push('mixed_calendars');
   // Days every usable instrument traded inside the window: what a mixed comparison, and every correlation, is computed on.
-  const inWindow = (read: Read) => read.bars!.filter((bar) => bar.day >= start! && bar.day <= end!);
   const common = usable.length ? usable.map((read) => new Set(inWindow(read).map((bar) => bar.day))).reduce((a, b) => new Set([...a].filter((day) => b.has(day)))) : new Set<string>();
   const figures: Figure[] = [];
   const used = new Map<string, DailyBar[]>();
   for (const read of reads) {
-    const symbol = read.instrument.symbol, ev = [`ev_${symbol}`];
+    const symbol = read.instrument.symbol, ev = [`ev_${symbol}`], item = evidence.find((entry) => entry.id === ev[0])!;
     let bars = read.bars ? inWindow(read) : null;
     if (bars && mixed) bars = bars.filter((bar) => common.has(bar.day));
     let quality: Quality = read.quality;
-    if (bars && !windowSound(bars, mixed ? 'equity' : read.instrument.assetClass)) { quality = 'error'; evidence.find((item) => item.id === ev[0])!.quality = 'error'; evidence.find((item) => item.id === ev[0])!.note = 'series refused: the window has a gap or an impossible move'; bars = null; }
     const m = bars ? metrics(bars) : null;
-    if (bars && !m) quality = 'missing';
+    if (bars && !m) { quality = 'missing'; item.quality = 'missing'; item.note = 'too few days both traded in the window'; }
     if (!m) limitations.push(`no_series:${symbol}`);
-    else used.set(symbol, bars!);
-    const basis = m ? `${mixed ? 'days both traded' : read.instrument.assetClass === 'crypto' ? 'UTC days' : 'exchange sessions'} from ${m.first.day} to ${m.last.day} (${m.changes.length} daily changes, close to close)` : `no usable series (${read.note ?? 'too few days in the window'})`;
-    const figure = (metric: string, value: number | null, unit: Figure['unit'], extra = '', q: Quality = quality): Figure => ({ id: `${metric}_${symbol}`, metric, subject: symbol, value: m && value !== null && Number.isFinite(value) ? value : null, unit, currency: unit === 'price' ? read.series?.currency ?? null : null, basis: basis + extra, from: m?.first.day ?? null, to: m?.last.day ?? null, days: m ? m.changes.length : null, evidence: ev, quality: m && value !== null ? q : m ? 'missing' : quality === 'valid' ? 'missing' : quality });
+    // The evidence is dated by the day its figures end on, which is not always the source's newest bar.
+    else { used.set(symbol, bars!); item.asOf = m.last.day; }
+    const basis = m ? `${mixed ? 'days both traded' : read.instrument.assetClass === 'crypto' ? 'UTC days' : 'exchange sessions'} from ${m.first.day} to ${m.last.day} (${m.changes.length} daily changes, close to close)` : `no usable series (${item.note ?? 'too few days in the window'})`;
+    const figure = (metric: string, value: number | null, unit: Figure['unit'], extra = ''): Figure => ({ id: `${metric}_${symbol}`, metric, subject: symbol, value: m && value !== null && Number.isFinite(value) ? value : null, unit, currency: unit === 'price' ? read.series?.currency ?? null : null, basis: basis + extra, from: m?.first.day ?? null, to: m?.last.day ?? null, days: m ? m.changes.length : null, evidence: ev, quality: m && value !== null && Number.isFinite(value) ? quality : quality === 'valid' ? 'missing' : quality });
     figures.push(
       figure('close', m?.last.close ?? null, 'price'),
       figure('return', m?.totalReturn ?? null, 'percent', '; last close over first close of the window, minus one'),

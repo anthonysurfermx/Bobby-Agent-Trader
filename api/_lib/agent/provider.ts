@@ -41,10 +41,14 @@ export function agentModel(env: NodeJS.ProcessEnv = process.env): string {
   return model;
 }
 
-/** What one call can cost at most: about three characters a token in, every allowed token out, at the list price. */
+/**
+ * What one call can cost at most: every allowed token out and, in, about three characters a token for plain
+ * Latin text and one token a byte for anything else (accents, other scripts, emoji: a true upper bound there).
+ */
 export function worstCaseUsd(request: Pick<ModelRequest, 'model' | 'system' | 'messages' | 'tools' | 'maxTokens'>): number {
-  const chars = request.system.length + JSON.stringify(request.messages).length + JSON.stringify(request.tools).length;
-  const tokensIn = Math.ceil(chars / 3) + 400;
+  const all = request.system + JSON.stringify(request.messages) + JSON.stringify(request.tools);
+  const plain = all.replace(/[^\x00-\x7f]/g, '').length;
+  const tokensIn = Math.ceil(plain / 3) + (Buffer.byteLength(all, 'utf8') - plain) + 400;
   const [pIn, , pOut] = modelPrice(request.model, tokensIn);
   // Input at the price of writing it to the provider's cache, which is the dearest an input token can be.
   return Number(((tokensIn * pIn * CACHE_WRITE + request.maxTokens * pOut) / 1e6).toFixed(6));
@@ -74,7 +78,10 @@ export const callAnthropicOnce: CallModel = async (request) => {
   }
   let data: { model?: string; stop_reason?: string; content?: Array<Record<string, unknown>>; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } };
   try { data = await res.json() as typeof data; } catch { return { ok: false, outcome: 'unknown', code: 'unreadable_body', status: 200, latencyMs: Date.now() - started }; }
-  const plain = data.usage?.input_tokens ?? 0, written = data.usage?.cache_creation_input_tokens ?? 0, cached = data.usage?.cache_read_input_tokens ?? 0, out = data.usage?.output_tokens ?? 0;
+  // A 200 that does not say what it used, or says it in something that is not a count, cannot be costed: unknown, never free.
+  const count = (value: unknown) => (value === undefined || value === null ? 0 : typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : NaN);
+  const plain = count(data.usage?.input_tokens), written = count(data.usage?.cache_creation_input_tokens), cached = count(data.usage?.cache_read_input_tokens), out = count(data.usage?.output_tokens);
+  if (!data.usage || ![plain, written, cached, out].every(Number.isFinite) || plain + written + cached + out === 0) return { ok: false, outcome: 'unknown', code: 'unreadable_usage', status: 200, latencyMs: Date.now() - started };
   const usage: Usage = { tokensIn: plain + written + cached, tokensOut: out, latencyMs: Date.now() - started };
   const usd = modelCost(request.model, plain, cached, out) + written * modelPrice(request.model, plain + written + cached)[0] * CACHE_WRITE / 1e6;
   const blocks: Block[] = [];

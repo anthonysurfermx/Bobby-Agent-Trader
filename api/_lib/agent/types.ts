@@ -32,7 +32,7 @@ export type Unit = 'price' | 'percent' | 'ratio' | 'count';
 export interface Evidence {
   id: string; tool: string;
   source: string; url: string | null; instrument: string | null;
-  /** The date the data refers to (the last completed bar), not when it was fetched. */
+  /** The date the data refers to: the last completed bar the figures use. Not when it was fetched. */
   asOf: string | null; retrievedAt: string;
   unit: Unit; scale: 1; currency: string | null;
   quality: Quality; note: string | null; synthetic?: true;
@@ -104,6 +104,8 @@ export interface Task {
   id: string;
   /** Derived by the server (a salted device or session hash); never read from the request body. */
   owner: string;
+  /** The salted address the errand came from, when the door knows it: what bounds a caller who invents owners. */
+  address?: string | null;
   session: string; requestId: string;
   /** owner-scoped idempotency key and the digest of the body it was first used with. */
   idemKey: string; bodyDigest: string;

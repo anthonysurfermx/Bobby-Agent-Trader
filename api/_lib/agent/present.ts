@@ -12,11 +12,11 @@
 // ============================================================
 import { appLocale, type AppLanguage } from '../../../src/lib/app-language.js';
 import { theirNumbers } from '../companion-review.js';
-import { UNIVERSE, WINDOWS, instrumentName } from './tools.js';
+import { UNIVERSE, WINDOWS, instrumentName, resolveMention } from './tools.js';
 import type { Analysis, Figure, Presentation } from './types.js';
 
 export interface Draft { kind: Presentation['kind']; gist: string; text: string; limitations: string[]; next: string; claims: Array<{ metric: string; top: string }> }
-export type Refusal = { code: 'unknown_figure' | 'figure_without_value' | 'typed_number' | 'bad_placeholder' | 'claim_contradicts_figures' | 'too_long' | 'empty' | 'gist_not_in_front'; detail: string };
+export type Refusal = { code: 'unknown_figure' | 'figure_without_value' | 'typed_number' | 'bad_placeholder' | 'claim_contradicts_figures' | 'claim_cannot_be_checked' | 'too_long' | 'empty'; detail: string };
 
 const PLACEHOLDER = /\{\{(f:[A-Za-z0-9_~]+|days)\}\}/g;
 /** Names a text may contain although they hold digits. */
@@ -32,32 +32,53 @@ export function formatFigure(figure: Figure, language: AppLanguage, locale?: str
   return new Intl.NumberFormat(tag, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(figure.value);
 }
 
-/** Every digit a text typed by itself, outside placeholders and outside names that contain digits. */
-function typedNumbers(text: string): string[] {
-  let bare = text.replace(PLACEHOLDER, ' ');
-  for (const name of NAMES_WITH_DIGITS) bare = bare.replace(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), ' ');
-  return bare.match(/\d[\d.,]*/g) ?? [];
-}
+const MARK = '￼';
+/** "Percent" spelled out. Code writes every percent sign, so a model that spells one is stating a number of its own. */
+const PERCENT_WORDS = /\b(?:por\s?ciento|porcentaje de|percent|per\s?cent|pour\s?cent|prozent|per\s?cento|por\s?cento)\b/i;
 
-/** Checks one string of a draft. Null when it can be shown. */
-function refuse(text: string, figures: Map<string, Figure>, theirs: Set<string>): Refusal | null {
+/**
+ * Checks one string of a draft. Null when it can be shown. What is read is the model's OWN words: each placeholder
+ * is replaced by a mark, look-alike digits are folded to digits (NFKC), and then:
+ *   · nothing may be glued to a placeholder (a letter, a digit, a sign): "60{{f:x}}" would join its number;
+ *   · the model writes no percent sign and no "percent" in words: only code does;
+ *   · a number is allowed when it is a window length standing alone, part of an instrument's name, or a number the
+ *     person wrote, written the same way (1,000 for their 1000; never 10.00).
+ */
+function refuse(text: string, figures: Map<string, Figure>, question: string): Refusal | null {
   for (const match of text.matchAll(PLACEHOLDER)) {
     if (match[1] === 'days') continue;
     const figure = figures.get(match[1].slice(2));
     if (!figure) return { code: 'unknown_figure', detail: match[1].slice(2) };
     if (figure.value === null) return { code: 'figure_without_value', detail: figure.id };
   }
-  if (/\{\{|\}\}/.test(text.replace(PLACEHOLDER, ''))) return { code: 'bad_placeholder', detail: text.replace(PLACEHOLDER, '').match(/\{\{[^}]{0,30}|[^{]{0,30}\}\}/)?.[0] ?? '' };
-  // The lengths of the windows the tool offers are not market numbers: "and over 60 days?" may be written.
-  for (const typed of typedNumbers(text)) if (!theirs.has(typed.replace(/[.,]/g, '')) && !theirs.has(typed) && !WINDOWS.some((days) => String(days) === typed)) return { code: 'typed_number', detail: typed };
+  let own = text.replace(PLACEHOLDER, MARK).normalize('NFKC');
+  if (/\{\{|\}\}/.test(own)) return { code: 'bad_placeholder', detail: own.match(/\{\{[^}]{0,30}|[^{]{0,30}\}\}/)?.[0] ?? '' };
+  const glued = new RegExp(`[\\p{L}\\p{N}%+\\-−]${MARK}|${MARK}[\\p{L}\\p{N}%]`, 'u').exec(own);
+  if (glued) return { code: 'bad_placeholder', detail: `glued: ${glued[0].replace(MARK, '{{…}}')}` };
+  if (own.includes('%') || own.includes('‰')) return { code: 'typed_number', detail: '%' };
+  const spelled = PERCENT_WORDS.exec(own);
+  if (spelled) return { code: 'typed_number', detail: spelled[0] };
+  for (const name of NAMES_WITH_DIGITS) own = own.replace(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), ' ');
+  const theirs = theirNumbers(question), asked = question.normalize('NFKC');
+  for (const match of own.matchAll(/\p{N}+(?:[.,]\p{N}+)*/gu)) {
+    const typed = match[0];
+    if (WINDOWS.some((days) => String(days) === typed)) continue;
+    // Theirs when they wrote it this way, or wrote the same whole number with or without thousands separators.
+    const whole = /^\p{N}{1,3}(?:[.,]\p{N}{3})+$/u.test(typed) ? typed.replace(/[.,]/g, '') : /^\p{N}+$/u.test(typed) ? typed : null;
+    if (asked.includes(typed) || (whole !== null && theirs.has(whole))) continue;
+    return { code: 'typed_number', detail: typed };
+  }
   return null;
 }
 
-/** "The larger fall was X", "X moved more": the orderings a draft commits to, checked against the figures. */
-function claimHolds(claim: { metric: string; top: string }, figures: Map<string, Figure>): boolean | null {
+/**
+ * The orderings a draft commits to ("the larger fall was X"), checked against the figures. A claim about something
+ * that is not a subject, or about a metric with fewer than two values, cannot be checked: that refuses it too.
+ */
+function claimHolds(claim: { metric: string; top: string }, figures: Map<string, Figure>): boolean {
   const same = [...figures.values()].filter((figure) => figure.metric === claim.metric && figure.value !== null);
   const mine = same.find((figure) => figure.subject === claim.top);
-  if (!mine || same.length < 2) return null;
+  if (!mine || same.length < 2) return false;
   // The larger fall, and the worse worst day, are the most negative; everything else is the largest.
   const rank = (figure: Figure) => (claim.metric === 'drawdown' || claim.metric === 'worst' ? -figure.value! : figure.value!);
   return same.every((figure) => figure === mine || rank(mine) > rank(figure));
@@ -121,7 +142,8 @@ function references(analysis: Analysis | null, used: string[]): Presentation['re
 export function composeByCode(analysis: Analysis | null, language: AppLanguage, locale?: string | null): Presentation {
   const figures = new Map((analysis?.figures ?? []).map((figure) => [figure.id, figure]));
   const ready = (analysis?.subjects ?? []).filter((symbol) => figures.get(`return_${symbol}`)?.value != null && figures.get(`drawdown_${symbol}`)?.value != null);
-  if (!analysis || ready.length < Math.min(2, analysis.subjects.length)) return { kind: 'unavailable', gist: UNAVAILABLE[language], text: UNAVAILABLE[language], figures: [], references: references(analysis, []), limitations: limitationsInWords(analysis, language).filter((_, n) => analysis?.limitations[n] !== 'past_window_only'), next: null, composedByCode: true };
+  // Whatever could be read is told: two against each other, or the one that came back, with the other named as a limit.
+  if (!analysis || !ready.length) return { kind: 'unavailable', gist: UNAVAILABLE[language], text: UNAVAILABLE[language], figures: [], references: references(analysis, []), limitations: limitationsInWords(analysis, language).filter((_, n) => analysis?.limitations[n] !== 'past_window_only'), next: null, composedByCode: true };
   const [a, b] = ready;
   const draft = (b ? COMPOSED[language](instrumentName(a), instrumentName(b)) : COMPOSED_ONE[language](instrumentName(a))).replace(/_A\}\}/g, `_${a}}}`).replace(/_B\}\}/g, `_${b}}}`);
   const text = write(draft, figures, analysis.windowDays, language, locale);
@@ -135,11 +157,15 @@ export function composeByCode(analysis: Analysis | null, language: AppLanguage, 
  */
 export function present(draft: Draft, analysis: Analysis | null, question: string, language: AppLanguage, locale?: string | null): { ok: true; presentation: Presentation } | { ok: false; refusal: Refusal } {
   const figures = new Map((analysis?.figures ?? []).map((figure) => [figure.id, figure]));
-  const theirs = theirNumbers(question);
   const gist = draft.gist.trim(), text = draft.text.trim(), next = draft.next.trim();
   if (!gist || !text) return { ok: false, refusal: { code: 'empty', detail: '' } };
-  for (const part of [gist, text, next, ...draft.limitations]) { const refusal = refuse(part, figures, theirs); if (refusal) return { ok: false, refusal }; }
-  for (const claim of draft.claims) if (claimHolds(claim, figures) === false) return { ok: false, refusal: { code: 'claim_contradicts_figures', detail: `${claim.metric}:${claim.top}` } };
+  for (const part of [gist, text, next, ...draft.limitations]) { const refusal = refuse(part, figures, question); if (refusal) return { ok: false, refusal }; }
+  for (const claim of draft.claims) {
+    // The model may name the subject by its name: code turns it into the symbol, as for a tool.
+    const top = resolveMention(claim.top)?.symbol ?? claim.top;
+    if (!analysis?.subjects.includes(top) || [...figures.values()].filter((figure) => figure.metric === claim.metric && figure.value !== null).length < 2) return { ok: false, refusal: { code: 'claim_cannot_be_checked', detail: `${claim.metric}:${claim.top}` } };
+    if (!claimHolds({ metric: claim.metric, top }, figures)) return { ok: false, refusal: { code: 'claim_contradicts_figures', detail: `${claim.metric}:${claim.top}` } };
+  }
   const days = analysis?.windowDays ?? null;
   const written = write(text, figures, days, language, locale), front = write(gist, figures, days, language, locale);
   if (front.length > 200 || written.length > 1100) return { ok: false, refusal: { code: 'too_long', detail: `${front.length}/${written.length}` } };

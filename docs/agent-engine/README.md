@@ -36,7 +36,10 @@ Code: `api/_lib/agent/`, door `api/agent-task.ts`, tests `scripts/test-agent-eng
 6. Provider money: reserved before every call at the worst case; a cap is never exceeded by reserved + settled + unknown; thirty concurrent reservations against room for ten give ten.
 7. A figure is computed only from a series the strict reader accepted. A refused series gives `error`, `missing` or `stale`, a null value and a named limitation. A price that did not move is a valid zero.
 8. Percent is percent; a price carries its currency; instruments of different calendars are compared on the days both traded and say so.
-9. The model types no market number: a digit outside a placeholder (other than the person's own numbers, names such as "S&P 500" and the tool's window lengths) refuses the draft; a stated ordering that contradicts the figures refuses it; twice refused, code tells the comparison.
+9. The model types no market number. What is read is its own words, with look-alike digits folded: no percent sign and no "percent" in words, nothing glued to a placeholder, and no digit other than a window length standing alone, an instrument's name, or a number the person wrote, written the same way. An ordering it states must be listed as a claim; a claim that contradicts the figures, or that cannot be checked, refuses the draft. Twice refused, code tells the figures.
+12. Everything of the model's that reaches a person is read by the second reader: the text, the limitations it wrote, the next question, and a text that calls itself a clarification. Only a text code wrote is not, and the task records which.
+13. A read is never spent on nothing that could have been shown: when the answering call fails after the read, code tells the figures; when nothing came back with a value, or the errand is cancelled before the tool ran, the read goes back.
+14. A cancel wins: a result that crosses an accepted cancel is not stored, and a cancel a runner never completed is completed by the store.
 10. Cancel is honoured after every wait; a result that arrives after it is never stored as an answer.
 11. Text inside a source's reply is data: an unreadable series, nothing more.
 
@@ -49,7 +52,9 @@ Code: `api/_lib/agent/`, door `api/agent-task.ts`, tests `scripts/test-agent-eng
 - **A second source.** `conflicting` is in the vocabulary and no tool can produce it yet: every instrument has one source.
 - **Asset resolution** is an alias table over the 14 instruments, exact after folding. The product's resolver (`src/lib/okx-asset-search.ts`) is not wired: its universe is wider than what the engine can evidence.
 - **Memory between sessions.** A follow-up reads the last completed task of the same session. Nothing is kept as a goal, and nothing here needs or uses the memory consent.
-- **Number words.** A model that wrote "doce por ciento" in an analysis would pass the digit rule; only the second reader stands there.
+- **Number words.** "Percent" in words is refused by code; a bare number word ("doce", "twice as much") in an analysis is not, and the second reader's "figure" class cannot be used there because it also fires on evidenced numbers. An ordering the model states without listing it as a claim is not checked.
+- **The door's guards.** The address bounds errands started and reads taken in a day. The companion's other guards (a per-minute line, a count per network, a shared day of turns) are not here.
+- **A second run's time.** A call starts only if the run has time for it; nothing reconciles an attempt left `dispatched` by a function that was killed (the SQL draft names the job).
 - **Languages.** Mechanisms are tested in Spanish; the code-written fallback and the limitation sentences exist in six languages; real runs in the other five are not done.
 - **No client.** Nothing in the apps calls the door.
 

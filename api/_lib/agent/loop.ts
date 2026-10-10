@@ -24,7 +24,7 @@ import { appLocale, languageName, type AppLanguage } from '../../../src/lib/app-
 import { companionFallback } from '../companion.js';
 import { judgeCompanionReply, companionJudgeModel } from '../companion-judge.js';
 import { modelPrice, type LlmUsage } from '../llm.js';
-import { composeByCode, present, type Draft } from './present.js';
+import { composeByCode, limitationsInWords, present, type Draft } from './present.js';
 import { agentModel, callAnthropicOnce, reservedCall, type Block, type CallModel, type Message, type WireTool } from './provider.js';
 import { taskError, taskEvents, taskResult, taskState } from './state.js';
 import { isFinal, waitingApproval, type AgentStore, type Begin, type Budget } from './store.js';
@@ -32,8 +32,12 @@ import { TOOLS, UNIVERSE, forModel, type ToolContext } from './tools.js';
 import { DEFAULT_LIMITS, ENGINE_VERSION, PROMPT_VERSION, TOOLSET_VERSION, type Analysis, type ApprovalScope, type Limits, type Presentation, type StepKind, type Task } from './types.js';
 
 export type Verdict = 'pass' | 'advice' | 'guarantee' | 'figure' | 'unchecked';
-/** The second reader: reads the text a person is about to get. Its own call is reserved like any other. */
-export type Reader = (p: { task: string; question: string; text: string; next: string | null; language: AppLanguage; locale: string | null }) => Promise<Verdict>;
+/**
+ * The second reader: reads everything of the model's a person is about to get (the text, its own limitations and
+ * the next question). Its own call is reserved like any other. `keepNext` false drops the next question; `usd` is
+ * what the reading cost, for the task's own record.
+ */
+export type Reader = (p: { task: string; question: string; text: string; next: string | null; language: AppLanguage; locale: string | null }) => Promise<Verdict | { verdict: Verdict; keepNext: boolean; usd?: number }>;
 export interface Deps { store: AgentStore; call: CallModel; tools: ToolContext; read: Reader; now: () => number; budget: { partition: string; capUsd: number }; limits: Limits; worker: string }
 
 const ADDRESS: Record<AppLanguage, string> = { en: '', es: ' Address them as "tú".', fr: ' Address them as "tu", never "vous".', it: ' Address them as "tu", never "Lei".', de: ' Address them as "du", never "Sie".', pt: ' Address them informally.' };
@@ -70,7 +74,8 @@ Write nothing outside tool calls. Finish by calling the tool "answer" exactly on
 
 const Answer = z.object({
   kind: z.enum(['explanation', 'analysis', 'clarification']), gist: z.string().trim().min(2).max(400), text: z.string().trim().min(2).max(2000),
-  claims: z.array(z.object({ metric: z.enum(['return', 'volatility', 'drawdown', 'worst', 'best']), top: z.string().regex(/^[A-Z]{2,6}$/) })).max(12).catch([]),
+  // No `.catch`: a malformed list is not an empty one. It is sent back once, like any other argument the server cannot read.
+  claims: z.array(z.object({ metric: z.enum(['return', 'volatility', 'drawdown', 'worst', 'best']), top: z.string().trim().min(1).max(60) })).max(12),
   limitations: z.array(z.string().trim().min(2).max(300)).max(4).catch([]), next: z.string().trim().max(200).catch(''),
 });
 const ANSWER_TOOL: WireTool = {
@@ -128,12 +133,12 @@ export function rebuild(task: Task, parent: { question: string; presentation: Pr
 }
 
 /** Starts a task, or returns the one this request already started. The owner is the server's, never the body's. */
-export async function createTask(deps: Pick<Deps, 'store' | 'now'>, p: { owner: string; session: string; requestId: string; question: string; language: AppLanguage; locale?: string | null; followsLatest?: boolean; model?: string }): Promise<Begin> {
+export async function createTask(deps: Pick<Deps, 'store' | 'now'>, p: { owner: string; address?: string | null; session: string; requestId: string; question: string; language: AppLanguage; locale?: string | null; followsLatest?: boolean; model?: string }): Promise<Begin> {
   const now = deps.now();
   const parent = p.followsLatest ? await deps.store.latestCompleted(p.owner, p.session) : null;
   const body = { question: p.question, language: p.language, session: p.session, followsLatest: Boolean(p.followsLatest) };
   return deps.store.begin({
-    id: `task_${randomUUID().replace(/-/g, '')}`, owner: p.owner, session: p.session, requestId: p.requestId, idemKey: p.requestId, bodyDigest: digest(body),
+    id: `task_${randomUUID().replace(/-/g, '')}`, owner: p.owner, address: p.address ?? null, session: p.session, requestId: p.requestId, idemKey: p.requestId, bodyDigest: digest(body),
     language: p.language, locale: p.locale ?? null, question: p.question, parent: parent?.id ?? null,
     model: p.model ?? agentModel(), promptVersion: PROMPT_VERSION, toolsetVersion: TOOLSET_VERSION, createdAt: new Date(now).toISOString(),
   }, { question: p.question, language: p.language }, now);
@@ -155,6 +160,14 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
     await write('cancelled', { by: 'runner' });
     return true;
   };
+  // The task cannot go on (no call left, the provider failed, no money). When the person's read already brought
+  // figures back, code tells them: a read is never spent on nothing that could have been shown. Only a task with
+  // nothing to tell ends in a named error.
+  const end = async (task: Task, code: string) => {
+    const mine = ownAnalysis(task), told = mine ? composeByCode(mine, task.language, task.locale) : null;
+    if (told?.kind === 'analysis') await write('answer', { result: { presentation: told, analysis: mine }, reader: 'not_read', instead: code });
+    else await write('error', { code });
+  };
   try {
     let parent: Parameters<typeof rebuild>[1] = null;
     if (claim.task.parent) {
@@ -169,18 +182,20 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
         const tool = TOOLS[approved.tool];
         let out: Awaited<ReturnType<typeof tool.run>> | null = null;
         try { out = await tool.run(approved.args, deps.tools); } catch { out = null; }
-        const useful = Boolean(out?.evidence.some((item) => item.quality === 'valid' || item.quality === 'stale'));
-        // The person's read is for evidence. When the server knows none came back, the read is theirs again.
+        // The person's read is for figures. When the server knows none came back with a value, the read is theirs again.
+        const useful = Boolean(out?.analysis?.figures.some((figure) => figure.value !== null));
         if (!useful) await deps.store.refund(id);
         if (!await write('tool_call', { useId: approved.useId, tool: approved.tool, args: approved.args, evidence: out?.evidence ?? [], data: out?.data ?? { error: 'the tool failed' }, ...(out?.analysis ? { analysis: out.analysis } : {}), metered: true, refunded: !useful })) return;
         continue;
       }
       if (waitingApproval(task)) return;
       const calls = task.steps.filter((step) => step.kind === 'model_call');
-      if (calls.length >= deps.limits.maxRounds) { await write('error', { code: 'limit_rounds' }); return; }
-      // Not enough of this run's time for another call: stop here. The steps are enough for the next run to go on.
-      if (deps.now() - started > deps.limits.runMs - 15_000) return;
-      const request = { model: task.model, system: agentPrompt(task.language, task.locale), messages: rebuild(task, parent), tools: WIRE_TOOLS, maxTokens: deps.limits.maxTokens, timeoutMs: 30_000, effort: agentEffort() };
+      if (calls.length >= deps.limits.maxRounds) { await end(task, 'limit_rounds'); return; }
+      // A call starts only when this run has the time for it and for the reading after it: otherwise stop here.
+      // The steps are enough for the next run to go on.
+      const left = deps.limits.runMs - (deps.now() - started);
+      if (left < 15_000) return;
+      const request = { model: task.model, system: agentPrompt(task.language, task.locale), messages: rebuild(task, parent), tools: WIRE_TOOLS, maxTokens: deps.limits.maxTokens, timeoutMs: Math.min(30_000, left - 8_000), effort: agentEffort() };
       const budget: Budget = { ...deps.budget, taskCapUsd: deps.limits.taskUsd };
       const reply = await reservedCall(deps.store, budget, id, request, deps.call, deps.now);
       if (!reply.ok) {
@@ -189,8 +204,9 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
         // Nothing was billed (the provider refused), or a reply was paid for and could not be used (cut off
         // mid-thought): its cost is known, so one more reserved attempt is safe. An attempt of unknown cost is
         // never followed by a blind second one: that ends the task in a named state.
-        if (failed.outcome !== 'none' && failed.outcome !== 'unknown' && calls.filter((step) => step.data.outcome === failed.outcome).length < 1) continue;
-        await write('error', { code: failed.outcome === 'none' ? `budget_${failed.code}` : failed.code });
+        // Once more per call, not per task: the call before this one must not have failed the same way.
+        if (failed.outcome !== 'none' && failed.outcome !== 'unknown' && calls.at(-1)?.data.outcome !== failed.outcome) continue;
+        await end((await deps.store.get(owner, id)) ?? task, failed.outcome === 'none' ? `budget_${failed.code}` : failed.code);
         return;
       }
       if (!await write('model_call', { outcome: 'ok', usd: reply.usd, reservedUsd: reply.reservedUsd, usage: reply.usage, stop: reply.turn.stop, modelReturned: reply.turn.modelReturned, blocks: reply.turn.blocks })) return;
@@ -205,7 +221,8 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
       }
       let asked = false;
       for (const use of uses) {
-        const tool = TOOLS[use.name];
+        // Looked up as an own key: "constructor" or "toString" is an unknown tool, not an inherited one.
+        const tool = Object.hasOwn(TOOLS, use.name) ? TOOLS[use.name] : undefined;
         const args = tool?.schema.safeParse(use.input);
         if (!tool || !args?.success) { if (!await write('tool_refused', { useId: use.id, tool: use.name, reason: tool ? 'invalid_arguments' : 'unknown_tool' })) return; continue; }
         // What will run is what the server made of the arguments (names into symbols), or nothing.
@@ -220,6 +237,8 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
         }
         // One metered action per task: after it ran, its figures are in the conversation; a second one is a new errand.
         if (asked || task.steps.some((step) => step.kind === 'approval_requested')) { if (!await write('tool_refused', { useId: use.id, tool: tool.name, reason: 'one_metered_action_per_task' })) return; continue; }
+        // The person is not asked to spend a read when no call is left to tell them what it found.
+        if (calls.length + 1 >= deps.limits.maxRounds) { if (!await write('tool_refused', { useId: use.id, tool: tool.name, reason: 'no_call_left' })) return; continue; }
         const scope = tool.scope!(ready);
         if (!await write('approval_requested', { scope: { ...scope, digest: scopeDigest(owner, id, scope) }, call: { useId: use.id, tool: tool.name, args: ready } })) return;
         asked = true;
@@ -249,22 +268,29 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
     if (repairs < 1) { await write('tool_refused', { useId, tool: 'answer', reason, detail }); return false; }
     presentation = composeByCode(ownAnalysis(task) ?? (draft?.kind === 'analysis' ? analysis : null), task.language, task.locale);
   }
-  let verdict: Verdict = 'pass';
-  // A clarification is a question to the person and a code-written text is code's: neither is the model's claim about a market.
-  if (presentation.kind !== 'clarification' && !presentation.composedByCode) {
-    verdict = await deps.read({ task: task.id, question: task.question, text: presentation.text, next: presentation.next, language: task.language, locale: task.locale });
+  // Everything of the model's that a person is about to get is read: the text, the limitations it wrote and the next
+  // question. Only a text code wrote itself is not (there is nothing of the model's in it), and the record says so.
+  let verdict: Verdict | 'not_read' = 'not_read', readerUsd = 0;
+  if (!presentation.composedByCode) {
+    // A clarification is one short question. Anything longer, or with no question in it, is not one: it is read as an explanation.
+    if (presentation.kind === 'clarification' && (presentation.text.length > 220 || !/[?？]/.test(presentation.text))) presentation.kind = 'explanation';
+    const own = presentation.limitations.filter((line) => !limitationsInWords(analysis, task.language).includes(line));
+    const read = await deps.read({ task: task.id, question: task.question, text: [presentation.text, ...own].join(' '), next: presentation.next, language: task.language, locale: task.locale });
     if (await stopped()) return true;
+    const said = typeof read === 'string' ? { verdict: read, keepNext: true, usd: 0 } : read;
+    verdict = said.verdict; readerUsd = said.usd ?? 0;
+    if (!said.keepNext) presentation.next = null;
     // An evidenced number is the point of an analysis. A text that cites none has no such excuse.
     const figuresAreEvidence = presentation.kind === 'analysis' && presentation.figures.length > 0 && verdict === 'figure';
     if (verdict !== 'pass' && !figuresAreEvidence) {
-      if (verdict === 'unchecked' && presentation.kind !== 'analysis') { await write('error', { code: 'unchecked' }); return true; }
-      // The model's words cannot be shown: an analysis is told by code from its figures, an explanation by the fixed sentence.
+      if (verdict === 'unchecked' && presentation.kind !== 'analysis') { await write('error', { code: 'unchecked', readerUsd }); return true; }
+      // The model's words cannot be shown: an analysis is told by code from its figures, anything else by the fixed sentence.
       presentation = presentation.kind === 'analysis' ? composeByCode(analysis, task.language, task.locale)
         : { kind: 'explanation', gist: companionFallback(task.language, true).text, text: companionFallback(task.language, true).text, figures: [], references: [], limitations: [], next: null, composedByCode: true };
     }
   }
   // The analysis on the table stays with the thread: a follow-up that cited no figure still hands it to the next one.
-  await write('answer', { result: { presentation, analysis }, reader: verdict });
+  await write('answer', { result: { presentation, analysis }, reader: verdict, readerUsd });
   return true;
 }
 
@@ -281,15 +307,21 @@ export function companionReader(store: AgentStore, budget: Budget, now: () => nu
     let verdict: Awaited<ReturnType<typeof judgeCompanionReply>> = null;
     try { await store.dispatch(reserved.attemptId); verdict = await judgeCompanionReply(question, { text, followUp: next }, language, { model, locale: locale ?? undefined, usage }); } catch { verdict = null; }
     const unknown = usage.some((row) => row.stop === 'timeout' || row.stop === 'network' || row.stop === 'deadline');
-    await store.settle(reserved.attemptId, unknown ? 'unknown' : 'settled', usage.reduce((sum, row) => sum + (row.usd ?? 0), 0)).catch(() => undefined);
-    return !verdict ? 'unchecked' : verdict.rejected ?? 'pass';
+    // Its cost is known only when every attempt either was refused by the provider or reported its own usage; a reply
+    // that could not be read, like one that never came, keeps the reservation.
+    const unread = !verdict && !usage.some((row) => row.ok || String(row.stop).startsWith('http_'));
+    const usd = usage.reduce((sum, row) => sum + (row.usd ?? 0), 0);
+    await store.settle(reserved.attemptId, unknown || unread ? 'unknown' : 'settled', usd).catch(() => undefined);
+    return { verdict: !verdict ? 'unchecked' : verdict.rejected ?? 'pass', keepNext: verdict?.keepNext ?? false, usd: unknown || unread ? reserveUsd : usd };
   };
 }
 
 /** The engine wired to the real provider and the real sources. */
 export function engineDeps(store: AgentStore, over: Partial<Deps> = {}): Deps {
   const now = over.now ?? (() => Date.now());
-  const budget = over.budget ?? { partition: 'agent', capUsd: Number(process.env.BOBBY_AGENT_DAILY_USD) > 0 ? Number(process.env.BOBBY_AGENT_DAILY_USD) : 5 };
+  // The ceiling is a day's: the partition carries the UTC day, so yesterday's attempts (settled, unknown or never
+  // settled) do not hold today's money. The no-blind-retry rule is per task and does not depend on it.
+  const budget = over.budget ?? { partition: `agent:${new Date(now()).toISOString().slice(0, 10)}`, capUsd: Number(process.env.BOBBY_AGENT_DAILY_USD) > 0 ? Number(process.env.BOBBY_AGENT_DAILY_USD) : 5 };
   const limits = over.limits ?? DEFAULT_LIMITS;
   return {
     store, now, budget, limits, worker: over.worker ?? `w_${randomUUID().slice(0, 8)}`,
@@ -315,7 +347,8 @@ export function taskView(task: Task, now: number, remaining: number | null) {
     approval: state === 'waiting_approval' ? waitingApproval(task) : null,
     // A client is given the analysis only with an answer that rests on it.
     result: result ? { ...result.presentation, analysis: result.analysis && result.presentation.kind === 'analysis' ? { subjects: result.analysis.subjects, windowDays: result.analysis.windowDays, figures: result.analysis.figures, evidence: result.analysis.evidence } : null } : null,
-    error: taskError(task) ? { code: taskError(task), retryable: state === 'failed' } : null,
+    // A failed task is final: the same requestId returns this same failure. `retryable` says a NEW request can help.
+    error: taskError(task) ? { code: taskError(task), retryable: ['provider_failed', 'provider_unknown', 'unchecked'].includes(taskError(task)!) } : null,
     allowance: { kind: 'reads' as const, remaining },
     engine: { model: task.model, prompt: task.promptVersion, tools: task.toolsetVersion },
   };

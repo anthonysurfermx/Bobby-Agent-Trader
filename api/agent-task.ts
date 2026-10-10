@@ -10,8 +10,10 @@
 // Every reply is the task's view (loop.ts, taskView): its state, the real events so far, the approval it waits
 // for, the result when there is one, and what the person has left. Coming back never calls a provider.
 //
-// Whose task it is: the server derives the owner from the request the way the companion does (the install's
-// salted hash, else the caller's address). A body field can never name an owner, a model, a plan or a limit.
+// Whose task it is: the server derives the owner from the request (the install's salted hash, else the caller's
+// address). The install id is a header, so the address bounds what one caller can do whatever ids it invents:
+// errands started in a day, and reads (four times one person's). The companion's other guards (a per-minute
+// line, a network-wide count, a shared day of turns) are NOT here yet. A body field can never name an owner, a model, a plan or a limit.
 // Another owner asking for a task gets 404, the same as for a task that does not exist.
 //
 // What is NOT here yet, on purpose (docs/agent-engine/README.md):
@@ -54,9 +56,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed', engine: { version: ENGINE_VERSION } });
   if (!requestOriginHost(req.headers)) return res.status(403).json({ error: 'Origin not allowed' });
   const refuse = (status: number, code: string) => res.status(status).json({ version: ENGINE_VERSION, error: { code } });
-  let owner: string | null = null;
-  try { owner = deviceHash(req) ?? getClientQuotaKeys(req)?.caller ?? null; } catch { owner = null; }
-  if (!owner) return refuse(503, 'engine_unavailable');
+  let owner: string | null = null, address: string | null = null;
+  try { address = getClientQuotaKeys(req)?.caller ?? null; owner = deviceHash(req) ?? address; } catch { owner = null; }
+  // The install id is a header a caller chooses: without the address nothing bounds a caller who invents installs.
+  if (!owner || !address) return refuse(503, 'engine_unavailable');
   const store = agentStore();
   if (!store) return refuse(503, 'engine_storage_unavailable');
   const deps = engineDeps(store, testDeps ?? {});
@@ -74,7 +77,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const ask = Ask.safeParse(body);
   if (ask.success) {
     if (!process.env.ANTHROPIC_API_KEY && !testDeps?.call) return refuse(503, 'engine_unavailable');
-    const begun = await createTask(deps, { owner, session: ask.data.sessionId, requestId: ask.data.requestId, question: ask.data.question, language: ask.data.language, locale: ask.data.locale ?? null, followsLatest: ask.data.follow === true });
+    const begun = await createTask(deps, { owner, address, session: ask.data.sessionId, requestId: ask.data.requestId, question: ask.data.question, language: ask.data.language, locale: ask.data.locale ?? null, followsLatest: ask.data.follow === true });
+    if (begun.state === 'crowded') return refuse(429, 'too_many_errands');
     if (!('task' in begun)) return refuse(409, 'request_id_reused');
     // The same request sent again finds its task: a finished one is returned as it is, one in progress goes on.
     await runTask(deps, owner, begun.task.id);
