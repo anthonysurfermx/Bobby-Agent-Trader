@@ -25,7 +25,7 @@ const CACHE_WRITE = 1.25;
 export interface WireTool { name: string; description: string; input_schema: Record<string, unknown> }
 export type Block = { type: 'text'; text: string } | { type: 'tool_use'; id: string; name: string; input: unknown };
 export type Message = { role: 'user' | 'assistant'; content: string | Array<Block | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }> };
-export interface ModelRequest { model: string; system: string; messages: Message[]; tools: WireTool[]; maxTokens: number; timeoutMs: number }
+export interface ModelRequest { model: string; system: string; messages: Message[]; tools: WireTool[]; maxTokens: number; timeoutMs: number; /** How hard the model thinks before it writes. Thinking is paid as output and counts against maxTokens. */ effort?: 'low' | 'medium' | 'high' }
 export interface ModelTurn { blocks: Block[]; stop: 'tool_use' | 'end_turn'; modelReturned: string | null }
 export interface Usage { tokensIn: number; tokensOut: number; latencyMs: number }
 export type ModelAttempt =
@@ -62,7 +62,7 @@ export const callAnthropicOnce: CallModel = async (request) => {
       headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
       // The instructions and the tools are the same in every call of a task: marked so the provider keeps them
       // for a few minutes and the second and third calls pay a tenth for them.
-      body: JSON.stringify({ model: request.model, max_tokens: request.maxTokens, system: [{ type: 'text', text: request.system, cache_control: { type: 'ephemeral' } }], messages: request.messages, tools: request.tools }),
+      body: JSON.stringify({ model: request.model, max_tokens: request.maxTokens, system: [{ type: 'text', text: request.system, cache_control: { type: 'ephemeral' } }], messages: request.messages, tools: request.tools, ...(request.effort ? { output_config: { effort: request.effort } } : {}) }),
     });
   } catch (error) {
     const timeout = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');

@@ -136,4 +136,6 @@ export interface Limits {
   /** Wall time of one run (a task may take several runs: before and after an approval). */ runMs: number;
   /** Provider dollars reserved by one task, all its calls together. */ taskUsd: number;
 }
-export const DEFAULT_LIMITS: Limits = { maxRounds: 6, maxTokens: 1200, runMs: 45_000, taskUsd: 0.25 };
+// 2,000 output tokens: an answer is about 400, and what the model thinks first is paid from the same allowance
+// (found on 2026-10-11: at 1,200 the smaller model ran out mid-thought on one errand in three).
+export const DEFAULT_LIMITS: Limits = { maxRounds: 6, maxTokens: 2000, runMs: 45_000, taskUsd: 0.25 };

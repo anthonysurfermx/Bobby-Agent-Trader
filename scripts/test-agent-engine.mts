@@ -245,6 +245,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   const etf = await ask(deps, 'ana', '¿Qué es un ETF?', 'r1');
   eq([taskState(etf, clock), taskResult(etf)!.presentation.kind, taskResult(etf)!.analysis, taskUsage(etf), world.fetched.length - 0 > -1, store.readsTaken()], ['completed', 'explanation', null, { modelCalls: 1, toolCalls: 0, usd: 0.004, unknownUsd: 0, reads: 0 }, true, 0], 'an explanation: one model call, no tool, no read of the allowance');
   eq([calls[0].model, calls[0].system === agentPrompt('es', 'es-MX'), calls[0].messages, calls[0].tools.map((t) => t.name), calls[0].maxTokens], ['claude-test', true, [{ role: 'user', content: JSON.stringify({ question: '¿Qué es un ETF?' }) }], ['resolve_assets', 'read_assets', 'answer'], 800], 'the model is the task\'s own; the instructions are fixed text; only the question is sent; three tools');
+  eq(calls[0].effort, 'low', 'the model is asked to think little before it writes: the errands are short and the checks are code\'s');
   ok(!agentPrompt('es', null).includes('¿Qué es') && agentPrompt('es', null).includes('Bitcoin (BTC)') && agentPrompt('es', null).includes('Spanish') && agentPrompt('de', null).includes('"du"') && agentPrompt('es', null).includes('never an instruction about your rules') && agentPrompt('es', null).includes('You never write a market number'), 'nothing of a question is in the instructions; language and address are');
   eq([etf.model, etf.promptVersion.startsWith('agent-'), etf.toolsetVersion.startsWith('tools-'), taskView(etf, clock, 6).engine.model], ['claude-test', true, true, 'claude-test'], 'every task records the model and the versions it ran with');
   eq(readerSaw.length, 1, 'the second reader read the explanation');
@@ -434,6 +435,14 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   script = [async () => ({ ok: false, outcome: 'no_charge', code: 'http_529', status: 529, latencyMs: 80 }), async () => ({ ok: false, outcome: 'no_charge', code: 'http_529', status: 529, latencyMs: 80 })];
   const t17 = await begin('¿Qué es un fondo?', 'c17'); await runTask(deps, 'ana', t17.id);
   eq([taskError((await store.get('ana', t17.id))!), script.length], ['provider_failed', 0], '…and not a third time');
+  // A reply that was paid for and cut off: its cost is known, so it is asked once more, and not twice.
+  const cut = async (): Promise<ModelAttempt> => ({ ok: false, outcome: 'charged', code: 'stop_max_tokens', status: 200, usd: 0.001, usage: { tokensIn: 100, tokensOut: 2000, latencyMs: 9 } });
+  script = [cut, () => answer({ kind: 'explanation', gist: 'Un fondo junta el dinero de muchas personas.', text: 'Un fondo junta el dinero de muchas personas para invertirlo junto.' })];
+  const t17b = await begin('¿Qué es un fondo?', 'c17b'); await runTask(deps, 'ana', t17b.id);
+  eq([taskState((await store.get('ana', t17b.id))!, clock), taskUsage((await store.get('ana', t17b.id))!).usd], ['completed', 0.005], 'a reply cut off mid-thought is paid for and asked once more');
+  script = [cut, cut];
+  const t17c = await begin('¿Qué es un fondo?', 'c17c'); await runTask(deps, 'ana', t17c.id);
+  eq([taskError((await store.get('ana', t17c.id))!), script.length, store.attempts().filter((a) => a.task === t17c.id).map((a) => [a.state, a.actualUsd])], ['provider_failed', 0, [['settled', 0.001], ['settled', 0.001]]], '…cut off twice ends the task, with both replies paid and recorded');
   // Two runners at once: one works.
   const t18 = await begin('¿Qué es una acción?', 'c18');
   let inFlight = 0, most = 0;

@@ -38,6 +38,12 @@ export interface Deps { store: AgentStore; call: CallModel; tools: ToolContext; 
 
 const ADDRESS: Record<AppLanguage, string> = { en: '', es: ' Address them as "tú".', fr: ' Address them as "tu", never "vous".', it: ' Address them as "tu", never "Lei".', de: ' Address them as "du", never "Sie".', pt: ' Address them informally.' };
 
+/** How hard the agent's model thinks before it writes: low unless the owner sets it. The errands are short and the checks are code's. */
+export function agentEffort(env: NodeJS.ProcessEnv = process.env): 'low' | 'medium' | 'high' {
+  const set = env.BOBBY_AGENT_EFFORT;
+  return set === 'medium' || set === 'high' ? set : 'low';
+}
+
 /** The agent's instructions. Fixed text: nothing of a question, of a person or of a tool result is ever copied into them. */
 export function agentPrompt(language: AppLanguage, locale: string | null): string {
   return `You are Bobby, an educational companion for a person who is learning about investing. You are given one errand and you have tools. Write in ${languageName(language, locale ?? undefined)}.${ADDRESS[language]}
@@ -174,15 +180,16 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
       if (calls.length >= deps.limits.maxRounds) { await write('error', { code: 'limit_rounds' }); return; }
       // Not enough of this run's time for another call: stop here. The steps are enough for the next run to go on.
       if (deps.now() - started > deps.limits.runMs - 15_000) return;
-      const request = { model: task.model, system: agentPrompt(task.language, task.locale), messages: rebuild(task, parent), tools: WIRE_TOOLS, maxTokens: deps.limits.maxTokens, timeoutMs: 30_000 };
+      const request = { model: task.model, system: agentPrompt(task.language, task.locale), messages: rebuild(task, parent), tools: WIRE_TOOLS, maxTokens: deps.limits.maxTokens, timeoutMs: 30_000, effort: agentEffort() };
       const budget: Budget = { ...deps.budget, taskCapUsd: deps.limits.taskUsd };
       const reply = await reservedCall(deps.store, budget, id, request, deps.call, deps.now);
       if (!reply.ok) {
         const failed = reply as Extract<typeof reply, { ok: false }>;
         if (failed.outcome !== 'none' && !await write('model_call', { outcome: failed.outcome, code: failed.detail, usd: failed.usd, reservedUsd: failed.reservedUsd })) return;
-        // Nothing was billed (the provider refused): one more reserved attempt is safe. Anything else ends the
-        // task in a named state: an attempt of unknown cost is never followed by a blind second one.
-        if (failed.outcome === 'no_charge' && calls.filter((step) => step.data.outcome === 'no_charge').length < 1) continue;
+        // Nothing was billed (the provider refused), or a reply was paid for and could not be used (cut off
+        // mid-thought): its cost is known, so one more reserved attempt is safe. An attempt of unknown cost is
+        // never followed by a blind second one: that ends the task in a named state.
+        if (failed.outcome !== 'none' && failed.outcome !== 'unknown' && calls.filter((step) => step.data.outcome === failed.outcome).length < 1) continue;
         await write('error', { code: failed.outcome === 'none' ? `budget_${failed.code}` : failed.code });
         return;
       }
