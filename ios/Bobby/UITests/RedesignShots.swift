@@ -37,6 +37,16 @@ final class RedesignShots: XCTestCase {
         let expectation = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: element)
         XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: timeout), .completed, element.debugDescription)
     }
+    private func scrollTo(_ element: XCUIElement) {
+        XCTAssertTrue(element.waitForExistence(timeout: 20))
+        let scroll = app.scrollViews.firstMatch
+        XCTAssertTrue(scroll.exists)
+        for _ in 0..<7 {
+            if element.isHittable { break }
+            scroll.swipeUp()
+        }
+        ready(element)
+    }
     private func type() {
         let web = app.webViews.firstMatch
         ready(pill); pill.tap()
@@ -107,8 +117,8 @@ final class RedesignShots: XCTestCase {
         launch("companion", notes: true)
         let profile = app.webViews.firstMatch.buttons[word("app", "aria.account").replacingOccurrences(of: "{name}", with: "Momo")]
         ready(profile); profile.tap()
-        ready(app.buttons["account-memory"]); app.buttons["account-memory"].tap()
-        ready(app.buttons["memory-educational-notes"]); app.buttons["memory-educational-notes"].tap()
+        scrollTo(app.buttons["account-memory"]); app.buttons["account-memory"].tap()
+        scrollTo(app.buttons["memory-educational-notes"]); app.buttons["memory-educational-notes"].tap()
         XCTAssertTrue(app.staticTexts["companion-notes-title"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["companion-note-interest"].exists)
         shot("09-notes-screen")
