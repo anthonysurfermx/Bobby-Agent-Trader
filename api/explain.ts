@@ -63,7 +63,7 @@ ${topPositions || 'None'}
 
 ${data.marketContext ? `ANALYZING IN CONTEXT OF MARKET: ${data.marketContext}` : ''}
 
-Focus on: Explain the detected strategy type and what it means for this wallet's trading approach. Reference the strategy metrics (ROI, sizing consistency, directional bias, bimodality). What patterns stand out? Is this wallet worth following? What risks should a copy-trader consider?`;
+Focus on: Explain the detected strategy type and what it means for this wallet's trading approach. Reference the strategy metrics (ROI, sizing consistency, directional bias, bimodality). What patterns stand out? Describe what this wallet did and how its positions turned out. Do not say whether anyone should follow or copy it.`;
 }
 
 function buildExchangeMetricsPrompt(data: any): string {
@@ -365,79 +365,6 @@ Focus on:
 7. RED FLAGS: Any signals that contradict each other? Conflicting alpha = uncertainty.`;
 }
 
-function buildChatOpportunityPrompt(data: any): string {
-  const opportunities = (data.opportunities || [])
-    .map((o: any, i: number) => {
-      const m = o.market;
-      const p = o.probability;
-      const a = o.analysis;
-      return `#${i + 1}: "${m.question}"
-  Side: ${p.recommendedSide || 'N/A'} (${p.winProbability}% win prob) | Edge: ${p.edge > 0 ? '+' : ''}${(p.edge * 100).toFixed(1)}%
-  Smart Money: ${a.smartMoneyDirection} ${a.smartMoneyPct}% | ${a.botCount} bots / ${a.totalScanned} scanned
-  VPIN: ${a.vpinScore !== null ? `${Math.round(a.vpinScore * 100)}% (${a.vpinClassification})` : 'N/A'}
-  Kelly Size: $${p.smartMoneySize} of $${data.amount || 1000} | Confidence: ${p.confidence.toUpperCase()}
-  Red Flags: ${a.redFlags.length > 0 ? a.redFlags.join('; ') : 'None'}
-  Volume: $${Math.round(m.volume).toLocaleString()}`;
-    })
-    .join('\n\n');
-
-  return `You are explaining trading opportunities to a user who said: "${data.userQuery}"
-
-User budget: $${data.amount || 1000}
-Risk level: ${data.risk || 'medium'}
-
-OPPORTUNITIES (ranked by edge):
-${opportunities || 'None found'}
-
-Explain in 5-8 lines what makes each opportunity good or bad.
-Focus on: edge, smart money alignment, VPIN insider signals, risk factors.
-End with a one-line actionable verdict on which is the best pick and why.
-Detect the user's language from their query and respond in that language.
-If their query is in Spanish, respond in Spanish. If English, respond in English.`;
-}
-
-function buildChatDeepAnalysisPrompt(data: any): string {
-  const m = data.market;
-  const p = data.probability;
-  const a = data.analysis;
-
-  return `You are doing a deep dive on a specific market the user selected.
-User said: "${data.userQuery}"
-User budget: $${data.amount || 1000}
-
-MARKET: "${m.question}"
-Current odds: YES ${(m.yesPrice * 100).toFixed(0)}% / NO ${(m.noPrice * 100).toFixed(0)}%
-Volume: $${Math.round(m.volume).toLocaleString()}
-End date: ${m.endDate}
-
-Win Probability: ${p.winProbability}%
-Recommended Side: ${p.recommendedSide || 'None'}
-Edge: ${p.edge > 0 ? '+' : ''}${(p.edge * 100).toFixed(1)}%
-Confidence: ${p.confidence.toUpperCase()}
-Kelly Size: $${p.smartMoneySize}
-
-Breakdown:
-  Market Implied: ${p.breakdown.marketImplied}%
-  Agent Adjustment: ${p.breakdown.agentAdjustment > 0 ? '+' : ''}${p.breakdown.agentAdjustment}%
-  VPIN Adjustment: ${p.breakdown.vpinAdjustment > 0 ? '+' : ''}${p.breakdown.vpinAdjustment}%
-  Red Flag Penalty: ${p.breakdown.redFlagPenalty}%
-  Market Impact: ${p.breakdown.marketImpact}%
-
-Smart Money: ${a.smartMoneyDirection} (${a.smartMoneyPct}%)
-Bot Rate: ${a.agentRate}%
-Bots: ${a.botCount} / ${a.totalScanned} scanned
-Dominant Strategy: ${a.dominantStrategy}
-VPIN: ${a.vpinScore !== null ? `${Math.round(a.vpinScore * 100)}% (${a.vpinClassification})` : 'insufficient data'}
-Red Flags: ${a.redFlags.join('; ') || 'None'}
-
-Explain in 5-7 lines:
-1. What makes this market interesting or risky
-2. What the smart money consensus tells us
-3. What the VPIN score means for insider activity
-4. A clear verdict: should the user enter, wait, or skip?
-Detect the user's language and respond accordingly.`;
-}
-
 function buildMetacognitionPrompt(data: any): string {
   const cal = data.calibration;
   const perf = data.performance;
@@ -511,53 +438,10 @@ Now produce the analysis. Remember:
 - End with TAGS: line`;
 }
 
-
-function buildSignalsPrompt(data: any): string {
-  const indicators = data.indicators || [];
-  const regime = data.regime || 'unknown';
-  const leader = data.leader;
-  const convictionModel = data.convictionModel;
-  const userName = data.userName || null;
-
-  const assetBlocks = indicators.map((asset: any) => {
-    const indLines = Object.entries(asset.indicators || {}).map(([name, reading]: [string, any]) =>
-      `  ${name}: ${reading.bias} | score: ${reading.score?.toFixed(2)} | weight: ${reading.weight?.toFixed(2)}`
-    ).join('\n');
-    return `${asset.symbol} — ${asset.signal?.toUpperCase()} | composite: ${asset.compositeScore?.toFixed(3)} | conviction: ${(asset.conviction * 100).toFixed(0)}% | agreement: ${(asset.agreement * 100).toFixed(0)}%
-${indLines}
-Trade Plan: entry=${asset.tradePlan?.entry ?? 'n/a'} | stop=${asset.tradePlan?.stop ?? 'n/a'} | target=${asset.tradePlan?.target ?? 'n/a'}`;
-  }).join('\n\n');
-
-  return `You are Bobby CIO analyzing technical indicators from OKX Agent Trade Kit for ${userName || 'the user'}.
-
-REGIME: ${regime}
-${leader ? `LEADER ASSET: ${leader.symbol} — ${leader.signal} (score ${leader.compositeScore?.toFixed(3)})` : 'No clear leader'}
-${convictionModel ? `CONVICTION MODEL: okx=${convictionModel.okxWeight} poly=${convictionModel.polyWeight} tech=${convictionModel.techWeight}` : ''}
-
-ASSETS:
-${assetBlocks || 'No indicator data available'}
-
-Explain what these indicators mean for a trader RIGHT NOW:
-1. Start with the most important signal — what should the user pay attention to?
-2. Explain which indicators agree and which conflict
-3. Translate the composite scores into plain language ("strong short means...")
-4. If there's a trade plan, explain the risk/reward
-5. Give ONE clear actionable recommendation
-6. Mention the regime and how it affects the weights
-
-VOICE RULES (THE 6AM PHONE CALL):
-- Be a sovereign, ruthless CIO. Impatient with noise but analytical.
-- BANNED: Emojis, "Hey guys", "As an AI", "Not financial advice". NEVER apologize.
-- Use assertive vocabulary: pain trade, liquidity sweep, leverage flush, capitulation.
-- Short paragraphs, direct delivery. Sound like a morning briefing, not a textbook.
-Address ${userName || 'the user'} by name once.`;
-}
-
 const VALID_CONTEXTS = [
   'wallet', 'exchange-metrics', 'latam-exchanges', 'market', 'smartmoney',
   'smartmoney-signals', 'smartmoney-edge', 'smartmoney-portfolios',
-  'smartmoney-bonds', 'smartmoney-alpha', 'chat-opportunity',
-  'chat-deep-analysis', 'metacognition', 'signals',
+  'smartmoney-bonds', 'smartmoney-alpha', 'metacognition',
 ] as const;
 
 function buildPrompt(context: unknown, data: any): string | null {
@@ -572,10 +456,7 @@ function buildPrompt(context: unknown, data: any): string | null {
     case 'smartmoney-portfolios': return buildSmartMoneyPortfoliosPrompt(data);
     case 'smartmoney-bonds': return buildSmartMoneyBondsPrompt(data);
     case 'smartmoney-alpha': return buildSmartMoneyAlphaPrompt(data);
-    case 'chat-opportunity': return buildChatOpportunityPrompt(data);
-    case 'chat-deep-analysis': return buildChatDeepAnalysisPrompt(data);
     case 'metacognition': return buildMetacognitionPrompt(data);
-    case 'signals': return buildSignalsPrompt(data);
     default: return null;
   }
 }

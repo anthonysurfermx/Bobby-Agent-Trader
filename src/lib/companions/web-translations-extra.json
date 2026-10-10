@@ -10864,5 +10864,11 @@
     "pt": "Não consegui terminar a explicação. Podes tentar de novo.",
     "it": "Non sono riuscito a completare la spiegazione. Puoi riprovare.",
     "de": "Ich konnte die Erklärung nicht abschließen. Du kannst es noch einmal versuchen."
+  },
+  "The market scan no longer runs in this chat. Ask your question at bobbyprotocol.xyz/desk.": {
+    "fr": "L’analyse du marché ne se fait plus dans ce chat. Posez votre question sur bobbyprotocol.xyz/desk.",
+    "pt": "A análise de mercado já não é feita neste chat. Faça a sua pergunta em bobbyprotocol.xyz/desk.",
+    "it": "L’analisi di mercato non si fa più in questa chat. Fai la tua domanda su bobbyprotocol.xyz/desk.",
+    "de": "Der Marktscan läuft nicht mehr in diesem Chat. Stelle deine Frage auf bobbyprotocol.xyz/desk."
   }
 }
