@@ -27,9 +27,9 @@ Physical iPhone microphone, speaker/echo, TestFlight installation remain separat
 
 ## Release state
 
-Draft PR: https://github.com/anthonysurfermx/Bobby-Agent-Trader/pull/178 remains a draft. The earlier signed archive is superseded and must not be uploaded. The final corrected signed archive path and current upload result are recorded in codex-status.md. The prior upload failed with `Failed to Use Accounts`; a fresh export/upload attempt follows final archive verification. No upload acceptance, processing or internal availability is claimed without Apple evidence.
+Draft PR: https://github.com/anthonysurfermx/Bobby-Agent-Trader/pull/178 remains a draft. The earlier signed archive is superseded and must not be uploaded. The final corrected signed archive path and current upload result are recorded in codex-status.md. The final corrected archive is signed and verified (1.8/69, expected team, matching resources, no Debug fixtures/QA hooks). A fresh upload attempt also failed with `exportArchive Failed to Use Accounts` (exit 70). Apple did not accept this build. No upload acceptance, processing or internal availability is claimed without Apple evidence.
 
-If the account is still blocked: on the Mac, open Xcode → Settings → Accounts, sign in with the developer Apple ID, and approve any sign-in request on the iPhone. The harness contains a one-command upload script for the final archive.
+If the account is still blocked: on the Mac, open Xcode → Settings → Accounts, sign in with the developer Apple ID, and approve any sign-in request on the iPhone. Then run the harness `upload-build69-final.zsh`; it uses only `Bobby-1.8-69-final.xcarchive` and requires the archive-verification record.
 
 The first branch push triggered Vercel's existing automatic preview integration. That exact preview was removed; automatic previews for this branch are now disabled. Production was not promoted or changed.
 
