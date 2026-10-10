@@ -151,7 +151,26 @@ final class NucleoSession: ObservableObject {
         if fixtures || BobbyApp.isUnitTestHost {
             var data: Data?
             companionContext = CompanionContextStore(read: { data }, write: { data = $0; return true })
-        } else { companionContext = .shared }
+        } else {
+#if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-qa-companion-live"),
+               let account = BobbyApp.argument(after: "-qa-companion-memory-account"), account.hasPrefix("companion-qa-") {
+                companionContext = CompanionContextStore(account: account)
+            } else { companionContext = .shared }
+#else
+            companionContext = .shared
+#endif
+        }
+#if DEBUG
+        if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-companion-day3") {
+            let now = Date()
+            companionContext.choose(true, now: now.addingTimeInterval(-2 * 86400))
+            companionContext.opened(now: now.addingTimeInterval(-86400))
+            companionContext.opened(now: now)
+            companionContext.answered(now: now)
+            for id in ["interest", "barrier", "when", "cushion", "hurry"] { companionContext.answer(id, value: nil) }
+        }
+#endif
         companionContext.opened()
         self.briefingIntent = briefingIntent ?? .shared
         self.newsIntent = newsIntent ?? .shared
@@ -300,10 +319,26 @@ final class NucleoSession: ObservableObject {
             guard companionContext.allows(companionPilot.capability), companionQuestionId == id, companionContext.next(preferred: id)?.id == id else {
                 throw NucleoFault.invalid("no current check-in")
             }
+            if let text = try p.string("text", required: false) {
+                guard !p.has("value"), text.utf16.count <= 400 else { return CompanionPilot.answerFailure() }
+                let revision = companionContext.revision
+                let reply = await companionPilot.answer(questionId: id, text: text)
+                guard companionContext.revision == revision, companionQuestionId == id else { return NucleoDesk.cancelledResult }
+                guard reply["status"] as? String == "noted", let patch = reply["patch"] as? [String: Any] else { return reply }
+                guard companionContext.apply(patch, for: id) else {
+                    if companionContext.storageError { return ["message": CompanionCopy.text("storageError")] }
+                    return CompanionPilot.answerFailure()
+                }
+                return companionCheckIn(preferred: reply["checkIn"] as? String)
+            }
             let value = try p.string("value", required: false, maxLength: 64)
             companionContext.answer(id, value: value)
             if companionContext.storageError { return ["message": CompanionCopy.text("storageError")] }
-            return companionCheckIn()
+            var next = companionCheckIn()
+            if id == "fall", let value, let label = CompanionCatalog.question(id)?.label(value) {
+                next["explanation"] = CompanionCopy.text("exerciseExplanation").replacingOccurrences(of: "{choice}", with: label)
+            }
+            return next
         case "cancel":
             return desk.cancel()
         case "read.rendered":
@@ -438,7 +473,7 @@ final class NucleoSession: ObservableObject {
             "pendingRead": desk.pendingRead() ?? NSNull(), "fixtures": fixtures, "platform": "ios", "appVersion": appVersion,
             "analysisLevel": NucleoLevelCenter.shared.level.pageJSON,
             "speaking": SpeakingDial(defaults: defaults).json(fixtures ? nil : AccountSession.shared.session?.userId),
-            "companionPilot": ["strings": CompanionCopy.json],
+            "companionPilot": ["strings": CompanionCopy.json, "textScale": UIFontMetrics(forTextStyle: .body).scaledValue(for: 17) / 17],
             "nudge": currentNudge().map { $0.json as Any } ?? NSNull(),
         ]
         // Bobby never invites someone into a wall: when the phone KNOWS the next read is refused, the

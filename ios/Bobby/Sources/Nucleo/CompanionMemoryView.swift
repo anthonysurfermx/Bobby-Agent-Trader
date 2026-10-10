@@ -3,36 +3,53 @@ import SwiftUI
 struct CompanionConsentView: View {
     @ObservedObject var store: CompanionContextStore
     let finished: (Bool) -> Void
+    @ScaledMetric(relativeTo: .title2) private var titleSize = 24
+    @ScaledMetric(relativeTo: .body) private var bodySize = 16
     var body: some View {
         let words = CompanionCopy.consent
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                if words.count == 7 {
-                    Text(words[0]).font(.system(size: 26, weight: .light, design: .rounded))
-                        .accessibilityAddTraits(.isHeader).accessibilityIdentifier("companion-consent-title")
-                    ForEach(1..<4) { index in
-                        Text(words[index]).font(.system(size: 16)).fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 12) {
+            if words.count == 7 {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(words[0]).font(.system(size: titleSize, weight: .light, design: .rounded))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityAddTraits(.isHeader).accessibilityIdentifier("companion-consent-title")
+                        ForEach(1..<4) { index in
+                            Text(words[index]).font(.system(size: bodySize)).fixedSize(horizontal: false, vertical: true)
+                        }
                     }
+                }
+                HStack(spacing: 12) {
                     Button(words[4]) {
                         store.choose(true)
                         if store.accepted { finished(true) }
                     }
-                    .buttonStyle(.borderedProminent).tint(Theme.cream).foregroundStyle(Theme.bg)
+                    .buttonStyle(ConsentChoiceStyle())
                     .accessibilityIdentifier("companion-consent-yes")
                     Button(words[5]) {
                         store.choose(false)
                         if store.decided { finished(false) }
                     }
+                    .buttonStyle(ConsentChoiceStyle())
                     .accessibilityIdentifier("companion-consent-no")
-                    Link(words[6], destination: L.site("privacy"))
-                        .accessibilityIdentifier("companion-consent-details")
-                    if store.storageError { Text(CompanionCopy.text("storageError")).font(.footnote) }
                 }
+                Link(destination: CompanionCopy.privacyURL) {
+                    Text(words[6]).frame(maxWidth: .infinity, minHeight: 44)
+                }.accessibilityIdentifier("companion-consent-details")
+                if store.storageError { Text(CompanionCopy.text("storageError")).font(.footnote) }
             }
-            .foregroundStyle(Theme.cream).padding(24)
-        }
+        }.foregroundStyle(Theme.cream).padding(20)
         .background(Theme.nucleoSurface.ignoresSafeArea())
         .interactiveDismissDisabled()
+    }
+}
+
+private struct ConsentChoiceStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.font(.body)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background(Theme.cream, in: RoundedRectangle(cornerRadius: 16))
+            .foregroundStyle(Theme.bg)
     }
 }
 
@@ -58,6 +75,8 @@ struct CompanionNotesView: View {
                 })).accessibilityIdentifier("companion-memory-toggle")
                 Text(CompanionCopy.text("retention")).font(.footnote).foregroundStyle(Theme.warmMuted)
                     .fixedSize(horizontal: false, vertical: true)
+                Text(CompanionCopy.text("deviceNotes")).font(.footnote).foregroundStyle(Theme.warmMuted)
+                    .fixedSize(horizontal: false, vertical: true)
                 if store.state.notes.isEmpty { Text(CompanionCopy.text("empty")).foregroundStyle(Theme.warmMuted) }
                 ForEach(store.state.notes) { note in
                     if let question = CompanionCatalog.question(note.field), let label = question.label(note.value) {
@@ -65,7 +84,7 @@ struct CompanionNotesView: View {
                             Text(question.title).font(.system(size: 14)).foregroundStyle(Theme.warmMuted).fixedSize(horizontal: false, vertical: true)
                             Text(label).font(.system(size: 18)).fixedSize(horizontal: false, vertical: true)
                                 .accessibilityIdentifier("companion-note-\(note.field)")
-                            Text(CompanionCopy.text(note.source)).font(.footnote).foregroundStyle(Theme.warmMuted)
+                            Text(CompanionCopy.text(question.needsConfirmation(note.value) ? "inferred" : note.source)).font(.footnote).foregroundStyle(Theme.warmMuted)
                             Text(CompanionCopy.text("expires") + " · " + note.expiresAt.formatted(.dateTime.locale(L.locale).day().month().year()))
                                 .font(.footnote).foregroundStyle(Theme.warmMuted)
                             HStack(spacing: 20) {

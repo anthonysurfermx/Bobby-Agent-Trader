@@ -417,7 +417,7 @@ STATES.LISTENING = {
     if (ST.name !== 'LISTENING') return;
     text = String(text || '').replace(/\s+/g, ' ').trim();
     this.finalWait = 0;
-    if (guideResumeOptions()) { txReset(); return; }
+    if (guideResumeOptions(text)) { txReset(); return; }
     if (!text){ txReset(); go('IDLE', { hint: 'hint.empty', restoreGreet: true }); return; }
     txSet(text, true);
     go('SENDING', { question: text, origin: 'speech' });
@@ -450,7 +450,7 @@ STATES.TYPING = {
     if (!this.d.fromRead) chipsHide();
     A.type.p.set(0); A.type.p.to(1, 'emit'); A.type.o.tween(1, 0.2, E.fade);
     A.pillO.tween(0, 0.16, E.fade);
-    el.ta.value = SPEECH.draft || ''; SPEECH.draft = ''; el.ta.placeholder = tt('type.placeholder'); att(el.taSend, 'aria-label', tt('type.send')); taAutosize();
+    el.ta.value = SPEECH.draft || ''; SPEECH.draft = ''; el.ta.placeholder = GUIDE_INPUT_CHECKIN ? guideWords().answerPlaceholder : tt('type.placeholder'); att(el.taSend, 'aria-label', GUIDE_INPUT_CHECKIN ? guideWords().answerSend : tt('type.send')); if (GUIDE_INPUT_CHECKIN) el.ta.maxLength = 400; else el.ta.removeAttribute('maxlength'); taAutosize();
     showTypeBox(true);
   },
   exit: function(){ A.type.p.to(0, 'ret'); A.type.o.tween(0, 0.16, E.fade); A.pillO.tween(1, 0.2, E.fade); try { el.ta.blur(); } catch (e) {} at(0.2, function(){ if (ST.name !== 'TYPING') showTypeBox(false); }); },
@@ -458,7 +458,7 @@ STATES.TYPING = {
     if (ST.name !== 'TYPING' || TB.composing) return;
     var q = el.ta.value.replace(/\s+/g, ' ').trim();
     if (!q){ this.cancel(); return; }
-    if (guideResumeOptions()) return;
+    if (guideResumeOptions(q)) return;
     var params = this.d.followUpOf ? { followUpOf: this.d.followUpOf, question: q } : { question: q };
     go('SENDING', { question: q, params: params, origin: 'type', fromRead: !!this.d.fromRead });
   },

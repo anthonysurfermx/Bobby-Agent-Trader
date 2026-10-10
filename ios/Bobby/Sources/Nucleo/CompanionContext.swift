@@ -11,17 +11,24 @@ struct CompanionQuestion: Codable, Identifiable, Equatable {
     let text: [String: String]
     let options: [Option]
     let spoken: [String]
+    let labels: [String: [String: String]]?
+    func accepts(_ value: String) -> Bool { value == "unsure" || options.contains { $0.id == value } || spoken.contains(value) }
     var title: String { text[L.language] ?? text["en"] ?? "" }
-    func label(_ value: String) -> String? { options.first { $0.id == value }.flatMap { $0.label[L.language] ?? $0.label["en"] } }
+    private func catalogLabel(_ value: String) -> String? {
+        let row = options.first { $0.id == value }?.label ?? labels?[value] ?? (value == "unsure" ? CompanionCatalog.bundled.unsure : nil)
+        return row?[L.language] ?? row?["en"]
+    }
+    func label(_ value: String) -> String? { catalogLabel(value) ?? (accepts(value) ? title : nil) }
+    func needsConfirmation(_ value: String) -> Bool { accepts(value) && catalogLabel(value) == nil }
     var json: [String: Any] { ["id": id, "text": title, "options": options.map { ["id": $0.id, "label": $0.label[L.language] ?? $0.label["en"] ?? ""] }] }
 }
 
 enum CompanionCatalog {
-    struct Catalog: Codable { let version: Int; let questions: [CompanionQuestion] }
+    struct Catalog: Codable { let version: Int; let unsure: [String: String]?; let questions: [CompanionQuestion] }
     static let bundled: Catalog = {
         guard let root = Bundle.main.url(forResource: "Nucleo", withExtension: nil),
               let data = try? Data(contentsOf: root.appendingPathComponent("companion-questions.json")),
-              let catalog = try? JSONDecoder().decode(Catalog.self, from: data) else { return Catalog(version: 0, questions: []) }
+              let catalog = try? JSONDecoder().decode(Catalog.self, from: data) else { return Catalog(version: 0, unsure: nil, questions: []) }
         return catalog
     }()
     static var questions: [CompanionQuestion] { bundled.questions }
@@ -39,12 +46,17 @@ enum CompanionCopy {
         let row = (copy["texts"] as? [String: [String: String]])?[key]
         return row?[L.language] ?? row?["en"] ?? ""
     }
+    static var privacyURL: URL {
+        var url = URLComponents(url: L.site("privacy"), resolvingAgainstBaseURL: false)!
+        url.fragment = "notes"
+        return url.url!
+    }
     static var consent: [String] {
         let rows = copy["consent"] as? [String: [String]]
         return rows?[L.language] ?? rows?["en"] ?? []
     }
     static var json: [String: Any] {
-        let keys = ["retry", "skip", "close", "personalized"]
+        let keys = ["retry", "skip", "close", "personalized", "answerFailed", "answerPlaceholder", "answerSend", "exerciseExplanation"]
         return Dictionary(uniqueKeysWithValues: keys.map { ($0, text($0)) })
     }
 }
@@ -52,7 +64,11 @@ enum CompanionCopy {
 /// Only enumerated notes enter the wire. Keychain is device-only and protected while locked; no sync.
 @MainActor
 final class CompanionContextStore: ObservableObject {
-    static let shared = CompanionContextStore()
+    static let shared: CompanionContextStore = {
+        let store = CompanionContextStore()
+        store.prepareInstall(defaults: .standard)
+        return store
+    }()
     static let notice = "memory-1"
     struct Note: Codable, Equatable, Identifiable {
         var id: String { field }
@@ -77,11 +93,31 @@ final class CompanionContextStore: ObservableObject {
     let account: String
     private let read: () -> Data?
     private let write: (Data) -> Bool
-    init(account: String = "companion-context-device-v1", read: (() -> Data?)? = nil, write: ((Data) -> Bool)? = nil) {
+    private let remove: () -> Bool
+    private var installDefaults: UserDefaults?
+    init(account: String = "companion-context-device-v1", read: (() -> Data?)? = nil, write: ((Data) -> Bool)? = nil, remove: (() -> Bool)? = nil) {
         self.account = account
         self.read = read ?? { Self.readKeychain(account) }
         self.write = write ?? { Self.writeKeychain(account, $0) }
+        self.remove = remove ?? (write.map { writer in { writer(Data()) } } ?? { Self.removeKeychain(account) })
         if let data = self.read(), let saved = try? JSONDecoder().decode(State.self, from: data) { state = saved }
+    }
+    /// The install marker is deliberately outside Keychain, so reinstalling drops an old device record.
+    func prepareInstall(defaults: UserDefaults) {
+        installDefaults = defaults
+        let key = "companion.context.install.v1"
+        guard !defaults.bool(forKey: key) else { return }
+        if reset() { defaults.set(true, forKey: key) }
+    }
+    @discardableResult func reset() -> Bool {
+        let removed = remove()
+        if !removed { installDefaults?.removeObject(forKey: "companion.context.install.v1") }
+        state = State(); storageError = !removed; revision = UUID(); changed()
+        return removed
+    }
+    private static func removeKeychain(_ account: String) -> Bool {
+        let status = SecItemDelete(query(account) as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
     }
     var accepted: Bool { state.accepted && state.notice == Self.notice }
     var decided: Bool { state.notice == Self.notice && state.decidedAt != nil }
@@ -137,6 +173,22 @@ final class CompanionContextStore: ObservableObject {
         }
         if !next.asked.contains(id) { next.asked.append(id) }
         _ = save(next)
+    }
+    /// Reject malformed or unrelated patches atomically. Raw answer text never enters this store.
+    @discardableResult func apply(_ patch: [String: Any], for id: String, now: Date = Date()) -> Bool {
+        guard accepted, Set(patch.keys) == Set(["notes", "asked"]),
+              let question = CompanionCatalog.question(id), question.day <= state.day,
+              let notes = patch["notes"] as? [[String: Any]], notes.count == 1,
+              let asked = patch["asked"] as? [String], asked == [id], let note = notes.first,
+              Set(note.keys) == Set(["field", "value", "source"]), note["field"] as? String == id,
+              let value = note["value"] as? String, question.accepts(value),
+              let source = note["source"] as? String, (["said", "inferred"].contains(source) || id == "fall" && source == "shown") else { return false }
+        var next = state
+        next.notes.removeAll { $0.field == id }
+        next.notes.append(Note(field: id, value: value, source: source, createdAt: now,
+            expiresAt: now.addingTimeInterval(Double(question.money || source == "inferred" ? 7 : 30) * 86400)))
+        if !next.asked.contains(id) { next.asked.append(id) }
+        return save(next)
     }
     func delete(_ id: String) { var next = state; next.notes.removeAll { $0.field == id }; _ = save(next) }
     func deleteAll() { var next = state; next.notes = []; _ = save(next) }

@@ -42,7 +42,12 @@ class Element {
     if (!this.queries.has(selector)) this.queries.set(selector, this.appendChild(new Element()));
     return this.queries.get(selector);
   }
-  querySelectorAll(selector) { return Array.from({ length: this.attributes.id === 'meri' ? 4 : 3 }, (_, index) => this.querySelector(selector + index)); }
+  querySelectorAll(selector) {
+    if (selector === 'button' && this.id === 'companionPanel') {
+      const collect = node => node.children.flatMap(child => child._guideAction ? [child] : collect(child));
+      return collect(this);
+    }
+    return Array.from({ length: this.attributes.id === 'meri' ? 4 : 3 }, (_, index) => this.querySelector(selector + index)); }
   addEventListener(name, callback) { this.listeners[name] = callback; }
   getBoundingClientRect() { return { left: 0, top: 0, width: 100, height: 30 }; }
   // What a browser would measure; a test hands in `measure` when a height decides something.
@@ -59,7 +64,7 @@ class Element {
 
 function harness({ legacyEvents = false, language = 'en', rejectCollections = false, nudgeActive = true,
   suggestions = { v: 1, quickAccess: [] }, holdAsks = false, measure = null, stallCollections = false,
-  theses = { v: 1, items: [] }, saved = null, speak = 'muted', speaking = null, chooseFails = false } = {}) {
+  theses = { v: 1, items: [] }, saved = null, speak = 'muted', speaking = null, chooseFails = false, companionAnswer = () => ({question:null}) } = {}) {
   const nodes = new Map(), calls = [], errors = [], pending = [];
   const made = () => Object.assign(new Element(), { measure });
   for (const match of template.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)) {
@@ -91,6 +96,9 @@ function harness({ legacyEvents = false, language = 'en', rejectCollections = fa
     setTimeout: () => 0, requestAnimationFrame(callback) { nextFrame = callback; }, Image: class {},
     webkit: { messageHandlers: { nucleo: { postMessage(envelope) {
       calls.push(JSON.parse(JSON.stringify(envelope)));
+      if (envelope.method === 'speech.start') return Promise.resolve({v:1,ok:true,result:{status:'listening'}});
+      if (envelope.method === 'speech.stop') return Promise.resolve({v:1,ok:true,result:{status:'processing'}});
+      if (envelope.method === 'companion.answer') return Promise.resolve(companionAnswer(envelope.params)).then(result => ({v:1,ok:true,result}));
       if (envelope.method === "speaking.choose") {
         if (chooseFails) return Promise.reject(new Error("storage failed"));
         session.speaking = { ...session.speaking, value: envelope.params.value, offer: false, refine: false };
@@ -710,8 +718,8 @@ const guideActionsOf = app => companionPanel(app).children.at(-1);
 test('a catalog question takes the chip row after a market reply and revocation restores it', async () => {
   const app = await idle({ seed: s => { s.companionPilot = { strings: { close:'Close',skip:'Skip' } }; } });
   await personRead(app, okRead({ companionCheckIn:{ question:{id:'interest',text:'Interest?',options:[{id:'crypto',label:'Crypto'}]} } }));
-  assert.equal(companionPanel(app).style.display,'block');
-  assert.equal(companionPanel(app).children[3].textContent,'Interest?');
+  assert.equal(companionPanel(app).style.display,'flex');
+  assert.equal(companionPanel(app).children[1].textContent,'Interest?');
   assert.deepEqual(rowOf(app),[]);
   app.context.nucleoBridge.emit('companion.revoked',{});
   assert.equal(companionPanel(app).style.display,'none');
@@ -724,7 +732,7 @@ test('companion text stays out of market cards and a follow-up always routes dir
   await companionReply(app,{ v:1,status:'companion',requestId:'90d2564c-6064-4275-95cd-5a3c7c0b5b56',text:'Learning explanation',followUp:'How does bitcoin work?' });
   assert.equal(app.context.nucleo.read().status,'companion');
   assert.equal(app.context.nucleo.read().symbol,null);
-  assert.equal(companionPanel(app).children[0].textContent,'Learning explanation');
+  assert.equal(companionPanel(app).children[0].children[0].textContent,'Learning explanation');
   guideActionsOf(app).children[0]._guideAction();
   await flush();
   assert.deepEqual(asksOf(app).at(-1),{question:'How does bitcoin work?',companion:true});
@@ -742,9 +750,52 @@ test('companion retries once and a revoked note removes the mark and check-in', 
   assert.equal(guideActionsOf(app).children.length,1,'only the exit after one retry');
   // A new typed question starts a new turn and may use the accepted notes.
   await companionReply(app,{v:1,status:'companion',text:'Explanation',personalized:true,companionCheckIn:{question:{id:'interest',text:'Interest?',options:[{id:'crypto',label:'Crypto'}]}}});
-  assert.equal(companionPanel(app).children[1].textContent,'Uses your notes');
+  assert.equal(companionPanel(app).children[0].children[1].textContent,'Uses your notes');
   app.context.nucleoBridge.emit('companion.revoked',{});
+  assert.equal(companionPanel(app).children[0].children[1].textContent,'');
   assert.equal(companionPanel(app).children[1].textContent,'');
-  assert.equal(companionPanel(app).children[3].textContent,'');
+  assert.deepEqual(app.errors,[]);
+});
+
+for (const input of ['type','speech']) test(`${input}: Bobby's answer uses the current check-in and never opens a market question`, async () => {
+  const app = await idle({companionAnswer: p => p.value ? {question:{id:'when',text:'When?',options:[{id:'2_to_7y',label:'Later'}]}} : {question:null}});
+  app.session.companionPilot = {strings:{skip:'Skip',close:'Close',answerPlaceholder:'Your answer',answerSend:'Send answer'}};
+  await companionReply(app,{status:'companion',text:'Explanation',companionCheckIn:{question:{id:'interest',text:'Interest?',options:[{id:'crypto',label:'Crypto'}]}}});
+  // Move past the first question before speaking: resuming must not restore the stale interest question.
+  companionPanel(app).children[2].children[0]._guideAction(); await flush();
+  if (input === 'type') {
+    tap(app,app.nodes.get('pill')); app.nodes.get('ta').value='in three years';
+    app.nodes.get('taSend').listeners.click();
+  } else {
+    app.session.mic.state='granted';
+    app.context.nucleoBridge.emit('session.changed',{...app.session}); await flush();
+    const pill=app.nodes.get('pill');
+    app.nodes.get('stage').listeners.pointerdown({target:pill,clientX:220,clientY:800,pointerId:1,button:0,preventDefault(){}});
+    await flush(); app.advance(0.5);
+    app.nodes.get('stage').listeners.pointerup({target:pill,clientX:220,clientY:800,pointerId:1,preventDefault(){}});
+    app.context.nucleoBridge.emit('speech.final',{text:'in three years'});
+  }
+  await flush();
+  assert.deepEqual(app.calls.filter(c=>c.method==='companion.answer').at(-1).params,{questionId:'when',text:'in three years'});
+  assert.equal(asksOf(app).length,1,'only the initial explanation spent a turn');
+  assert.equal(app.context.nucleo.state(),'COMPANION'); assert.deepEqual(app.errors,[]);
+});
+test('a failed answer keeps the choices and the localized line; a local exercise choice asks its explanation', async () => {
+  let result={message:'Pick an option.'};
+  const app=await idle({companionAnswer:()=>result});app.session.companionPilot={strings:{skip:'Skip',close:'Close'}};
+  await companionReply(app,{status:'companion',text:'Explanation',companionCheckIn:{question:{id:'fall',text:'What would you do?',options:[{id:'pause',label:'Stop'}]}}});
+  tap(app,app.nodes.get('pill'));app.nodes.get('ta').value='my answer';app.nodes.get('taSend').listeners.click();await flush();
+  assert.equal(companionPanel(app).children[0].children[0].textContent,'Pick an option.');
+  assert.equal(companionPanel(app).children[2].children[0].textContent,'Stop');
+  result={question:null,explanation:'I chose Stop. What does a fall mean?'};
+  companionPanel(app).children[2].children[0]._guideAction(); await flush();
+  assert.deepEqual(asksOf(app).at(-1),{question:'I chose Stop. What does a fall mean?',companion:true});
+  assert.deepEqual(app.errors,[]);
+});
+test('the fact fixture is separate from narration and retains its source and year', async () => {
+  const app=await idle();const fixture=JSON.parse(read('../fixtures/native/companion-explanation-fact.json'));
+  await companionReply(app,{status:'companion',requestId:fixture.requestId,text:fixture.reply.text,fact:fixture.fact});
+  assert.equal(companionPanel(app).children[0].children[2].textContent,fixture.fact.text+'\n'+fixture.fact.source+' · '+fixture.fact.year);
+  assert.equal(app.calls.filter(c=>c.method==='speak').at(-1).params.text,fixture.reply.text);
   assert.deepEqual(app.errors,[]);
 });

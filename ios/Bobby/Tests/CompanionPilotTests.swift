@@ -53,4 +53,52 @@ final class CompanionPilotTests: XCTestCase {
         let r = await p.turn(question: "What is investing?", requestId: UUID().uuidString, candidate: nil, speech: "plain")
         XCTAssertEqual(r?["status"] as? String, "cancelled")
     }
+    func testTypedAnswerCarriesContextButNoQuestionAndKeepsThePatchSeparate() async {
+        let p = CompanionPilot(); var posted: [String: Any]?
+        p.context = { ["version": 1, "consent": ["notice": "memory-1", "memory": true, "money": true], "day": 1] }
+        p.transport = { _, method, body in
+            if method == "GET" { return (["companion": ["context": true, "catalog": 1, "notices": ["memory-1"]]], 405) }
+            posted = body
+            return (["version": 1, "kind": "noted", "patch": ["notes": [["field": "when", "value": "2_to_7y", "source": "said"]], "asked": ["when"]], "checkIn": ["questionId": "cushion"]], 200)
+        }
+        let result = await p.answer(questionId: "when", text: "in three years")
+        XCTAssertEqual(result["status"] as? String, "noted")
+        XCTAssertNil(posted?["question"]); XCTAssertNotNil(posted?["context"])
+        XCTAssertEqual((posted?["answer"] as? [String: String])?["text"], "in three years")
+        XCTAssertEqual(result["checkIn"] as? String, "cushion")
+        XCTAssertNil(result["asset"]); XCTAssertNil(result["text"])
+    }
+    func testAnswerFailureAndUTF16LimitKeepOptionsAvailable() async {
+        let p = CompanionPilot(); var posts = 0
+        p.context = { ["version": 1] }
+        p.transport = { _, method, _ in
+            if method == "GET" { return (["companion": ["context": true]], 405) }
+            posts += 1
+            return (["version": 1, "kind": "error", "error": ["code": "notes_limit", "message": "Pick an option."]], 429)
+        }
+        let long = await p.answer(questionId: "interest", text: String(repeating: "🙂", count: 201))
+        XCTAssertNotNil(long["message"]); XCTAssertEqual(posts, 0)
+        let refused = await p.answer(questionId: "interest", text: "crypto")
+        XCTAssertEqual(refused["message"] as? String, "Pick an option."); XCTAssertEqual(posts, 1)
+        p.context = { nil }
+        _ = await p.answer(questionId: "interest", text: "crypto")
+        XCTAssertEqual(posts, 1, "no answer travels without consented context")
+    }
+    func testRevocationDiscardsPendingNotedPatchAndFactsAreEnvelopeOnly() async {
+        let p = CompanionPilot(); var revision = UUID(); p.revision = { revision }; p.context = { ["version": 1] }
+        p.transport = { _, method, _ in
+            if method == "GET" { return (["companion": ["context": true]], 405) }
+            revision = UUID()
+            return (["version": 1, "kind": "noted", "patch": ["notes": [], "asked": []]], 200)
+        }
+        let cancelled = await p.answer(questionId: "interest", text: "crypto")
+        XCTAssertEqual(cancelled["status"] as? String, "cancelled")
+        p.transport = { _, _, _ in
+            (["version": 1, "kind": "explanation", "reply": ["text": "Explanation", "fact": ["text": "Wrong nested card"]], "fact": ["text": "Envelope card", "source": "Source", "year": "2026"]], 200)
+        }
+        let result = await p.turn(question: "What is investing?", requestId: UUID().uuidString, candidate: nil, speech: nil)
+        XCTAssertEqual((result?["fact"] as? [String: String])?["text"], "Envelope card")
+        XCTAssertEqual(result?["text"] as? String, "Explanation")
+    }
+
 }

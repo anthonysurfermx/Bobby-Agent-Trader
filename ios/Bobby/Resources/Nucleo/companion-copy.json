@@ -199,6 +199,46 @@
       "pt": "Não consegui salvar as anotações. Tente de novo.",
       "it": "Non ho potuto salvare gli appunti. Riprova.",
       "de": "Ich konnte die Notizen nicht speichern. Versuche es erneut."
+    },
+    "answerFailed": {
+      "es": "No pude anotarlo. Puedes elegir una de las opciones.",
+      "en": "I could not note that. You can pick one of the options.",
+      "fr": "Je n’ai pas pu le noter. Tu peux choisir une des options.",
+      "pt": "Não consegui anotar. Você pode escolher uma das opções.",
+      "it": "Non sono riuscito ad annotarlo. Puoi scegliere una delle opzioni.",
+      "de": "Das konnte ich nicht notieren. Du kannst eine der Optionen wählen."
+    },
+    "answerPlaceholder": {
+      "es": "Tu respuesta a Bobby",
+      "en": "Your answer to Bobby",
+      "fr": "Ta réponse à Bobby",
+      "pt": "Sua resposta ao Bobby",
+      "it": "La tua risposta a Bobby",
+      "de": "Deine Antwort an Bobby"
+    },
+    "answerSend": {
+      "es": "Enviar respuesta",
+      "en": "Send answer",
+      "fr": "Envoyer la réponse",
+      "pt": "Enviar resposta",
+      "it": "Invia risposta",
+      "de": "Antwort senden"
+    },
+    "exerciseExplanation": {
+      "es": "Elegí «{choice}». ¿Qué significa una caída así?",
+      "en": "I chose “{choice}”. What does a drop like that mean?",
+      "fr": "J’ai choisi « {choice} ». Que signifie une baisse comme ça ?",
+      "pt": "Escolhi “{choice}”. O que significa uma queda assim?",
+      "it": "Ho scelto «{choice}». Che cosa significa un calo così?",
+      "de": "Ich habe „{choice}“ gewählt. Was bedeutet so ein Rückgang?"
+    },
+    "deviceNotes": {
+      "en": "These notes stay on this device when you sign out.",
+      "es": "Estas notas se quedan en este dispositivo cuando cierras sesión.",
+      "de": "Diese Notizen bleiben beim Abmelden auf diesem Gerät.",
+      "fr": "Ces notes restent sur cet appareil quand tu te déconnectes.",
+      "pt": "Estas notas ficam neste dispositivo quando você sai da conta.",
+      "it": "Queste note restano su questo dispositivo quando esci dal tuo account."
     }
   }
 }

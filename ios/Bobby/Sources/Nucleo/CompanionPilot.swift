@@ -55,6 +55,9 @@ final class CompanionPilot {
         if let context = context() { body["context"] = context }
         let epoch = revision()
         let response = try? await transport("api/companion-turn", "POST", body)
+#if DEBUG
+        recordLiveQA(response, contextSent: body["context"] != nil, requestKind: "question")
+#endif
         guard !Task.isCancelled, revision() == epoch else { return NucleoDesk.cancelledResult }
         guard let response, let json = response.0 as? [String: Any], json["version"] as? Int == 1,
               let kind = json["kind"] as? String else { return Self.failure() }
@@ -64,7 +67,7 @@ final class CompanionPilot {
                 "followUp": NucleoDeskIO.nextQuestion(reply["followUp"]) as Any? ?? NSNull(),
                 "personalized": json["personalized"] as? Bool ?? false]
             if let check = json["checkIn"] as? [String: Any], let id = check["questionId"] as? String { result["checkIn"] = id }
-            if let fact = reply["fact"] as? [String: Any] ?? json["fact"] as? [String: Any] { result["fact"] = fact }
+            if let fact = json["fact"] as? [String: Any] { result["fact"] = fact }
             return result
         }
         if kind == "desk_offer", let candidate,
@@ -78,6 +81,47 @@ final class CompanionPilot {
         }
         return Self.failure(message: error?["message"] as? String, retryable: error?["retryable"] as? Bool ?? true)
     }
+    /// Free text is read once by the server; only a validated enum patch is persisted by the caller.
+    func answer(questionId: String, text: String) async -> [String: Any] {
+        guard await probe().context, !text.isEmpty, text.utf16.count <= 400, let context = context() else {
+            return Self.answerFailure()
+        }
+        let body: [String: Any] = ["version": 1, "requestId": UUID().uuidString,
+            "answer": ["questionId": questionId, "text": text], "context": context,
+            "language": L.language, "locale": L.language == "pt" ? "pt-BR" : L.locale.identifier]
+        let epoch = revision()
+        let response = try? await transport("api/companion-turn", "POST", body)
+#if DEBUG
+        recordLiveQA(response, contextSent: true, requestKind: "answer")
+#endif
+        guard !Task.isCancelled, revision() == epoch else { return NucleoDesk.cancelledResult }
+        guard let response, let json = response.0 as? [String: Any], json["version"] as? Int == 1 else { return Self.answerFailure() }
+        if (200..<300).contains(response.1), json["kind"] as? String == "noted", let patch = json["patch"] as? [String: Any] {
+            var result: [String: Any] = ["status": "noted", "patch": patch]
+            if let check = json["checkIn"] as? [String: Any], let id = check["questionId"] as? String { result["checkIn"] = id }
+            return result
+        }
+        let error = json["error"] as? [String: Any]
+        return Self.answerFailure(message: error?["message"] as? String)
+    }
+    static func answerFailure(message: String? = nil) -> [String: Any] {
+        ["message": message ?? CompanionCopy.text("answerFailed")]
+    }
+#if DEBUG
+    private func recordLiveQA(_ response: (Any?, Int)?, contextSent: Bool, requestKind: String) {
+        if ProcessInfo.processInfo.arguments.contains("-qa-companion-live"), let response,
+           let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first,
+           let record = try? JSONSerialization.data(withJSONObject: ["language": L.language,
+               "requestKind": requestKind, "status": response.1, "contextSent": contextSent,
+               "response": response.0 ?? [:]], options: [.sortedKeys]) {
+            let file = directory.appendingPathComponent("companion-live-replies.jsonl")
+            if !FileManager.default.fileExists(atPath: file.path) { _ = FileManager.default.createFile(atPath: file.path, contents: nil) }
+            if let handle = try? FileHandle(forWritingTo: file) {
+                try? handle.seekToEnd(); try? handle.write(contentsOf: record + Data([10])); try? handle.close()
+            }
+        }
+    }
+#endif
     static var unavailable: String { CompanionCopy.text("unavailable") }
     static func failure(message: String? = nil, retryable: Bool = true) -> [String: Any] {
         ["v": 1, "status": "companion_error", "message": message ?? unavailable, "retryable": retryable]

@@ -10,6 +10,61 @@ final class CompanionContextTests: XCTestCase {
     }
     private let live = CompanionPilot.Capability(enabled: true, context: true, catalog: 1, notices: ["memory-1"])
 
+    func testInstallResetRemovesConsentAndNotesButNormalLaunchKeepsThem() {
+        let suite = "companion.install.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var data: Data?
+        let s = CompanionContextStore(read: { data }, write: { data = $0; return true })
+        s.choose(true); s.answered(); s.answer("interest", value: "crypto")
+        let old = data
+        s.prepareInstall(defaults: defaults)
+        XCTAssertFalse(s.decided); XCTAssertTrue(s.state.notes.isEmpty); XCTAssertNil(s.wire(capability: live))
+        s.choose(true); s.answered(); s.answer("interest", value: "companies")
+        s.prepareInstall(defaults: defaults)
+        XCTAssertTrue(s.accepted); XCTAssertEqual(s.state.notes.first?.value, "companies")
+        defaults.removePersistentDomain(forName: suite)
+        data = old
+        let reinstall = CompanionContextStore(read: { data }, write: { data = $0; return true })
+        reinstall.prepareInstall(defaults: defaults)
+        XCTAssertFalse(reinstall.decided); XCTAssertTrue(reinstall.state.notes.isEmpty)
+        let reloaded = CompanionContextStore(read: { data }, write: { data = $0; return true })
+        XCTAssertFalse(reloaded.decided); XCTAssertTrue(reloaded.state.notes.isEmpty)
+        XCTAssertEqual(CompanionCopy.privacyURL.fragment, "notes")
+    }
+    func testFailedResetRevokesMemoryAndRetriesOnNextLaunch() {
+        let suite = "companion.failed.install.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var data: Data?, canRemove = false
+        let s = CompanionContextStore(read: { data }, write: { data = $0; return true }, remove: { canRemove })
+        s.choose(true); let revision = s.revision
+        s.prepareInstall(defaults: defaults)
+        XCTAssertFalse(s.accepted); XCTAssertTrue(s.storageError); XCTAssertNotEqual(s.revision, revision)
+        XCTAssertFalse(defaults.bool(forKey: "companion.context.install.v1"))
+        canRemove = true; s.prepareInstall(defaults: defaults)
+        XCTAssertTrue(defaults.bool(forKey: "companion.context.install.v1")); XCTAssertFalse(s.storageError)
+        canRemove = false; XCTAssertFalse(s.reset())
+        XCTAssertFalse(defaults.bool(forKey: "companion.context.install.v1"), "a failed account/global erase retries before loading old notes next launch")
+    }
+
+    func testAdditiveCatalogLabelsUseTheServerWording() throws {
+        var data = try XCTUnwrap(Bundle.main.url(forResource: "Nucleo", withExtension: nil))
+        data.appendPathComponent("companion-questions.json")
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: data)) as? [String: Any])
+        var questions = try XCTUnwrap(json["questions"] as? [[String: Any]])
+        questions[0]["labels"] = ["gold": ["en": "Reviewed gold", "es": "Oro revisado", "de": "Geprüftes Gold"]]
+        json["questions"] = questions
+        let catalog = try JSONDecoder().decode(CompanionCatalog.Catalog.self, from: JSONSerialization.data(withJSONObject: json))
+        let question = catalog.questions[0]
+        let expected = ["en": "Reviewed gold", "es": "Oro revisado", "de": "Geprüftes Gold"][L.language] ?? "Reviewed gold"
+        XCTAssertEqual(question.label("gold"), expected); XCTAssertFalse(question.needsConfirmation("gold"))
+        if CompanionCatalog.bundled.questions[0].labels == nil {
+            XCTAssertEqual(CompanionCatalog.questions[0].label("gold"), CompanionCatalog.questions[0].title)
+            XCTAssertTrue(CompanionCatalog.questions[0].needsConfirmation("gold"))
+        }
+    }
+
     func testConsentCatalogAndWireAreGated() {
         let s = store()
         XCTAssertEqual(CompanionCatalog.questions.count, 8)
@@ -108,5 +163,34 @@ final class CompanionContextTests: XCTestCase {
         let disabled = CompanionContextStore(account: account)
         XCTAssertTrue(disabled.decided); XCTAssertFalse(disabled.accepted)
         XCTAssertTrue(disabled.state.notes.isEmpty)
+        XCTAssertTrue(disabled.reset())
+        let erased = CompanionContextStore(account: account)
+        XCTAssertFalse(erased.decided); XCTAssertTrue(erased.state.notes.isEmpty)
     }
+    func testReaderPatchPersistsOnlyEnumsAndRejectsUnrelatedOrMalformedNotesAtomically() {
+        let s = store(); let now = Date(); s.choose(true); s.answered()
+        let patch: [String: Any] = ["notes": [["field": "interest", "value": "funds", "source": "said"]], "asked": ["interest"]]
+        XCTAssertTrue(s.apply(patch, for: "interest", now: now))
+        XCTAssertEqual(s.state.notes.first?.value, "funds")
+        XCTAssertEqual(s.state.notes.first?.expiresAt.timeIntervalSince(now), 30 * 86400)
+        XCTAssertFalse(CompanionCatalog.question("interest")!.label("funds")!.isEmpty)
+        let saved = s.state
+        for bad: [String: Any] in [
+            ["notes": [["field": "interest", "value": "raw secret answer", "source": "said"]], "asked": ["interest"]],
+            ["notes": [["field": "interest", "value": "crypto", "source": "said", "text": "raw answer"]], "asked": ["interest"]],
+            ["notes": [["field": "when", "value": "under_2y", "source": "said"]], "asked": ["interest"]],
+            ["notes": [["field": "interest", "value": "crypto", "source": "confirmed"]], "asked": ["interest"]],
+            ["notes": [["field": "interest", "value": "crypto", "source": "said"]], "asked": ["barrier"]]
+        ] { XCTAssertFalse(s.apply(bad, for: "interest")); XCTAssertEqual(s.state, saved) }
+        XCTAssertTrue(s.apply(["notes": [["field": "barrier", "value": "unsure", "source": "inferred"]], "asked": ["barrier"]], for: "barrier", now: now))
+        let inferred = s.state.notes.first { $0.field == "barrier" }!
+        XCTAssertEqual(inferred.source, "inferred"); XCTAssertEqual(inferred.expiresAt.timeIntervalSince(now), 7 * 86400)
+        XCTAssertEqual(s.next()?.id, "when")
+        for question in CompanionCatalog.questions {
+            XCTAssertTrue(question.accepts("unsure")); XCTAssertFalse(question.label("unsure")!.isEmpty)
+            for value in question.spoken { XCTAssertFalse(question.label(value)!.isEmpty) }
+        }
+        s.choose(false); XCTAssertFalse(s.apply(patch, for: "interest")); XCTAssertNil(s.wire(capability: live))
+    }
+
 }

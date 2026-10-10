@@ -215,6 +215,7 @@ function fit(){
   stage.classList.toggle('lbx-x', fitX > 0.5); stage.classList.toggle('lbx-y', fitY > 0.5);
   sizeCanvas();
   if (typeof placeTypeBox === 'function') placeTypeBox();
+  if (typeof guideLayout === 'function') guideLayout();
 }
 function refit(){ if (W.innerWidth !== fitW || W.innerHeight !== fitH){ fit(); dirty = true; } }
 var DEV_DPR = W.devicePixelRatio || 1;
