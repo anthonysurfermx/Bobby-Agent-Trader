@@ -1454,18 +1454,21 @@ final class HarnessSurfaceTests: XCTestCase {
     /// follow-up arrives at the moment the plan chose, in the time zone the plan was made in.
     func testAFollowUpIsHandedToIOSAsAnInstantInTheTimeZoneOfThePlan() async throws {
         let center = make()
-        let asked = at(7, 20, 30)
+        // iOS only reports a next trigger for a future instant; a fixed October date expires.
+        let asked = try XCTUnwrap(calendar.nextDate(after: Date(),
+            matching: DateComponents(hour: 20, minute: 30, weekday: 4), matchingPolicy: .nextTime))
+        let expected = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: asked))
         clock = asked
         await ask(center, "NVDA")
         _ = await center.accept()
         let notice = try XCTUnwrap(fake.requests["v18.follow.asset"])
-        XCTAssertEqual(notice.fireAt, at(8, 20, 30))
+        XCTAssertEqual(notice.fireAt, expected)
         let trigger = try XCTUnwrap(notice.request().trigger as? UNCalendarNotificationTrigger)
         XCTAssertEqual(trigger.dateComponents.timeZone, TimeZone(identifier: "America/Mexico_City"), "the hour is the hour of the plan's clock")
         XCTAssertEqual(trigger.dateComponents.hour, 20)
         XCTAssertEqual(trigger.dateComponents.minute, 30)
         XCTAssertFalse(trigger.repeats)
-        XCTAssertEqual(trigger.nextTriggerDate(), at(8, 20, 30), "that instant, wherever the phone is: 04:30 in Madrid, if they flew there and did not open the app")
+        XCTAssertEqual(trigger.nextTriggerDate(), expected, "that instant, wherever the phone is, in the time zone of the plan")
         // Opening the app there plans again on the clock of where they are: inside 09:00–21:00.
         calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Madrid"))
         clock = asked.addingTimeInterval(90 * 60)       // an hour and a half after the question: 06:00 in Madrid
