@@ -12,6 +12,8 @@
 //     fall is a game with made-up numbers, not something they said about themselves);
 //   · `spoken`: values no button offers. Only the reader of a spoken or typed answer returns them
 //     (api/_lib/companion-reader.ts).
+//   · `labels`: the words for each of those values, and `unsure` at the top for every question: a note is
+//     always shown in the catalog's own words, never in a model's.
 // The wording is the owner's (2026-10-10), informal in the six languages; Portuguese is Brazil's.
 // ============================================================
 import type { AppLanguage } from '../../src/lib/app-language.js';
@@ -24,6 +26,8 @@ type Words = Record<AppLanguage, string>;
 export interface CatalogQuestion {
   id: QuestionId; day: number; money: boolean; source: 'said' | 'shown';
   text: Words; options: Array<{ id: string; label: Words }>; spoken: string[];
+  /** The words for each `spoken` value, so a note the reader made can be shown as the buttons' own are. */
+  labels: Record<string, Words>;
 }
 
 // Written as the owner's table is: es, en, fr, pt, it, de.
@@ -45,6 +49,7 @@ const QUESTIONS: CatalogQuestion[] = [
       option('none', 'Ni idea', 'No idea', 'Aucune idée', 'Não faço ideia', 'Non ne ho idea', 'Keine Ahnung'),
     ],
     spoken: ['funds', 'gold', 'other'],
+    labels: { funds: six('Fondos', 'Funds', 'Des fonds', 'Fundos', 'Fondi', 'Fonds'), gold: six('Oro', 'Gold', "L'or", 'Ouro', 'Oro', 'Gold'), other: six('Otra cosa', 'Something else', 'Autre chose', 'Outra coisa', 'Altro', 'Etwas anderes') },
   },
   {
     id: 'barrier', day: 1, money: false, source: 'said',
@@ -57,6 +62,7 @@ const QUESTIONS: CatalogQuestion[] = [
       option('distrust', 'No confío', "I don't trust it", "Je n'ai pas confiance", 'Não confio', 'Non mi fido', 'Ich traue dem nicht'),
     ],
     spoken: ['no_time', 'none', 'other'],
+    labels: { no_time: six('No tengo tiempo', "I don't have time", "Je n'ai pas le temps", 'Não tenho tempo', 'Non ho tempo', 'Ich habe keine Zeit'), none: six('Nada en especial', 'Nothing in particular', 'Rien de particulier', 'Nada em especial', 'Niente di particolare', 'Nichts Besonderes'), other: six('Otra cosa', 'Something else', 'Autre chose', 'Outra coisa', 'Altro', 'Etwas anderes') },
   },
   {
     id: 'when', day: 1, money: true, source: 'said',
@@ -67,19 +73,19 @@ const QUESTIONS: CatalogQuestion[] = [
       option('over_7y', 'En más de 7 años', 'In more than 7 years', 'Dans plus de 7 ans', 'Em mais de 7 anos', 'Tra più di 7 anni', 'In mehr als 7 Jahren'),
       unsure(),
     ],
-    spoken: [],
+    spoken: [], labels: {},
   },
   {
     id: 'cushion', day: 1, money: true, source: 'said',
     text: six('Si mañana te saliera un gasto inesperado, ¿necesitarías ese dinero?', 'If an unexpected expense came up tomorrow, would you need that money?', 'Si une dépense imprévue arrivait demain, aurais-tu besoin de cet argent ?', 'Se amanhã surgisse um gasto inesperado, você precisaria desse dinheiro?', 'Se domani arrivasse una spesa imprevista, ti servirebbe quel denaro?', 'Wenn morgen eine unerwartete Ausgabe käme, bräuchtest du dieses Geld?'),
     options: [option('would_need_it', 'Sí', 'Yes', 'Oui', 'Sim', 'Sì', 'Ja'), option('would_not', 'No', 'No', 'Non', 'Não', 'No', 'Nein'), unsure()],
-    spoken: [],
+    spoken: [], labels: {},
   },
   {
     id: 'hurry', day: 2, money: true, source: 'said',
     text: six('¿Qué tan pronto te gustaría ver resultados?', 'How soon would you like to see results?', 'En combien de temps aimerais-tu voir des résultats ?', 'Em quanto tempo você gostaria de ver resultados?', 'Tra quanto vorresti vedere risultati?', 'Wie schnell möchtest du Ergebnisse sehen?'),
     options: [option('soon', 'Pronto', 'Soon', 'Vite', 'Logo', 'Presto', 'Bald'), option('no_rush', 'Sin prisa', 'No rush', 'Sans me presser', 'Sem pressa', 'Senza fretta', 'Ohne Eile'), unsure()],
-    spoken: [],
+    spoken: [], labels: {},
   },
   {
     id: 'fall', day: 3, money: true, source: 'shown',
@@ -90,7 +96,7 @@ const QUESTIONS: CatalogQuestion[] = [
       option('continue', 'Seguiría', 'I would carry on', 'Je continuerais', 'Eu continuaria', 'Andrei avanti', 'Ich würde weitermachen'),
       unsure(),
     ],
-    spoken: [],
+    spoken: [], labels: {},
   },
   {
     id: 'belief', day: 4, money: false, source: 'said',
@@ -102,17 +108,31 @@ const QUESTIONS: CatalogQuestion[] = [
       option('none', 'Nada en especial', 'Nothing in particular', 'Rien de particulier', 'Nada em especial', 'Niente di particolare', 'Nichts Besonderes'),
     ],
     spoken: ['gold_is_safe', 'property_is_safe', 'government_is_safe', 'savings_is_safest', 'lose_it_all', 'banks_keep_it', 'crypto_is_fast', 'other'],
+    labels: {
+      gold_is_safe: six('El oro nunca pierde', 'Gold never loses', "L'or ne perd jamais", 'O ouro nunca perde', "L'oro non perde mai", 'Gold verliert nie'),
+      property_is_safe: six('Una propiedad nunca pierde', 'Property never loses', "L'immobilier ne perd jamais", 'Imóvel nunca perde', 'Il mattone non perde mai', 'Immobilien verlieren nie'),
+      government_is_safe: six('Lo del gobierno no puede perder', 'What the government sells cannot lose', "Ce que vend l'État ne peut pas perdre", 'O que é do governo não tem como perder', 'Ciò che vende lo Stato non può perdere', 'Was der Staat verkauft, kann nicht verlieren'),
+      savings_is_safest: six('La cuenta de ahorro es lo más seguro', 'A savings account is the safest', "Le livret, c'est le plus sûr", 'A poupança é o mais seguro', 'Il conto di risparmio è la cosa più sicura', 'Das Sparbuch ist das Sicherste'),
+      lose_it_all: six('Si baja, ya lo perdiste', 'If it falls, you have lost it', "Si ça baisse, c'est perdu", 'Se cair, já perdeu', "Se scende, l'hai perso", 'Wenn es fällt, ist es weg'),
+      banks_keep_it: six('Los bancos se quedan con todo', 'The banks keep it all', 'Les banques gardent tout', 'Os bancos ficam com tudo', 'Le banche si tengono tutto', 'Die Banken behalten alles'),
+      crypto_is_fast: six('Con cripto te haces rico rápido', 'Crypto makes you rich fast', 'La crypto rend riche vite', 'Com cripto se fica rico rápido', 'Con le cripto si diventa ricchi in fretta', 'Mit Krypto wird man schnell reich'),
+      other: six('Otra cosa', 'Something else', 'Autre chose', 'Outra coisa', 'Altro', 'Etwas anderes'),
+    },
   },
   {
     id: 'format', day: 5, money: false, source: 'said',
     text: six('¿Cómo te explico mejor?', 'How do I explain best for you?', "Comment je t'explique le mieux ?", 'Como eu te explico melhor?', 'Come ti spiego meglio?', 'Wie erkläre ich es dir am besten?'),
     options: [option('examples', 'Con ejemplos', 'With examples', 'Avec des exemples', 'Com exemplos', 'Con esempi', 'Mit Beispielen'), option('steps', 'Paso a paso', 'Step by step', 'Étape par étape', 'Passo a passo', 'Passo dopo passo', 'Schritt für Schritt')],
-    spoken: [],
+    spoken: [], labels: {},
   },
 ];
 
 /** The catalog as a client holds it: `skip` is the label of the way out every question has. */
-export const COMPANION_CATALOG = { version: CATALOG_VERSION, skip: six('Omitir', 'Skip', 'Passer', 'Pular', 'Salta', 'Überspringen'), questions: QUESTIONS };
+export const COMPANION_CATALOG = {
+  version: CATALOG_VERSION, skip: six('Omitir', 'Skip', 'Passer', 'Pular', 'Salta', 'Überspringen'),
+  /** The words for `unsure` on a question that has no such button. */
+  unsure: unsure().label, questions: QUESTIONS,
+};
 
 const BY_ID = Object.fromEntries(QUESTIONS.map((question) => [question.id, question])) as Record<QuestionId, CatalogQuestion>;
 export const companionQuestion = (id: QuestionId): CatalogQuestion => BY_ID[id];

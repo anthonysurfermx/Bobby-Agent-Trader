@@ -52,6 +52,7 @@ import { llmCaps, llmSpend, logLlmUsage } from './_lib/llm-usage.js';
 import type { LlmUsage } from './_lib/llm.js';
 import { COMPANION_VERSION, CompanionRequest, CompanionUnchecked, companionAllowance, companionDailyCeiling, companionDailyUsd, companionEnabled, companionModel, runCompanionTurn } from './_lib/companion.js';
 import { companionCapabilities, companionContextEnabled, companionPicture, nextCheckIn, readCompanionContext } from './_lib/companion-context.js';
+import { companionJudgeModel } from './_lib/companion-judge.js';
 import { NOTES_A_DAY, companionAnswer, companionReaderModel, readCompanionAnswer } from './_lib/companion-reader.js';
 
 export const config = { maxDuration: 60 };
@@ -92,7 +93,7 @@ const COPY: Record<'invalid' | 'long' | 'unavailable' | 'paused' | 'limit' | 'cr
   // An answer to one of Bobby's questions that was not noted, whatever the reason: the options are still there to tap.
   answer: {
     en: 'I could not note that. You can pick one of the options.', es: 'No pude anotarlo. Puedes elegir una de las opciones.',
-    fr: 'Je n’ai pas pu le noter. Tu peux choisir une des options.', pt: 'Não consegui anotar. Podes escolher uma das opções.',
+    fr: 'Je n’ai pas pu le noter. Tu peux choisir une des options.', pt: 'Não consegui anotar. Dá para escolher uma das opções.',
     it: 'Non sono riuscito ad annotarlo. Puoi scegliere una delle opzioni.', de: 'Das konnte ich nicht notieren. Du kannst eine der Optionen wählen.',
   },
 };
@@ -131,7 +132,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (ask && (ask.question.length > DESK_QUESTION_MAX * 2 || Array.from(ask.question).length > DESK_QUESTION_MAX)) return refuse(400, 'question_too_long', COPY.long[language], false, unknown);
   // What the person told Bobby, when it is to be read; null is the turn of a person who sent nothing.
   const context = ask ? readCompanionContext(ask.context) : null;
-  const picture = context ? companionPicture(context.notes) : null;
+  // Only with the second reader on: it is what refuses a reply that labels the person, and the lists that
+  // stand in for it when the owner turns it off have no such rule.
+  const picture = context && companionJudgeModel() ? companionPicture(context.notes) : null;
   // What a turn that fails says: an explanation that was not finished, or an answer that was not noted.
   const sorry = (answer ? COPY.answer : COPY.unavailable)[language];
   if (!process.env.ANTHROPIC_API_KEY) return refuse(503, 'companion_unavailable', sorry, false, unknown);
