@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "skip": { "en": "Skip", "es": "Omitir", "fr": "Passer", "pt": "Pular", "it": "Salta", "de": "Überspringen" },
+  "questions": [
+    {
+      "id": "interest", "day": 1, "money": false, "source": "said",
+      "text": { "en": "Does anything catch your eye?", "es": "¿Algo te llama la atención?", "fr": "Quelque chose t'attire ?", "pt": "Alguma coisa chama sua atenção?", "it": "C'è qualcosa che ti incuriosisce?", "de": "Gibt es etwas, das dich neugierig macht?" },
+      "options": [
+        { "id": "companies", "label": { "en": "Companies I know", "es": "Empresas que conozco", "fr": "Des entreprises que je connais", "pt": "Empresas que conheço", "it": "Aziende che conosco", "de": "Firmen, die ich kenne" } },
+        { "id": "crypto", "label": { "en": "Crypto", "es": "Cripto", "fr": "Crypto", "pt": "Cripto", "it": "Cripto", "de": "Krypto" } },
+        { "id": "government", "label": { "en": "Something from the government", "es": "Algo del gobierno", "fr": "Quelque chose de l'État", "pt": "Algo do governo", "it": "Qualcosa dello Stato", "de": "Etwas vom Staat" } },
+        { "id": "property", "label": { "en": "Property", "es": "Una propiedad", "fr": "L'immobilier", "pt": "Um imóvel", "it": "Una casa", "de": "Immobilien" } },
+        { "id": "none", "label": { "en": "No idea", "es": "Ni idea", "fr": "Aucune idée", "pt": "Não faço ideia", "it": "Non ne ho idea", "de": "Keine Ahnung" } }
+      ],
+      "spoken": ["funds", "gold", "other"]
+    },
+    {
+      "id": "barrier", "day": 1, "money": false, "source": "said",
+      "text": { "en": "What has stopped you until today?", "es": "¿Qué te ha detenido hasta hoy?", "fr": "Qu'est-ce qui t'a retenu jusqu'ici ?", "pt": "O que te segurou até hoje?", "it": "Che cosa ti ha frenato finora?", "de": "Was hat dich bisher abgehalten?" },
+      "options": [
+        { "id": "fear_of_loss", "label": { "en": "Fear of losing", "es": "Miedo a perder", "fr": "La peur de perdre", "pt": "Medo de perder", "it": "Paura di perdere", "de": "Angst zu verlieren" } },
+        { "id": "words", "label": { "en": "I don't get the words", "es": "No entiendo las palabras", "fr": "Je ne comprends pas les mots", "pt": "Não entendo os termos", "it": "Non capisco i termini", "de": "Ich verstehe die Begriffe nicht" } },
+        { "id": "where_to_start", "label": { "en": "I don't know where to start", "es": "No sé por dónde empezar", "fr": "Je ne sais pas par où commencer", "pt": "Não sei por onde começar", "it": "Non so da dove cominciare", "de": "Ich weiß nicht, wo ich anfangen soll" } },
+        { "id": "no_money", "label": { "en": "I feel I don't have enough", "es": "Siento que no me alcanza", "fr": "J'ai l'impression de ne pas avoir assez", "pt": "Sinto que não tenho o bastante", "it": "Mi sembra di non avere abbastanza", "de": "Ich habe das Gefühl, es reicht nicht" } },
+        { "id": "distrust", "label": { "en": "I don't trust it", "es": "No confío", "fr": "Je n'ai pas confiance", "pt": "Não confio", "it": "Non mi fido", "de": "Ich traue dem nicht" } }
+      ],
+      "spoken": ["no_time", "none", "other"]
+    },
+    {
+      "id": "when", "day": 1, "money": true, "source": "said",
+      "text": { "en": "When do you think you will need that money?", "es": "¿Cuándo crees que vas a necesitar ese dinero?", "fr": "Quand penses-tu avoir besoin de cet argent ?", "pt": "Quando você acha que vai precisar desse dinheiro?", "it": "Quando pensi che ti servirà quel denaro?", "de": "Wann, glaubst du, brauchst du das Geld?" },
+      "options": [
+        { "id": "under_2y", "label": { "en": "In under 2 years", "es": "En menos de 2 años", "fr": "Dans moins de 2 ans", "pt": "Em menos de 2 anos", "it": "Tra meno di 2 anni", "de": "In weniger als 2 Jahren" } },
+        { "id": "2_to_7y", "label": { "en": "In 2 to 7 years", "es": "En 2 a 7 años", "fr": "Dans 2 à 7 ans", "pt": "Em 2 a 7 anos", "it": "Tra 2 e 7 anni", "de": "In 2 bis 7 Jahren" } },
+        { "id": "over_7y", "label": { "en": "In more than 7 years", "es": "En más de 7 años", "fr": "Dans plus de 7 ans", "pt": "Em mais de 7 anos", "it": "Tra più di 7 anni", "de": "In mehr als 7 Jahren" } },
+        { "id": "unsure", "label": { "en": "I don't know", "es": "No sé", "fr": "Je ne sais pas", "pt": "Não sei", "it": "Non lo so", "de": "Ich weiß es nicht" } }
+      ],
+      "spoken": []
+    },
+    {
+      "id": "cushion", "day": 1, "money": true, "source": "said",
+      "text": { "en": "If an unexpected expense came up tomorrow, would you need that money?", "es": "Si mañana te saliera un gasto inesperado, ¿necesitarías ese dinero?", "fr": "Si une dépense imprévue arrivait demain, aurais-tu besoin de cet argent ?", "pt": "Se amanhã surgisse um gasto inesperado, você precisaria desse dinheiro?", "it": "Se domani arrivasse una spesa imprevista, ti servirebbe quel denaro?", "de": "Wenn morgen eine unerwartete Ausgabe käme, bräuchtest du dieses Geld?" },
+      "options": [
+        { "id": "would_need_it", "label": { "en": "Yes", "es": "Sí", "fr": "Oui", "pt": "Sim", "it": "Sì", "de": "Ja" } },
+        { "id": "would_not", "label": { "en": "No", "es": "No", "fr": "Non", "pt": "Não", "it": "No", "de": "Nein" } },
+        { "id": "unsure", "label": { "en": "I don't know", "es": "No sé", "fr": "Je ne sais pas", "pt": "Não sei", "it": "Non lo so", "de": "Ich weiß es nicht" } }
+      ],
+      "spoken": []
+    },
+    {
+      "id": "hurry", "day": 2, "money": true, "source": "said",
+      "text": { "en": "How soon would you like to see results?", "es": "¿Qué tan pronto te gustaría ver resultados?", "fr": "En combien de temps aimerais-tu voir des résultats ?", "pt": "Em quanto tempo você gostaria de ver resultados?", "it": "Tra quanto vorresti vedere risultati?", "de": "Wie schnell möchtest du Ergebnisse sehen?" },
+      "options": [
+        { "id": "soon", "label": { "en": "Soon", "es": "Pronto", "fr": "Vite", "pt": "Logo", "it": "Presto", "de": "Bald" } },
+        { "id": "no_rush", "label": { "en": "No rush", "es": "Sin prisa", "fr": "Sans me presser", "pt": "Sem pressa", "it": "Senza fretta", "de": "Ohne Eile" } },
+        { "id": "unsure", "label": { "en": "I don't know", "es": "No sé", "fr": "Je ne sais pas", "pt": "Não sei", "it": "Non lo so", "de": "Ich weiß es nicht" } }
+      ],
+      "spoken": []
+    },
+    {
+      "id": "fall", "day": 3, "money": true, "source": "shown",
+      "text": { "en": "Just playing: 100 becomes 80. What would you do?", "es": "Solo jugando: 100 pasa a 80. ¿Qué harías?", "fr": "Juste pour jouer : 100 devient 80. Que ferais-tu ?", "pt": "Só de brincadeira: 100 vira 80. O que você faria?", "it": "Solo per gioco: 100 diventa 80. Che cosa faresti?", "de": "Nur zum Spiel: Aus 100 werden 80. Was würdest du tun?" },
+      "options": [
+        { "id": "pause", "label": { "en": "I would stop", "es": "Pararía", "fr": "J'arrêterais", "pt": "Eu pararia", "it": "Mi fermerei", "de": "Ich würde aufhören" } },
+        { "id": "understand", "label": { "en": "I would want to know why", "es": "Querría entender por qué", "fr": "Je voudrais comprendre pourquoi", "pt": "Ia querer entender o porquê", "it": "Vorrei capire perché", "de": "Ich würde verstehen wollen, warum" } },
+        { "id": "continue", "label": { "en": "I would carry on", "es": "Seguiría", "fr": "Je continuerais", "pt": "Eu continuaria", "it": "Andrei avanti", "de": "Ich würde weitermachen" } },
+        { "id": "unsure", "label": { "en": "I don't know", "es": "No sé", "fr": "Je ne sais pas", "pt": "Não sei", "it": "Non lo so", "de": "Ich weiß es nicht" } }
+      ],
+      "spoken": []
+    },
+    {
+      "id": "belief", "day": 4, "money": false, "source": "said",
+      "text": { "en": "What have you always heard about money or investing that you take as true?", "es": "¿Qué has oído siempre sobre el dinero o invertir que das por cierto?", "fr": "Qu'as-tu toujours entendu sur l'argent ou l'investissement que tu tiens pour vrai ?", "pt": "O que você sempre ouviu sobre dinheiro ou investir e dá como certo?", "it": "Che cosa hai sempre sentito sul denaro o sugli investimenti che dai per vero?", "de": "Was hast du über Geld oder Geldanlage immer gehört und hältst es für wahr?" },
+      "options": [
+        { "id": "market_is_casino", "label": { "en": "The stock market is a casino", "es": "La bolsa es un casino", "fr": "La Bourse, c'est un casino", "pt": "A bolsa é um cassino", "it": "La borsa è un casinò", "de": "Die Börse ist ein Casino" } },
+        { "id": "need_lots_of_money", "label": { "en": "You need a lot of money", "es": "Se necesita mucho dinero", "fr": "Il faut beaucoup d'argent", "pt": "Precisa de muito dinheiro", "it": "Servono tanti soldi", "de": "Man braucht viel Geld" } },
+        { "id": "too_late", "label": { "en": "I am already late", "es": "Ya voy tarde", "fr": "Je m'y prends trop tard", "pt": "Já é tarde para mim", "it": "Ormai è tardi", "de": "Ich bin schon zu spät dran" } },
+        { "id": "none", "label": { "en": "Nothing in particular", "es": "Nada en especial", "fr": "Rien de particulier", "pt": "Nada em especial", "it": "Niente di particolare", "de": "Nichts Besonderes" } }
+      ],
+      "spoken": ["gold_is_safe", "property_is_safe", "government_is_safe", "savings_is_safest", "lose_it_all", "banks_keep_it", "crypto_is_fast", "other"]
+    },
+    {
+      "id": "format", "day": 5, "money": false, "source": "said",
+      "text": { "en": "How do I explain best for you?", "es": "¿Cómo te explico mejor?", "fr": "Comment je t'explique le mieux ?", "pt": "Como eu te explico melhor?", "it": "Come ti spiego meglio?", "de": "Wie erkläre ich es dir am besten?" },
+      "options": [
+        { "id": "examples", "label": { "en": "With examples", "es": "Con ejemplos", "fr": "Avec des exemples", "pt": "Com exemplos", "it": "Con esempi", "de": "Mit Beispielen" } },
+        { "id": "steps", "label": { "en": "Step by step", "es": "Paso a paso", "fr": "Étape par étape", "pt": "Passo a passo", "it": "Passo dopo passo", "de": "Schritt für Schritt" } }
+      ],
+      "spoken": []
+    }
+  ]
+}

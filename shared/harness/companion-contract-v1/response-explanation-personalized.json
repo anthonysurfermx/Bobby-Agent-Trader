@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "requestId": "5252cefe-fb15-4c8f-93cc-c6f26e54b58d",
+  "kind": "explanation",
+  "reply": {
+    "text": "Un ETF es una canasta que junta muchas inversiones en una sola, y se compra y se vende como una acción. Su valor sube y baja con lo que lleva dentro, así que también se puede perder dinero. Vamos con calma: primero entender, después decidir.",
+    "followUp": "¿Qué hay dentro de un ETF?"
+  },
+  "nextAction": null,
+  "personalized": true,
+  "checkIn": { "questionId": "when" },
+  "fact": null,
+  "allowance": { "kind": "orientation", "consumed": 1, "remaining": 9 }
+}
