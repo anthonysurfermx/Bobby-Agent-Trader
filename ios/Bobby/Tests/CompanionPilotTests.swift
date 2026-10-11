@@ -138,4 +138,23 @@ final class CompanionPilotTests: XCTestCase {
         XCTAssertEqual(ConversationCopy.limit(headers:["Retry-After":"6300"],now:now,calendar:calendar,locale:Locale(identifier:"es_MX")),ConversationCopy.limitKnown(when))
     }
 
+    func testLimitSnapshotRecomputesLocalDayFromTheOriginalDeadline() async {
+        let old=L.language; defer { UserDefaults.standard.set(old,forKey:L.preferenceKey) }
+        UserDefaults.standard.set("es",forKey:L.preferenceKey)
+        let calendar=Calendar.current
+        let start=calendar.date(from:DateComponents(year:2026,month:10,day:10,hour:23,minute:30))!
+        var current=start
+        let pilot=CompanionPilot(); pilot.limitNow={current}
+        pilot.responseHeaders=["Retry-After":"6300"]
+        pilot.transport={ _,method,_ in
+            if method=="GET" { return (["companion":[:]],405) }
+            return (["version":1,"kind":"error","error":["code":"orientation_limit"]],429)
+        }
+        _=await pilot.turn(question:"What is investing?",requestId:"kept-limit",candidate:nil,speech:nil)
+        XCTAssertTrue((pilot.limitSnapshot()?["line"] as? String)?.contains("mañana") == true)
+        current=start.addingTimeInterval(3600)
+        XCTAssertEqual(pilot.limitSnapshot()?["requestId"] as? String,"kept-limit")
+        XCTAssertTrue((pilot.limitSnapshot()?["line"] as? String)?.contains("hoy") == true)
+    }
+
 }

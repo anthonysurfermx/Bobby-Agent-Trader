@@ -827,3 +827,10 @@ test('A10: background keeps the answer and drops an invitation that has not arri
  leaveAndReturn(app);app.advance(12);await flush();
  assert.equal(app.context.nucleo.state(),'COMPANION');assert.equal(companionPanel(app).children[0].children[0].textContent,'First sentence.');assert.equal(guideActionsOf(app).children.length,0);assert.equal(asksOf(app).length,1);assert.deepEqual(app.errors,[]);
 });
+
+test('A10: refreshed native limit text updates the same visible failed turn',async()=>{
+ const app=await idle(),id='90d2564c-6064-4275-95cd-5a3c7c0b5b56';
+ await companionReply(app,{status:'companion_error',requestId:id,code:'limit',retryable:false,limitLine:'Tomorrow at 1:15'});
+ leaveAndReturn(app);app.context.nucleoBridge.emit('session.changed',{...app.session,companionPilot:{limit:{requestId:id,line:'Today at 1:15'}}});
+ assert.equal(companionPanel(app).children[0].children[0].textContent,'Today at 1:15');assert.equal(asksOf(app).length,1);assert.deepEqual(app.errors,[]);
+});

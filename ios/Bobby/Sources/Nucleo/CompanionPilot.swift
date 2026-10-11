@@ -20,6 +20,14 @@ final class CompanionPilot {
     private var lastProbe: Date?
     private var probeEpoch = 0
     var responseHeaders: [String: String] = [:]
+    private var limitRequestId: String?
+    private var limitUntil: Date?
+    var limitNow: () -> Date = Date.init
+    func limitSnapshot() -> [String: Any]? {
+        guard let id = limitRequestId else { return nil }
+        let current = limitNow()
+        return ["requestId":id, "line":limitUntil.map { ConversationCopy.limitKnown(ConversationCopy.when($0, now:current, calendar:.current, locale:L.locale)) } ?? ConversationCopy.limitUnknown()]
+    }
     func invalidateProbe() { probeEpoch += 1; probeTask?.cancel(); probeTask = nil; lastProbe = nil; capability = Capability() }
     var context: () -> [String: Any]? = { nil }
     var revision: () -> UUID = { UUID(uuidString: "00000000-0000-0000-0000-000000000000")! }
@@ -96,6 +104,11 @@ final class CompanionPilot {
         let error = json["error"] as? [String: Any]
         if kind == "error", ["orientation_limit", "companion_paused"].contains(error?["code"] as? String ?? "") {
             if candidate != nil { return ["v": 1, "status": "companion_offer"] }
+            if error?["code"] as? String == "orientation_limit" {
+                limitRequestId = requestId
+                let seconds = (responseHeaders.first(where: { $0.key.lowercased() == "retry-after" })?.value).flatMap(Double.init)
+                limitUntil = seconds.flatMap { $0.isFinite && $0 >= 0 ? limitNow().addingTimeInterval($0) : nil }
+            }
             return ["v": 1, "status": "companion_error", "message": error?["message"] as? String ?? Self.unavailable,
                     "retryable": false, "code": error?["code"] as? String == "companion_paused" ? "paused" : "limit",
                     "limitLine": ConversationCopy.limit(headers: responseHeaders), "requestId": requestId]

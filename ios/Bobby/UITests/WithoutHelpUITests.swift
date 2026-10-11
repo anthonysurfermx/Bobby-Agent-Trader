@@ -70,6 +70,18 @@ final class WithoutHelpUITests: ConversationFixtureCase {
         Thread.sleep(forTimeInterval:1)
         app.activate()
     }
+    func testComposerGrowsToFourLinesThenScrolls() {
+        launch(); type("Bitcoin")
+        let field=web.textViews.firstMatch, oneLine=field.frame.height
+        field.typeText(String(repeating:" Ethereum",count:8))
+        XCTAssertGreaterThan(field.frame.height,oneLine+15); shot("64-field-two-complete-lines")
+        field.typeText(String(repeating:" NVIDIA Apple",count:8))
+        let fourLines=field.frame.height
+        field.typeText(String(repeating:" Solana ETF",count:8))
+        XCTAssertEqual(field.frame.height,fourLines,accuracy:2)
+        XCTAssertTrue((field.value as? String)?.contains("Solana") == true)
+        XCTAssertFalse(button("aria.closeAnswer").exists); shot("65-field-four-lines-scroll")
+    }
     func testBackgroundKeepsTypedDraft() {
         launch(); type(word("ex.1")); backgroundAndReturn(); ready(web.textViews.firstMatch)
         XCTAssertEqual(web.textViews.firstMatch.value as? String,word("ex.1"))

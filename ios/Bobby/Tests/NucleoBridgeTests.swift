@@ -801,7 +801,9 @@ final class NucleoBridgeTests: XCTestCase {
         XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("desk-debate") || $0.contains("bobby-asset-search") })
         session.appWentBackground()
         let (envelope,_) = await bridge.handle(body:["v":1,"method":"ask","params":["retry":failed["requestId"]!]],trusted:true)
-        XCTAssertEqual((envelope as? [String:Any])?["ok"] as? Bool,false)
+        XCTAssertEqual((envelope as? [String:Any])?["ok"] as? Bool,true, "A10 keeps the failed turn on background")
+        XCTAssertEqual(sent.count,4)
+        XCTAssertTrue(NSDictionary(dictionary:sent[1]).isEqual(to:sent[3]),"A10 retry keeps the same UUID, language, question and previous")
         session.teardown()
     }
 

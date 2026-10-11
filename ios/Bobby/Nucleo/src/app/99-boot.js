@@ -95,6 +95,8 @@ function wire(){
     var walled = oneTapOff();
     if(s&&NucleoLocale.language(s.language)!==LANG)conversationReset();
     applySession(s, false);
+    var limit=s&&s.companionPilot&&s.companionPilot.limit;
+    if(GUIDE&&GUIDE.code==='limit'&&limit&&limit.requestId===GUIDE.requestId){GUIDE.limitLine=limit.line;if(ST.name==='COMPANION')guideRender();}
     if (ST.name === 'IDLE') pillMode(idleMode());
     /* the last read was spent, or reads came back: the idle row loses or regains its one-tap chips at once */
     if (oneTapOff() !== walled && ST.name === 'IDLE') showIdleSuggestions(); else nudgeSync();

@@ -508,7 +508,7 @@ final class NucleoSession: ObservableObject {
             "speaking": SpeakingDial(defaults: defaults).json(fixtures ? nil : AccountSession.shared.session?.userId),
             "textScale": UIFontMetrics(forTextStyle: .body).scaledValue(for: 17) / 17,
             "exampleIndex": exampleIndex(),
-            "companionPilot": ["strings": CompanionCopy.json, "enabled": companionPilot.capability.known ? companionPilot.capability.enabled as Any : NSNull(), "textScale": UIFontMetrics(forTextStyle: .body).scaledValue(for: 17) / 17],
+            "companionPilot": ["limit":companionPilot.limitSnapshot().map { $0 as Any } ?? NSNull(), "strings": CompanionCopy.json, "enabled": companionPilot.capability.known ? companionPilot.capability.enabled as Any : NSNull(), "textScale": UIFontMetrics(forTextStyle: .body).scaledValue(for: 17) / 17],
             "nudge": currentNudge().map { $0.json as Any } ?? NSNull(),
         ]
         // Bobby never invites someone into a wall: when the phone KNOWS the next read is refused, the
