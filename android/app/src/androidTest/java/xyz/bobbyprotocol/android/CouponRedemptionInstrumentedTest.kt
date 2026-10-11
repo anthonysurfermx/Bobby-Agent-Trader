@@ -38,7 +38,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onRoot
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertTrue
-import androidx.compose.ui.test.junit4.createComposeRule
+import xyz.bobbyprotocol.android.createReleaseComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -56,7 +56,7 @@ import xyz.bobbyprotocol.android.ui.CouponSuccessPopup
 /** Empty Compose activity and offline receipts: no account, coupon, store or server mutation. */
 @RunWith(AndroidJUnit4::class)
 class CouponRedemptionInstrumentedTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createReleaseComposeRule()
     @Before fun requireEmulator() {
         assumeTrue(Build.FINGERPRINT.startsWith("generic") || Build.MODEL.contains("sdk_gphone") || Build.HARDWARE in setOf("ranchu", "goldfish"))
     }

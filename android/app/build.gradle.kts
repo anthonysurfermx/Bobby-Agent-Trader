@@ -18,6 +18,8 @@ val fcmEnabled = config("BOBBY_FCM_ENABLED").equals("true", ignoreCase = true)
 android {
     namespace = "xyz.bobbyprotocol.android"
     compileSdk = 36
+    // CI may exercise the same optimized release with an ephemeral runner-only certificate.
+    testBuildType = providers.gradleProperty("bobbyTestBuildType").getOrElse("debug")
     defaultConfig {
         applicationId = "xyz.bobbyprotocol.bobby"
         minSdk = 26
@@ -48,9 +50,19 @@ android {
             keyPassword = config("BOBBY_ANDROID_KEY_PASSWORD")
         }
     }
+    val ciSigning = config("BOBBY_CI_TEST_KEYSTORE")
+    if (ciSigning.isNotBlank()) {
+        signingConfigs.create("ciTest") {
+            storeFile = file(ciSigning)
+            storePassword = "android"
+            keyAlias = "ci-test"
+            keyPassword = "android"
+        }
+    }
     buildTypes {
         release {
             if (uploadKeystore.isNotBlank()) signingConfig = signingConfigs.getByName("upload")
+            if (ciSigning.isNotBlank()) signingConfig = signingConfigs.getByName("ciTest")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -97,7 +109,7 @@ dependencies {
     implementation("com.revenuecat.purchases:purchases:10.15.1")
     if (fcmEnabled) implementation("com.google.firebase:firebase-messaging:25.1.3")
     debugImplementation("androidx.compose.ui:ui-tooling")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
+
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
@@ -114,7 +126,8 @@ tasks.register("validateReleaseConfig") {
         require(config("BOBBY_API_BASE_URL", "https://bobbyprotocol.xyz").startsWith("https://")) { "Release API URL must use HTTPS" }
         require(config("BOBBY_SUPABASE_URL").startsWith("https://")) { "Set BOBBY_SUPABASE_URL for release" }
         require(config("BOBBY_SUPABASE_ANON_KEY").isNotBlank()) { "Set the public BOBBY_SUPABASE_ANON_KEY for release" }
-        require(config("REVENUECAT_ANDROID_API_KEY").startsWith("goog_")) { "Set a Google Play public RevenueCat key for release" }
+        val billingKey = config("REVENUECAT_ANDROID_API_KEY").trim()
+        require(billingKey.isEmpty() || (billingKey.startsWith("goog_") && billingKey.length > 5)) { "Billing is disabled without a key; when enabled use a Google Play public RevenueCat key" }
     }
 }
 tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn("validateReleaseConfig") }

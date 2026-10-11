@@ -13,7 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.test.junit4.createComposeRule
+import xyz.bobbyprotocol.android.createReleaseComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicReference
 /** Empty AndroidX activity: no MainActivity, repository, account, fixtures or remote market calls. */
 @RunWith(AndroidJUnit4::class)
 class EquipmentStageInstrumentedTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createReleaseComposeRule()
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
     @Test

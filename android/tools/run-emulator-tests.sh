@@ -14,6 +14,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
+build_type=${BOBBY_TEST_BUILD_TYPE:-Debug}
 out=build/emulator
 # Where a test saves a screenshot (V18Shots in app/src/androidTest): the shell may write there, and
 # it outlives the app, which Gradle removes from the device when the tests end.
@@ -37,7 +38,7 @@ part() {
   name=$1
   shift
   echo "==== Instrumented tests: $name ===="
-  ./gradlew :app:connectedDebugAndroidTest --no-daemon "$@" || status=1
+  ./gradlew :app:connected${build_type}AndroidTest --no-daemon "$@" || status=1
   mkdir -p "$out/$name"
   cp -R app/build/reports/androidTests/connected "$out/$name/report" 2>/dev/null || true
   cp -R app/build/outputs/androidTest-results/connected "$out/$name/results" 2>/dev/null || true

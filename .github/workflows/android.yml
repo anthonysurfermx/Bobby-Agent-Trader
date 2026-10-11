@@ -1,6 +1,9 @@
 name: Android
 
 on:
+  push:
+    branches: ['android/play-rc']
+    paths: ['android/**', '.github/workflows/android*.yml', 'docs/play-store/**']
   pull_request:
     # shared/harness holds the golden file every platform's follow-up planner must pass.
     paths: ['android/**', 'shared/harness/**', '.github/workflows/android.yml']
@@ -45,6 +48,36 @@ jobs:
           done
           echo 'Android command-line tools are missing from the hosted SDK.' >&2
           exit 1
+      - name: Load public release client configuration
+        env:
+          BOBBY_SUPABASE_URL: ${{ vars.BOBBY_SUPABASE_URL }}
+          BOBBY_SUPABASE_ANON_KEY: ${{ vars.BOBBY_SUPABASE_ANON_KEY }}
+        run: python3 android/tools/export-public-client-config.py
       - name: Build, test and lint Android
         working-directory: android
-        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:lintDebug --no-daemon
+        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:lintDebug :app:bundleRelease :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease --no-daemon
+      - name: Inspect the unsigned Play bundle
+        if: matrix.fcm == 'false'
+        working-directory: android
+        run: |
+          curl --fail --location --retry 3 https://github.com/google/bundletool/releases/download/1.18.2/bundletool-all-1.18.2.jar -o "$RUNNER_TEMP/bundletool.jar"
+          python3 tools/check-release-bundle.py app/build/outputs/bundle/release/app-release.aab "$RUNNER_TEMP/bundletool.jar"
+      - name: Keep the unsigned bundle and release evidence
+        if: matrix.fcm == 'false'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: android-unsigned-release-${{ github.sha }}
+          path: |
+            android/app/build/outputs/bundle/release/
+            android/app/build/outputs/mapping/release/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Keep unit and lint reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: android-native-reports-fcm-${{ matrix.fcm }}
+          path: |
+            android/app/build/reports/tests/
+            android/app/build/reports/lint-results-*.html
+          retention-days: 14
