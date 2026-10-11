@@ -69,6 +69,19 @@ class ConversationFixtureCase: XCTestCase {
             if abovePill { XCTAssertLessThanOrEqual(c.frame.maxY,700 * scale + (size.height-844 * scale)/2 + 1,c.debugDescription) }
         }
     }
+    func assertPillGlyphVisible(_ control: XCUIElement) {
+        let image=app.screenshot().image.cgImage!,data=image.dataProvider!.data!,bytes=CFDataGetBytePtr(data)!
+        let factor=CGFloat(image.width)/app.windows.firstMatch.frame.width
+        let cx=Int(control.frame.midX*factor),cy=Int(control.frame.midY*factor),radius=Int(10*factor)
+        var ink=0
+        for y in stride(from:cy-radius,to:cy+radius,by:2) {
+            for x in stride(from:cx-radius,to:cx+radius,by:2) {
+                let i=y*image.bytesPerRow+x*4
+                if min(bytes[i],min(bytes[i+1],bytes[i+2]))>150 { ink += 1 }
+            }
+        }
+        XCTAssertGreaterThan(ink,20,"The pill must display its next-action glyph")
+    }
     func backgroundAndReturn() {
         XCUIDevice.shared.press(.home)
         Thread.sleep(forTimeInterval:1)
@@ -699,7 +712,7 @@ final class StoreScreenShots: ConversationFixtureCase {
         app.terminate();launch("companion",memory:"barrier");ask();answered()
         let words=labels["companion"] as! [String:String]
         let chip=web.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",words["bobbyAsks"]!.components(separatedBy:"{question}")[0])).firstMatch
-        ready(chip);chip.tap();ready(web.buttons[words["notNow"]!]);shot("04-personal-question")
+        ready(chip);chip.tap();ready(web.buttons[words["notNow"]!]);assertPillGlyphVisible(web.buttons[words["speakAnswer"]!]);shot("04-personal-question")
         app.terminate();launch("companion",notes:true)
         let profile=web.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Momo.'")).firstMatch
         ready(profile);profile.tap()
@@ -714,7 +727,7 @@ final class StoreScreenShots: ConversationFixtureCase {
 final class StoreFirstLaunchWalk: FirstRunFixtureCase {
     func testCleanEnglishETFQuestionNoticeAndReadAll() {
         XCTAssertEqual(language,"en")
-        fresh("companion",voice:true);shot("01-review-clean-first-launch")
+        fresh("companion",voice:true);shot("01-review-clean-first-launch",delay:3)
         web.buttons[firstWords["aria.type"]!].tap();ready(web.textViews.firstMatch)
         web.textViews.firstMatch.tap();web.textViews.firstMatch.typeText("What is an ETF?")
         shot("02-review-typed-etf")
@@ -877,5 +890,16 @@ final class StoreAdditionalWalk: ConversationFixtureCase {
         let restore=app.buttons["paywall-restore"];reach(restore);restore.tap()
         shot("41-review-pro-signed-in-restore-fixture")
         app.buttons["paywall-close"].tap();ready(button("aria.type"))
+    }
+    // Withdrawal uses the shipping Profile row, not a fixture flag.
+    func testWithdrawAIConsentStopsQuestionsAndKeepsProfileAccessible() {
+        launch();profile();let risk=app.buttons["account-risk"];reach(risk);risk.tap()
+        let withdraw=app.buttons["risk-withdraw-consent"];reach(withdraw);shot("42-review-withdraw-ai-door")
+        withdraw.tap();ready(app.buttons["Withdraw consent"]);shot("43-review-withdraw-ai-confirm")
+        app.buttons["Withdraw consent"].tap();ready(button("aria.type"));shot("44-review-ai-withdrawn")
+        ask("What is an ETF?")
+        ready(web.buttons["I agree to the risk notice and AI processing"]);shot("45-review-withdrawn-question-needs-consent")
+        let profileAfter=web.buttons.matching(NSPredicate(format:"label == 'Profile' OR label BEGINSWITH 'Momo.'")).firstMatch
+        ready(profileAfter);profileAfter.tap();ready(app.buttons["account-close"]);shot("46-review-profile-after-withdrawal")
     }
 }
