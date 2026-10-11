@@ -1,6 +1,8 @@
 # Android 1.2.0 (10) — release evidence
 
-**NO-GO for an all-green release handoff:** latest emulator run 38181402020 has three consecutive infrastructure failures on Spanish, German, Portuguese and Italian (499a9a74 / ebaa8cc9 / a50ed999). Host disappearance/RenderThread segfault and lost adb transport are not coverage. The limit has been reported in the external status log and those jobs are not retried in a loop. Other stages may finish, but cannot establish all six locales. The final unsigned artifact identity, exact download command, byte sizes and SHA-256 values belong to `## TO CLAUDE — handoff` in the external status log and draft PR #185. Artifact `evidence.json` independently records `sourceCommit`; Claude must match that SHA before signing.
+The FCM-off release handoff uses the completed API35 minified suite, API34/API35 debug suites and one finished journey in each of six languages at the documented checkpoints below. **The shipping source is byte-identical to the final head; these are hosted-emulator results, never physical-phone results.** The final-head device matrix is not claimed all-green. Spanish/German/Portuguese/Italian each reached three consecutive infrastructure failures; chasing those hosts is stopped. A single final-head minified API35 suite attempt, followed by a single French tap-fix journey attempt, is recorded in the external handoff whether it passes or the host dies.
+
+The final unsigned FCM-off artifact identity, exact download command, bytes and SHA-256 belong to `## TO CLAUDE — handoff` and draft PR #185. Artifact `evidence.json.sourceCommit` must match the final commit before owner signing. The FCM-on packaging worker failure is a separate variant limit unless final stacktrace shows an effect on the FCM-off artifact. No signing, merge or Google publication is included.
 
 ## Configuration
 
@@ -8,7 +10,13 @@ Package `xyz.bobbyprotocol.bobby`, namespace `xyz.bobbyprotocol.android`, versio
 
 ## Verified application checkpoint
 
-Shipping application sources/assets/build configuration are unchanged after `4a8437ebc06a5f4ec0ef7c5e9a264c7c407d6cb0`. Subsequent fixes concern instrumentation, emulator setup, captures and documentation. The final dossier and asynchronous touch-injection fix create another commit. Native CI will produce artifacts for that exact head. The newly scheduled emulator workflow will be cancelled before device execution to respect the three-failure limit, leaving the final matrix explicitly incomplete. Only individual jobs below the infrastructure limit may be rerun; no green completion is claimed. Intermediate bundles must not be substituted for the handoff.
+Shipping application sources, generated-engine sources, build configuration and ProGuard are unchanged after `4a8437ebc06a5f4ec0ef7c5e9a264c7c407d6cb0`. Later changes affect instrumentation, emulator setup/captures and this dossier. This source comparison is exact:
+
+```sh
+git diff --stat 4a8437eb..HEAD -- android/app/src/main android/app/build.gradle.kts android/app/proguard-rules.pro
+```
+
+Result: **empty output; no tracked shipping file/byte changed**. The separate `android/nucleo/src` comparison is also empty. This establishes source equality, not identical compiled artifact hashes or a physical phone. Final native CI still produces unsigned artifacts for the exact final documentation/test commit; intermediate bundles must not replace them.
 
 - [Native 38150444353](https://github.com/anthonysurfermx/Bobby-Agent-Trader/actions/runs/38150444353): FCM-off/on both passed. Independently downloaded XML totals 997 debug plus 997 release JVM cases per configuration, zero failures/errors/skips. FCM-off lint 73 warnings/2 hints; FCM-on 75 warnings/2 hints; no error/fatal findings.
 - [Device 38150444437](https://github.com/anthonysurfermx/Bobby-Agent-Trader/actions/runs/38150444437): API35 Debug and minified Release suites each passed 116 cases: 106 passed, 10 skipped, 0 failures/errors. API34 Debug passed 116 cases: 105 passed, 11 skipped, 0 failures/errors. Eight existing WebGL acceptance cases, one software-GPU island animation and the locale-only class without its argument are skipped. API34 also skips an unsupported binary-message feature. These are named limits, not positive coverage.
@@ -31,7 +39,18 @@ French on a50ed999 reached home but its synchronous test pointer injection was i
 
 ## Six-locale evidence
 
-Required release journeys: en-US, es-MX, fr-FR, pt-BR, it-IT, de-DE, each with one passed finalized JUnit case and no skips. Each exercises actual Activity/session/bridge, risk gating, home, real IME, a controlled read, the report control, Profile/Credits, memory consent, local memory, reminders, invitation and disposable account deletion. Only transport/account data are staged; no real identity or service mutation is used. UI uses the shipping no-WebGL fallback on a software GPU. After hosted 37.2.12 RenderThread segfaults, CI uses the current `-gpu software` mode rather than deprecated `swiftshader_indirect`; [official graphics configuration](https://developer.android.com/studio/run/emulator-acceleration) documents these modes. Renderer/image/adb failures are excluded and retried with a maximum of three consecutive infrastructure failures per job.
+Completed checkpoint journeys: en-US, es-MX, fr-FR, pt-BR, it-IT, de-DE, each with one passed finalized JUnit case and no skips. Each exercises actual Activity/session/bridge, risk gating, home, real IME, a controlled read, the report control, Profile/Credits, memory consent, local memory, reminders, invitation and disposable account deletion. Only transport/account data are staged; no real identity or service mutation is used. UI uses the shipping no-WebGL fallback on a software GPU. After hosted 37.2.12 RenderThread segfaults, CI uses the current `-gpu software` mode rather than deprecated `swiftshader_indirect`; [official graphics configuration](https://developer.android.com/studio/run/emulator-acceleration) documents these modes. Renderer/image/adb failures are excluded and retried with a maximum of three consecutive infrastructure failures per job.
+
+| Locale | Completed journey head | Run / attempt | JUnit result |
+|---|---|---|---|
+| en-US | `4a8437eb` | 38150444437 / 2 | 1 passed, 0 skips/errors/failures |
+| es-MX | `4a8437eb` | 38150444437 / 1 | 1 passed, 0 skips/errors/failures |
+| fr-FR | `ebaa8cc9` | 38180370546 / 1 | 1 passed, 0 skips/errors/failures |
+| pt-BR | `27280754` | 38177652259 / 1 | 1 passed, 0 skips/errors/failures |
+| it-IT | `4a8437eb` | 38150444437 / 2 | 1 passed, 0 skips/errors/failures |
+| de-DE | `4a8437eb` | 38150444437 / 1 | 1 passed, 0 skips/errors/failures |
+
+Every listed source head has the same shipping-source bytes as the final head. The Italian journey passed JUnit, but its keyboard frame is rejected visually; that capture is excluded from listing/IME evidence. No failed setup, vanished host, cancelled stage or unfinalized report contributes coverage.
 
 Each locale gate requires 18 native 720×1280 RGB PNGs without alpha plus their original system `screencap` frames at exactly the same dimensions. Software decoding/PNG encoding avoids hardware-bitmap readback, but the newest host failures show that this alone does not cure the emulator death; handoff verification compares every RGB pixel against the native raw frame. No resizing/cropping/overlay occurs. This 9:16 display preserves 360×640dp at 320dpi while reducing observed software-WebView tile pressure. It meets Play phone requirements but falls below the recommended 1080px resolution. Suite 720×1600 diagnostic shots exceed Play's maximum 2:1 ratio and must not be uploaded unchanged. The historical handoff has 107 visually approved frames and 1 rejected Italian keyboard frame; [screenshots-review.md](screenshots-review.md) records the results and original provenance manifests accompany the external files.
 

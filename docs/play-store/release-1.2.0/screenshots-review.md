@@ -1,6 +1,6 @@
 # Native release capture review — six languages
 
-All 108 handed-off frames were visually inspected: 107 are approved as historical UI evidence; the Italian keyboard frame is rejected. **Six-locale verification of the final head is blocked, not complete.** The latest Spanish, German, Portuguese and Italian jobs each reached the three-infrastructure-failure limit; they are not rerun in a loop. A historical passed journey is never substituted for final-head coverage.
+All 108frames were visually inspected: 107approved for the listing/UI dossier, and the Italian keyboard frame rejected. The six documented checkpoint journeys have finalized passed JUnit. Their shipping source is byte-identical to the final head, while their commits/attempts remain explicit. The final-head matrix is not claimed all-green; three consecutive infrastructure failures on es/de/pt-BR/it ended further capture chasing. Hosted CI evidence is never physical-phone evidence.
 
 ## Capture provenance
 
@@ -58,4 +58,4 @@ Prefer home, completed read, Credits, Memory and invitation. Exclude `it/04-keyb
 
 ## Remaining acceptance
 
-Final-head minified suite and all six unskipped locale journeys must be green before this candidate is called technically ready. Failed setup, vanished emulators, cancelled stages and unfinalized JUnit never count as coverage. Native signing/Play delivery, Google OAuth/deep links, dictation/voice, battery-delayed notifications, OEM keyboards/cutouts, predictive-back gestures, GPU/WebGL, runtime 16KB and real backend requests still need separate physical-phone acceptance. Production profile sync depends on owner-approved PR #186/migration; the client contains no bypass.
+One final-head minified API35 suite attempt and then one French tap-fix journey attempt are recorded externally. The completed six-locale checkpoints above remain the shipping-equivalent evidence; final-head cancellations and failed attempts are disclosed separately. Failed setup, vanished emulators, cancelled stages and unfinalized JUnit never count as coverage. Native signing/Play delivery, Google OAuth/deep links, dictation/voice, battery-delayed notifications, OEM keyboards/cutouts, predictive-back gestures, GPU/WebGL, runtime 16KB and real backend requests still need separate physical-phone acceptance. Production profile sync depends on owner-approved PR #186/migration; the client contains no bypass.
