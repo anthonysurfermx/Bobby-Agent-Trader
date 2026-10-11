@@ -65,7 +65,7 @@ fun ReportContentSheet(session: NucleoSession, repository: BobbyRepository, onCl
         DarkSheetSystemBars()
         Column(Modifier.fillMaxWidth().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(copy("title"), style = MaterialTheme.typography.headlineSmall)
+                Text(copy("title"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
                 TextButton(onClick = onClose) { Text(session.text("Close", "Cerrar")) }
             }
             Text(copy("notice"), style = MaterialTheme.typography.bodySmall)

@@ -1,6 +1,7 @@
 package xyz.bobbyprotocol.android.v18
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.os.ParcelFileDescriptor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -206,6 +207,26 @@ object V18Shots {
         sendAwayNotResponding()
         shell("mkdir -p $FOLDER")
         shell("screencap -p $FOLDER/$name.png")
+    }
+
+    /** Capture the real display directly as 24-bit PNG; no resize, crop, overlay or pixel repaint. */
+    @androidx.annotation.RequiresApi(31)
+    fun saveListing(name: String) {
+        require(Regex("^[a-z0-9][a-z0-9-]{0,100}$").matches(name))
+        sendAwayNotResponding()
+        shell("mkdir -p $FOLDER")
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val bitmap = checkNotNull(automation.takeScreenshot()) { "Native screenshot failed" }
+        try {
+            bitmap.setHasAlpha(false)
+            val pipes = automation.executeShellCommandRw("cat > $FOLDER/$name.png")
+            ParcelFileDescriptor.AutoCloseInputStream(pipes[0]).use { output ->
+                ParcelFileDescriptor.AutoCloseOutputStream(pipes[1]).use { input ->
+                    check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, input)) { "PNG encoding failed" }
+                }
+                output.readBytes() // EOF confirms the shell writer closed the capture file.
+            }
+        } finally { bitmap.recycle() }
     }
 
     /**

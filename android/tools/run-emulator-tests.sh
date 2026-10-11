@@ -25,6 +25,10 @@ page=xyz.bobbyprotocol.android.v18.FollowUpPageInstrumentedTest
 argument=-Pandroid.testInstrumentationRunnerArguments
 
 mkdir -p "$out/shots"
+rm -f "$out/instrumentation-crash.txt"
+if [ "${BOBBY_TEST_LOCALE:-suite}" != suite ]; then
+  bash tools/set-emulator-locale.sh "$BOBBY_TEST_LOCALE" || exit 1
+fi
 adb shell mkdir -p "$device_shots"
 # An emulator that draws in software sometimes shows "isn't responding" for its own launcher, over
 # the screen being photographed: the system is asked not to show those windows.
@@ -42,11 +46,28 @@ trap collect EXIT
 
 status=0
 part() {
+  if [ -f "$out/instrumentation-crash.txt" ]; then return; fi
   name=$1
   shift
   echo "==== Instrumented tests: $name ===="
   # A runner that crashes before JUnit starts can otherwise wait until the whole 90-minute job ends.
-  timeout --signal=TERM --kill-after=30s 15m ./gradlew :app:connected${build_type}AndroidTest --no-daemon "$@" || status=1
+  log_start=$(( $(wc -c < "$out/logcat.txt") + 1 ))
+  timeout --signal=TERM --kill-after=30s 15m ./gradlew :app:connected${build_type}AndroidTest --no-daemon "$@" &
+  test_process=$!
+  (
+    while kill -0 "$test_process" 2>/dev/null; do
+      if tail -c +"$log_start" "$out/logcat.txt" | grep -Fq 'AndroidRuntime: Process: xyz.bobbyprotocol.bobby,'; then
+        echo "Bobby crashed in '$name'; preserving logcat and captures." | tee "$out/instrumentation-crash.txt"
+        kill -TERM "$test_process" 2>/dev/null || true
+        break
+      fi
+      sleep 2
+    done
+  ) &
+  watchdog=$!
+  wait "$test_process" || status=1
+  kill "$watchdog" 2>/dev/null || true
+  wait "$watchdog" 2>/dev/null || true
   mkdir -p "$out/$name"
   cp -R app/build/reports/androidTests/connected "$out/$name/report" 2>/dev/null || true
   cp -R app/build/outputs/androidTest-results/connected "$out/$name/results" 2>/dev/null || true

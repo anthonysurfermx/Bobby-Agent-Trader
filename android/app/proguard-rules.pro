@@ -6,6 +6,10 @@
 # calls that app-only shrinking cannot see; preserve this one runtime class across both APKs.
 -keep class kotlin.jvm.internal.Intrinsics { *; }
 
+# AndroidJUnitRunner calls the shared AndroidX tracing facade before JUnit starts. Release-only
+# shrinking otherwise removes it because application tracing is inlined/disabled.
+-keep class androidx.tracing.Trace { *; }
+
 # The device acceptance tests install a fixture transport by field name; production owns this client too.
 -keepclassmembers class xyz.bobbyprotocol.android.data.BobbyRepository { okhttp3.OkHttpClient client; }
 # Device acceptance inspects the actual activity session and repository, without shipping any fixture hook.

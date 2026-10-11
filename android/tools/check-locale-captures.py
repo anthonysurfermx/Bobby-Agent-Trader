@@ -19,8 +19,10 @@ names = [
 ]
 for name in names:
     path = root / 'shots' / f'locale-{language}-{name}.png'
-    header = path.read_bytes()[:24]
+    header = path.read_bytes()[:26]
     assert header[:8] == b'\x89PNG\r\n\x1a\n', path
     width, height = struct.unpack('>II', header[16:24])
     assert width >= 1080 and height >= 1920, f'{path}: {width}x{height}'
+    assert max(width, height) <= 3840 and max(width, height) <= 2 * min(width, height), f'{path}: invalid Play dimensions'
+    assert header[24] == 8 and header[25] == 2, f'{path}: Play needs 24-bit RGB PNG without alpha'
 print(f'{language}: one passed release journey, {len(names)} native captures at listing resolution')

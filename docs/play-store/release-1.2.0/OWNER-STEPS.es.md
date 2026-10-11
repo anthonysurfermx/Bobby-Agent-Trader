@@ -31,7 +31,7 @@ Entrega técnica: draft PR #185; versión **1.2.0**, código **10**, paquete **x
 
 Contacto de desarrollador/email, entidad y domicilio: usa los datos reales de la cuenta Console. Son datos del propietario, no inventados en este dossier. Completa también declaraciones nuevas que Console muestre; no ocultes una función para eludir revisión.
 
-Capturas de teléfono: usar las capturas aprobadas de cada idioma descritas en `screenshots-review.md` (1080×2400). No usar la captura de consentimiento/borrado como promesa de un backend real probado. Icono: `app-icon-512.png`, copiado sin cambios del icono de esta app Android (512×512). Feature graphic: `../final/feature-graphic-1024x500.png` (1024×500), arte de marca existente en inglés, revisado visualmente; no contiene una pantalla de otro producto ni menciona tiendas/cadenas retiradas. Usa ese recurso común o el arte localizado que el propietario ya haya aprobado; no estires el icono.
+Capturas de teléfono: usar las capturas aprobadas de cada idioma descritas en `screenshots-review.md` (1080×1920). No usar la captura de consentimiento/borrado como promesa de un backend real probado. Icono: `app-icon-512.png`, mismos píxeles del icono Android, en PNG de 32 bits (512×512). Feature graphic: `feature-graphic-1024x500.png` (1024×500, PNG de 24 bits sin alpha), mismos píxeles RGB del arte de marca existente en inglés, revisado visualmente; no contiene una pantalla de otro producto ni menciona tiendas/cadenas retiradas. Usa ese recurso común o el arte localizado que el propietario ya haya aprobado; no estires el icono.
 
 ## 3. Prueba interna primero
 

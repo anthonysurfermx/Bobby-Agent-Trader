@@ -146,6 +146,7 @@ class ReleaseLocaleSmokeInstrumentedTest {
         // Exercise the finished answer's shipping handler, not only the generic native route.
         js("document.querySelector('.report-answer').click();true")
         compose.waitUntil(30_000) { runCatching { compose.onNodeWithText(reportContentTitle(language)).assertExists() }.isSuccess }
+        compose.onNodeWithText(session.text("Close", "Cerrar")).assertIsDisplayed()
         shot("04b-report-from-read")
         close()
         open("account")
@@ -223,6 +224,9 @@ class ReleaseLocaleSmokeInstrumentedTest {
             web.reload(session.page)
         } }
         waitFor { js("!!window.nucleoBridge") == true }
+        val deviceAppLocale = activity.resources.configuration.locales[0].toLanguageTag()
+        assertEquals("Android delivers the selected app locale", LOCALES.getValue(language), deviceAppLocale)
+        android.util.Log.i("BobbyLocaleProof", "appLocale=$deviceAppLocale, interface=$language")
         assertEquals(language, bridge("session").getString("language"))
     }
 
@@ -272,7 +276,7 @@ class ReleaseLocaleSmokeInstrumentedTest {
     }
     private fun close() { device.pressBack(); Thread.sleep(800) }
     private fun scrollSheet() { device.swipe(device.displayWidth/2, device.displayHeight*4/5, device.displayWidth/2, device.displayHeight/5, 18); compose.waitForIdle() }
-    private fun shot(name: String) { compose.waitForIdle(); Thread.sleep(700); V18Shots.save("locale-$language-$name") }
+    private fun shot(name: String) { compose.waitForIdle(); Thread.sleep(700); V18Shots.saveListing("locale-$language-$name") }
     private fun bridge(method: String, params: JSONObject = JSONObject()): JSONObject {
         js("window.releaseSmoke=null;window.nucleoBridge.call(${JSONObject.quote(method)},$params).then(function(r){window.releaseSmoke=JSON.stringify(r);},function(e){window.releaseSmoke=JSON.stringify({fault:e.code});});true")
         waitFor { js("typeof window.releaseSmoke === 'string'") == true }

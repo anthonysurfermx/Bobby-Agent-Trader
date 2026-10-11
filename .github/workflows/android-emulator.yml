@@ -98,7 +98,7 @@ jobs:
           working-directory: android
           # A hosted runner has no GPU: the page's WebGL scene is drawn in software, and its cost grows
           # with every pixel. 720x1600 at 320 dpi is a 360x800 dp phone, the most common Android size.
-          pre-emulator-launch-script: bash tools/emulator-screen.sh ${{ matrix.locale == 'suite' && '720 1600 320' || '1080 2400 480' }}
+          pre-emulator-launch-script: bash tools/emulator-screen.sh ${{ matrix.locale == 'suite' && '720 1600 320' || '1080 1920 480' }}
           # What the tests are told about this emulator: it exists for this run only (a test that changes a
           # system setting may use it), and it has no GPU (the suite that drives the WebGL page by script is skipped).
           script: bash tools/run-emulator-tests.sh -PbobbyTestBuildType=${{ matrix.build-type == 'Release' && 'release' || 'debug' }} -Pandroid.testInstrumentationRunnerArguments.bobbyOwnedEmulator=ci-throwaway -Pandroid.testInstrumentationRunnerArguments.bobbySoftwareGpu=true
