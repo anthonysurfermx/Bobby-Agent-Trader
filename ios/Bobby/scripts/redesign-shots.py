@@ -113,6 +113,16 @@ def main():
                 folder = args.output / (DEVICES[key][2] + '-' + args.language + ('-plus1' if args.text_size == '+1' else ''))
                 folder.mkdir(parents=True, exist_ok=True)
                 if list(folder.glob('*.png')): raise RuntimeError(f'Refusing to mix captures with an existing run: {folder}')
+                # Set the owned phone's system language before SpringBoard starts: app launch
+                # arguments alone leave permission dialogs and Settings in the host language.
+                current = data(['xcrun', 'simctl', 'list', 'devices', 'available', '-j'])['devices']
+                info = next(d for group in current.values() for d in group if d['udid'] == udid)
+                preferences = Path(info['dataPath']) / 'Library/Preferences/.GlobalPreferences.plist'
+                settings = plistlib.loads(preferences.read_bytes()) if preferences.exists() else {}
+                settings['AppleLanguages'] = [args.language]
+                settings['AppleLocale'] = LOCALES[args.language]
+                preferences.parent.mkdir(parents=True, exist_ok=True)
+                preferences.write_bytes(plistlib.dumps(settings))
                 run(['xcrun', 'simctl', 'boot', udid])
                 run(['xcrun', 'simctl', 'bootstatus', udid, '-b'])
                 run(['xcrun', 'simctl', 'ui', udid, 'content_size', 'extra-large' if args.text_size == '+1' else 'large'])
