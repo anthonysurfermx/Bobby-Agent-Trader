@@ -70,6 +70,8 @@ What kind of errand it is decides what you do:
 - You cannot tell which things they mean, or they asked to compare and named fewer than two: ask one short question, kind "clarification". Do not guess.
 - The errand needs something no tool gives you (what a fund holds, how concentrated it is, fees, earnings, news, a forecast, what to do): say plainly that you cannot establish that here, and say what you can establish. Never fill the gap from memory.
 - "previous" in the input is their last question, your answer to it and the figures behind it. A follow-up about those figures is answered from them, with no new tool call. Use a tool again only if they ask for other assets or another window.
+- "declined" in the input is an errand of theirs for which you offered a read and they said no: nothing was read. It tells you which assets and which window they were talking about, so never ask them again which ones. If they now ask for it, call read_assets for it: the app asks them again. Their earlier yes or no is never a permission.
+- They ask for more than three assets together: say plainly that you compare up to three at a time and ask which three, kind "clarification". Do not offer to split them into several reads yourself.
 - The instruments you can read with evidence are: ${UNIVERSE.map((instrument) => `${instrument.name} (${instrument.symbol})`).join(', ')}. Windows: 30 or 60 days. Suggest nothing outside them.
 
 Numbers. You never write a market number. Every figure lives in a tool result (or in "previous") and has an id: to state it, write {{f:ID}} and the app writes the number with its unit, so never put a percent sign or the word for percent after it. {{days}} writes only the number of calendar days of the window: write the plain word for "days" right after it (never sessions or trading days: the window holds fewer of those). A figure that is one day's (the worst day, the best day) carries that day: {{d:ID}} writes its date. {{from:ID}} and {{to:ID}} write the first and the last day a figure covers. Never type a date or a count of days yourself. Never state a number of your own, in digits or in words. Three things are not that: the length of the window you read, or the two lengths the tool offers named together ("30 or 60 days"), followed by the word for days; a number the person wrote, said back exactly as they wrote it; a name that holds a number (S&P 500, Nasdaq 100, 24/7). In gist and text the window is always written with {{days}}; the other length, or the two together, may be named only in a limitation or in next. Never compute, never round, never restate a figure in words, never put two placeholders side by side. A figure whose value is null does not exist: say that it could not be established.
@@ -117,8 +119,11 @@ function approvedNotRun(task: Pick<Task, 'steps'>): { useId: string; tool: strin
 }
 
 /** The conversation, rebuilt from the steps and from nothing else. */
-export function rebuild(task: Task, parent: { question: string; presentation: Presentation; analysis: Analysis | null } | null): Message[] {
+/** An errand of the same conversation that stopped at its card because the person said no: what they asked and what was offered. */
+export interface Declined { question: string; assets: string[]; windowDays: number | null }
+export function rebuild(task: Task, parent: { question: string; presentation: Presentation; analysis: Analysis | null } | null, declined: Declined | null = null): Message[] {
   const input: Record<string, unknown> = { question: task.question };
+  if (declined) input.declined = { question: declined.question, offered: { assets: declined.assets, windowDays: declined.windowDays } };
   if (parent) input.previous = { question: parent.question, answer: parent.presentation.text, ...(parent.analysis ? { figures: parent.analysis.figures.map(forModel), windowDays: parent.analysis.windowDays, limitations: parent.analysis.limitations } : {}) };
   const messages: Message[] = [{ role: 'user', content: JSON.stringify(input) }];
   let open: Array<Extract<Block, { type: 'tool_use' }>> = [];
@@ -183,9 +188,17 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
     else await write('error', { code });
   };
   try {
-    let parent: Parameters<typeof rebuild>[1] = null;
+    let parent: Parameters<typeof rebuild>[1] = null, declined: Declined | null = null;
     if (claim.task.parent) {
-      const before = await deps.store.get(owner, claim.task.parent), result = before ? taskResult(before) : null;
+      let before = await deps.store.get(owner, claim.task.parent);
+      // A card they said no to leaves what was asked and what was offered, never a figure and never a permission.
+      // What was answered before it is still on the table: the walk goes up to it (three steps at most).
+      for (let up = 0; up < 3 && before && !taskResult(before) && before.steps.at(-1)?.kind === 'approval_denied'; up++) {
+        const scope = [...before.steps].reverse().find((step) => step.kind === 'approval_requested')?.data.scope as ApprovalScope | undefined;
+        declined ??= { question: before.question, assets: scope?.assets ?? [], windowDays: scope?.windowDays ?? null };
+        before = before.parent ? await deps.store.get(owner, before.parent) : null;
+      }
+      const result = before ? taskResult(before) : null;
       if (before && result) parent = { question: before.question, presentation: result.presentation, analysis: result.analysis };
     }
     for (;;) {
@@ -219,7 +232,7 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
       // The steps are enough for the next run to go on.
       const left = deps.limits.runMs - (deps.now() - started);
       if (left < 15_000) return;
-      const request = { model: task.model, system: agentPrompt(task.language, task.locale), messages: rebuild(task, parent), tools: WIRE_TOOLS, maxTokens: deps.limits.maxTokens, timeoutMs: Math.min(30_000, left - 8_000), effort: agentEffort() };
+      const request = { model: task.model, system: agentPrompt(task.language, task.locale), messages: rebuild(task, parent, declined), tools: WIRE_TOOLS, maxTokens: deps.limits.maxTokens, timeoutMs: Math.min(30_000, left - 8_000), effort: agentEffort() };
       const budget: Budget = { ...deps.budget, taskCapUsd: deps.limits.taskUsd };
       const reply = await reservedCall(deps.store, budget, id, request, deps.call, deps.now);
       if (!reply.ok) {

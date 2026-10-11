@@ -94,7 +94,8 @@ create or replace function agent_get(p_owner text, p_id text) returns jsonb lang
   select agent_task_json(id) from agent_tasks where id = p_id and owner = p_owner
 $$;
 create or replace function agent_latest_completed(p_owner text, p_session text) returns jsonb language sql stable set search_path = public, pg_temp as $$
-  select agent_task_json(t.id) from agent_tasks t join agent_steps s on s.task = t.id and s.kind = 'answer'
+  -- What reached the person: an answer, or a card they said no to (the last step of a task that ended that way).
+  select agent_task_json(t.id) from agent_tasks t join agent_steps s on s.task = t.id and s.kind in ('answer', 'approval_denied')
   where t.owner = p_owner and t.session = p_session order by s.at desc, t.seq desc limit 1
 $$;
 

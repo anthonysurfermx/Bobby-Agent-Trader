@@ -113,7 +113,8 @@ export class MemoryAgentStore implements AgentStore {
 
   async latestCompleted(owner: string, session: string): Promise<Task | null> {
     this.load();
-    const done = Object.values(this.state.tasks).filter((task) => task.owner === owner && task.session === session && task.steps.some((step) => step.kind === 'answer'));
+    // What reached the person: an answer, or a card they said no to (it leaves what was asked, never figures).
+    const done = Object.values(this.state.tasks).filter((task) => task.owner === owner && task.session === session && (task.steps.some((step) => step.kind === 'answer') || task.steps.at(-1)?.kind === 'approval_denied'));
     done.sort((a, b) => a.steps.at(-1)!.at.localeCompare(b.steps.at(-1)!.at));
     return done.length ? clone(done.at(-1)!) : null;
   }

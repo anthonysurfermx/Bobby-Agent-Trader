@@ -180,6 +180,19 @@ try {
     for (const key of ['z', 'm', 'a']) { await s.begin(newTask(owner, key, { session: 'tie' }), {}, T0); const c = await s.claim(`task_${owner}_${key}`, 'w', 1000, T0); await s.append(`task_${owner}_${key}`, c!.fence, 'answer', { result: {} }, T0); await s.release(`task_${owner}_${key}`, c!.fence); }
     return (await s.latestCompleted(owner, 'tie'))?.id.endsWith('_a');
   }, true, 'answers of one instant: the errand begun last is the latest');
+  // A card the person said no to is the latest thing that reached them: the next turn can be told what was asked.
+  await same(async (s) => {
+    const owner = `no${fresh()}`;
+    await s.begin(newTask(owner, 'a', { session: 'decl' }), {}, T0);
+    const first = await s.claim(`task_${owner}_a`, 'w', 1000, T0); await s.append(`task_${owner}_a`, first!.fence, 'answer', { result: {} }, T0); await s.release(`task_${owner}_a`, first!.fence);
+    await s.begin(newTask(owner, 'b', { session: 'decl' }), {}, T0 + 1000);
+    const second = await s.claim(`task_${owner}_b`, 'w', 1000, T0 + 1000);
+    await s.append(`task_${owner}_b`, second!.fence, 'approval_requested', { scope: { action: 'read_assets', assets: ['BTC'], windowDays: 30, depth: 'standard', consumption: { reads: 1 }, digest: 'd' }, call: { useId: 'u', tool: 'read_assets', args: { symbols: ['BTC'], windowDays: 30 } } }, T0 + 1000);
+    await s.release(`task_${owner}_b`, second!.fence);
+    const before = (await s.latestCompleted(owner, 'decl'))?.id.endsWith('_a');
+    const denied = await s.deny(owner, `task_${owner}_b`, T0 + 2000);
+    return [before, denied, (await s.latestCompleted(owner, 'decl'))?.id.endsWith('_b'), (await s.latestCompleted(owner, 'decl'))?.steps.at(-1)?.kind];
+  }, [true, true, true, 'approval_denied'], 'a waiting card is not yet the latest; once declined it is');
   // A missing fence or digest is refused.
   await same(async (s) => {
     const owner = `nf${fresh()}`, d = await waiting(s as InstanceType<typeof PgAgentStore>, owner, 'k');

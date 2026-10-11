@@ -219,7 +219,7 @@ const LIMITATION: Record<string, Record<AppLanguage, (subject: string) => string
   },
   no_series: {
     en: (s) => `I could not read a reliable series for ${s}.`, es: (s) => `No pude leer una serie fiable de ${s}.`, fr: (s) => `Je n’ai pas pu lire une série fiable pour ${s}.`,
-    pt: (s) => `Não consegui ler uma série fiável de ${s}.`, it: (s) => `Non sono riuscito a leggere una serie affidabile per ${s}.`, de: (s) => `Für ${s} konnte ich keine verlässliche Reihe lesen.`,
+    pt: (s) => `Não consegui ler uma série de preços válida de ${s}.`, it: (s) => `Non sono riuscito a leggere una serie affidabile per ${s}.`, de: (s) => `Für ${s} konnte ich keine verlässliche Reihe lesen.`,
   },
   past_window_only: {
     en: () => 'This is what happened in that window; it does not say what comes next.', es: () => 'Es lo que pasó en ese periodo; no dice lo que viene.',
@@ -249,6 +249,15 @@ const COMPOSED_ONE: Record<AppLanguage, (a: string) => string> = {
   it: (a) => `Negli ultimi {{days}} giorni, ${a} è variato del {{f:return_A}}. Il suo calo più ampio da un massimo è stato del {{f:drawdown_A}}.`,
   de: (a) => `In den letzten {{days}} Tagen hat sich ${a} um {{f:return_A}} verändert. Der größte Rückgang von einem Hoch betrug {{f:drawdown_A}}.`,
 };
+/** Added when every instrument told has its average daily move: the fallback then answers "which moved more each day" as well. */
+const COMPOSED_MOVE: Record<AppLanguage, { one: string; two: (a: string, b: string) => string; many: (items: string) => string; each: (name: string, symbol: string) => string }> = {
+  en: { one: ' On an average day it moved {{f:move_A}}.', two: (a, b) => ` On an average day ${a} moved {{f:move_A}} and ${b} {{f:move_B}}.`, many: (items) => `On an average day, ${items}.`, each: (name, s) => `${name} moved {{f:move_${s}}}` },
+  es: { one: ' En un día promedio se movió {{f:move_A}}.', two: (a, b) => ` En un día promedio, ${a} se movió {{f:move_A}} y ${b} {{f:move_B}}.`, many: (items) => `En un día promedio, ${items}.`, each: (name, s) => `${name} se movió {{f:move_${s}}}` },
+  fr: { one: ' Un jour moyen, il a bougé de {{f:move_A}}.', two: (a, b) => ` Un jour moyen, ${a} a bougé de {{f:move_A}} et ${b} de {{f:move_B}}.`, many: (items) => `Un jour moyen, ${items}.`, each: (name, s) => `${name} a bougé de {{f:move_${s}}}` },
+  pt: { one: ' A variação média por dia foi de {{f:move_A}}.', two: (a, b) => ` A variação média por dia foi de {{f:move_A}} em ${a} e de {{f:move_B}} em ${b}.`, many: (items) => `A variação média por dia foi ${items}.`, each: (name, s) => `de {{f:move_${s}}} em ${name}` },
+  it: { one: ' In un giorno medio si è mosso del {{f:move_A}}.', two: (a, b) => ` In un giorno medio ${a} si è mosso del {{f:move_A}} e ${b} del {{f:move_B}}.`, many: (items) => `In un giorno medio, ${items}.`, each: (name, s) => `${name} si è mosso del {{f:move_${s}}}` },
+  de: { one: ' An einem durchschnittlichen Tag bewegte er sich um {{f:move_A}}.', two: (a, b) => ` An einem durchschnittlichen Tag bewegte sich ${a} um {{f:move_A}} und ${b} um {{f:move_B}}.`, many: (items) => `An einem durchschnittlichen Tag: ${items}.`, each: (name, s) => `${name} {{f:move_${s}}}` },
+};
 /** Added for one instrument when both days exist: the fallback then answers "which was the best day" as well. */
 const COMPOSED_DAYS: Record<AppLanguage, string> = {
   en: ' Its worst day was {{d:worst_A}}, at {{f:worst_A}}, and its best was {{d:best_A}}, at {{f:best_A}}.',
@@ -271,13 +280,13 @@ const COMPOSED_MANY: Record<AppLanguage, { changes: (items: string) => string; c
 };
 export const UNAVAILABLE: Record<AppLanguage, string> = {
   en: 'I could not gather reliable data to answer that. Your question is still here.', es: 'No pude reunir datos fiables para responder eso. Tu pregunta sigue aquí.',
-  fr: 'Je n’ai pas pu réunir des données fiables pour répondre. Ta question est toujours là.', pt: 'Não consegui reunir dados fiáveis para responder. A tua pergunta continua aqui.',
+  fr: 'Je n’ai pas pu réunir des données fiables pour répondre. Ta question est toujours là.', pt: 'Não consegui reunir dados suficientes para responder. A pergunta continua aqui.',
   it: 'Non sono riuscito a raccogliere dati affidabili per rispondere. La tua domanda è ancora qui.', de: 'Ich konnte keine verlässlichen Daten dafür sammeln. Deine Frage ist noch da.',
 };
 /** For an answer that needed no data and whose words could not be shown: it does not blame data that was never asked for. */
 export const UNANSWERED: Record<AppLanguage, string> = {
   en: 'I could not answer that with the care it needs this time. Your question is still here.', es: 'Esta vez no logré responder eso con el cuidado que pide. Tu pregunta sigue aquí.',
-  fr: 'Cette fois, je n’ai pas réussi à répondre avec le soin qu’il faut. Ta question est toujours là.', pt: 'Desta vez não consegui responder com o cuidado que isso pede. A tua pergunta continua aqui.',
+  fr: 'Cette fois, je n’ai pas réussi à répondre avec le soin qu’il faut. Ta question est toujours là.', pt: 'Desta vez não consegui responder com o cuidado que isso pede. A pergunta continua aqui.',
   it: 'Questa volta non sono riuscito a rispondere con la cura che serve. La tua domanda è ancora qui.', de: 'Diesmal konnte ich das nicht mit der nötigen Sorgfalt beantworten. Deine Frage ist noch da.',
 };
 /** For an explanation whose words held a number no figure supports (what a fund holds, a fee, a price): it says what is missing and what Bobby can do. */
@@ -305,15 +314,17 @@ export function composeByCode(analysis: Analysis | null, language: AppLanguage, 
   if (!analysis || !ready.length) return { kind: 'unavailable', gist: UNAVAILABLE[language], text: UNAVAILABLE[language], figures: [], references: references(analysis, []), limitations: limitationsInWords(analysis, language).filter((_, n) => analysis?.limitations[n] !== 'past_window_only'), next: null, composedByCode: true };
   if (ready.length > 2) {
     const many = COMPOSED_MANY[language];
-    const text = write(`${many.changes(listed(ready.map((symbol) => many.change(instrumentName(symbol), symbol)), language))} ${many.falls(listed(ready.map((symbol) => many.fall(instrumentName(symbol), symbol)), language))}`, figures, analysis.windowDays, language, locale);
-    const used = [...ready.map((symbol) => `return_${symbol}`), ...ready.map((symbol) => `drawdown_${symbol}`)];
+    const moved = ready.every((symbol) => figures.get(`move_${symbol}`)?.value != null);
+    const text = write(`${many.changes(listed(ready.map((symbol) => many.change(instrumentName(symbol), symbol)), language))}${moved ? ` ${COMPOSED_MOVE[language].many(listed(ready.map((symbol) => COMPOSED_MOVE[language].each(instrumentName(symbol), symbol)), language))}` : ''} ${many.falls(listed(ready.map((symbol) => many.fall(instrumentName(symbol), symbol)), language))}`, figures, analysis.windowDays, language, locale);
+    const used = [...ready.map((symbol) => `return_${symbol}`), ...(moved ? ready.map((symbol) => `move_${symbol}`) : []), ...ready.map((symbol) => `drawdown_${symbol}`)];
     return { kind: 'analysis', gist: text.slice(0, text.indexOf('. ') + 1) || text, text, figures: used, references: references(analysis, used), limitations: limitationsInWords(analysis, language), next: null, composedByCode: true };
   }
   const [a, b] = ready;
   const days = !b && ['worst', 'best'].every((metric) => { const figure = figures.get(`${metric}_${a}`); return figure?.value != null && Boolean(figure.day); });
-  const draft = (b ? COMPOSED[language](instrumentName(a), instrumentName(b)) : COMPOSED_ONE[language](instrumentName(a)) + (days ? COMPOSED_DAYS[language] : '')).replace(/_A\}\}/g, `_${a}}}`).replace(/_B\}\}/g, `_${b}}}`);
+  const moved = [a, b].filter(Boolean).every((symbol) => figures.get(`move_${symbol}`)?.value != null);
+  const draft = (b ? COMPOSED[language](instrumentName(a), instrumentName(b)) + (moved ? COMPOSED_MOVE[language].two(instrumentName(a), instrumentName(b)) : '') : COMPOSED_ONE[language](instrumentName(a)) + (moved ? COMPOSED_MOVE[language].one : '') + (days ? COMPOSED_DAYS[language] : '')).replace(/_A\}\}/g, `_${a}}}`).replace(/_B\}\}/g, `_${b}}}`);
   const text = write(draft, figures, analysis.windowDays, language, locale);
-  const used = b ? [`return_${a}`, `return_${b}`, `drawdown_${a}`, `drawdown_${b}`] : [`return_${a}`, `drawdown_${a}`, ...(days ? [`worst_${a}`, `best_${a}`] : [])];
+  const used = b ? [`return_${a}`, `return_${b}`, `drawdown_${a}`, `drawdown_${b}`, ...(moved ? [`move_${a}`, `move_${b}`] : [])] : [`return_${a}`, `drawdown_${a}`, ...(moved ? [`move_${a}`] : []), ...(days ? [`worst_${a}`, `best_${a}`] : [])];
   return { kind: 'analysis', gist: text.slice(0, text.indexOf('. ') + 1) || text, text, figures: used, references: references(analysis, used), limitations: limitationsInWords(analysis, language), next: null, composedByCode: true };
 }
 

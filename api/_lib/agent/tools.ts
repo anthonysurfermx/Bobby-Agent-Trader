@@ -186,8 +186,6 @@ export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<T
   const usable = reads.filter((read) => read.bars);
   const mixed = new Set(usable.map((read) => read.instrument.assetClass)).size > 1;
   if (mixed) limitations.push('mixed_calendars');
-  // Days every usable instrument traded inside the window: what every correlation is computed on (and nothing else).
-  const common = usable.length ? usable.map((read) => new Set(inWindow(read).map((bar) => bar.day))).reduce((a, b) => new Set([...a].filter((day) => b.has(day)))) : new Set<string>();
   const figures: Figure[] = [];
   const used = new Map<string, DailyBar[]>();
   for (const read of reads) {
@@ -216,10 +214,14 @@ export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<T
   if (used.size) limitations.unshift('past_window_only');
   const symbols = [...used.keys()];
   for (let i = 0; i < symbols.length; i++) for (let j = i + 1; j < symbols.length; j++) {
-    const a = used.get(symbols[i])!.filter((bar) => common.has(bar.day)), b = used.get(symbols[j])!.filter((bar) => common.has(bar.day));
-    const ma = metrics(a), mb = metrics(b);
-    const r = ma && mb && ma.changes.length >= MIN_CHANGES ? correlation(ma.changes, mb.changes) : null;
-    figures.push({ id: `corr_${symbols[i]}_${symbols[j]}`, metric: 'correlation', subject: `${symbols[i]}~${symbols[j]}`, value: r, unit: 'ratio', currency: null, basis: `correlation of the daily changes on the ${ma?.changes.length ?? 0} days both traded${r === null ? `; needs ${MIN_CHANGES}` : ''}`, from: ma?.first.day ?? null, to: ma?.last.day ?? null, days: ma?.changes.length ?? null, evidence: [`ev_${symbols[i]}`, `ev_${symbols[j]}`], quality: r === null ? 'missing' : 'valid' });
+    // A daily change is always ONE instrument's change from its own previous close, here as in every other figure:
+    // the two are paired on the days both have one. (Changes taken between the closes both have would give a coin
+    // a Monday that carries its weekend, and a number that is not what "daily changes" says.)
+    const own = (symbol: string) => { const bars = used.get(symbol)!; return new Map(bars.slice(1).map((bar, n) => [bar.day, pct(bar.close / bars[n].close - 1)] as const)); };
+    const a = own(symbols[i]), b = own(symbols[j]);
+    const days = [...a.keys()].filter((day) => b.has(day)).sort();
+    const r = days.length >= MIN_CHANGES ? correlation(days.map((day) => a.get(day)!), days.map((day) => b.get(day)!)) : null;
+    figures.push({ id: `corr_${symbols[i]}_${symbols[j]}`, metric: 'correlation', subject: `${symbols[i]}~${symbols[j]}`, value: r, unit: 'ratio', currency: null, basis: `correlation of each one's own daily changes on the ${days.length} days both traded${r === null ? `; needs ${MIN_CHANGES}` : ''}`, from: days[0] ?? null, to: days.at(-1) ?? null, days: days.length, evidence: [`ev_${symbols[i]}`, `ev_${symbols[j]}`], quality: r === null ? 'missing' : 'valid' });
   }
   const analysis: Analysis = { kind: args.symbols.length > 1 ? 'comparison' : 'single', subjects: args.symbols, windowDays: args.windowDays, figures, evidence, limitations, computedAt: now.toISOString() };
   return { evidence, analysis, data: { figures: figures.map(forModel), evidence: evidence.map(({ id, source, instrument, asOf, quality, note }) => ({ id, source, instrument, asOf, quality, note })), limitations, windowDays: args.windowDays } };
