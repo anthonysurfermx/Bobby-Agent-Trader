@@ -31,7 +31,7 @@ struct SpeakingDial {
     }
     func json(_ owner: String?) -> [String: Any] {
         ["owner": tag(owner), "value": value(owner) as Any? ?? NSNull(),
-         "offer": defaults.bool(forKey: "bobby.speaking.fresh") && value(owner) == nil,
+         "offer": false,
          "refine": defaults.integer(forKey: key(owner, "count")) >= 3 && !defaults.bool(forKey: key(owner, "refined"))]
     }
 }

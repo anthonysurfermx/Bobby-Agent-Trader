@@ -386,3 +386,64 @@ final class InvitationPacingTests: XCTestCase {
         XCTAssertTrue(store.decided);XCTAssertNil(store.wire(capability:.init(enabled:true,context:true,catalog:1,notices:["memory-1"])))
     }
 }
+
+@MainActor
+final class CompanionNotesOwnershipTests: XCTestCase {
+    private func seeded() -> CompanionContextStore {
+        var data: Data?
+        let store = CompanionContextStore(read: { data }, write: { data = $0; return true })
+        store.choose(true); store.answered(); store.answer("interest", value: "crypto")
+        return store
+    }
+    func testGuestToFirstSignInKeepsConsentAndEveryNoteAndStoresOnlyHash() {
+        let store = seeded(); let before = store.state.notes
+        XCTAssertFalse(store.bindOwner("first-account")); XCTAssertTrue(store.accepted); XCTAssertEqual(store.state.notes, before)
+        XCTAssertEqual(store.state.ownerTag, SpeakingDial().tag("first-account")); XCTAssertNotEqual(store.state.ownerTag, "first-account")
+        let wire = store.wire(capability:.init(enabled:true,context:true,catalog:1,notices:["memory-1"]))!
+        XCTAssertEqual(Set(wire.keys),Set(["version","consent","day","asked","notes"]))
+    }
+    func testSignOutAndSameAccountReturnKeepConsentAndExpiry() {
+        let store = seeded(); store.bindOwner("a"); let before = store.state
+        XCTAssertFalse(store.bindOwner(nil)); XCTAssertFalse(store.bindOwner("a")); XCTAssertEqual(store.state, before)
+    }
+    func testDifferentAccountResetsBeforeContextCanTravelAndSurvivesRestart() {
+        var data:Data?;let store=CompanionContextStore(read:{data},write:{data=$0;return true})
+        store.choose(true);store.answered();store.answer("interest",value:"crypto");store.bindOwner("a")
+        XCTAssertTrue(store.bindOwner("b"));XCTAssertFalse(store.accepted);XCTAssertFalse(store.decided);XCTAssertTrue(store.state.notes.isEmpty)
+        XCTAssertNil(store.wire(capability:.init(enabled:true,context:true,catalog:1,notices:["memory-1"])))
+        let restarted=CompanionContextStore(read:{data},write:{data=$0;return true})
+        XCTAssertFalse(restarted.bindOwner("b"));XCTAssertTrue(restarted.state.notes.isEmpty);XCTAssertFalse(restarted.accepted)
+    }
+    func testFailedAccountResetCannotLeakOldNotes() {
+        var data:Data?;var failing=false
+        let store=CompanionContextStore(read:{data},write:{if failing{return false};data=$0;return true})
+        store.choose(true);store.answered();store.answer("interest",value:"crypto");store.bindOwner("a");failing=true
+        XCTAssertTrue(store.bindOwner("b"));XCTAssertFalse(store.accepted);XCTAssertTrue(store.state.notes.isEmpty);XCTAssertTrue(store.storageError)
+        XCTAssertNil(store.wire(capability:.init(enabled:true,context:true,catalog:1,notices:["memory-1"])))
+        failing=false;store.bindOwner("b");XCTAssertFalse(store.accepted);XCTAssertTrue(store.state.notes.isEmpty)
+    }
+    func testUndoRestoresExactSourceAndExpiryAndDeletedQuestionStaysRetired() {
+        let store=seeded();let note=store.state.notes[0]
+        XCTAssertTrue(store.delete("interest"));XCTAssertTrue(store.state.asked.contains("interest"));XCTAssertTrue(store.restore(note))
+        XCTAssertEqual(store.state.notes,[note]);XCTAssertFalse(store.restore(note))
+    }
+    func testInferenceChangesOnlyThroughExplicitConfirmationOrCatalogCorrection() {
+        let store=seeded();XCTAssertTrue(store.apply(["notes":[["field":"barrier","value":"words","source":"inferred"]],"asked":["barrier"]],for:"barrier"))
+        let before=store.state.notes.first{$0.field=="barrier"}!
+        store.opened();XCTAssertEqual(store.state.notes.first{$0.field=="barrier"}?.source,"inferred")
+        XCTAssertTrue(store.confirm("barrier"));let after=store.state.notes.first{$0.field=="barrier"}!
+        XCTAssertEqual(after.source,"confirmed");XCTAssertEqual(after.expiresAt,before.expiresAt);XCTAssertEqual(after.value,before.value)
+        XCTAssertFalse(store.confirm("barrier"));XCTAssertTrue(store.correct("barrier",value:"unsure"));XCTAssertEqual(store.state.notes.first{$0.field=="barrier"}?.source,"confirmed")
+        XCTAssertFalse(store.correct("barrier",value:"raw private words"))
+        for q in CompanionCatalog.questions { for value in q.spoken { XCTAssertTrue(q.correctionValues.contains(value));XCTAssertNotNil(q.label(value)) } }
+    }
+    func testMoreDetailsHasExactLocalizedNotesURLInAllSixLanguages() {
+        let before=UserDefaults.standard.string(forKey:L.preferenceKey)
+        defer { if let before { UserDefaults.standard.set(before,forKey:L.preferenceKey) } else { UserDefaults.standard.removeObject(forKey:L.preferenceKey) } }
+        for language in ["en","es","fr","pt","it","de"] {
+            UserDefaults.standard.set(language,forKey:L.preferenceKey)
+            XCTAssertEqual(CompanionCopy.privacyURL.absoluteString,"https://bobbyprotocol.xyz/privacy?lang=\(language)#notes")
+        }
+    }
+
+}

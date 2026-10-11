@@ -142,7 +142,7 @@ final class RedesignShots: XCTestCase {
     }
     func test07AnswerWithNotes() {
         launch("companion", notes: true); ask(); answered()
-        XCTAssertTrue(app.webViews.firstMatch.staticTexts[word("companion", "personalized")].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.webViews.firstMatch.buttons["companion-notes-link"].waitForExistence(timeout: 10))
         shot("07-answer-with-notes")
     }
     func test08CompanionFailureRetry() {

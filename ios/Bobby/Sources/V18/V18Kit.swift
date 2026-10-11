@@ -36,10 +36,11 @@ struct QuietGlyphButton: View {
     let systemImage: String
     let label: String
     let id: String
+    var minimumTarget: CGFloat = 44
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) { QuietGlyph(systemImage: systemImage) }
+        Button(action: action) { QuietGlyph(systemImage: systemImage).frame(width: minimumTarget, height: minimumTarget).contentShape(Rectangle()) }
             .buttonStyle(.plain)
             .accessibilityLabel(label)
             .accessibilityIdentifier(id)

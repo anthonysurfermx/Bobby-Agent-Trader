@@ -5274,9 +5274,9 @@ function ariaState(){ var k = ARIA[ST.name]; if (k) att(el.sphereA, 'aria-label'
 /* ---- app/65-companion.js ---- */
 /* I-1: one answer, optional depth, and exactly one invitation. All copy is keyed. */
 var GUIDE=null, CHECKIN=null, GUIDE_RETRIES=0, GUIDE_BUSY=false, GUIDE_INPUT_CHECKIN=false, GUIDE_EPOCH=0, GUIDE_ANSWER_ERROR='';
-var guidePanel=mk('section','conversation'), guideReply=mk('p','conversation-phrase'), guideMark=mk('p','conversation-meta'), guideFact=mk('p','conversation-body'), guideBody=mk('p','conversation-body');
+var guidePanel=mk('section','conversation'), guideReply=mk('p','conversation-phrase'), guideMark=mk('button','conversation-meta quiet-link'), guideFact=mk('p','conversation-body'), guideBody=mk('p','conversation-body');
 var guideNarrative=mk('div'), guideActions=mk('div','conversation-slot'), guideQuestion=mk('p'), guideOptions=mk('div');
-guidePanel.id='companionPanel'; guideReply.id='companion-reply'; guideNarrative.id='conversation-reading'; guideBody.id='conversation-body'; guideActions.id='conversation-slot';
+guideMark.id='companion-notes-link';guidePanel.id='companionPanel'; guideReply.id='companion-reply'; guideNarrative.id='conversation-reading'; guideBody.id='conversation-body'; guideActions.id='conversation-slot';
 [guideReply,guideBody,guideFact,guideMark].forEach(function(e){guideNarrative.appendChild(e);}); guidePanel.appendChild(guideNarrative); uiEl.appendChild(guidePanel); uiEl.appendChild(guideActions);
 guidePanel.style.display=guideActions.style.display='none';
 var guideDisclosure=mk('button','quiet-link'); guideDisclosure.id='companion-read-all'; guidePanel.appendChild(guideDisclosure);
@@ -5289,6 +5289,7 @@ function quietAction(b, action){
   b.addEventListener('click',function(e){e.stopPropagation();if(e.detail===0&&!b.disabled)action();});
 }
 quietAction(guideDisclosure,function(){ if(!GUIDE)return;var oldTop=guidePanel.getBoundingClientRect().top; GUIDE.reading=true; guideRender();if(guidePanel.animate){var dy=(oldTop-guidePanel.getBoundingClientRect().top)/(fitS||1);guidePanel.animate(RM?[{opacity:0},{opacity:1}]:[{transform:'translateY('+dy+'px)'},{transform:'translateY(0)'}],{duration:RM?200:600,easing:'cubic-bezier(.2,.75,.25,1)'});}conversationBorn(guideBody,'sphere',25); });
+quietAction(guideMark,function(){if(GUIDE&&GUIDE.personalized&&SES&&SES.companionPilot&&SES.companionPilot.memoryAllowed)bcall('companion.notes',{}).catch(noop);});
 function guideWords(){return SES&&SES.companionPilot&&SES.companionPilot.strings||{};}
 function guideButton(host,text,action,id,primary){var b=mk('button',primary?'quiet-primary':'quiet-chip',text);b.type='button';b.id=id;quietAction(b,action);if(!primary){b.textContent='';b.appendChild(mk('span','conversation-chip-label',text));}host.appendChild(b);return b;}
 function guideAsk(question,retry){
@@ -5322,7 +5323,7 @@ function guideRender(){
  guideReply.textContent=error?guideFailureLine():(hasLead?gist:GUIDE.reading?'':text);
  guideBody.textContent=!error&&GUIDE.reading?(hasLead?text.slice(gist.length).trim():text):'';
  guideFact.textContent=GUIDE.reading&&GUIDE.fact?GUIDE.fact.text+'\n'+GUIDE.fact.source+' · '+GUIDE.fact.year:'';
- guideMark.textContent=GUIDE.reading&&GUIDE.personalized?guideWords().personalized||'':'';guideMark.classList.toggle('conversation-noted',!!GUIDE.personalized);
+ guideMark.textContent=GUIDE.reading&&GUIDE.personalized&&SES&&SES.companionPilot&&SES.companionPilot.memoryAllowed?guideWords().personalized||'':'';guideMark.setAttribute('aria-label',guideWords().notesLineName||'');guideMark.style.minHeight=(44/Math.max(.5,fitS||1))+'px';guideMark.style.display=guideMark.textContent?'block':'none';
  guideDisclosure.textContent=tt('answer.readAll')+' ⌄';guideDisclosure.setAttribute('aria-label',tt('answer.readAll'));  guideDisclosure.style.display=!error&&!GUIDE.reading&&hasLead&&gist!==text?'block':'none';
  guidePanel.style.display='block';guideActions.textContent='';guideActions.style.display='block';
  if(error){if(GUIDE.retryable)guideButton(guideActions,tt('fail.retry'),function(){guideAsk(READ&&READ.question,true);},'companion-retry',true);}
@@ -6764,14 +6765,19 @@ var DIAL_WORDS = {
  it: ['Come vuoi che ti parli?', ['Semplice','Con termini','Tecnico'], ['È salito rapidamente. Un tetto vicino ha già fermato la salita.','È salito rapidamente (ipercomprato). C’è un tetto vicino (resistenza).','Ipercomprato su 1H, sotto resistenza. Manca conferma.'], 'Va bene così','Inizia ora','Cosa vuoi capire oggi?', ['Più semplice','Va bene così','Più tecnico']],
  de: ['Wie soll ich mit dir sprechen?', ['Einfach','Mit Begriffen','Technisch'], ['Der Kurs stieg schnell. Eine nahe Grenze stoppte ihn schon einmal.','Der Kurs stieg schnell (überkauft). Eine Grenze ist nah (Widerstand).','Überkauft auf 1H, unter Widerstand. Bestätigung fehlt.'], 'So passt es','Jetzt starten','Was möchtest du heute verstehen?', ['Einfacher','So passt es','Technischer']]
 };
+var DIAL_EXITS = {"en": ["Save", "Leave as is", "That didn’t save. Try again."], "es": ["Guardar", "Dejar como está", "No se guardó. Inténtalo de nuevo."], "fr": ["Enregistrer", "Laisser tel quel", "Non enregistré. Réessaie."], "pt": ["Guardar", "Deixar como está", "Não foi guardado. Tenta de novo."], "it": ["Salva", "Lascia così", "Non salvato. Riprova."], "de": ["Speichern", "So lassen", "Nicht gespeichert. Versuch es noch einmal."]};
+var dialReturn = null;
+function dialExitWords(){return DIAL_EXITS[LANG]||DIAL_EXITS.en;}
+function dialClose(){dialBusy=false;if(dialReturn){var answer=dialReturn;dialReturn=null;answer.invitation=null;answer.slotBorn=false;go('COMPANION',{reply:answer});}else go('RETURNING');}
 var dial = D.getElementById('speakingDial'), dialIndex = 0, dialBusy = false, dialOwner = null, dialGreeting = false;
 function dialWords(){ return DIAL_WORDS[LANG] || DIAL_WORDS.en; }
 function dialPaint(index){
+ var target=44/Math.max(.5,fitS||1);D.getElementById('speakingConfirm').style.minHeight=target+'px';D.getElementById('speakingSkip').style.minHeight=target+'px';
  dialIndex = clamp(Math.round(index), 0, 2); var w = dialWords();
  D.getElementById('speakingQuestion').textContent = w[0];
  var range = D.getElementById('speakingRange'); range.value = dialIndex; range.setAttribute('aria-label', w[0]); range.setAttribute('aria-valuetext', w[1][dialIndex]);
  D.getElementById('speakingSample').textContent = w[2][dialIndex];
- D.getElementById('speakingConfirm').textContent = w[3]; D.getElementById('speakingSkip').textContent = w[4];
+ D.getElementById('speakingConfirm').textContent = dialExitWords()[0]; D.getElementById('speakingSkip').textContent = dialExitWords()[1];
  Array.prototype.forEach.call(dial.querySelectorAll('[data-dial]'), function(b, i){ b.textContent = w[1][i]; b.setAttribute('aria-pressed', String(i === dialIndex)); });
  var thumb = D.getElementById('speakingThumb'); thumb.setAttribute('cx', [8,148,288][dialIndex]); thumb.setAttribute('cy', [8,54,8][dialIndex]);
  var mode = RM ? 'set' : 'to'; U.energy[mode]([.25,.45,.7][dialIndex]); U.swirl[mode]([0,.15,.35][dialIndex]); U.wflow[mode]([.12,.22,.35][dialIndex]); dirty = true;
@@ -6782,13 +6788,13 @@ function dialSave(index, feedback){
  bcall('speaking.choose', { value: DIAL_VALUES[index], owner: owner, feedback: !!feedback }).then(function(s){
   if (gen !== OWNER_GEN) return;
   applySession(s, false); dialBusy = false;
-  if (ST.name === 'SPEAKING_DIAL'){ dialGreeting = true; stage.classList.add('speaking-greet'); go('RETURNING'); }
+  if (ST.name === 'SPEAKING_DIAL') dialClose();
   dialRefine();
- }, function(){ dialBusy = false; if (gen === OWNER_GEN) D.getElementById('speakingError').textContent = LANG === 'es' ? 'Inténtalo de nuevo' : 'Try again'; });
+ }, function(){ dialBusy = false; if (gen === OWNER_GEN) D.getElementById('speakingError').textContent = dialExitWords()[2]; });
 }
 STATES.SPEAKING_DIAL = {
  enter: function(){
-  dialOwner = SES.speaking.owner; dialBusy = false; chipsHide(); greetOut(); meriOut(); hint('');
+  dialReturn = GUIDE || null; dialOwner = SES.speaking.owner; dialBusy = false; chipsHide(); greetOut(); meriOut(); hint('');
   stage.classList.add('speaking-on'); dial.classList.add('on'); dial.setAttribute('aria-hidden','false'); D.getElementById('speakingRange').focus();
   S.cy[RM ? 'set' : 'to'](302); S.r[RM ? 'set' : 'to'](112); U.faceOn.to(0); U.presence.to(0); tintHome();
   D.getElementById('speakingError').textContent = ''; dialPaint(Math.max(0, DIAL_VALUES.indexOf(SES.speaking.value)));
@@ -6802,7 +6808,7 @@ STATES.SPEAKING_DIAL = {
 D.getElementById('speakingRange').addEventListener('input', function(e){ if (!dialBusy) dialPaint(+e.target.value); });
 Array.prototype.forEach.call(dial.querySelectorAll('[data-dial]'), function(b){ b.addEventListener('click', function(){ if (!dialBusy) dialPaint(+b.getAttribute('data-dial')); }); });
 D.getElementById('speakingConfirm').addEventListener('click', function(){ dialSave(dialIndex, false); });
-D.getElementById('speakingSkip').addEventListener('click', function(){ dialSave(0, false); });
+D.getElementById('speakingSkip').addEventListener('click', function(){ if(!dialBusy) dialClose(); });
 var refineVisible = null, refineLanguage = null;
 function dialRefine(){
  var row = D.getElementById('speakingRefine'), show = !!(SES && SES.speaking && SES.speaking.refine && ST.name === 'HANDBACK');

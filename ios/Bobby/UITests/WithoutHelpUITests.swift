@@ -615,3 +615,66 @@ final class MemoryInvitationShots: ConversationFixtureCase {
     }
     func test16ExerciseFollowUpOnlyOnTap() { openQuestion("fall");shot("23-exercise-question");let option=option("pause",field:"fall");ready(option);option.tap();ready(web.buttons.matching(NSPredicate(format:"label CONTAINS %@",copy("exerciseFollowUp"))).firstMatch);shot("24-exercise-followup") }
 }
+
+final class MemoryNotesShots: ConversationFixtureCase {
+    func copy(_ key:String)->String { (labels["companion"] as! [String:String])[key]! }
+    func notes(_ seeded:Bool = true, scenario:String = "companion", ownerReset:Bool = false) {
+        launch(scenario,notes:seeded, memory:ownerReset ? "owner-reset" : nil)
+        let profile=web.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Momo.'")).firstMatch
+        ready(profile);profile.tap();let memory=app.buttons["account-memory"];for _ in 0..<6 where !memory.isHittable { app.scrollViews.firstMatch.swipeUp() };ready(memory);memory.tap()
+        let door=app.buttons["memory-educational-notes"];ready(door);door.tap();ready(app.staticTexts["companion-notes-title"])
+    }
+    func row(_ field:String)->XCUIElement { app.buttons["companion-note-row-"+field] }
+    func reach(_ element:XCUIElement) { for _ in 0..<6 where !element.isHittable { app.scrollViews.firstMatch.swipeUp() };ready(element) }
+    func detail(_ field:String) { reach(row(field));row(field).tap();ready(app.staticTexts["companion-detail-value"]) }
+    func test01NotesRowsAndSaidDetail() {
+        notes();physicalControls([app.buttons["companion-notes-close"],app.switches["companion-memory-toggle"]],abovePill:false);reach(row("barrier"));physicalControls([row("interest"),row("barrier")],abovePill:false)
+        XCTAssertFalse(app.buttons["companion-correct-interest"].exists);XCTAssertTrue(app.staticTexts[copy("toConfirm")].exists)
+        shot("40-notes-said-inferred");detail("interest");XCTAssertFalse(app.buttons["companion-note-confirm"].exists)
+        physicalControls([app.buttons["companion-correct-interest"],app.buttons["companion-delete-interest"]],abovePill:false);shot("41-detail-said")
+    }
+    func test02InferredOnlyExplicitPrimaryConfirms() {
+        notes();detail("barrier");ready(app.buttons["companion-note-confirm"]);shot("42-detail-inferred")
+        app.buttons["companion-detail-close"].tap();ready(row("barrier"));XCTAssertTrue(app.staticTexts[copy("toConfirm")].exists)
+        detail("barrier");app.buttons["companion-note-confirm"].tap();XCTAssertTrue(app.buttons["companion-note-confirm"].waitForNonExistence(timeout:5))
+        XCTAssertTrue(app.staticTexts["companion-detail-origin"].label.hasPrefix(copy("detail.confirmed").components(separatedBy:"{date}")[0]));shot("43-inference-confirmed")
+    }
+    func test03CorrectionChecksCurrentAndStoresConfirmed() {
+        notes();detail("interest");app.buttons["companion-correct-interest"].tap();ready(app.buttons["companion-correct-option-crypto"])
+        XCTAssertTrue(app.buttons["companion-correct-option-crypto"].isSelected);shot("44-correction-current-choice")
+        reach(app.buttons["companion-correct-option-companies"]);app.buttons["companion-correct-option-companies"].tap()
+        ready(app.buttons["companion-correct-interest"]);XCTAssertTrue(app.staticTexts["companion-detail-origin"].label.hasPrefix(copy("detail.confirmed").components(separatedBy:"{date}")[0]));shot("45-correction-confirmed")
+    }
+    func test04DeleteUndoReturnsExactNoteAndDeleteAllKeepsMemory() {
+        notes();detail("interest");let origin=app.staticTexts["companion-detail-origin"].label
+        app.buttons["companion-delete-interest"].tap();ready(app.buttons["companion-note-undo"]);XCTAssertFalse(row("interest").exists);shot("46-note-deleted-undo",delay:0)
+        app.buttons["companion-note-undo"].tap();ready(row("interest"));detail("interest");XCTAssertEqual(app.staticTexts["companion-detail-origin"].label,origin)
+        app.buttons["companion-detail-close"].tap();reach(app.buttons["companion-delete-all"]);app.buttons["companion-delete-all"].tap();ready(app.buttons["companion-delete-confirm"])
+        physicalControls([app.buttons["companion-delete-confirm"],app.buttons["companion-delete-cancel"]],abovePill:false);shot("47-delete-all-confirm")
+        app.buttons["companion-delete-confirm"].tap();ready(app.staticTexts["companion-notes-empty"]);XCTAssertEqual(app.switches["companion-memory-toggle"].value as? String,"1");shot("48-notes-empty")
+    }
+    func test05MemoryOffAndServerDisabled() {
+        notes();let toggle=app.switches["companion-memory-toggle"];reach(toggle);toggle.tap();ready(app.buttons["companion-delete-confirm"]);shot("49-memory-off-confirm")
+        app.buttons["companion-delete-confirm"].tap();ready(app.staticTexts["companion-notes-off"]);XCTAssertFalse(row("interest").exists);shot("50-notes-off")
+        app.terminate();notes(false,scenario:"companion-mismatch");XCTAssertFalse(app.switches["companion-memory-toggle"].isEnabled);shot("51-notes-disabled")
+    }
+    func test06ReadingNotesLineOpensNotesAndNotedOpensDetail() {
+        launch("companion",notes:true);ask();answered()
+        let line=web.buttons[copy("notesLineName")];ready(line);physicalControls([line]);shot("52-answer-notes-line")
+        line.tap();ready(app.staticTexts["companion-notes-title"]);shot("53-notes-from-answer")
+        app.buttons["companion-notes-close"].tap();ready(button("aria.closeAnswer"))
+        app.terminate();launch("companion",memory:"money");ask();answered()
+        let chip=web.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",copy("bobbyAsks").components(separatedBy:"{question}")[0])).firstMatch
+        ready(chip);chip.tap();let label=((labels["catalog"] as! [String:[String:Any]])["when"]!["options"] as! [String:String])["under_2y"]!
+        ready(web.buttons[label]);web.buttons[label].tap()
+        let noted=web.buttons.matching(NSPredicate(format:"label CONTAINS %@",copy("noted").components(separatedBy:"{label}")[0])).firstMatch
+        ready(noted);noted.tap();ready(app.staticTexts["companion-detail-value"]);shot("54-detail-from-noted")
+    }
+    func test07UndoDiesOnBackground() {
+        notes();detail("interest");app.buttons["companion-delete-interest"].tap();ready(app.buttons["companion-note-undo"])
+        backgroundAndReturn();XCTAssertFalse(app.buttons["companion-note-undo"].exists);XCTAssertFalse(row("interest").exists);shot("55-undo-cleared-after-background")
+    }
+    func test08AccountChangeResetHasNoOldNotes() {
+        notes(true,ownerReset:true);ready(app.staticTexts["companion-notes-off"]);XCTAssertFalse(row("interest").exists);XCTAssertFalse(row("barrier").exists);shot("56-account-change-reset")
+    }
+}

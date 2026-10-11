@@ -196,8 +196,9 @@ private struct NucleoStage: View {
         case .companionNotes:
             CompanionNotesView(store: session.companionContext,
                 questionsAvailable: { session.companionContext.allows(session.companionPilot.capability) },
+                riskAccepted: { session.profile.acceptedRiskNotice }, initialField: session.companionNotesField,
                 onClose: { session.sheet = nil })
-                .presentationDetents([.large]).presentationBackground(Theme.nucleoSurface)
+                .presentationDetents([.large]).presentationDragIndicator(.visible).presentationCornerRadius(34).presentationBackground { QuietMemorySurface() }
         case .memoryConsent:
             MemoryConsentSheet { session.sheet = nil }
                 .presentationDetents([.medium, .large])
@@ -215,7 +216,7 @@ private struct NucleoStage: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
         case .memory:
-            MemoryView(riskAccepted: session.profile.acceptedRiskNotice, onEducationalNotes: { session.switchSheet(to: .companionNotes) }, onSpeaking: { session.openSpeakingDial() }, onClose: { session.sheet = nil })
+            MemoryView(riskAccepted: session.profile.acceptedRiskNotice, onEducationalNotes: { session.companionNotesField = nil; session.switchSheet(to: .companionNotes) }, onSpeaking: { session.openSpeakingDial() }, onClose: { session.sheet = nil })
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)

@@ -1,8 +1,8 @@
 /* I-1: one answer, optional depth, and exactly one invitation. All copy is keyed. */
 var GUIDE=null, CHECKIN=null, GUIDE_RETRIES=0, GUIDE_BUSY=false, GUIDE_INPUT_CHECKIN=false, GUIDE_EPOCH=0, GUIDE_ANSWER_ERROR='';
-var guidePanel=mk('section','conversation'), guideReply=mk('p','conversation-phrase'), guideMark=mk('p','conversation-meta'), guideFact=mk('p','conversation-body'), guideBody=mk('p','conversation-body');
+var guidePanel=mk('section','conversation'), guideReply=mk('p','conversation-phrase'), guideMark=mk('button','conversation-meta quiet-link'), guideFact=mk('p','conversation-body'), guideBody=mk('p','conversation-body');
 var guideNarrative=mk('div'), guideActions=mk('div','conversation-slot'), guideQuestion=mk('p'), guideOptions=mk('div');
-guidePanel.id='companionPanel'; guideReply.id='companion-reply'; guideNarrative.id='conversation-reading'; guideBody.id='conversation-body'; guideActions.id='conversation-slot';
+guideMark.id='companion-notes-link';guidePanel.id='companionPanel'; guideReply.id='companion-reply'; guideNarrative.id='conversation-reading'; guideBody.id='conversation-body'; guideActions.id='conversation-slot';
 [guideReply,guideBody,guideFact,guideMark].forEach(function(e){guideNarrative.appendChild(e);}); guidePanel.appendChild(guideNarrative); uiEl.appendChild(guidePanel); uiEl.appendChild(guideActions);
 guidePanel.style.display=guideActions.style.display='none';
 var guideDisclosure=mk('button','quiet-link'); guideDisclosure.id='companion-read-all'; guidePanel.appendChild(guideDisclosure);
@@ -15,6 +15,7 @@ function quietAction(b, action){
   b.addEventListener('click',function(e){e.stopPropagation();if(e.detail===0&&!b.disabled)action();});
 }
 quietAction(guideDisclosure,function(){ if(!GUIDE)return;var oldTop=guidePanel.getBoundingClientRect().top; GUIDE.reading=true; guideRender();if(guidePanel.animate){var dy=(oldTop-guidePanel.getBoundingClientRect().top)/(fitS||1);guidePanel.animate(RM?[{opacity:0},{opacity:1}]:[{transform:'translateY('+dy+'px)'},{transform:'translateY(0)'}],{duration:RM?200:600,easing:'cubic-bezier(.2,.75,.25,1)'});}conversationBorn(guideBody,'sphere',25); });
+quietAction(guideMark,function(){if(GUIDE&&GUIDE.personalized&&SES&&SES.companionPilot&&SES.companionPilot.memoryAllowed)bcall('companion.notes',{}).catch(noop);});
 function guideWords(){return SES&&SES.companionPilot&&SES.companionPilot.strings||{};}
 function guideButton(host,text,action,id,primary){var b=mk('button',primary?'quiet-primary':'quiet-chip',text);b.type='button';b.id=id;quietAction(b,action);if(!primary){b.textContent='';b.appendChild(mk('span','conversation-chip-label',text));}host.appendChild(b);return b;}
 function guideAsk(question,retry){
@@ -48,7 +49,7 @@ function guideRender(){
  guideReply.textContent=error?guideFailureLine():(hasLead?gist:GUIDE.reading?'':text);
  guideBody.textContent=!error&&GUIDE.reading?(hasLead?text.slice(gist.length).trim():text):'';
  guideFact.textContent=GUIDE.reading&&GUIDE.fact?GUIDE.fact.text+'\n'+GUIDE.fact.source+' · '+GUIDE.fact.year:'';
- guideMark.textContent=GUIDE.reading&&GUIDE.personalized?guideWords().personalized||'':'';guideMark.classList.toggle('conversation-noted',!!GUIDE.personalized);
+ guideMark.textContent=GUIDE.reading&&GUIDE.personalized&&SES&&SES.companionPilot&&SES.companionPilot.memoryAllowed?guideWords().personalized||'':'';guideMark.setAttribute('aria-label',guideWords().notesLineName||'');guideMark.style.minHeight=(44/Math.max(.5,fitS||1))+'px';guideMark.style.display=guideMark.textContent?'block':'none';
  guideDisclosure.textContent=tt('answer.readAll')+' ⌄';guideDisclosure.setAttribute('aria-label',tt('answer.readAll'));  guideDisclosure.style.display=!error&&!GUIDE.reading&&hasLead&&gist!==text?'block':'none';
  guidePanel.style.display='block';guideActions.textContent='';guideActions.style.display='block';
  if(error){if(GUIDE.retryable)guideButton(guideActions,tt('fail.retry'),function(){guideAsk(READ&&READ.question,true);},'companion-retry',true);}

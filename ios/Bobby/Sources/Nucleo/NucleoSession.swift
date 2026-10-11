@@ -185,6 +185,7 @@ final class NucleoSession: ObservableObject {
             companionContext.answered()
             for id in ["interest", "barrier", "when", "cushion"] { companionContext.answer(id, value: nil) }
             companionContext.answer("interest", value: "crypto")
+            _ = companionContext.apply(["notes": [["field": "barrier", "value": "words", "source": "inferred"]], "asked": ["barrier"]], for: "barrier")
         }
         if fixtures && (ProcessInfo.processInfo.arguments.contains("-qa-companion-day3") || ProcessInfo.processInfo.arguments.contains("-qa-companion-day4")) {
             let now = Date()
@@ -239,6 +240,7 @@ final class NucleoSession: ObservableObject {
                         companionContext.opened(now: now.addingTimeInterval(-86400)); companionContext.opened(now:now); companionContext.answered()
                     }
                     for id in before { companionContext.answer(id,value:nil) }
+                    if scene == "owner-reset" { companionContext.bindOwner("fixture-a", defaults: defaults); companionContext.bindOwner("fixture-b", defaults: defaults) }
                 }
             }
         }
@@ -1713,6 +1715,7 @@ final class NucleoSession: ObservableObject {
         accountGeneration = account.generation
         pendingFirstAsk = nil
         accountUserID = account.session?.userId
+        if companionContext.bindOwner(accountUserID, defaults: defaults) { companionPacing.reset(); companionQuestionId = nil; companionAnswerEpoch += 1 }
         if wasAnonymous, let owner = accountUserID { SpeakingDial(defaults: defaults).inheritGuest(owner) }
         desk.clearConversation()
         desk.invalidatePending(preservingAnonymousSignInRetries: wasAnonymous && accountUserID != nil)

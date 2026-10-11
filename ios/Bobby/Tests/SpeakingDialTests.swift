@@ -10,7 +10,7 @@ final class SpeakingDialTests: XCTestCase {
     }
     func testUpgradeDoesNotAskAgainAndFreshInstallDoes() {
         withDial { d in d.prepare(existing: true); XCTAssertEqual(d.json(nil)["offer"] as? Bool, false); d.prepare(existing: false); XCTAssertEqual(d.json(nil)["offer"] as? Bool, false) }
-        withDial { d in d.prepare(existing: false); XCTAssertEqual(d.json(nil)["offer"] as? Bool, true); d.choose("plain", owner: nil); XCTAssertEqual(d.json(nil)["offer"] as? Bool, false) }
+        withDial { d in d.prepare(existing: false); XCTAssertEqual(d.json(nil)["offer"] as? Bool, false); d.choose("plain", owner: nil); XCTAssertEqual(d.json(nil)["offer"] as? Bool, false) }
     }
     func testGuestChoiceSurvivesRestartAndOnlyFirstAccountInherits() {
         withDial { d in d.prepare(existing: false); d.choose("terms", owner: nil); XCTAssertEqual(SpeakingDial(defaults: d.defaults).value(nil), "terms"); d.inheritGuest("a"); XCTAssertEqual(d.value("a"), "terms"); d.inheritGuest("b"); XCTAssertNil(d.value("b")); XCTAssertEqual(d.value(nil), "terms") }

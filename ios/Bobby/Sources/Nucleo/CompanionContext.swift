@@ -15,6 +15,7 @@ struct CompanionQuestion: Codable, Identifiable, Equatable {
     let spoken: [String]
     let labels: [String: [String: String]]?
     func accepts(_ value: String) -> Bool { value == "unsure" || options.contains { $0.id == value } || spoken.contains(value) }
+    var correctionValues: [String] { (options.map(\.id) + spoken + ["unsure"]).reduce(into: [String]()) { values, value in if !values.contains(value) { values.append(value) } } }
     var title: String { text[L.language] ?? text["en"] ?? "" }
     private func catalogLabel(_ value: String) -> String? {
         let row = options.first { $0.id == value }?.label ?? labels?[value] ?? (value == "unsure" ? CompanionCatalog.bundled.unsure : nil)
@@ -92,6 +93,7 @@ final class CompanionContextStore: ObservableObject {
         var answeredOn: Date? = nil
         var asked: [String] = []
         var notes: [Note] = []
+        var ownerTag: String? = nil
         var rest: [String: Date]? = nil
         var rests: [String: Int]? = nil
     }
@@ -106,6 +108,7 @@ final class CompanionContextStore: ObservableObject {
     private var installDefaults: UserDefaults?
     private(set) var undecodableRecord: Data?
     private var declineForLaunch = false
+    private var ownerBlocked = false
     init(account: String = "companion-context-device-v1", read: (() -> Data?)? = nil, write: ((Data) -> Bool)? = nil, remove: (() -> Bool)? = nil) {
         self.account = account
         self.read = read ?? { Self.readKeychain(account) }
@@ -127,14 +130,14 @@ final class CompanionContextStore: ObservableObject {
     @discardableResult func reset() -> Bool {
         let removed = remove()
         if !removed { installDefaults?.removeObject(forKey: "companion.context.install.v1") }
-        state = State(); declineForLaunch = false; storageError = !removed; revision = UUID(); changed()
+        state = State(); declineForLaunch = false; ownerBlocked = false; storageError = !removed; revision = UUID(); changed()
         return removed
     }
     private static func removeKeychain(_ account: String) -> Bool {
         let status = SecItemDelete(query(account) as CFDictionary)
         return status == errSecSuccess || status == errSecItemNotFound
     }
-    var accepted: Bool { state.accepted && state.notice == Self.notice }
+    var accepted: Bool { !ownerBlocked && state.accepted && state.notice == Self.notice }
     var decided: Bool { declineForLaunch || state.notice == Self.notice && state.decidedAt != nil }
     func allows(_ capability: CompanionPilot.Capability) -> Bool {
         capability.context && capability.catalog == CompanionCatalog.bundled.version && capability.notices.contains(Self.notice)
@@ -146,6 +149,7 @@ final class CompanionContextStore: ObservableObject {
     }
     func choose(_ yes: Bool, now: Date = Date(), calendar: Calendar = .current) {
         var next = yes && accepted ? state : State()
+        next.ownerTag = state.ownerTag
         next.notice = Self.notice; next.accepted = yes; next.decidedAt = now
         if yes && !accepted { next.lastOpen = calendar.startOfDay(for: now) }
         let stored = save(next)
@@ -225,7 +229,42 @@ final class CompanionContextStore: ObservableObject {
         } else if !next.asked.contains(id) { next.asked.append(id) }
         return save(next)
     }
-    func delete(_ id: String) { var next = state; next.notes.removeAll { $0.field == id }; _ = save(next) }
+    @discardableResult func delete(_ id: String) -> Bool {
+        var next = state; next.notes.removeAll { $0.field == id }; return save(next)
+    }
+    @discardableResult func restore(_ note: Note) -> Bool {
+        guard accepted, !state.notes.contains(where: { $0.field == note.field }),
+              let question = CompanionCatalog.question(note.field), question.accepts(note.value) else { return false }
+        var next = state; next.notes.append(note); return save(next)
+    }
+    @discardableResult func confirm(_ id: String) -> Bool {
+        guard accepted, let old = state.notes.first(where: { $0.field == id }), old.source == "inferred" else { return false }
+        var next = state
+        next.notes.removeAll { $0.field == id }
+        next.notes.append(Note(field: old.field, value: old.value, source: "confirmed", createdAt: old.createdAt, expiresAt: old.expiresAt))
+        return save(next)
+    }
+    @discardableResult func correct(_ id: String, value: String, now: Date = Date()) -> Bool {
+        guard accepted, state.notes.contains(where: { $0.field == id }),
+              let question = CompanionCatalog.question(id), question.accepts(value) else { return false }
+        var next = state; next.notes.removeAll { $0.field == id }
+        next.notes.append(Note(field: id, value: value, source: "confirmed", createdAt: now,
+            expiresAt: now.addingTimeInterval(Double(question.money ? 7 : 30) * 86400)))
+        return save(next)
+    }
+    /// Sign-out retains the last account. Guest -> first account and same-account return retain notes.
+    /// A failed account reset blocks context in RAM before any request can be built.
+    @discardableResult func bindOwner(_ owner: String?, defaults: UserDefaults = .standard) -> Bool {
+        guard let owner else { return false }
+        let tag = SpeakingDial(defaults: defaults).tag(owner)
+        guard state.ownerTag != tag || ownerBlocked else { return false }
+        let changedOwner = state.ownerTag != nil && state.ownerTag != tag
+        var next = changedOwner ? State() : state; next.ownerTag = tag
+        let stored = save(next)
+        ownerBlocked = !stored
+        if changedOwner && !stored { state = State(); revision = UUID(); changed() }
+        return changedOwner
+    }
     func deleteAll() { var next = state; next.notes = []; _ = save(next) }
     func wire(capability: CompanionPilot.Capability, now: Date = Date()) -> [String: Any]? {
         guard accepted, allows(capability) else { return nil }

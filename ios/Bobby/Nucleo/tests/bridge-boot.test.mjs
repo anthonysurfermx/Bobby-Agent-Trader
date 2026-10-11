@@ -710,7 +710,7 @@ test('failed persistence keeps the dial open and allows retry',async()=>{
  const app=harness({chooseFails:true,speaking:{owner:'a',value:null,offer:true,refine:false}});app.boot();await flush();app.advance(1.1);
  app.context.nucleoBridge.emit('speaking.open',{});
  app.nodes.get('speakingConfirm').listeners.click();await flush();assert.equal(app.context.nucleo.state(),'SPEAKING_DIAL');
- assert.equal(app.nodes.get('speakingError').textContent,'Try again');assert.equal(app.session.speaking.value,null);
+ assert.equal(app.nodes.get('speakingError').textContent,'That didn’t save. Try again.');assert.equal(app.session.speaking.value,null);
 });
 
 
@@ -914,4 +914,32 @@ test('I-2: dragging the accessibility list preserves its scroll position across 
  scroll.listeners.pointermove({clientY:200,cancelable:true,preventDefault(){},stopPropagation(){}});
  scroll.listeners.pointerup();const after=scroll.scrollTop;assert.ok(after>0);app.advance(1);assert.equal(scroll.scrollTop,after);
  assert.equal(app.calls.filter(c=>c.method==='companion.answer').length,0);assert.deepEqual(app.errors,[]);
+});
+
+const I2_DIAL_EXPECTED={"en": ["Save", "Leave as is", "That didn’t save. Try again."], "es": ["Guardar", "Dejar como está", "No se guardó. Inténtalo de nuevo."], "fr": ["Enregistrer", "Laisser tel quel", "Non enregistré. Réessaie."], "pt": ["Guardar", "Deixar como está", "Não foi guardado. Tenta de novo."], "it": ["Salva", "Lascia così", "Non salvato. Riprova."], "de": ["Speichern", "So lassen", "Nicht gespeichert. Versuch es noch einmal."]};
+for(const language of ['en','es','fr','pt','it','de']) test('I-2b '+language+': dial errors are localized and Leave as is stores no preference',async()=>{
+ const app=await idle({language,chooseFails:true,speaking:{owner:'a',value:null,offer:false,refine:false}});
+ app.context.nucleoBridge.emit('speaking.open',{});assert.equal(app.nodes.get('speakingConfirm').textContent,I2_DIAL_EXPECTED[language][0]);assert.equal(app.nodes.get('speakingSkip').textContent,I2_DIAL_EXPECTED[language][1]);app.nodes.get('speakingConfirm').listeners.click();await flush();
+ assert.equal(app.nodes.get('speakingError').textContent,I2_DIAL_EXPECTED[language][2]);
+ assert.equal(app.context.nucleo.state(),'SPEAKING_DIAL');
+ const count=app.calls.filter(c=>c.method==='speaking.choose').length;
+ app.nodes.get('speakingSkip').listeners.click();await flush();assert.equal(app.calls.filter(c=>c.method==='speaking.choose').length,count);
+ assert.equal(app.session.speaking.value,null);assert.deepEqual(app.errors,[]);
+});
+test('I-2b: the dial returns the same answer without speaking it again or asking a question',async()=>{
+ const app=await idle({speaking:{owner:'a',value:null,offer:false,refine:false}});memoryStrings(app);
+ await companionReply(app,{status:'companion',requestId:'90d2564c-6064-4275-95cd-5a3c7c0b5b56',gist:'Learning.',text:'Learning. Explanation.',invitation:{kind:'dial',text:'How should I talk to you?'}});app.advance(2);await flush();
+ const speeches=app.calls.filter(c=>c.method==='speak'&&c.params.id!=='speaking-dial').length;
+ guideActionsOf(app).children[0]._guideAction();await flush();assert.equal(app.context.nucleo.state(),'SPEAKING_DIAL');
+ app.nodes.get('speakingSkip').listeners.click();await flush();assert.equal(app.context.nucleo.state(),'COMPANION');
+ assert.equal(companionPanel(app).children[0].children[0].textContent,'Learning.');
+ assert.equal(app.calls.filter(c=>c.method==='speaking.choose').length,0);
+ assert.equal(app.calls.filter(c=>c.method==='speak'&&c.params.id!=='speaking-dial').length,speeches);assert.equal(asksOf(app).length,1);assert.deepEqual(app.errors,[]);
+});
+test('I-2b: the reading notes link opens only native notes and revocation removes it',async()=>{
+ const app=await idle();memoryStrings(app);app.session.companionPilot.memoryAllowed=true;app.session.companionPilot.strings.personalized='With your notes';app.session.companionPilot.strings.notesLineName='With your notes. See my notes';
+ await companionReply(app,{status:'companion',text:'Explanation without gist',personalized:true});
+ const mark=companionPanel(app).children[0].children[3];assert.equal(typeof mark._guideAction,'function');assert.equal(mark.getAttribute('aria-label'),'With your notes. See my notes');
+ mark._guideAction();await flush();assert.equal(app.calls.filter(c=>c.method==='companion.notes').length,1);assert.equal(asksOf(app).length,1);
+ app.context.nucleoBridge.emit('companion.revoked',{});assert.equal(mark.style.display,'none');assert.deepEqual(app.errors,[]);
 });
