@@ -362,6 +362,8 @@ const original = globalThis.fetch;
 globalThis.fetch = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
   const url = String(input), method = (init.method ?? 'GET').toUpperCase();
   const body = typeof init.body === 'string' ? JSON.parse(init.body) : null;
+  // The instructions travel as one cached block (prompt caching, llm.ts); these checks read their text.
+  if (body && Array.isArray(body.system)) body.system = body.system.map((block: { text?: string }) => block.text ?? '').join('');
   calls.push({ url, method, body, headers: (init.headers ?? {}) as Record<string, string> });
   const u = new URL(url);
   if (u.hostname === 'api.anthropic.com') return String(body?.system ?? '').startsWith('You check one reply') ? world.judge() : String(body?.system ?? '').startsWith('You read one answer') ? world.reader() : world.model();

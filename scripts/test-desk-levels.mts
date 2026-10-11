@@ -50,6 +50,8 @@ function mock(reply: Reply) {
   calls = [];
   globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     const call: Call = { url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null, headers: Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>).map(([k, v]) => [k.toLowerCase(), v])), method: init?.method ?? 'GET' };
+    // The instructions travel as one cached block (prompt caching, llm.ts); these checks read their text.
+    if (call.body && Array.isArray(call.body.system)) call.body.system = call.body.system.map((block: { text?: string }) => block.text ?? '').join('');
     calls.push(call);
     return reply(call);
   }) as typeof fetch;

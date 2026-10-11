@@ -58,11 +58,21 @@ function stopped(signal?: AbortSignal) { if (signal?.aborted) throw new Error('A
 function requestSignal(timeoutMs: number, signal?: AbortSignal): AbortSignal {
   return signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
 }
+/**
+ * Anthropic reuses the fixed start of a prompt when it is marked. A surface's instructions are the same on every call,
+ * so they are marked: a write costs 1.25 times the input price and a read 0.05 to 0.1 times, which pays from one
+ * repeat in five within five minutes (in the ledger of 2026-09-27 to 2026-10-11 the desk repeated in 34% of its calls
+ * and the companion in 55%). A prompt under the model's minimum is simply not cached. `BOBBY_PROMPT_CACHE=off` sends
+ * the plain string again.
+ */
+export const CACHE_WRITE = 1.25;
+const anthropicSystem = (system: string): string | Array<Record<string, unknown>> =>
+  (process.env.BOBBY_PROMPT_CACHE === 'off' || !system ? system : [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }]);
 function textRequest(spec: ModelSpec, system: string, messages: TextMessage[], stream: boolean, tool?: LlmToolSchema) {
   const key = keyFor(spec.provider);
   if (!key) throw new Error('App text provider not configured');
   if (spec.provider === 'anthropic') {
-    const body: Record<string, unknown> = { model: spec.model, max_tokens: spec.maxTokens, system, messages,
+    const body: Record<string, unknown> = { model: spec.model, max_tokens: spec.maxTokens, system: anthropicSystem(system), messages,
       output_config: { effort: spec.effort ?? 'low' }, ...(stream ? { stream: true } : {}) };
     // Small text/tool ceilings belong to the answer; keep adaptive thinking for the desk adapter.
     if (!adaptiveOnly(spec.model) && ((spec.effort ?? 'low') === 'low' || tool)) body.thinking = { type: 'disabled' };
@@ -86,11 +96,13 @@ function textRequest(spec: ModelSpec, system: string, messages: TextMessage[], s
 function usageRow(spec: ModelSpec, started: number, data: any, stop: string | null, ok: boolean): LlmUsage {
   const u = data?.usage;
   const cached = spec.provider === 'anthropic' ? u?.cache_read_input_tokens ?? 0 : u?.prompt_tokens_details?.cached_tokens ?? 0;
-  const input = spec.provider === 'anthropic' ? (u?.input_tokens ?? 0) + (u?.cache_creation_input_tokens ?? 0) : (u?.prompt_tokens ?? 0) - cached;
+  // Tokens written to the cache are input too, at the write price: they are counted with the input and costed apart.
+  const written = spec.provider === 'anthropic' ? u?.cache_creation_input_tokens ?? 0 : 0;
+  const input = spec.provider === 'anthropic' ? u?.input_tokens ?? 0 : (u?.prompt_tokens ?? 0) - cached;
   const output = spec.provider === 'anthropic' ? u?.output_tokens ?? 0 : u?.completion_tokens ?? 0;
-  return { provider: spec.provider, model: spec.model, role: null, tokensIn: input + cached, tokensCached: cached,
+  return { provider: spec.provider, model: spec.model, role: null, tokensIn: input + written + cached, tokensCached: cached,
     tokensOut: output, tokensReasoning: spec.provider === 'anthropic' ? u?.output_tokens_details?.thinking_tokens ?? 0 : u?.completion_tokens_details?.reasoning_tokens ?? 0,
-    usd: modelCost(spec.model, input, cached, output), latencyMs: Date.now() - started, stop, ok };
+    usd: modelCost(spec.model, input, cached, output, written), latencyMs: Date.now() - started, stop, ok };
 }
 function flushUsage(rows: LlmUsage[], endpoint: string): void {
   if (!rows.length) return;
@@ -349,9 +361,10 @@ export function modelPrice(model: string, totalInputTokens = 0): [number, number
   if (!unpriced.has(model)) { unpriced.add(model); console.warn('[llm] no list price for', model, '— costed at the dearest known price'); }
   return DEAREST;
 }
-export function modelCost(model: string, uncachedIn: number, cachedIn: number, out: number): number {
-  const [pIn, pCached, pOut] = modelPrice(model, uncachedIn + cachedIn);
-  return (uncachedIn * pIn + cachedIn * pCached + out * pOut) / 1e6;
+/** `writtenIn`: input tokens the provider stored in its prompt cache on this call (Anthropic), billed at CACHE_WRITE times the input price. */
+export function modelCost(model: string, uncachedIn: number, cachedIn: number, out: number, writtenIn = 0): number {
+  const [pIn, pCached, pOut] = modelPrice(model, uncachedIn + cachedIn + writtenIn);
+  return (uncachedIn * pIn + writtenIn * pIn * CACHE_WRITE + cachedIn * pCached + out * pOut) / 1e6;
 }
 
 const legacyOpenAi = (model: string) => /^gpt-4/.test(model);
@@ -412,7 +425,7 @@ export async function completeJson(
         const key = process.env.ANTHROPIC_API_KEY;
         if (!key) throw new Error('ANTHROPIC_API_KEY not configured');
         res = await postJson('https://api.anthropic.com/v1/messages', { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, {
-          model: spec.model, max_tokens: spec.maxTokens, system,
+          model: spec.model, max_tokens: spec.maxTokens, system: anthropicSystem(system),
           messages: [{ role: 'user', content: user }],
           output_config: { ...(spec.effort ? { effort: spec.effort } : {}), format: { type: 'json_schema', schema: schema.schema } },
         }, left);
@@ -474,10 +487,10 @@ export async function completeJson(
     stop_reason?: string; content?: Array<{ type: string; text?: string }>;
     usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; output_tokens_details?: { thinking_tokens?: number } };
   };
-  const inTok = (data.usage?.input_tokens ?? 0) + (data.usage?.cache_creation_input_tokens ?? 0), cached = data.usage?.cache_read_input_tokens ?? 0, outTok = data.usage?.output_tokens ?? 0;
+  const inTok = data.usage?.input_tokens ?? 0, written = data.usage?.cache_creation_input_tokens ?? 0, cached = data.usage?.cache_read_input_tokens ?? 0, outTok = data.usage?.output_tokens ?? 0;
   const stop = data.stop_reason ?? null;
-  note({ tokensIn: inTok + cached, tokensCached: cached, tokensOut: outTok, tokensReasoning: data.usage?.output_tokens_details?.thinking_tokens ?? 0,
-    usd: modelCost(spec.model, inTok, cached, outTok), stop, ok: stop === 'end_turn' });
+  note({ tokensIn: inTok + written + cached, tokensCached: cached, tokensOut: outTok, tokensReasoning: data.usage?.output_tokens_details?.thinking_tokens ?? 0,
+    usd: modelCost(spec.model, inTok, cached, outTok, written), stop, ok: stop === 'end_turn' });
   if (stop !== 'end_turn') throw new LlmIncompleteError('Structured model response incomplete or refused');
   return parseOrFail((data.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join(''), opts.usage);
 }

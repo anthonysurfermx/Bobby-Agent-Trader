@@ -656,6 +656,8 @@ await check('BP-10 register: storage read failure → 502 and no write; owner ch
       const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } });
       if (isHost(url, 'api.openai.com') || isHost(url, 'api.anthropic.com')) {
         const body = JSON.parse(String(init?.body));
+        // The instructions travel as one cached block (prompt caching, llm.ts); these checks read their text.
+        if (body && Array.isArray(body.system)) body.system = body.system.map((block: { text?: string }) => block.text ?? '').join('');
         const system = String(body.system ?? body.messages[0].content);
         let out: unknown;
         if (system.includes('Alpha Hunter')) out = { thesis: 'bullish structure', evidence: ['e1'], catalyst: 'c', conviction: 8 };
