@@ -45,7 +45,7 @@ alter table agent_reads enable row level security; alter table agent_attempts en
 revoke all on agent_tasks, agent_steps, agent_reads, agent_attempts from public;
 
 -- ---------- reading ----------
-create or replace function agent_task_json(p_id text) returns jsonb language sql stable as $$
+create or replace function agent_task_json(p_id text) returns jsonb language sql stable set search_path = public, pg_temp as $$
   select jsonb_build_object(
     'id', t.id, 'owner', t.owner, 'address', t.address, 'session', t.session, 'requestId', t.request_id, 'idemKey', t.request_id,
     'bodyDigest', t.body_digest, 'language', t.language, 'locale', t.locale, 'question', t.question, 'parent', t.parent,
@@ -56,16 +56,16 @@ create or replace function agent_task_json(p_id text) returns jsonb language sql
     'steps', coalesce((select jsonb_agg(jsonb_build_object('n', s.n, 'at', to_char(s.at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'kind', s.kind, 'data', s.data) order by s.n) from agent_steps s where s.task = t.id), '[]'::jsonb))
   from agent_tasks t where t.id = p_id
 $$;
-create or replace function agent_is_final(p_id text) returns boolean language sql stable as $$
+create or replace function agent_is_final(p_id text) returns boolean language sql stable set search_path = public, pg_temp as $$
   select exists (select 1 from agent_steps where task = p_id and kind in ('answer','error','cancelled','approval_denied'))
 $$;
 -- The approval a task waits on: requested, and neither granted nor denied since.
-create or replace function agent_waiting_scope(p_id text) returns jsonb language sql stable as $$
+create or replace function agent_waiting_scope(p_id text) returns jsonb language sql stable set search_path = public, pg_temp as $$
   select s.data->'scope' from agent_steps s where s.task = p_id and s.kind = 'approval_requested'
     and not exists (select 1 from agent_steps later where later.task = p_id and later.n > s.n and later.kind in ('approval_granted','approval_denied'))
   order by s.n desc limit 1
 $$;
-create or replace function agent_push(p_id text, p_kind text, p_data jsonb, p_now timestamptz) returns jsonb language plpgsql as $$
+create or replace function agent_push(p_id text, p_kind text, p_data jsonb, p_now timestamptz) returns jsonb language plpgsql set search_path = public, pg_temp as $$
 declare v_n integer;
 begin
   select coalesce(max(n), 0) + 1 into v_n from agent_steps where task = p_id;
@@ -73,7 +73,7 @@ begin
   return jsonb_build_object('n', v_n, 'at', to_char(p_now at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'kind', p_kind, 'data', p_data);
 end $$;
 -- Writes `cancelled`. A read taken for a metered action that never ran asked no source: it goes back here.
-create or replace function agent_end_cancelled(p_id text, p_now timestamptz, p_by text) returns void language plpgsql as $$
+create or replace function agent_end_cancelled(p_id text, p_now timestamptz, p_by text) returns void language plpgsql set search_path = public, pg_temp as $$
 declare v_back boolean := false;
 begin
   update agent_tasks set lease_worker = null, lease_until = null where id = p_id;
@@ -84,16 +84,16 @@ begin
   perform agent_push(p_id, 'cancelled', case when v_back then jsonb_build_object('by', p_by, 'readGivenBack', true) else jsonb_build_object('by', p_by) end, p_now);
 end $$;
 
-create or replace function agent_get(p_owner text, p_id text) returns jsonb language sql stable as $$
+create or replace function agent_get(p_owner text, p_id text) returns jsonb language sql stable set search_path = public, pg_temp as $$
   select agent_task_json(id) from agent_tasks where id = p_id and owner = p_owner
 $$;
-create or replace function agent_latest_completed(p_owner text, p_session text) returns jsonb language sql stable as $$
+create or replace function agent_latest_completed(p_owner text, p_session text) returns jsonb language sql stable set search_path = public, pg_temp as $$
   select agent_task_json(t.id) from agent_tasks t join agent_steps s on s.task = t.id and s.kind = 'answer'
   where t.owner = p_owner and t.session = p_session order by s.at desc, t.seq desc limit 1
 $$;
 
 -- ---------- a task's life ----------
-create or replace function agent_begin(p_task jsonb, p_received jsonb, p_now timestamptz, p_tasks_per_address integer) returns jsonb language plpgsql as $$
+create or replace function agent_begin(p_task jsonb, p_received jsonb, p_now timestamptz, p_tasks_per_address integer) returns jsonb language plpgsql set search_path = public, pg_temp as $$
 declare v_id text; v_digest text; v_address text := p_task->>'address';
 begin
   -- One errand per (owner, request): requests that arrive together queue here, and all but the first find it.
@@ -119,7 +119,7 @@ begin
   return jsonb_build_object('state', 'new', 'task', agent_task_json(p_task->>'id'));
 end $$;
 
-create or replace function agent_claim(p_id text, p_worker text, p_lease_ms integer, p_now timestamptz) returns jsonb language plpgsql as $$
+create or replace function agent_claim(p_id text, p_worker text, p_lease_ms integer, p_now timestamptz) returns jsonb language plpgsql set search_path = public, pg_temp as $$
 declare v agent_tasks%rowtype;
 begin
   select * into v from agent_tasks where id = p_id for update;
@@ -132,7 +132,7 @@ begin
   return jsonb_build_object('fence', v.fence + 1, 'task', agent_task_json(p_id));
 end $$;
 
-create or replace function agent_append(p_id text, p_fence integer, p_kind text, p_data jsonb, p_now timestamptz) returns jsonb language plpgsql as $$
+create or replace function agent_append(p_id text, p_fence integer, p_kind text, p_data jsonb, p_now timestamptz) returns jsonb language plpgsql set search_path = public, pg_temp as $$
 declare v agent_tasks%rowtype;
 begin
   select * into v from agent_tasks where id = p_id for update;
@@ -149,7 +149,7 @@ begin
   return agent_push(p_id, p_kind, p_data, p_now);
 end $$;
 
-create or replace function agent_release(p_id text, p_fence integer) returns void language plpgsql as $$
+create or replace function agent_release(p_id text, p_fence integer) returns void language plpgsql set search_path = public, pg_temp as $$
 declare v agent_tasks%rowtype; v_at timestamptz;
 begin
   select * into v from agent_tasks where id = p_id for update;
@@ -161,12 +161,12 @@ begin
   end if;
 end $$;
 
-create or replace function agent_remaining(p_owner text, p_now timestamptz, p_reads_per_day integer) returns integer language sql stable as $$
+create or replace function agent_remaining(p_owner text, p_now timestamptz, p_reads_per_day integer) returns integer language sql stable set search_path = public, pg_temp as $$
   select case when p_reads_per_day is null then null else greatest(0, p_reads_per_day - coalesce((select sum(units) from agent_reads where owner = p_owner and day = (p_now at time zone 'utc')::date), 0))::integer end
 $$;
 
 -- approve(): owner, task, the waiting approval and its exact digest, and the person's read, in one transaction.
-create or replace function agent_approve(p_owner text, p_id text, p_digest text, p_now timestamptz, p_reads_per_day integer) returns jsonb language plpgsql as $$
+create or replace function agent_approve(p_owner text, p_id text, p_digest text, p_now timestamptz, p_reads_per_day integer) returns jsonb language plpgsql set search_path = public, pg_temp as $$
 declare v agent_tasks%rowtype; v_scope jsonb; v_units integer; v_day date := (p_now at time zone 'utc')::date;
 begin
   select * into v from agent_tasks where id = p_id and owner = p_owner for update;
@@ -195,7 +195,7 @@ begin
   return jsonb_build_object('state', 'granted', 'remaining', agent_remaining(p_owner, p_now, p_reads_per_day));
 end $$;
 
-create or replace function agent_deny(p_owner text, p_id text, p_now timestamptz) returns boolean language plpgsql as $$
+create or replace function agent_deny(p_owner text, p_id text, p_now timestamptz) returns boolean language plpgsql set search_path = public, pg_temp as $$
 begin
   perform 1 from agent_tasks where id = p_id and owner = p_owner for update;
   if not found or agent_waiting_scope(p_id) is null or agent_is_final(p_id) then return false; end if;
@@ -203,7 +203,7 @@ begin
   return true;
 end $$;
 
-create or replace function agent_cancel(p_owner text, p_id text, p_now timestamptz) returns boolean language plpgsql as $$
+create or replace function agent_cancel(p_owner text, p_id text, p_now timestamptz) returns boolean language plpgsql set search_path = public, pg_temp as $$
 declare v agent_tasks%rowtype; v_asked boolean; v_idle boolean;
 begin
   select * into v from agent_tasks where id = p_id and owner = p_owner for update;
@@ -216,16 +216,16 @@ begin
   return true;
 end $$;
 
-create or replace function agent_refund(p_id text) returns void language sql as $$ delete from agent_reads where task = p_id $$;
+create or replace function agent_refund(p_id text) returns void language sql set search_path = public, pg_temp as $$ delete from agent_reads where task = p_id $$;
 
 -- ---------- provider money ----------
 -- What an attempt holds of a cap: its cost once known, nothing once known free, its whole reservation otherwise.
-create or replace function agent_committed(p_partition text) returns numeric language sql stable as $$
+create or replace function agent_committed(p_partition text) returns numeric language sql stable set search_path = public, pg_temp as $$
   select coalesce(sum(case state when 'settled' then coalesce(actual_usd, reserve_usd) when 'no_charge' then 0 else reserve_usd end), 0)
   from agent_attempts where partition = p_partition
 $$;
 -- reserve(): the partition's cap, the task's cap and "no blind second attempt", checked and written under one lock.
-create or replace function agent_reserve(p_partition text, p_cap numeric, p_task_cap numeric, p_task text, p_model text, p_reserve numeric, p_now timestamptz) returns jsonb language plpgsql as $$
+create or replace function agent_reserve(p_partition text, p_cap numeric, p_task_cap numeric, p_task text, p_model text, p_reserve numeric, p_now timestamptz) returns jsonb language plpgsql set search_path = public, pg_temp as $$
 declare v_id text; v_task numeric;
 begin
   if p_cap is null or p_task_cap is null or p_reserve is null or not (p_cap > 0) or not (p_task_cap > 0) or not (p_reserve > 0) then return jsonb_build_object('ok', false, 'code', 'not_configured'); end if;
@@ -241,13 +241,13 @@ begin
   insert into agent_attempts (id, task, partition, model, reserve_usd, at) values (v_id, p_task, p_partition, p_model, p_reserve, p_now);
   return jsonb_build_object('ok', true, 'attemptId', v_id);
 end $$;
-create or replace function agent_dispatch(p_attempt text) returns void language plpgsql as $$
+create or replace function agent_dispatch(p_attempt text) returns void language plpgsql set search_path = public, pg_temp as $$
 begin
   update agent_attempts set state = 'dispatched' where id = p_attempt and state = 'reserved';
   if not found then raise exception 'attempt is not reserved'; end if;
 end $$;
 -- Settled once: a second settle of the same attempt changes nothing.
-create or replace function agent_settle(p_attempt text, p_outcome text, p_actual numeric) returns void language plpgsql as $$
+create or replace function agent_settle(p_attempt text, p_outcome text, p_actual numeric) returns void language plpgsql set search_path = public, pg_temp as $$
 begin
   if not exists (select 1 from agent_attempts where id = p_attempt) then raise exception 'unknown attempt'; end if;
   update agent_attempts set state = p_outcome,
@@ -255,6 +255,25 @@ begin
   where id = p_attempt and state in ('reserved', 'dispatched');
 end $$;
 
--- Still to write before this is a migration: a reconcile job that turns an attempt left `dispatched` beyond the
--- function's maximum duration into `unknown`; a purge of finished tasks after the retention the owner decides;
--- grants to the service role only (Supabase grants ALL to anon and authenticated by default: revoke from both).
+-- ---------- who may call ----------
+-- Nobody but the service role. Supabase grants EXECUTE and table rights to anon and authenticated by default, so
+-- revoking from PUBLIC alone is not enough (found in the audit of 2026-09-28): each role is named. On a database
+-- without those roles (the local scratch one) the block does nothing for them.
+do $$
+declare v_role text; v_fn regprocedure;
+begin
+  for v_fn in select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'agent\_%' loop
+    execute format('revoke all on function %s from public', v_fn);
+    foreach v_role in array array['anon', 'authenticated'] loop
+      if exists (select 1 from pg_roles where rolname = v_role) then
+        execute format('revoke all on function %s from %I', v_fn, v_role);
+        execute format('revoke all on agent_tasks, agent_steps, agent_reads, agent_attempts from %I', v_role);
+      end if;
+    end loop;
+    if exists (select 1 from pg_roles where rolname = 'service_role') then execute format('grant execute on function %s to service_role', v_fn); end if;
+  end loop;
+end $$;
+
+-- Still to write before this is a migration: a purge of finished tasks after the retention the owner decides, and
+-- a job that labels as `unknown` an attempt left `dispatched` by a function that was killed (it already holds its
+-- whole reservation and already blocks a second attempt; only its name is wrong).

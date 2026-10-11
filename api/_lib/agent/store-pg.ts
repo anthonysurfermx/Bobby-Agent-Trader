@@ -4,11 +4,12 @@
 // single-threaded, the database gives with row locks and advisory locks.
 //
 // The transport is injected: `rpc(name, args)` calls a function with named arguments and returns its value. In
-// production that would be PostgREST with the service role (as api/_lib/briefings/db.ts does); in the tests it
-// is a node-postgres pool against a LOCAL scratch database. There is no production database for the engine
-// yet: the SQL is a draft and nothing applies it (README, "What is missing").
+// production it is PostgREST with the service role (`postgrestAgentRpc`, below); in the tests it is a
+// node-postgres pool against a LOCAL scratch database. There is no production database for the engine yet: the
+// SQL is a draft and nothing applies it (README, "What is missing"), so that transport answers 404 until it is.
 // A transport failure throws: the engine's callers treat storage that cannot answer as "do not go on".
 // ============================================================
+import { bobbyRest, bobbyServiceHeaders } from '../bobby-db.js';
 import type { AgentStore, Approve, Begin, Budget, Outcome, Reserve } from './store.js';
 import type { Step, StepKind, Task } from './types.js';
 
@@ -20,6 +21,24 @@ const UNWRITABLE = /\u0000|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff
  * errand unwritable (a paid call whose step cannot be stored would be paid again): each is written as U+FFFD.
  */
 const writable = <T>(value: T): T => JSON.parse(JSON.stringify(value, (_key, part) => (typeof part === 'string' ? part.replace(UNWRITABLE, '\ufffd') : part))) as T;
+
+/** Storage that did not answer, or answered something that is not an answer. Carries the function's name and the status, never an argument. */
+export class AgentStorageError extends Error {
+  constructor(readonly fn: string, readonly status: number | null) { super(`agent storage ${fn} ${status ?? 'network'}`); this.name = 'AgentStorageError'; }
+}
+/**
+ * The production transport: PostgREST `rpc/<function>` with the service role, as api/_lib/briefings/db.ts does.
+ * Named arguments travel as one JSON object (a jsonb argument is a nested object, not a string). Anything but a
+ * 2xx with a readable body throws: the door answers 503 and the errand stays as the store last recorded it.
+ */
+export const postgrestAgentRpc: AgentRpc = async (name, args) => {
+  let response: Response;
+  try { response = await fetch(bobbyRest(`rpc/${name}`), { method: 'POST', headers: bobbyServiceHeaders(), body: JSON.stringify(args), signal: AbortSignal.timeout(6000) }); } catch { throw new AgentStorageError(name, null); }
+  if (!response.ok) throw new AgentStorageError(name, response.status);
+  const text = await response.text();
+  if (!text) return null;   // a function that returns nothing
+  try { return JSON.parse(text) as unknown; } catch { throw new AgentStorageError(name, response.status); }
+};
 
 export class PgAgentStore implements AgentStore {
   constructor(private readonly rpc: AgentRpc, private readonly readsPerDay: number | null = 6, private readonly tasksPerAddress = 120) {}

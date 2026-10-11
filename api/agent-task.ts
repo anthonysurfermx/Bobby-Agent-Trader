@@ -18,7 +18,9 @@
 //
 // What is NOT here yet, on purpose (docs/agent-engine/README.md):
 //   · durable storage in production. The store is chosen by BOBBY_AGENT_STORE: "memory" (one instance, lost
-//     with it: for a preview only) or a file path (local development). With neither, the door answers 503
+//     with it: for a preview only), a file path (local development) or "postgres" (the functions of
+//     docs/agent-engine/agent-engine.sql through PostgREST: they exist only once the owner makes that SQL a
+//     migration). With none, or with storage that does not answer, the door answers 503
 //     `engine_storage_unavailable`: an errand is never accepted that could be silently lost.
 //   · the product's own allowance (api/_lib/access.ts) and its money caps. The engine keeps its own count of
 //     reads and its own dollar ceiling (BOBBY_AGENT_DAILY_USD) until those are wired, with their migration.
@@ -31,6 +33,7 @@ import { requestOriginHost } from './_lib/origins.js';
 import { getClientQuotaKeys } from './_lib/rate-limit.js';
 import { createTask, engineDeps, runTask, taskView } from './_lib/agent/loop.js';
 import { FileAgentStore, MemoryAgentStore, isFinal, type AgentStore } from './_lib/agent/store.js';
+import { PgAgentStore, postgrestAgentRpc } from './_lib/agent/store-pg.js';
 import { ENGINE_VERSION } from './_lib/agent/types.js';
 
 export const config = { maxDuration: 60 };
@@ -44,6 +47,9 @@ export function __setAgentTestDeps(over: typeof testDeps): void { testDeps = ove
 export function agentStore(env: NodeJS.ProcessEnv = process.env): AgentStore | null {
   const where = env.BOBBY_AGENT_STORE?.trim();
   if (where === 'memory') return (memory ??= new MemoryAgentStore(6));
+  // The database, through its functions. Until the owner makes the SQL a migration they do not exist: every call
+  // then fails and the door answers 503, exactly as with no store at all.
+  if (where === 'postgres') return new PgAgentStore(postgrestAgentRpc, 6, 120);
   return where && where.startsWith('/') ? new FileAgentStore(where, 6) : null;
 }
 

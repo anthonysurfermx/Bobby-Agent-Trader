@@ -28,6 +28,10 @@ const ok = (value: unknown, what: string) => { assert.ok(value, what); checks++;
 
 const pool = new pg.Pool({ connectionString: url, max: 12 });
 await pool.query('drop table if exists agent_steps, agent_reads, agent_attempts, agent_tasks cascade');
+// As on Supabase: the API's roles exist, and whatever is created in `public` is granted to anon and authenticated by default.
+for (const role of ['anon', 'authenticated', 'service_role']) await pool.query(`do $$ begin if not exists (select 1 from pg_roles where rolname = '${role}') then create role ${role} nologin; end if; end $$`);
+await pool.query('alter default privileges in schema public grant all on functions to anon, authenticated; alter default privileges in schema public grant all on tables to anon, authenticated');
+await pool.query(`do $$ declare f regprocedure; begin for f in select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'agent\\_%' loop execute format('drop function %s cascade', f); end loop; end $$`);
 const sql = readFileSync(new URL('../docs/agent-engine/agent-engine.sql', import.meta.url), 'utf8');
 await pool.query(sql);
 await pool.query(sql);   // applying it twice changes nothing
@@ -45,6 +49,10 @@ const scope = { action: 'read_assets' as const, assets: ['BTC', 'ETH'], windowDa
 
 try {
   const store = new PgAgentStore(rpc, 2, 2);
+  // 0. Nobody but the service role: not the API's anonymous role, not a signed-in one, whatever the defaults grant.
+  const open = (await pool.query(`select count(*) filter (where has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute')) as open, count(*) filter (where has_function_privilege('service_role', p.oid, 'execute')) as service, count(*) as fns, count(*) filter (where p.proconfig is null or not p.proconfig::text like '%search_path=public, pg_temp%') as loose from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'agent\\_%'`)).rows[0];
+  const tables = (await pool.query(`select count(*) as n from unnest(array['agent_tasks','agent_steps','agent_reads','agent_attempts']) t, unnest(array['anon','authenticated']) r, unnest(array['select','insert','update','delete']) p where has_table_privilege(r, t, p)`)).rows[0];
+  eq([Number(open.fns), Number(open.open), Number(open.service), Number(open.loose), Number(tables.n)], [20, 0, 20, 0, 0], 'twenty functions, each with a fixed search path, callable by the service role and by neither API role; the tables are closed to both');
   // 1. One errand per owner and request, whoever arrives first.
   const first = await store.begin(newTask('ana', 'k1'), { question: 'q' }, T0);
   eq([first.state, (await store.begin(newTask('ana', 'k1'), {}, T0)).state, (await store.begin(newTask('ana', 'k1', { bodyDigest: 'other' }), {}, T0)).state, (await store.begin(newTask('ben', 'k1'), {}, T0)).state], ['new', 'replay', 'mismatch', 'new'], 'the same key and body is the same task; another body is refused; another owner\'s key is theirs');

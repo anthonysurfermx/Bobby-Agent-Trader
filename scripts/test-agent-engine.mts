@@ -754,6 +754,23 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
     clock += 120_000;
     const looked = await send('GET', null, 'device-agent-0000000003', { id: lostId });
     eq([cancelling.body.state, cancelling.body.allowance.remaining, looked.body.state, looked.body.allowance.remaining, looked.body.result], ['cancel_requested', 5, 'cancelled', 6, null], 'a cancel whose runner never came back is completed by the next look, and the read no tool used goes back');
+    // The database store, before its functions exist (or when it does not answer): 503, and the errand is not accepted.
+    process.env.BOBBY_AGENT_STORE = 'postgres';
+    const fetchedBefore = fetched, noDb = await send('POST', askBody({ requestId: '5a5a5a5a-0000-4000-8000-000000000004' }));
+    eq([noDb.statusCode, noDb.body.error.code, fetched - fetchedBefore], [503, 'engine_storage_unavailable', 1], 'the database store that does not answer is a 503 after one call: nothing is accepted that could be lost');
+    {
+      const { postgrestAgentRpc, AgentStorageError } = await import('../api/_lib/agent/store-pg.ts');
+      const sent: Array<{ url: string; init: RequestInit }> = [];
+      const replies: Array<() => Response> = [() => new Response('{"state":"new"}', { status: 200 }), () => new Response(null, { status: 204 }), () => new Response('null', { status: 200 }), () => new Response('{"message":"function not found"}', { status: 404 }), () => new Response('<html>', { status: 200 })];
+      globalThis.fetch = (async (url: string, init: RequestInit) => { sent.push({ url: String(url), init }); return replies.shift()!(); }) as typeof fetch;
+      const first = await postgrestAgentRpc('agent_begin', { p_task: { id: 't', question: 'q' }, p_now: '2026-10-11T00:00:00.000Z' });
+      const headers = sent[0].init.headers as Record<string, string>;
+      eq([first, sent[0].url, sent[0].init.method, JSON.parse(String(sent[0].init.body)), headers.apikey === process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY, headers.Authorization === `Bearer ${process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY}`], [{ state: 'new' }, `${process.env.BOBBY_SUPABASE_URL}/rest/v1/rpc/agent_begin`, 'POST', { p_task: { id: 't', question: 'q' }, p_now: '2026-10-11T00:00:00.000Z' }, true, true], 'the database is called as a function, with the service role, its jsonb arguments as objects');
+      eq([await postgrestAgentRpc('agent_release', {}), await postgrestAgentRpc('agent_get', {})], [null, null], 'a function that returns nothing, and one that returns null, are both null');
+      const failed = async () => { try { await postgrestAgentRpc('agent_get', { p_owner: 'secret-owner' }); return 'answered'; } catch (error) { return error instanceof AgentStorageError ? `${error.fn}:${error.status}:${error.message.includes('secret-owner')}` : 'other'; } };
+      eq([await failed(), await failed()], ['agent_get:404:false', 'agent_get:200:false'], 'a status that is not success, or a body that is not an answer, throws with the function and the status and nothing of the arguments');
+      globalThis.fetch = (async () => { fetched++; throw new Error('no network in this test'); }) as typeof fetch;
+    }
     // Storage that stops answering in the middle of anything: 503, never a guess and never a 500 with a stack.
     process.env.BOBBY_AGENT_STORE = '/dev/null/not-a-directory/store.json';
     const broken = await send('POST', askBody({ requestId: '5a5a5a5a-0000-4000-8000-000000000009' }));

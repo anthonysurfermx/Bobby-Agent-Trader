@@ -47,7 +47,7 @@ Code: `api/_lib/agent/`, door `api/agent-task.ts`, tests `scripts/test-agent-eng
 
 ## What it does not do, and what is missing
 
-- **Durable storage in production.** The store and its SQL exist and pass on a local Postgres; what is missing is the owner's decision to make the SQL a migration (with it: how long a person's question is kept, grants for the service role only, a reconcile job for attempts left `dispatched`), and wiring the door to a PostgREST transport. Until then the door answers 503 unless a development store is configured.
+- **Durable storage in production.** The store, its SQL and the transport that calls it exist: `BOBBY_AGENT_STORE=postgres` makes the door call the functions through PostgREST with the service role. The SQL passes on a local Postgres (51 checks, including that neither API role can call a function or read a table, whatever the defaults grant). What is missing is the owner's decision to make it a migration, and with it how long a person's question is kept. Until then those functions do not exist and the door answers 503.
 - **The product's own allowance and money caps.** The engine counts its own reads (6 a day in the development stores) and its own dollar ceiling. Wiring `api/_lib/access.ts` (guest, weekly, Pro) is the next step and decides what "a read" costs here.
 - **Work that outlives a request.** A run stops between steps when it is out of time and the next request continues it. There is no worker or queue: a task advances only when its owner asks again.
 - **More tools.** No holdings or concentration of a fund, no fees, fundamentals, news or calendar, no single-asset analysis through the three-agent desk. Each is a tool with its own evidence contract.
