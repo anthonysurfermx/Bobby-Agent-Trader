@@ -106,7 +106,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: android-emulator-${{ matrix.build-type }}-api-${{ matrix.api }}-${{ matrix.locale }}
+          # A rerun keeps the failed attempt's diagnostics and cannot collide with its artifact.
+          name: android-emulator-${{ matrix.build-type }}-api-${{ matrix.api }}-${{ matrix.locale }}-attempt-${{ github.run_attempt }}
           path: android/build/emulator
           if-no-files-found: warn
           retention-days: 14

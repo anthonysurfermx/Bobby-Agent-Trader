@@ -32,7 +32,15 @@ for attempt in $(seq 1 90); do
 done
 [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ] || { echo 'Locale restart did not finish.' >&2; exit 1; }
 [ "$(adb shell getprop persist.sys.locale | tr -d '\r')" = "$device_locale" ] || exit 1
-adb unroot
-adb wait-for-device
+# Restarting the framework can also reconnect adbd while it drops root. A closed
+# command transport is not proof of failure or success: require the shell UID.
+locale_shell_ready=false
+for locale_shell_attempt in $(seq 1 5); do
+  adb unroot || true
+  adb wait-for-device
+  if [ "$(adb shell id -u | tr -d '\r')" = 2000 ]; then locale_shell_ready=true; break; fi
+  sleep 2
+done
+[ "$locale_shell_ready" = true ] || { echo 'The disposable image did not return to the shell UID.' >&2; exit 1; }
 adb shell input keyevent 82
 echo "Disposable emulator system locale: $device_locale"

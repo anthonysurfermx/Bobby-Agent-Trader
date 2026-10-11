@@ -85,7 +85,7 @@ class ReleaseLocaleSmokeInstrumentedTest {
     }
 
     @After fun restore() {
-        scenario?.close(); scenario = null
+        finishScenario()
         backups.forEach { (name, values) ->
             val editor = context.getSharedPreferences(name, 0).edit().clear()
             values.forEach { (key, value) -> editor.restoreValue(key, value) }
@@ -190,7 +190,7 @@ class ReleaseLocaleSmokeInstrumentedTest {
         close()
 
         // Disposable identity, encrypted by the shipping store; its token can reach only fixtures.
-        scenario?.close(); scenario = null
+        finishScenario()
         SecureStore(context).write("session", JSONObject().put("userId", OWNER).put("access", "ci-local-only")
             .put("refresh", "ci-local-only").put("displayName", "Alex").put("provider", "google")
             .put("expiresAt", System.currentTimeMillis() + 3_600_000).toString())
@@ -198,8 +198,13 @@ class ReleaseLocaleSmokeInstrumentedTest {
         network.answer("GET", "/api/bobby-access", V18Fixtures.freeAccount())
         launch()
         open("account")
+        // Settle modal expansion before scrolling; otherwise a later inset/layout
+        // frame can photograph the profile's top despite the preceding assertion.
+        compose.mainClock.advanceTimeBy(1000)
+        compose.waitForIdle()
         compose.onNodeWithTag("account-delete").performScrollTo().assertIsDisplayed()
         shot("07-profile-account-controls")
+        compose.onNodeWithTag("account-delete").assertIsDisplayed()
         close()
         onMain { session.v18.switchSheet(V18Routes.MEMORY_CONSENT) }
         compose.waitUntil(30_000) { runCatching { compose.onNodeWithTag("memory-consent-privacy", true).assertExists() }.isSuccess }
@@ -235,6 +240,15 @@ class ReleaseLocaleSmokeInstrumentedTest {
         assertFalse(context.getSharedPreferences("bobby.nucleo", 0).contains("profile.$OWNER.riskVersion"))
         shot("16-account-deleted")
         assertFalse("RevenueCat was never initialized", com.revenuecat.purchases.Purchases.isConfigured)
+    }
+
+    private fun finishScenario() {
+        val running = scenario ?: return
+        // Finish through the actual lifecycle before ActivityScenario waits for idle.
+        // A continuously animated live WebView can otherwise stall test teardown.
+        onMain { activity.finish() }
+        running.close()
+        scenario = null
     }
 
     private fun launch() {
