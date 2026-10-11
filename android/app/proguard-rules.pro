@@ -7,6 +7,10 @@
 # so preserve this library's ABI across both APKs while Bobby and other libraries stay optimized.
 -keep class kotlin.** { *; }
 
+# Compose's external test idling registry shares the shipping coroutine runtime (JobKt was
+# removed by app-only shrinking). Preserve that library ABI; Bobby classes remain optimized.
+-keep class kotlinx.coroutines.** { *; }
+
 # AndroidJUnitRunner calls the shared AndroidX tracing facade before JUnit starts. Release-only
 # shrinking otherwise removes it because application tracing is inlined/disabled.
 -keep class androidx.tracing.Trace { *; }

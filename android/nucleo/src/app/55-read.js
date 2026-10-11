@@ -294,6 +294,9 @@ function fillCards(m){
   if (typeof SES !== 'undefined' && SES && SES.reportContentLabel){
     var report = mk('button', 'report-answer', SES.reportContentLabel);
     report.type = 'button';
+    report.id = 'reportAnswer';
+    // Keep this native button out of the stage's captured card-drag gesture so a real tap clicks it.
+    report.onpointerdown = report.ontouchstart = function(e){ e.stopPropagation(); };
     report.onclick = function(e){ e.stopPropagation(); bcall('openNative', { route:'reportContent' }).catch(noop); };
     el.card0.inn.appendChild(report);
   }

@@ -63,6 +63,11 @@ test('a finished Android debate opens the in-app report sheet without attaching 
   const button = el.card0.inn.children.at(-1);
   assert.equal(button.className, 'report-answer');
   assert.equal(button.textContent, 'Denunciar esta resposta');
+  assert.equal(button.id, 'reportAnswer');
+  let stopped = 0;
+  button.onpointerdown({ stopPropagation() { stopped++; } });
+  button.ontouchstart({ stopPropagation() { stopped++; } });
+  assert.equal(stopped, 2, 'physical taps avoid the ancestor card drag and retain the native click');
   button.onclick({ stopPropagation() {} });
   assert.deepEqual(calls, [{ method: 'openNative', params: { route: 'reportContent' } }]);
 });

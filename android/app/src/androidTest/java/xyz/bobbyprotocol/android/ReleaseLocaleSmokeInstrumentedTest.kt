@@ -143,8 +143,25 @@ class ReleaseLocaleSmokeInstrumentedTest {
         assertEquals("ok", JSONObject(js("JSON.stringify(window.nucleo.read())") as String).getString("status"))
         assertEquals(session.text("Report this answer", "Reportar esta respuesta"), js("document.querySelector('.report-answer').textContent"))
         shot("04-read")
-        // Exercise the finished answer's shipping handler, not only the generic native route.
-        js("document.querySelector('.report-answer').click();true")
+        // Pull the real cards, scroll the debate and tap its visible report control.
+        if (js("window.nucleo.state()==='CARDS'") != true) {
+            device.swipe(device.displayWidth/2, device.displayHeight/2, device.displayWidth/2, device.displayHeight*3/4, 24)
+            waitFor { js("window.nucleo.state()==='CARDS'") == true }
+        }
+        repeat(8) {
+            if (!domVisible("reportAnswer")) {
+                val bounds = JSONArray(js("JSON.stringify((function(){var r=document.querySelector('#card0 .scr').getBoundingClientRect();return [r.left+r.width/2,r.top,r.bottom,innerWidth];})())") as String)
+                val xy = IntArray(2); var width = 0
+                onMain { web.view.getLocationOnScreen(xy); width = web.view.width }
+                val scale = width / bounds.getDouble(3)
+                val x = (xy[0] + bounds.getDouble(0)*scale).toInt()
+                val top = (xy[1] + bounds.getDouble(1)*scale).toInt()
+                val bottom = (xy[1] + bounds.getDouble(2)*scale).toInt()
+                device.swipe(x, bottom-20, x, top+20, 20)
+                Thread.sleep(600)
+            }
+        }
+        tapDom("reportAnswer")
         compose.waitUntil(30_000) { runCatching { compose.onNodeWithText(reportContentTitle(language)).assertExists() }.isSuccess }
         compose.onNodeWithText(session.text("Close", "Cerrar")).assertIsDisplayed()
         shot("04b-report-from-read")
@@ -263,7 +280,7 @@ class ReleaseLocaleSmokeInstrumentedTest {
 
     private fun open(route: String) { bridge("openNative", JSONObject().put("route", route)); Thread.sleep(1000) }
     private fun tapDom(id: String) {
-        waitFor { js("(function(){var e=document.getElementById(${JSONObject.quote(id)}),r=e.getBoundingClientRect(),s=getComputedStyle(e),h=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.width>0 && r.height>0 && s.visibility==='visible' && s.pointerEvents!=='none' && h && (h===e || e.contains(h));})()") == true }
+        waitFor { domVisible(id) }
         val position = JSONArray(js("JSON.stringify((function(){var r=document.getElementById(${JSONObject.quote(id)}).getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2,innerWidth];})())") as String)
         val xy = IntArray(2); var width = 0
         onMain { web.view.getLocationOnScreen(xy); width = web.view.width }
@@ -274,6 +291,7 @@ class ReleaseLocaleSmokeInstrumentedTest {
         MotionEvent.obtain(down,down,MotionEvent.ACTION_DOWN,x,y,0).also { instrumentation.sendPointerSync(it); it.recycle() }
         MotionEvent.obtain(down,down+30,MotionEvent.ACTION_UP,x,y,0).also { instrumentation.sendPointerSync(it); it.recycle() }
     }
+    private fun domVisible(id: String): Boolean = js("(function(){var e=document.getElementById(${JSONObject.quote(id)}),r=e.getBoundingClientRect(),s=getComputedStyle(e),h=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.width>0 && r.height>0 && s.visibility==='visible' && s.pointerEvents!=='none' && h && (h===e || e.contains(h));})()") == true
     private fun close() { device.pressBack(); Thread.sleep(800) }
     private fun scrollSheet() { device.swipe(device.displayWidth/2, device.displayHeight*4/5, device.displayWidth/2, device.displayHeight/5, 18); compose.waitForIdle() }
     private fun shot(name: String) { compose.waitForIdle(); Thread.sleep(700); V18Shots.saveListing("locale-$language-$name") }
