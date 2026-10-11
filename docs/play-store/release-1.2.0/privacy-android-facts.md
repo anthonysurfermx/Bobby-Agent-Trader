@@ -42,7 +42,7 @@ All app transport uses HTTPS, prohibits cross-host redirects, and keeps auth nat
 | Briefings | Settings, cadence/cursor/id; voice request includes briefing id/version/segment/voice/language; audio fetched by id. Opted-in local worker checks preferences and newest briefing about every 15 minutes when Android allows it. | `data/BobbyRepository.kt:291`; `platform/BriefingReminders.kt:43`, `:59` |
 | Google sign-in | System browser OAuth to Supabase/Google, PKCE/state and callback; native token exchange/refresh to Supabase Auth. Google handles the user's sign-in information. Tokens never enter the bundled page. | `data/BobbyRepository.kt:325`, `:344`, `:562` |
 | Delete account | Owner-bound authenticated GET then DELETE `/api/account`; no microphone audio or thesis content. | `data/BobbyRepository.kt:403` |
-| Report/share/support | System mail/share/browser opened by explicit user action. A report is not silently submitted. | `ui/ReportContentSheet.kt`; `ui/BobbySupportLinks.kt`; `MainActivity.kt:416` |
+| Report/share/support | Report sends only the person's written text, reason, language and app version to `/api/feedback` on explicit Send, without account bearer/device header/attached question. Share/support open system share/browser on the person's tap. | `ui/ReportContentSheet.kt:93`, `:107`; `ui/ReportContentPolicy.kt:16`; `ui/BobbySupportLinks.kt`; `MainActivity.kt:416` |
 
 The AI and voice processing are server mediated. The public policy must name the server's actual processors/retention; this Android inventory alone cannot establish those facts.
 

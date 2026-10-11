@@ -116,6 +116,8 @@ dependencies {
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
+    // AndroidX Test references these annotations; the optimized test APK must resolve them under R8.
+    androidTestImplementation("com.google.errorprone:error_prone_annotations:2.36.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     // The system's own windows (the permission question, the notification shade) for the emulator tests.
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
