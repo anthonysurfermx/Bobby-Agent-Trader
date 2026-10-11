@@ -340,6 +340,12 @@ final class NucleoSession: ObservableObject {
         case "confirm.refresh":
             return try desk.refreshConfirmation(p)
         case "ask":
+#if DEBUG
+            if fixtures, let start = fixtureHandoverStart {
+                print("I1B_HANDOVER_ASK_SECONDS=\(ProcessInfo.processInfo.systemUptime - start)")
+                fixtureHandoverStart = nil
+            }
+#endif
             return try await desk.ask(p)
         case "companion.presented":
             return ["status": "idle"] // I-1: no automatic consent or personal question.
@@ -465,6 +471,9 @@ final class NucleoSession: ObservableObject {
             return ["count": markHint(key)]
         case "nudge.seen":
             let id = try p.string("id", pattern: NucleoNudge.idPattern)!
+#if DEBUG
+            if fixtures && id == "fixture.home" && ProcessInfo.processInfo.arguments.contains("-qa-home-nudge") { return ["count":1,"active":true] }
+#endif
             let count = NudgeCenter.shared.seen(id)
             scheduleNudgeRefresh(for: id)
             return ["count": count, "active": NudgeCenter.shared.isCurrent(id) && NudgeCenter.shared.eligible(id, at: NudgeCenter.shared.now())]
@@ -529,10 +538,16 @@ final class NucleoSession: ObservableObject {
             "speaking": SpeakingDial(defaults: defaults).json(fixtures ? nil : AccountSession.shared.session?.userId),
             "textScale": UIFontMetrics(forTextStyle: .body).scaledValue(for: 17) / 17,
             "exampleIndex": exampleIndex(),
+            "hasDeliveredRead": SpeakingDial(defaults: defaults).hasDeliveredRead(fixtures ? nil : AccountSession.shared.session?.userId),
             "companionPilot": ["limit":companionPilot.limitSnapshot().map { $0 as Any } ?? NSNull(), "strings": CompanionCopy.json, "enabled": companionPilot.capability.known ? companionPilot.capability.enabled as Any : NSNull(), "textScale": UIFontMetrics(forTextStyle: .body).scaledValue(for: 17) / 17],
             "nudge": currentNudge().map { $0.json as Any } ?? NSNull(),
         ]
 #if DEBUG
+        if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-home-fresh") { json["hasDeliveredRead"] = false }
+        if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-home-reads") { json["hasDeliveredRead"] = true }
+        if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-home-nudge") {
+            json["nudge"] = ["id":"fixture.home", "text": ConversationCopy.ready(), "cta": ConversationCopy.readFallback()]
+        }
         // Review-only composition; impossible outside the offline signed fixture harness.
         if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-consent-preview") { json["consentPreview"] = true }
 #endif
@@ -1090,6 +1105,9 @@ final class NucleoSession: ObservableObject {
 
     // MARK: - Onboarding
 
+#if DEBUG
+    private var fixtureHandoverStart: TimeInterval?
+#endif
     func finishOnboarding(ask: [String: Any]? = nil) -> [String: Any] {
         guard profile.acceptedRiskNotice else { return ["status": "incomplete", "missing": ["risk"]] }
         if companions.companionId == nil {
@@ -1097,6 +1115,9 @@ final class NucleoSession: ObservableObject {
             guard let starter = starters.first(where: { $0.id != "orb" }) ?? starters.first,
                   (try? setCompanion(starter.id)) != nil else { return ["status": "incomplete", "missing": ["companion"]] }
         }
+#if DEBUG
+        if fixtures, ask != nil { fixtureHandoverStart = ProcessInfo.processInfo.systemUptime }
+#endif
         pendingFirstAsk = ask.map { ($0, handoverOwner(), handoverNow() + 30) }
         profile.onboarded = true
         if signedIn {

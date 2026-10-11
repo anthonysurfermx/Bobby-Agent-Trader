@@ -186,7 +186,7 @@ typeIn.addEventListener('compositionend', function(){ typeComposing = false; typ
 typeIn.addEventListener('input', typeAutosize);
 typeSend.addEventListener('pointerdown', function(e){ e.preventDefault(); });   /* keep the keyboard up */
 typeSend.addEventListener('click', function(){ typeSubmit(); });
-typeIn.addEventListener('blur', function(){ setTimeout(function(){ if (W.state === 'TYPING' && !typeComposing && document.activeElement !== typeIn) typeCancel(); }, 180); });
+typeIn.addEventListener('blur', function(){ setTimeout(function(){ if (W.state === 'TYPING' && !W.bg && !typeComposing && document.activeElement !== typeIn) typeCancel(); }, 180); });
 function renderTyping(){
   if (!typeBox.classList.contains('on')) return;
   var vv = window.visualViewport, vb = vv ? vv.offsetTop + vv.height : window.innerHeight;

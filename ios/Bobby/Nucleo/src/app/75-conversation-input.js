@@ -139,3 +139,10 @@ STATES.READ_CONFIRM={enter:function(prev,d){this.reply=d.reply||this.reply;var c
 var conversationTypeEnter=STATES.TYPING.enter,conversationTypeDown=STATES.TYPING.down;
 STATES.TYPING.enter=function(prev,d){S.cy.set(180);S.r.set(48);conversationTypeEnter.call(this,prev,d);};
 STATES.TYPING.down=function(h){if(h==='close')return tapG(function(){STATES.TYPING.cancel();});return conversationTypeDown.call(this,h);};
+// A deliberate field tap reopens WebKit editing after outside dismissal, preserving the cursor.
+el.ta.addEventListener('pointerup',function(){
+ if(ST.name!=='TYPING')return;
+ var vv=W.visualViewport,closed=vv&&vv.height>W.innerHeight*.85,start=el.ta.selectionStart,end=el.ta.selectionEnd;
+ if(closed&&D.activeElement===el.ta)el.ta.blur();
+ focusTa();try{el.ta.setSelectionRange(start,end);}catch(_){}
+});

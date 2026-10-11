@@ -16,12 +16,15 @@ class ConversationFixtureCase: XCTestCase {
     func button(_ key: String) -> XCUIElement { web.buttons[word(key)] }
     override func setUp() { continueAfterFailure = false }
     override func tearDown() { app?.terminate(); super.tearDown() }
-    func launch(_ scenario: String = "companion-plain", speech: String = "words", voice: Bool = false, permission: String = "granted", notes: Bool = false, voiceFails: Bool = false, level: String = "rapido") {
+    func launch(_ scenario: String = "companion-plain", speech: String = "words", voice: Bool = false, permission: String = "granted", notes: Bool = false, voiceFails: Bool = false, level: String = "rapido", home: String = "fresh") {
         app = XCUIApplication()
         app.launchArguments = ["-nucleo-fixtures", scenario, "-nucleo-page", "app", "-qa-companion", "-qa-speech-fixture", speech, "-qa-speech-permission", permission,
             "-AppleLanguages", "(\(language))", "-app.language", language, "-AppleLocale", ["es":"es_MX", "de":"de_DE", "pt":"pt_PT", "it":"it_IT", "en":"en_US", "fr":"fr_FR"][language]!,
             "-agent.riskNoticeVersion", "6", "-companion.id", "momo", "-companion.selected.v2.local", "momo",
             "-avatar.voiceMuted", voice ? "NO" : "YES", "-nucleo.voiceMuteReset.v1", "YES", "-nucleo.analysisLevel", level]
+        if home == "fresh" { app.launchArguments += ["-qa-home-fresh"] }
+        if home == "reads" { app.launchArguments += ["-qa-home-reads"] }
+        if home == "nudge" { app.launchArguments += ["-qa-home-nudge"] }
         if voice { app.launchArguments += ["-qa-voice-fixture", voiceFails ? "failure" : "success"] }
         if notes { app.launchArguments += ["-qa-redesign-notes"] }
         app.launch(); ready(button("aria.type"))
@@ -42,8 +45,8 @@ class ConversationFixtureCase: XCTestCase {
     }
     func ask(_ question: String? = nil) { type(question ?? word("ex.1")); ready(button("type.send")); button("type.send").tap() }
     func answered() { ready(button("aria.closeAnswer")); XCTAssertFalse(app.buttons["companion-consent-yes"].exists); XCTAssertFalse(web.buttons["companion-answer"].exists) }
-    func shot(_ name: String) {
-        Thread.sleep(forTimeInterval: 1)
+    func shot(_ name: String, delay: Double = 1) {
+        Thread.sleep(forTimeInterval: delay)
         let system=XCUIApplication(bundleIdentifier:"com.apple.springboard"),predicate=NSPredicate(format:"label CONTAINS[c] 'Apple Intel'")
         let height=app.windows.firstMatch.frame.height
         let candidates=system.descendants(matching:.any).matching(predicate).allElementsBoundByIndex + app.descendants(matching:.any).matching(predicate).allElementsBoundByIndex
@@ -51,6 +54,7 @@ class ConversationFixtureCase: XCTestCase {
             let clear=XCTNSPredicateExpectation(predicate:NSPredicate { _,_ in !banner.exists || banner.frame.maxY <= 0 || banner.frame.minY >= height },object:nil)
             XCTAssertEqual(XCTWaiter.wait(for:[clear],timeout:15),.completed)
         }
+        if let intro=app.buttons.matching(NSPredicate(format:"label == 'Continue'")).allElementsBoundByIndex.first(where:{$0.isHittable && $0.frame.minY > height * 0.7}) { intro.tap() }
         let a = XCTAttachment(screenshot: app.screenshot()); a.name = "redesign-" + name; a.lifetime = .keepAlways; add(a)
     }
     func physicalControls(_ controls: [XCUIElement], abovePill: Bool = true) {
@@ -60,6 +64,11 @@ class ConversationFixtureCase: XCTestCase {
             XCTAssertGreaterThanOrEqual(c.frame.width,43.5,c.debugDescription); XCTAssertGreaterThanOrEqual(c.frame.height,43.5,c.debugDescription)
             if abovePill { XCTAssertLessThanOrEqual(c.frame.maxY,700 * scale + (size.height-844 * scale)/2 + 1,c.debugDescription) }
         }
+    }
+    func backgroundAndReturn() {
+        XCUIDevice.shared.press(.home)
+        Thread.sleep(forTimeInterval:1)
+        app.activate()
     }
     func listening() { button("aria.talk").tap(); ready(button("aria.sendSpoken")); Thread.sleep(forTimeInterval: 0.7) }
 }
@@ -76,12 +85,9 @@ final class WithoutHelpUITests: ConversationFixtureCase {
         XCTAssertEqual(field.value as? String, question)
         XCTAssertFalse(button("aria.closeAnswer").exists)
         shot("67-keyboard-outside-draft-kept")
+        field.tap(); XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout:5))
+        XCTAssertEqual(field.value as? String,question);shot("68-keyboard-reopened-draft")
         ready(button("type.send")); button("type.send").tap(); answered()
-    }
-    func backgroundAndReturn() {
-        XCUIDevice.shared.press(.home)
-        Thread.sleep(forTimeInterval:1)
-        app.activate()
     }
     func testComposerGrowsToFourLinesThenScrolls() {
         launch(); type("Bitcoin")
@@ -143,6 +149,18 @@ final class WithoutHelpUITests: ConversationFixtureCase {
 }
 
 final class ConversationShots: ConversationFixtureCase {
+    func checkHomeExamples() {
+        let size=app.windows.firstMatch.frame.size,scale=min(size.width/390,size.height/844),offset=(size.width-390*scale)/2
+        let examples=web.buttons.allElementsBoundByIndex.filter { $0.isHittable && $0.frame.minY >= 630*scale && $0.frame.maxY < 710*scale }
+        XCTAssertGreaterThan(examples.count,0);XCTAssertLessThanOrEqual(examples.count,3)
+        physicalControls(examples)
+        for c in examples { XCTAssertGreaterThanOrEqual(c.frame.minX,offset+19*scale);XCTAssertLessThanOrEqual(c.frame.maxX,offset+371*scale) }
+    }
+    func test86HomeNoReadsWholeExamples() {launch();checkHomeExamples();shot("86-home-no-reads-whole-examples")}
+    func test87HomeReadsWholeExamples() {launch(home:"reads");checkHomeExamples();shot("87-home-with-reads-whole-examples")}
+    func test88HomeNudgeWholeExamples() {launch(home:"nudge");checkHomeExamples();XCTAssertTrue(web.staticTexts.matching(NSPredicate(format:"label ==[c] %@",nativeWord("ready"))).firstMatch.exists);shot("88-home-nudge-whole-examples")}
+    func test99HomeExplanationsOff() {launch("companion-off");Thread.sleep(forTimeInterval:1);XCTAssertFalse(button("ex.1").isHittable);shot("99-home-explanations-off")}
+    func test89HomeWallEducationStays() {launch("quota");checkHomeExamples();shot("89-home-wall-examples")}
     func test01Rest() { launch(); shot("01-rest") }
     func test02Typing() { launch(); type(word("ex.1")); shot("02-typing") }
     func test03Listening() { launch(); listening(); shot("03-listening") }
@@ -246,5 +264,131 @@ final class ConsentPreviewShots: ConversationFixtureCase {
         shot("70-consent-composition-preview")
         ready(later); ready(agree); physicalControls([later, agree], abovePill: false)
         ready(web.buttons[words["risk.notice"]!]); ready(web.buttons[words["risk.profile"]!])
+    }
+}
+
+final class FirstRunShots: ConversationFixtureCase {
+    var firstWords: [String:String] { labels["onboarding"] as! [String:String] }
+    func fresh(_ scenario: String = "companion-plain", speech: String = "words", stale: Bool = false, wait: Bool = true, permission: String = "granted") {
+        app = XCUIApplication()
+        app.launchArguments = ["-nucleo-fixtures", scenario, "-nucleo-page", "onboarding", "-nucleo-reset-onboarding", "-qa-speech-fixture", speech, "-qa-speech-permission", permission,
+            "-agent.riskNoticeVersion", "0", "-avatar.voiceMuted", "YES", "-nucleo.voiceMuteReset.v1", "YES",
+            "-AppleLanguages", "(\(language))", "-app.language", language,
+            "-AppleLocale", ["es":"es_MX","de":"de_DE","en":"en_US","pt":"pt_PT"][language]!]
+        if stale { app.launchArguments += ["-qa-stale-consent", "-companion.id", "momo", "-companion.selected.v2.local", "momo", "-agent.riskNoticeVersion", "5"] }
+        app.launch(); if !stale && wait { ready(web.buttons[firstWords["aria.type"]!],timeout:10) }
+    }
+    func testIntroCaptionNaturalFrames() {
+        fresh(wait:false)
+        for i in 0..<8 {
+            let a=XCTAttachment(screenshot:app.screenshot());a.name="redesign-\(90+i)-natural-intro-frame";a.lifetime = .keepAlways;add(a)
+            Thread.sleep(forTimeInterval:0.3)
+        }
+        ready(web.buttons[firstWords["aria.type"]!]);shot("98-intro-folded-ready")
+    }
+    func testReadyControlsAndWholeExamples() {
+        fresh()
+        let keyboard=web.buttons[firstWords["aria.type"]!], example=web.buttons[firstWords["ex.1"]!]
+        ready(example); physicalControls([keyboard], abovePill:false); physicalControls([example])
+        ready(web.buttons[firstWords["risk.profile"]!]); shot("71-first-run-ready-caption")
+        Thread.sleep(forTimeInterval:3); ready(keyboard); shot("72-first-run-ready-title")
+        example.tap(); ready(web.buttons[firstWords["risk.activate"]!]); shot("73-first-run-educational-consent")
+    }
+    func testEducationalFirstQuestionHandsOverToDailyAnswer() {
+        fresh(); let example=web.buttons[firstWords["ex.1"]!]
+        ready(example); example.tap(); let agree=web.buttons[firstWords["risk.activate"]!]
+        ready(agree); agree.press(forDuration:1.8)
+        answered(); XCTAssertFalse(web.buttons[firstWords["risk.notice"]!].isHittable)
+        XCTAssertFalse(web.buttons[firstWords["chip.again"]!].isHittable)
+        shot("74-first-run-educational-daily-answer")
+    }
+
+    func testConsentNotNowKeepsDraftAndTapNeverAccepts() {
+        fresh(); ready(web.buttons[firstWords["ex.1"]!]); web.buttons[firstWords["ex.1"]!].tap()
+        let agree=web.buttons[firstWords["risk.activate"]!],later=web.buttons[firstWords["risk.notNow"]!]
+        ready(later); physicalControls([later,agree],abovePill:false); shot("76-consent-with-not-now")
+        agree.tap(); XCTAssertTrue(web.staticTexts.matching(NSPredicate(format:"label ==[c] %@",firstWords["risk.holdHint"]!)).firstMatch.exists)
+        XCTAssertTrue(later.isHittable); shot("77-consent-short-tap-hint",delay:0)
+        later.tap(); ready(web.buttons[firstWords["aria.sendSpoken"]!])
+        XCTAssertTrue(web.staticTexts[firstWords["ex.1"]!].exists)
+        XCTAssertTrue(web.staticTexts.matching(NSPredicate(format:"label ==[c] %@",firstWords["risk.kept"]!)).firstMatch.exists); shot("78-declined-held-draft")
+        web.buttons[firstWords["aria.sendSpoken"]!].tap(); ready(later)
+        XCTAssertFalse(button("aria.closeAnswer").exists)
+    }
+    func testReconsentNotNowIsReadyWithoutQuestion() {
+        fresh(stale:true); let later=web.buttons[firstWords["risk.notNow"]!]
+        ready(later); shot("79-reconsent-beat"); later.tap()
+        ready(web.buttons[firstWords["aria.type"]!]); ready(web.buttons[firstWords["risk.profile"]!])
+        shot("80-reconsent-ready")
+        let text=web.staticTexts.allElementsBoundByIndex.map { $0.label }.joined(separator:" ").components(separatedBy:.whitespacesAndNewlines).filter { !$0.isEmpty }.joined(separator:" ")
+        XCTAssertTrue(text.contains(firstWords["risk.later"]!),text)
+    }
+    func testFirstRunListeningKeyboardKeepsHeardWords() {
+        fresh(); let talk=web.buttons[firstWords["aria.talk"]!],keyboard=web.buttons[firstWords["aria.type"]!]
+        ready(talk); talk.tap(); ready(web.buttons[firstWords["aria.sendSpoken"]!]); Thread.sleep(forTimeInterval:0.8)
+        keyboard.tap(); ready(web.textViews.firstMatch)
+        XCTAssertEqual(web.textViews.firstMatch.value as? String,firstWords["ex.1"]!)
+        XCTAssertFalse(web.buttons[firstWords["risk.notNow"]!].isHittable); shot("81-first-run-heard-in-keyboard")
+    }
+    func testFirstRunBackgroundKeepsHeardDraft() {
+        fresh(); ready(web.buttons[firstWords["aria.talk"]!]);web.buttons[firstWords["aria.talk"]!].tap()
+        ready(web.buttons[firstWords["aria.sendSpoken"]!]);Thread.sleep(forTimeInterval:0.8);backgroundAndReturn()
+        ready(web.buttons[firstWords["aria.sendSpoken"]!]);XCTAssertTrue(web.staticTexts.matching(NSPredicate(format:"label ==[c] %@",firstWords["cap.stopped"]!)).firstMatch.exists)
+        XCTAssertFalse(web.buttons[firstWords["risk.notNow"]!].isHittable);shot("82-first-run-background-held")
+    }
+    func testFirstRunHoldAppendsToHeldDraft() {
+        fresh();let q=firstWords["ex.1"]!;web.buttons[q].tap();ready(web.buttons[firstWords["risk.notNow"]!])
+        web.buttons[firstWords["risk.notNow"]!].tap();ready(web.buttons[firstWords["aria.sendSpoken"]!])
+        web.buttons[firstWords["aria.sendSpoken"]!].press(forDuration:1.8)
+        ready(web.buttons[firstWords["risk.notNow"]!]);web.buttons[firstWords["risk.notNow"]!].tap()
+        ready(web.buttons[firstWords["aria.type"]!]);web.buttons[firstWords["aria.type"]!].tap();ready(web.textViews.firstMatch)
+        XCTAssertEqual(web.textViews.firstMatch.value as? String,q+" "+q)
+        XCTAssertFalse(button("aria.closeAnswer").exists);shot("99-first-run-held-appended-words")
+    }
+    func testFirstRunAutomaticStopsNeverSend() {
+        for (speech,caption) in [("minute","cap.minute"),("interruption","cap.stopped"),("silence","cap.stopped")] {
+            fresh(speech:speech);ready(web.buttons[firstWords["aria.talk"]!]);web.buttons[firstWords["aria.talk"]!].tap()
+            ready(web.buttons[firstWords["aria.sendSpoken"]!])
+            XCTAssertTrue(web.staticTexts.matching(NSPredicate(format:"label ==[c] %@",firstWords[caption]!)).firstMatch.waitForExistence(timeout:16))
+            XCTAssertTrue(web.staticTexts[firstWords["ex.1"]!].exists)
+            XCTAssertFalse(web.buttons[firstWords["risk.notNow"]!].isHittable)
+            shot("99-first-run-held-\(speech)")
+        }
+        fresh(speech:"empty");ready(web.buttons[firstWords["aria.talk"]!]);web.buttons[firstWords["aria.talk"]!].tap()
+        ready(web.buttons[firstWords["aria.sendSpoken"]!]);ready(web.buttons[firstWords["aria.talk"]!],timeout:16)
+        XCTAssertTrue(web.staticTexts.matching(NSPredicate(format:"label ==[c] %@",firstWords["cap.empty"]!)).firstMatch.exists)
+        XCTAssertFalse(web.buttons[firstWords["risk.notNow"]!].isHittable);shot("99-first-run-empty-capture")
+    }
+    func testFirstRunKeyboardCancelsPermissionPrimer() {
+        fresh(permission:"undetermined");web.buttons[firstWords["aria.talk"]!].tap();ready(web.buttons[firstWords["perm.cta"]!])
+        web.buttons[firstWords["aria.type"]!].tap();ready(web.textViews.firstMatch)
+        web.textViews.firstMatch.typeText(firstWords["ex.1"]!)
+        XCTAssertFalse(web.buttons[firstWords["aria.sendSpoken"]!].isHittable)
+        XCTAssertFalse(web.buttons[firstWords["risk.notNow"]!].isHittable);shot("99-first-run-permission-to-keyboard")
+    }
+    func testFirstRunBackgroundKeepsTypedDraft() {
+        fresh();web.buttons[firstWords["aria.type"]!].tap();ready(web.textViews.firstMatch)
+        web.textViews.firstMatch.typeText(firstWords["ex.1"]!);backgroundAndReturn();ready(web.textViews.firstMatch)
+        XCTAssertEqual(web.textViews.firstMatch.value as? String,firstWords["ex.1"]!)
+        XCTAssertFalse(web.buttons[firstWords["risk.notNow"]!].isHittable);shot("99-first-run-typed-background")
+    }
+    func testHandoverPreparingThenFirstAnswerRecording() {
+        fresh("companion-waiting"); ready(web.buttons[firstWords["ex.1"]!]);web.buttons[firstWords["ex.1"]!].tap()
+        let agree=web.buttons[firstWords["risk.activate"]!];ready(agree);shot("83-handover-before-hold")
+        agree.press(forDuration:1.3)
+        XCTAssertTrue(web.staticTexts[word("status.preparing")].waitForExistence(timeout:1))
+        // Rendering latency is measured in the recording, not XCTest query overhead.
+        // Native also logs fixture handover→ask seconds without logging the question.
+        XCTAssertTrue(web.staticTexts[firstWords["ex.1"]!].exists);shot("84-handover-preparing-no-idle")
+        ready(button("aria.closeAnswer"),timeout:45);shot("85-handover-first-daily-answer")
+    }
+
+    func testAssetFirstQuestionHandsOverToConfirmation() {
+        fresh()
+        let asset=web.buttons.matching(NSPredicate(format:"label CONTAINS 'NVIDIA' OR label CONTAINS 'Bitcoin'")).firstMatch
+        ready(asset); asset.tap(); let agree=web.buttons[firstWords["risk.activate"]!]
+        ready(agree); agree.press(forDuration:1.8)
+        ready(button("risk.notNow")); XCTAssertFalse(button("aria.closeAnswer").exists)
+        shot("75-first-run-asset-daily-confirmation")
     }
 }

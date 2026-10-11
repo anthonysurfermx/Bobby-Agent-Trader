@@ -12,6 +12,7 @@ struct SpeakingDial {
         if defaults.object(forKey: "bobby.speaking.fresh") == nil { defaults.set(!existing, forKey: "bobby.speaking.fresh") }
     }
     func value(_ owner: String?) -> String? { defaults.string(forKey: key(owner, "value")).flatMap { Self.values.contains($0) ? $0 : nil } }
+    func hasDeliveredRead(_ owner: String?) -> Bool { defaults.integer(forKey: key(owner, "count")) > 0 }
     func choose(_ value: String, owner: String?, feedback: Bool = false) {
         guard Self.values.contains(value) else { return }
         defaults.set(value, forKey: key(owner, "value"))

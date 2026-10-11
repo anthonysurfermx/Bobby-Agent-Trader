@@ -75,10 +75,18 @@ struct BobbyApp: App {
         if args.contains("-nucleo-reset-onboarding") {
             let defaults = UserDefaults.standard
             ["agent.onboarded", "agent.riskNoticeVersion", "companion.id"].forEach { defaults.removeObject(forKey: $0) }
+            if nucleoOptions.fixtures != nil {
+                defaults.removeObject(forKey: "companion.selected.v2.local")
+                let dial = SpeakingDial(defaults: defaults)
+                ["count", "reads"].forEach { defaults.removeObject(forKey: dial.key(nil, $0)) }
+            }
         }
 #endif
         if args.contains("-qa-coupon") {
             NucleoFixtures.activate(scenario: "default", liveVoice: false)
+        }
+        if nucleoOptions.fixtures != nil && args.contains("-qa-stale-consent") {
+            UserDefaults.standard.set(true, forKey:"agent.onboarded")
         }
         if let scenario = nucleoOptions.fixtures {
             NucleoFixtures.activate(scenario: scenario, liveVoice: args.contains("-nucleo-fixtures-live-voice"))

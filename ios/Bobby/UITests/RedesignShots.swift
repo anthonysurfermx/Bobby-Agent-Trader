@@ -172,8 +172,7 @@ final class RedesignShots: XCTestCase {
     }
     private func firstRunReady() {
         launch("default", firstRun: true)
-        let chip = app.webViews.firstMatch.buttons[word("onboarding", "chip.look").replacingOccurrences(of: "{sym}", with: "BTC")]
-        ready(chip, timeout: 45)
+        ready(app.webViews.firstMatch.buttons[word("onboarding", "aria.type")], timeout: 10)
     }
     func test11FirstRunReady() {
         firstRunReady()
@@ -182,7 +181,8 @@ final class RedesignShots: XCTestCase {
     }
     func test12FirstRunConsentBeat() {
         firstRunReady()
-        app.webViews.firstMatch.buttons[word("onboarding", "chip.look").replacingOccurrences(of: "{sym}", with: "BTC")].tap()
+        let assets = app.webViews.firstMatch.buttons.matching(NSPredicate(format:"label CONTAINS 'NVIDIA' OR label CONTAINS 'Bitcoin'"))
+        ready(assets.firstMatch); assets.firstMatch.tap()
         ready(app.webViews.firstMatch.buttons[word("onboarding", "risk.notice")])
         ready(app.webViews.firstMatch.buttons[word("onboarding", "risk.activate")])
         shot("12-first-run-consent-beat")

@@ -265,3 +265,24 @@ test('the web twin lays the consent copy out with the same code as the iOS page'
   for (const name of ['buildRisk', 'layoutRisk', 'riskCue']) assert.equal(realFunction(web('30-dom.js'), name), realFunction(ios('30-dom.js'), name), name);
   for (const name of ['riskScrollMax', 'inRiskBody', 'scrollRisk']) assert.equal(realFunction(web('90-input.js'), name), realFunction(ios('90-input.js'), name), name);
 });
+
+// T18 / SPEC4.7.6: approved production bounds beside the unchanged frozen-twin layout above.
+const consentSource = read('../src/onboarding/85-consent-preview.js');
+for (const scale of [1, 1.118]) for (const headings of [[22,22,22,22],[44,22,22,22]]) {
+  test(`iPhone approved consent at textScale ${scale}, headings ${headings}: four full-colour lines and reachable final text`, () => {
+    const body = { style:{setProperty(key,value){this[key]=value;}}, scrollHeight:540, scrollTop:0 };
+    const lines = headings.map(height => ({offsetHeight:height*scale,style:{}}));
+    const ctx = vm.createContext({SESSION:{textScale:scale},lineEls:lines,rbodyEl:body,RISK_LAYOUT:null,
+      sc:(el,key,value)=>el.style[key]=value,f1:value=>value.toFixed(1)});
+    vm.runInContext(realFunction(consentSource,'consentRiskLayout'),ctx);
+    const l=ctx.consentRiskLayout();
+    assert.ok(l.bodyHeight+0.01>=4*l.lineHeight,'four whole lines');
+    assert.equal(body.style['--risk-solid'],4*l.lineHeight+'px','fade begins below line four');
+    assert.ok(l.body+l.bodyHeight<=638);assert.equal(l.notice,642);
+    assert.ok(l.notice+44/0.790<694+4,'full notice is above agreement');
+    assert.ok(694+44/0.790<756,'agreement above Not now');
+    assert.ok(756+44/0.790<844,'44pt Not now inside screen');
+    body.scrollTop=body.scrollHeight-l.bodyHeight;
+    assert.equal(body.scrollTop+l.bodyHeight,body.scrollHeight,'all legal text reachable');
+  });
+}

@@ -41,8 +41,23 @@
 #companion-read-all{margin:4px auto 0}
 .quiet-level{color:#F2EDE4!important}
 
-/* Fixture-only review scene, SPEC4.7.6; normal consent bounds/actions are untouched. */
+/* Approved iPhone consent composition, SPEC4.7.6. */
 .consent-preview #pill{top:694px;min-height:var(--preview-target);}
 .consent-preview #riskProfile{background:rgba(242,237,228,.06);border-color:rgba(242,237,228,.30);height:var(--preview-target);min-width:var(--preview-target);}
 .consent-preview #notice{height:var(--preview-target);}
 #consent-preview-not-now{position:absolute;left:95px;top:756px;width:200px;height:var(--preview-target);min-height:var(--preview-target);font:400 calc(15px * var(--preview-type))/1.4 var(--sans);color:#F2EDE4!important;z-index:22;pointer-events:auto;}
+
+#stage #title{white-space:normal;text-wrap:balance;}
+#stage #sub{font-size:15px;line-height:21px;}
+#first-run-keyboard{z-index:21;}
+
+/* First-run examples are one whole row; the inactive legacy overflow mask is removed. */
+
+/* Approved consent: the lower fade never dims any of the first four whole lines. */
+.consent-preview #lines .rb.dn{-webkit-mask-image:linear-gradient(to bottom,#000 max(var(--risk-solid),calc(100% - 12px)),transparent);mask-image:linear-gradient(to bottom,#000 max(var(--risk-solid),calc(100% - 12px)),transparent)}
+.consent-preview #lines .rb.up.dn{-webkit-mask-image:linear-gradient(to bottom,transparent,#000 12px,#000 max(var(--risk-solid),calc(100% - 12px)),transparent);mask-image:linear-gradient(to bottom,transparent,#000 12px,#000 max(var(--risk-solid),calc(100% - 12px)),transparent)}
+.consent-preview #hint{top:376px;}
+#stage #hint{font-size:max(11px,calc(11px / var(--first-fit,1)));line-height:max(13px,calc(14px / var(--first-fit,1)));}
+
+#stage:not(.consent-preview) #hint{top:calc(741px - 28px / var(--first-fit,1));height:calc(28px / var(--first-fit,1));}
+#stage #hint .roll,#stage #hint .roll>span{height:calc(28px / var(--first-fit,1));line-height:calc(14px / var(--first-fit,1));}

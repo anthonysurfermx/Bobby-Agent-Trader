@@ -226,7 +226,14 @@ export function askStartCases(kit) {
     assert.equal(state(another), 'TYPING');
     another.nodes.get('ta').value = 'and the volume';
     await taken(another, 'tok-3', 'TYPING over a read');
-    assert.deepEqual(asksOf(another).map((ask) => Object.keys(ask).sort().join()), [kit.confirm ? 'chip,confirm,question' : 'chip,question', 'token']);
+    assert.deepEqual(asksOf(another).map((ask) => Object.keys(ask).sort().join()), [kit.confirm ? 'chip,companion,question' : 'chip,question', 'token']);
+    if (kit.confirm) {
+      const asset = await idle();
+      const chip = chipsOf(asset).find(node => node.textContent === 'NVIDIA');
+      assert.ok(chip, 'an asset of the same row'); tap(asset, chip);
+      assert.deepEqual(Object.keys(asksOf(asset)[0]).sort(), ['chip', 'confirm', 'question']);
+      assert.deepEqual(asset.errors, []);
+    }
     assert.deepEqual(empty.errors.concat(words.errors, another.errors), []);
   });
 
@@ -346,7 +353,7 @@ export function askStartCases(kit) {
   test('a row rebuilt under a native sheet draws nothing out of place, and is right again when the sheet has gone', async () => {
     const app = await idle({ seed: (session) => { session.nudge = { id: 'harness.move.nvda', text: 'NVDA +2.3% since you asked', cta: 'See your week' }; } });
     app.advance(1); await flush();
-    assert.deepEqual(rowOf(app), ['See your week', 'NVIDIA', ...(kit.confirm ? ['Bitcoin','Ethereum'] : ['BTC','ETH'])]);
+    assert.deepEqual(rowOf(app), kit.confirm ? ['See your week', 'What is investing?'] : ['See your week', 'NVIDIA', 'BTC', 'ETH']);
     const settled = (nodes) => { const places = nodes.map(placeOf); return nodes.every(drawn) && places.every(Boolean) && new Set(places.map(String)).size === nodes.length; };
     assert.ok(settled(chipsOf(app)), 'on the home every chip is drawn in a place of its own');
     // The tap on the nudge's button: native opens its sheet, retires the nudge and sends the session again.
@@ -357,17 +364,17 @@ export function askStartCases(kit) {
     const frozen = app.context.nucleo.time();
     app.advance(3); await flush();
     assert.equal(app.context.nucleo.time(), frozen, 'the loop stands still under the sheet');
-    assert.ok(chipsOf(app).length >= 3, 'the row was rebuilt under the sheet');
+    assert.ok(kit.confirm ? chipsOf(app).length === 2 : chipsOf(app).length >= 3, 'the row was rebuilt under the sheet');
     for (const node of chipsOf(app)) assert.ok(!drawn(node), node.textContent + ': not drawn while nothing can place it');
     assert.ok(!drawn(app.nodes.get('eyebrow')), 'and the line above the row waits with it');
     // The sheet goes: the row is the new one, each chip in its place.
     emit(app, 'native.sheet', { route: 'followUp', state: 'closed' });
     await flush(); app.advance(2.5); await flush();
-    assert.deepEqual(rowOf(app), ['NVIDIA', ...(kit.confirm ? ['Bitcoin','Ethereum'] : ['BTC','ETH'])]);
+    assert.deepEqual(rowOf(app), kit.confirm ? ['What is investing?', 'NVIDIA'] : ['NVIDIA', 'BTC', 'ETH']);
     assert.ok(settled(chipsOf(app)), 'drawn, each in its place');
     const places = chipsOf(app).map(placeOf);
     assert.ok(places.every((at, index) => at[1] === places[0][1] && (index === 0 || at[0] > places[index - 1][0])), 'one row, left to right');
-    assert.ok(drawn(app.nodes.get('eyebrow')));
+    assert.equal(drawn(app.nodes.get('eyebrow')), !kit.confirm);
     assert.deepEqual(app.errors, []);
   });
 

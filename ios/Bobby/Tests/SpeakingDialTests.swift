@@ -18,6 +18,16 @@ final class SpeakingDialTests: XCTestCase {
     func testAccountsKeepSeparateChoicesAndUnknownValuesDoNotReplaceThem() {
         withDial { d in d.choose("plain", owner: "a"); d.choose("technical", owner: "b"); d.choose("unknown", owner: "a"); XCTAssertEqual(d.value("a"), "plain"); XCTAssertEqual(d.value("b"), "technical"); XCTAssertNil(d.value(nil)); XCTAssertNotEqual(d.tag("a"), d.tag("b")) }
     }
+    func testDeliveredReadOrderingIsOwnerScopedAndSurvivesRestart() {
+        withDial { d in
+            XCTAssertFalse(d.hasDeliveredRead(nil)); XCTAssertFalse(d.hasDeliveredRead("a"))
+            d.delivered("read-a", owner: "a")
+            XCTAssertTrue(SpeakingDial(defaults: d.defaults).hasDeliveredRead("a"))
+            XCTAssertFalse(d.hasDeliveredRead("b")); XCTAssertFalse(d.hasDeliveredRead(nil))
+            d.delivered("guest-read", owner: nil); XCTAssertTrue(d.hasDeliveredRead(nil))
+            XCTAssertFalse(d.hasDeliveredRead("b"))
+        }
+    }
     func testThirdDistinctReadOffersOneRefinementOnly() {
         withDial { d in d.delivered("1", owner: "a"); d.delivered("1", owner: "a"); d.delivered("2", owner: "a"); XCTAssertEqual(d.json("a")["refine"] as? Bool, false); d.delivered("3", owner: "a"); XCTAssertEqual(d.json("a")["refine"] as? Bool, true); XCTAssertEqual(d.json("b")["refine"] as? Bool, false); d.choose("terms", owner: "a", feedback: true); d.delivered("4", owner: "a"); XCTAssertEqual(d.json("a")["refine"] as? Bool, false) }
     }

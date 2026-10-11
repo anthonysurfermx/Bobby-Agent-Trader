@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import plistlib
 import re
+import signal
 import shutil
 import subprocess
 import sys
@@ -34,6 +35,7 @@ def main():
     parser.add_argument('--device', choices=['se', 'pro', 'all'], default='all')
     parser.add_argument('--text-size', choices=['default', '+1'], default='default')
     parser.add_argument('--test', '--tests', dest='tests', action='append', help='UI test class or Class/method; repeat or comma-separate (default RedesignShots)')
+    parser.add_argument('--record', action='store_true', help='Record the full selected UI run (offline simulator)')
     parser.add_argument('--cleanup', action='store_true', help='Delete only simulators created by this invocation')
     parser.add_argument('--derived-data', type=Path, default=HARNESS / 'ios/dd')
     parser.add_argument('--package-cache', type=Path, default=Path.home() / 'Library/Developer/Xcode/DerivedData/Bobby-ebrmosnbrttmoldliysreeksjobv/SourcePackages')
@@ -53,6 +55,7 @@ def main():
     except FileExistsError: parser.error(f'Simulator is in use (lock: {lock}); do not run concurrently')
     created, phones, active = [], {}, None
     result = None
+    recording = None
     try:
         if shutil.disk_usage(HARNESS).free < 5 * 1024**3:
             raise RuntimeError('Less than 5 GiB free: clean owned result bundles before capturing')
@@ -116,8 +119,12 @@ def main():
                            '-testLanguage', args.language, '-testRegion', LOCALES[args.language].split('_')[1]]
                 command += ['-only-testing:' + (t if t == 'BobbyTests' or t.startswith(('BobbyUITests/', 'BobbyTests/')) else 'BobbyUITests/' + t) for t in tests]
                 command += ['-skip-testing:BobbyUITests/CompanionBuild69UITests/' + t for t in skips]
+                if args.record:
+                    recording=subprocess.Popen(['xcrun','simctl','io',udid,'recordVideo','--codec=h264',str(folder/'recording.mp4')],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
                 with (folder / 'test.log').open('w') as log:
                     outcome = subprocess.run([str(x) for x in command + ['test-without-building']], text=True, stdout=log, stderr=subprocess.STDOUT)
+                if recording:
+                    recording.send_signal(signal.SIGINT);recording.wait(timeout=20);recording=None
                 if not result.is_dir(): raise RuntimeError(f'No result bundle; see {folder / "test.log"}')
                 summary = data(['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', result])
                 (folder / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
@@ -160,6 +167,8 @@ def main():
         finally:
             plan.unlink(missing_ok=True)
     finally:
+        if recording:
+            recording.send_signal(signal.SIGINT);recording.wait(timeout=20)
         if result and result.exists(): shutil.rmtree(result)
         if active: subprocess.run(['xcrun', 'simctl', 'shutdown', active], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if args.cleanup:

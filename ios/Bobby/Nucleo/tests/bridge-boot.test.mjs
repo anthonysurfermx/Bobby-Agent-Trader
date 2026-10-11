@@ -236,7 +236,7 @@ test('a native nudge is the first idle chip, its line is the eyebrow, and every 
   app.boot(); await flush(); app.advance(1.2); await flush();
   assert.equal(app.context.nucleo.state(), 'IDLE');
   const chips = chipsOf(app);
-  assert.equal(chips.length, 1);
+  assert.equal(chips.length, 2);
   assert.equal(chips[0].textContent, 'Remember it');
   assert.match(chips[0].className, /\bnudge\b/);
   assert.equal(chips[0].getAttribute('aria-label'), 'I can pick this up next time. Remember it');
@@ -290,7 +290,7 @@ test('no nudge, a malformed nudge or one without a button draws nothing and repo
     const app = harness();
     if (nudge !== undefined) app.session.nudge = nudge;
     app.boot(); await flush(); app.advance(1.2); await flush();
-    assert.equal(chipsOf(app).length, 0, JSON.stringify(nudge));
+    assert.equal(nudgeChips(app).length, 0, JSON.stringify(nudge));
     assert.equal(app.calls.filter((call) => call.method.startsWith('nudge.')).length, 0, JSON.stringify(nudge));
     assert.deepEqual(app.errors, []);
   }
@@ -496,9 +496,9 @@ test('a restored read stands at the hand-back with its row at once, and never wi
 // for a question the person asked by themselves, so it starts no chain of follow-ups (ARCHITECTURE.md §3.5) ----
 test('a one-tap chip tells native the words were Bobby’s; a typed question and “another question” do not', async () => {
   const app = await idle();
-  assert.deepEqual(rowOf(app), ['NVIDIA', 'Bitcoin', 'Ethereum']);
+  assert.deepEqual(rowOf(app), ['What is investing?', 'NVIDIA']);
   tap(app, chipsOf(app)[1]);
-  assert.deepEqual(asksOf(app), [{ question: 'How is Bitcoin looking?', chip: true, confirm: true }], 'an asset of the idle home');
+  assert.deepEqual(asksOf(app), [{ question: 'How is NVIDIA looking?', chip: true, confirm: true }], 'an asset of the idle home');
   await handBack(app, okRead({ synthesis: synthesis(NEXT.en.question) }));
   assert.deepEqual(rowOf(app), [NEXT.en.question, 'Another question about NVDA', 'How is BTC looking?']);
   tap(app, chipsOf(app)[2]);
@@ -539,20 +539,20 @@ test('with no read left the idle home shows no asset chip; they come back when a
   app.session.oneTap = false;
   app.boot(); await flush(); app.advance(1.2); await flush();
   assert.equal(app.context.nucleo.state(), 'IDLE');
-  assert.deepEqual(rowOf(app), [], 'nothing to tap that would end on the sign-in or the paywall');
+  assert.deepEqual(rowOf(app), ['What is investing?'], 'education remains without inviting a market wall');
   // A nudge is native's own line and stays (it never starts a read by itself).
   app.context.nucleoBridge.emit('session.changed', { ...app.session, nudge: { id: 'memory.offer', text: 'I can pick this up next time', cta: 'Remember it' } });
   await flush();
-  assert.deepEqual(rowOf(app), ['Remember it']);
+  assert.deepEqual(rowOf(app), ['Remember it', 'What is investing?']);
   // Reads are back (a new week, a gift, Bobby Pro): native stops saying no and the row returns.
   const open = { ...app.session }; delete open.oneTap;
   app.context.nucleoBridge.emit('session.changed', open);
   await flush(); app.advance(1.0); await flush();
-  assert.deepEqual(rowOf(app), ['NVIDIA', 'Bitcoin', 'Ethereum']);
+  assert.deepEqual(rowOf(app), ['What is investing?', 'NVIDIA']);
   // And the other way: the last read was spent while the home was showing.
   app.context.nucleoBridge.emit('session.changed', { ...open, oneTap: false });
   await flush(); app.advance(1.0); await flush();
-  assert.deepEqual(rowOf(app), []);
+  assert.deepEqual(rowOf(app), ['What is investing?']);
   assert.equal(asksOf(app).length, 0);
   assert.deepEqual(app.errors, []);
 });

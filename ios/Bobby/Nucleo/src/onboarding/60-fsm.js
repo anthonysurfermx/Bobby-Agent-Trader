@@ -786,13 +786,13 @@ function closeActive(){ var s = W.state; return isOn('dock') && (s === 'RESOLVIN
 function wireEvents(){
   if (!BR) return;
   BR.on('session.changed', function(s){ applySession(s); });
-  BR.on('app.state', function(p){ W.bg = p && p.state === 'background'; if (W.bg){ W.speechDraft = ''; W.draftEpoch = (W.draftEpoch || 0) + 1; } if (W.bg && W.state === 'LISTENING') cancelListening(); });
+  BR.on('app.state', function(p){ W.bg = p && p.state === 'background'; if (W.bg && typeof TALK_MODE !== 'undefined' && TALK_MODE === 'tap' && W.state === 'LISTENING') firstRunAutoStop('cap.stopped'); else if (W.bg && (typeof TALK_MODE === 'undefined' || TALK_MODE === 'hold')){ W.speechDraft = ''; W.draftEpoch = (W.draftEpoch || 0) + 1; if (W.state === 'LISTENING') cancelListening(); } });
   BR.on('account.changed', function(){ W.speechDraft = ''; W.draftEpoch = (W.draftEpoch || 0) + 1; typeIn.value = ''; typeAutosize(); });
   BR.on('ask.stage', function(p){ if (p && p.stage === 'accepted' && W.state === 'RESOLVING') go('THINK_WAIT'); });
   BR.on('speech.level', function(p){ W.micLevel = p && fin(p.level) ? p.level : 0; W.micLevelT = T; });
   BR.on('speech.partial', function(p){ if (W.state === 'LISTENING' && p){ W.speechText = String(p.text || ''); updateWords(p.text); } });
   BR.on('speech.final', function(p){ onSpeechFinal(p && p.text); });
-  BR.on('speech.error', function(p){ if (W.state === 'LISTENING'){ if (p && p.code === 'interrupted') W.speechDraft = W.speechText || ''; cancelListening(Ls('hint.sttError')); } });
+  BR.on('speech.error', function(p){ if (W.state === 'LISTENING'){ if (typeof TALK_MODE !== 'undefined' && TALK_MODE === 'tap') firstRunAutoStop(p && p.reason === 'minute' ? 'cap.minute' : 'cap.stopped'); else { if (p && p.code === 'interrupted') W.speechDraft = W.speechText || ''; cancelListening(Ls('hint.sttError')); } } });
   ['voice.start', 'voice.level', 'voice.progress', 'voice.word', 'voice.end'].forEach(function(n){
     BR.on(n, function(p){ if (p && typeof p.id === 'string' && p.id.indexOf('preview-') === 0){ if (n === 'voice.level'){ W.pvLevel = fin(p.level) ? p.level : 0; W.pvLevelT = T; } return; } onVoice(n, p); });
   });

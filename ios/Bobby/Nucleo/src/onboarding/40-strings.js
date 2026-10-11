@@ -8,6 +8,14 @@
    ============================================================ */
 var STR = {
   en: {
+    "aria.type": "Type",
+    "follow.how": "How is {symbol} looking?",
+    "ex.1": "What is investing?",
+    "ex.2": "What is a stock?",
+    "ex.3": "What is inflation?",
+    "ex.4": "What is an index fund?",
+    "ex.5": "What does risk mean?",
+    "ex.6": "Why do prices move?",
     "status.preparing": "Preparing your answer…",
     "risk.notNow": "Not now",
     "risk.kept": "Nothing was sent. Your question is still here.",
@@ -103,6 +111,14 @@ var STR = {
     'pause': 'Paused'
   },
   es: {
+    "aria.type": "Escribir",
+    "follow.how": "¿Cómo se ve {symbol}?",
+    "ex.1": "¿Qué es invertir?",
+    "ex.2": "¿Qué es una acción?",
+    "ex.3": "¿Qué es la inflación?",
+    "ex.4": "¿Qué es un fondo indexado?",
+    "ex.5": "¿Qué significa riesgo?",
+    "ex.6": "¿Por qué se mueven los precios?",
     "status.preparing": "Preparando tu respuesta…",
     "risk.notNow": "Ahora no",
     "risk.kept": "No se envió nada. Tu pregunta sigue aquí.",
@@ -199,6 +215,14 @@ var STR = {
   }
 ,
   fr: {
+    "aria.type": "Écrire",
+    "follow.how": "Que penser de {symbol} ?",
+    "ex.1": "C’est quoi, investir ?",
+    "ex.2": "C’est quoi, une action ?",
+    "ex.3": "C’est quoi, l’inflation ?",
+    "ex.4": "C’est quoi, un fonds indiciel ?",
+    "ex.5": "Que veut dire « risque » ?",
+    "ex.6": "Pourquoi les prix bougent ?",
     "status.preparing": "Je prépare ta réponse…",
     "risk.notNow": "Pas maintenant",
     "risk.kept": "Rien n’a été envoyé. Ta question est toujours là.",
@@ -296,6 +320,14 @@ var STR = {
     "pause": "En pause"
   },
   pt: {
+    "aria.type": "Escrever",
+    "follow.how": "Como está {symbol}?",
+    "ex.1": "O que é investir?",
+    "ex.2": "O que é uma ação?",
+    "ex.3": "O que é a inflação?",
+    "ex.4": "O que é um fundo indexado?",
+    "ex.5": "O que significa risco?",
+    "ex.6": "Porque é que os preços se movem?",
     "status.preparing": "A preparar a tua resposta…",
     "risk.notNow": "Agora não",
     "risk.kept": "Nada foi enviado. A tua pergunta continua aqui.",
@@ -394,6 +426,14 @@ var STR = {
   }
 ,
   it: {
+    "aria.type": "Scrivi",
+    "follow.how": "Come sta andando {symbol}?",
+    "ex.1": "Che cos’è investire?",
+    "ex.2": "Che cos’è un’azione?",
+    "ex.3": "Che cos’è l’inflazione?",
+    "ex.4": "Che cos’è un fondo indicizzato?",
+    "ex.5": "Cosa significa rischio?",
+    "ex.6": "Perché i prezzi si muovono?",
     "status.preparing": "Preparo la tua risposta…",
     "risk.notNow": "Non ora",
     "risk.kept": "Non è stato inviato nulla. La tua domanda è ancora qui.",
@@ -491,6 +531,14 @@ var STR = {
     "pause": "In pausa"
   },
   de: {
+    "aria.type": "Schreiben",
+    "follow.how": "Wie steht es um {symbol}?",
+    "ex.1": "Was heißt investieren?",
+    "ex.2": "Was ist eine Aktie?",
+    "ex.3": "Was ist Inflation?",
+    "ex.4": "Was ist ein Indexfonds?",
+    "ex.5": "Was bedeutet Risiko?",
+    "ex.6": "Warum bewegen sich Preise?",
     "status.preparing": "Ich bereite deine Antwort vor…",
     "risk.notNow": "Jetzt nicht",
     "risk.kept": "Es wurde nichts gesendet. Deine Frage ist noch da.",

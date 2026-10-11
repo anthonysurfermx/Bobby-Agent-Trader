@@ -18,6 +18,7 @@ const nativeText = file => fs.readFileSync(path.join(ios, file),'utf8');
 const copyNative = nativeText('Sources/Nucleo/ConversationCopy.swift');
 const levelNative = nativeText('Sources/Nucleo/NucleoLevels.swift');
 const pairs = {
+  ready: copyNative.match(/static func ready[^\n]+L\.t\("([^"]+)", "([^"]+)"/).slice(1,3),
   read: copyNative.match(/static func readLabel[^\n]+L\.t\("([^"]+)", "([^"]+)"/).slice(1,3),
   deep: levelNative.match(/case \.profundo: return L\.t\("([^"\n]+)", "([^"\n]+)"/).slice(1,3),
   quick: levelNative.match(/case \.rapido: return L\.t\("([^"]+)", "([^"]+)"/).slice(1,3)
