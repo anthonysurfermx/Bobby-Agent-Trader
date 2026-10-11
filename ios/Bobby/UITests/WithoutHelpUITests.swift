@@ -551,12 +551,30 @@ final class MemoryInvitationShots: ConversationFixtureCase {
         XCTAssertTrue(button("aria.closeAnswer").exists);XCTAssertFalse(exitScene.exists)
     }
     func test10MoneyNeverChains() { openQuestion("money");shot("13-money-question");let option=option("under_2y",field:"when");ready(option);option.tap();ready(noted);shot("14-noted-one-option");XCTAssertFalse(exitScene.exists) }
+    func sphereVisible() {
+        let image=app.screenshot().image.cgImage!,data=image.dataProvider!.data!,bytes=CFDataGetBytePtr(data)!
+        var colors=0
+        for y in stride(from:image.height*12/100,to:image.height*40/100,by:4) {
+            for x in stride(from:image.width*30/100,to:image.width*65/100,by:4) {
+                let i=y*image.bytesPerRow+x*4,a=Int(bytes[i]),g=Int(bytes[i+1]),b=Int(bytes[i+2])
+                if min(a,b)>70 && max(a,b)-g>25 { colors += 1 }
+            }
+        }
+        XCTAssertGreaterThan(colors,100,"The sphere must remain visibly colored after exploring options")
+    }
     func test11BarrierDragDoesNotChoose() {
         openQuestion("barrier");let options=web.otherElements[copy("options")]
         let start=options.coordinate(withNormalizedOffset:CGVector(dx:0.85,dy:0.5)),end=options.coordinate(withNormalizedOffset:CGVector(dx:0.15,dy:0.5))
-        start.press(forDuration:0.1,thenDragTo:end);XCTAssertTrue(exitScene.exists);XCTAssertFalse(noted.exists);shot("15-long-label-row-scrolled")
+        start.press(forDuration:0.1,thenDragTo:end);sphereVisible();XCTAssertTrue(exitScene.exists);XCTAssertFalse(noted.exists);shot("15-long-label-row-scrolled")
     }
-    func test12LargestList() { openQuestion("barrier",size:"UICTContentSizeCategoryAccessibilityXXXL");shot("16-options-list");web.swipeUp();physicalControls([exitScene]);shot("17-options-list-scrolled") }
+    func test12LargestList() {
+        openQuestion("barrier",size:"UICTContentSizeCategoryAccessibilityXXXL");shot("16-options-list")
+        let first=option("fear_of_loss",field:"barrier")
+        for _ in 0..<2 {
+            web.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.65)).press(forDuration:0.1,thenDragTo:web.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.35)))
+        }
+        ready(first);sphereVisible();physicalControls([first,exitScene]);shot("17-options-list-scrolled")
+    }
     func typeAnswer(_ text: String) {
         web.buttons[copy("typeAnswer")].tap();ready(web.textViews.firstMatch);web.textViews.firstMatch.tap()
         if let intro=app.buttons.matching(NSPredicate(format:"label == 'Continue'")).allElementsBoundByIndex.first(where:{$0.isHittable && $0.frame.minY>app.windows.firstMatch.frame.height*0.7}) { intro.tap() }

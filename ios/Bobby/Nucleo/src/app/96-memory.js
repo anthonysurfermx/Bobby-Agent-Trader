@@ -1,5 +1,6 @@
 /* I-2: native supplies every invitation and owns every counter. The page has no catalog. */
 var MEMORY_SCENE=null,MEMORY_NOTES=[],MEMORY_BUSY=false,MEMORY_SEND_EPOCH=0,MEMORY_AUTO=null;
+var MEMORY_LAYOUT_KEY=null;
 var memoryPanel=mk('section','conversation memory-scene'),memoryScroll=mk('div','memory-scroll'),memoryQuestion=mk('p','conversation-phrase'),memoryWhy=mk('p','memory-why'),memoryError=mk('p','memory-error'),memoryOptions=mk('div','memory-options'),memoryExit=mk('button','quiet-link');
 memoryPanel.id='companion-question-scene';memoryQuestion.id='companion-question';memoryError.id='companion-answer-error';memoryOptions.id='companion-options';memoryExit.id='companion-not-now';
 [memoryQuestion,memoryWhy,memoryError,memoryOptions].forEach(function(e){memoryScroll.appendChild(e);});memoryPanel.appendChild(memoryScroll);memoryPanel.appendChild(memoryExit);uiEl.appendChild(memoryPanel);memoryPanel.style.display='none';
@@ -34,10 +35,12 @@ function memoryPaint(){
  if(!MEMORY_SCENE)return;var q=MEMORY_SCENE;memoryQuestion.textContent=q.text;memoryWhy.textContent=q.why||'';memoryError.textContent=GUIDE_ANSWER_ERROR;memoryExit.textContent=guideWords().notNow;
  memoryOptions.textContent='';memoryOptions.setAttribute('role','group');memoryOptions.setAttribute('aria-label',guideWords().options);
  q.options.forEach(function(o,i){var b=mk('button','memory-choice',o.label);b.id='companion-option-'+o.id;b.type='button';b.setAttribute('aria-label',o.label);b.setAttribute('aria-posinset',i+1);b.setAttribute('aria-setsize',q.options.length);quietAction(b,function(){memoryAnswer(o.id,null,b);});b.disabled=MEMORY_BUSY;memoryOptions.appendChild(b);});memoryExit.disabled=MEMORY_BUSY;
- memoryLayout();conversationBorn(memoryQuestion,'sphere',32);at(.07,function(){if(MEMORY_SCENE===q)conversationBorn(memoryWhy,'sphere');});conversationBorn(memoryOptions,'pill');conversationBorn(memoryExit,'pill');
+ MEMORY_LAYOUT_KEY=null;memoryLayout();conversationBorn(memoryQuestion,'sphere',32);at(.07,function(){if(MEMORY_SCENE===q)conversationBorn(memoryWhy,'sphere');});conversationBorn(memoryOptions,'pill');conversationBorn(memoryExit,'pill');
 }
 function memoryLayout(){
- if(!MEMORY_SCENE)return;var scale=Math.max(.5,fitS||1),k=(SES&&SES.textScale||1)/scale,target=44/scale;
+ if(!MEMORY_SCENE)return;
+ var layoutKey=[fitS,SES&&SES.textScale,ST.name,MEMORY_SCENE.questionId||MEMORY_SCENE.id,GUIDE_ANSWER_ERROR,memoryOptions.style.display,memoryExit.style.display,memoryWhy.style.display].join('|');
+ if(MEMORY_LAYOUT_KEY===layoutKey)return;MEMORY_LAYOUT_KEY=layoutKey;var scale=Math.max(.5,fitS||1),k=(SES&&SES.textScale||1)/scale,target=44/scale;
  memoryPanel.style.setProperty('--type',k);memoryPanel.style.setProperty('--target',target+'px');memoryQuestion.style.fontSize=26*k+'px';memoryQuestion.style.lineHeight=32*k+'px';memoryWhy.style.font=15*k+'px/'+21*k+'px var(--sans)';memoryExit.style.font=15*k+'px/'+21*k+'px var(--sans)';memoryExit.style.minHeight=target+'px';memoryError.style.font=15*k+'px/'+21*k+'px var(--sans)';
  memoryPanel.classList.remove('memory-list');memoryScroll.style.height='auto';memoryPanel.style.top='300px';
  var options=Array.prototype.slice.call(memoryOptions.children),height=target;
@@ -51,9 +54,20 @@ function memoryLayout(){
 function memoryFade(){var row=memoryOptions;row.style.setProperty('--left-fade',row.scrollLeft>0?'20px':'0px');row.style.setProperty('--right-fade',row.scrollLeft+row.clientWidth<row.scrollWidth-2?'64px':'0px');}
 function memoryListFade(){memoryScroll.style.setProperty('--fade-top',memoryScroll.scrollTop>0?'20px':'0px');memoryScroll.style.setProperty('--fade-bottom',memoryScroll.scrollTop+memoryScroll.clientHeight<memoryScroll.scrollHeight-1?'24px':'0px');}
 memoryScroll.addEventListener('scroll',memoryListFade);
+var memoryListDrag=null;
+memoryScroll.addEventListener('pointerdown',function(e){
+ if(!memoryPanel.classList.contains('memory-list'))return;
+ memoryListDrag={y:e.clientY,top:memoryScroll.scrollTop};
+ if(!e.target.closest('button')){e.stopPropagation();if(e.cancelable)e.preventDefault();try{memoryScroll.setPointerCapture(e.pointerId);}catch(_){}}
+},true);
+memoryScroll.addEventListener('pointermove',function(e){
+ if(!memoryListDrag)return;if(e.cancelable)e.preventDefault();e.stopPropagation();
+ memoryScroll.scrollTop=Math.max(0,memoryListDrag.top+(memoryListDrag.y-e.clientY)/(fitS||1));memoryListFade();
+},true);
+['pointerup','pointercancel'].forEach(function(name){memoryScroll.addEventListener(name,function(){memoryListDrag=null;},true);});
 var memoryDrag=null;
-memoryOptions.addEventListener('pointerdown',function(e){memoryDrag={x:e.clientX,left:memoryOptions.scrollLeft};e.stopPropagation();});
-memoryOptions.addEventListener('pointermove',function(e){if(memoryDrag&&!memoryPanel.classList.contains('memory-list')){memoryOptions.scrollLeft=memoryDrag.left+(memoryDrag.x-e.clientX)/(fitS||1);memoryFade();}e.stopPropagation();});
+memoryOptions.addEventListener('pointerdown',function(e){memoryDrag={x:e.clientX,left:memoryOptions.scrollLeft};},true);
+memoryOptions.addEventListener('pointermove',function(e){if(memoryDrag&&!memoryPanel.classList.contains('memory-list')){if(e.cancelable)e.preventDefault();memoryOptions.scrollLeft=memoryDrag.left+(memoryDrag.x-e.clientX)/(fitS||1);memoryFade();}e.stopPropagation();});
 ['pointerup','pointercancel'].forEach(function(n){memoryOptions.addEventListener(n,function(e){memoryDrag=null;e.stopPropagation();});});memoryOptions.addEventListener('scroll',memoryFade);
 function memoryAnswer(value,text,button){
  if(!MEMORY_SCENE||MEMORY_BUSY)return;MEMORY_BUSY=true;GUIDE_ANSWER_ERROR='';var q=MEMORY_SCENE,epoch=++MEMORY_SEND_EPOCH,params={questionId:q.questionId||q.id};if(text!=null)params.text=text.slice(0,400);else params.value=value;

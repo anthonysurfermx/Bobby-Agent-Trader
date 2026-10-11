@@ -903,3 +903,15 @@ test('I-2: sending once can be cancelled and a late answer never replaces the re
  finish({status:'noted',note:{field:'interest',label:'Crypto',source:'said'},next:null});await flush();
  assert.equal(app.context.nucleo.state(),'TYPING');assert.equal(app.nodes.get('ta').value,'my private words');assert.deepEqual(app.errors,[]);
 });
+
+
+test('I-2: dragging the accessibility list preserves its scroll position across animation frames',async()=>{
+ const app=await idle({measure:node=>node.id==='companion-question-scene'?450:60});memoryStrings(app);app.session.textScale=2;
+ await companionReply(app,{status:'companion',gist:'Learning.',text:'Learning. Explanation.',invitation:interestQuestion});app.advance(2);await flush();guideActionsOf(app).children[0]._guideAction();await flush();
+ const panel=memoryPanelOf(app),scroll=panel.children[0];scroll.scrollTop=0;scroll.scrollHeight=1000;scroll.clientHeight=200;
+ let height=scroll.style.height;Object.defineProperty(scroll.style,'height',{get:()=>height,set:value=>{height=value;if(value==='auto')scroll.scrollTop=0;},configurable:true});
+ scroll.listeners.pointerdown({clientY:500,target:scroll,cancelable:true,preventDefault(){},stopPropagation(){}});
+ scroll.listeners.pointermove({clientY:200,cancelable:true,preventDefault(){},stopPropagation(){}});
+ scroll.listeners.pointerup();const after=scroll.scrollTop;assert.ok(after>0);app.advance(1);assert.equal(scroll.scrollTop,after);
+ assert.equal(app.calls.filter(c=>c.method==='companion.answer').length,0);assert.deepEqual(app.errors,[]);
+});
