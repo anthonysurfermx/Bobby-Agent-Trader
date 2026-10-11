@@ -6,6 +6,13 @@ import SwiftUI
 import UIKit
 import WebKit
 
+/// WebKit's content view forwards this public getter to its owning web view.
+/// Text editing and outside-tap dismissal remain the normal UIKit/WebKit path.
+@MainActor
+final class NucleoContentWebView: WKWebView {
+    override var inputAccessoryView: UIView? { nil }
+}
+
 @MainActor
 final class NucleoWebController: NSObject, WKNavigationDelegate, WKUIDelegate, NucleoEmitting {
     /// Bundle.main/Nucleo — the only directory the web view may load from.
@@ -39,7 +46,7 @@ final class NucleoWebController: NSObject, WKNavigationDelegate, WKUIDelegate, N
         config.mediaTypesRequiringUserActionForPlayback = []
         config.preferences.javaScriptCanOpenWindowsAutomatically = false
         config.userContentController.addScriptMessageHandler(handler, contentWorld: .page, name: "nucleo")
-        webView = WKWebView(frame: .zero, configuration: config)
+        webView = NucleoContentWebView(frame: .zero, configuration: config)
         super.init()
         webView.navigationDelegate = self
         webView.uiDelegate = self
