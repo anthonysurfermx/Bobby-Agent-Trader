@@ -898,7 +898,7 @@ test('I-2: sending once can be cancelled and a late answer never replaces the re
  await companionReply(app,{status:'companion',gist:'Learning.',text:'Learning. Explanation.',invitation:interestQuestion});app.advance(2);await flush();guideActionsOf(app).children[0]._guideAction();
  keyboardOf(app)._guideAction();app.nodes.get('ta').value='my private words';app.nodes.get('ta').listeners.input();app.nodes.get('taSend').listeners.click({detail:0,stopPropagation(){}});await flush();
  assert.equal(app.context.nucleo.state(),'PERSONAL_SENDING');assert.equal(app.calls.filter(c=>c.method==='companion.answer').length,1);
- app.advance(.6);tap(app,app.nodes.get('pill'));await flush();
+ app.advance(.6);assert.ok(Number(app.nodes.get('pill').querySelector('.stop').style.opacity)>.95,'Cancel must have a settled visible stop icon');tap(app,app.nodes.get('pill'));await flush();
  assert.equal(app.context.nucleo.state(),'TYPING');assert.equal(app.nodes.get('ta').value,'my private words');assert.ok(app.calls.some(c=>c.method==='cancel'));
  finish({status:'noted',note:{field:'interest',label:'Crypto',source:'said'},next:null});await flush();
  assert.equal(app.context.nucleo.state(),'TYPING');assert.equal(app.nodes.get('ta').value,'my private words');assert.deepEqual(app.errors,[]);

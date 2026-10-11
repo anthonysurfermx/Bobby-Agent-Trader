@@ -593,9 +593,22 @@ final class MemoryInvitationShots: ConversationFixtureCase {
         openQuestion("money",scenario:"companion-answer-error");typeAnswer(ownAnswer);web.buttons[copy("answerSend")].tap();ready(web.textViews.firstMatch)
         XCTAssertEqual(web.textViews.firstMatch.value as? String,ownAnswer);ready(web.staticTexts[copy("answerFailed")]);shot("22-answer-error-draft-kept")
     }
+    func stopVisible(_ control: XCUIElement) {
+        let image=app.screenshot().image.cgImage!,data=image.dataProvider!.data!,bytes=CFDataGetBytePtr(data)!
+        let factor=CGFloat(image.width)/app.windows.firstMatch.frame.width
+        let cx=Int(control.frame.midX*factor),cy=Int(control.frame.midY*factor),radius=Int(10*factor)
+        var ink=0
+        for y in stride(from:cy-radius,to:cy+radius,by:2) {
+            for x in stride(from:cx-radius,to:cx+radius,by:2) {
+                let i=y*image.bytesPerRow+x*4
+                if min(bytes[i],min(bytes[i+1],bytes[i+2]))>150 { ink += 1 }
+            }
+        }
+        XCTAssertGreaterThan(ink,20,"Cancel must show its light stop glyph inside the pill")
+    }
     func test17SendingCancelKeepsDraftAndIgnoresLateAnswer() {
         openQuestion("money",scenario:"companion-answer-slow");typeAnswer(ownAnswer)
-        web.buttons[copy("answerSend")].tap();ready(button("aria.cancelQuestion"));shot("25-answer-sending-stop",delay:0)
+        web.buttons[copy("answerSend")].tap();ready(button("aria.cancelQuestion"));Thread.sleep(forTimeInterval:1);stopVisible(button("aria.cancelQuestion"));shot("25-answer-sending-stop",delay:0)
         button("aria.cancelQuestion").tap();ready(web.textViews.firstMatch)
         XCTAssertEqual(web.textViews.firstMatch.value as? String,ownAnswer)
         Thread.sleep(forTimeInterval:1);XCTAssertFalse(noted.exists);shot("26-answer-cancel-draft-kept")

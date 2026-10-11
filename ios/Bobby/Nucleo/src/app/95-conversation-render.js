@@ -21,7 +21,7 @@ function conversationChrome(){
   var height=confirmPanel.offsetHeight,r=clamp((602-12-32-height)/2,Math.max(44,44/scale),98),spare=Math.max(0,602-12-32-height-2*r),top=110+.4*spare;moveSphere(top+r,r);confirmPanel.style.top=(top+2*r+32)+'px';
  }
  if(TALK_MODE==='tap'&&name!=='TYPING'&&name!=='BOOT'){
-  var mode=waiting||speaking?'stop':'mic';if(A.mode!==mode)pillMode(mode);
+  var mode=waiting||name==='PERSONAL_SENDING'||speaking?'stop':'mic';if(A.mode!==mode)pillMode(mode);
   if(!send){op(el.pillMic,mode==='mic'?1:0);op(el.pillStop,mode==='stop'?1:0);op(el.pillKbd,0);op(el.pillThink,0);op(el.pillBars,0);}
  }
  if(name==='TYPING'){
