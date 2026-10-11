@@ -6,7 +6,7 @@ The source is at **1.2.0 (code 10)**, Bobby 1.8, described in the next section. 
 
 ## Bobby 1.8 for Android: version 1.2.0 (code 10)
 
-`app/build.gradle.kts` is at **1.2.0 (10)**. Phones have **1.1.4 (9)**. 1.2.0 is Bobby 1.8 for Android, a port of iOS 1.8 (`ios/Bobby/Sources/V18/`, design law `ios/Bobby/V18-DESIGN.md`): the same rules, limits, ids and words, in six languages. **Nothing of 1.2.0 has been built for release, installed on a real phone, or published.** A debug build runs on CI's emulator (see "What is verified, and what is not").
+`app/build.gradle.kts` is at **1.2.0 (10)**. Phones have **1.1.4 (9)**. 1.2.0 is Bobby 1.8 for Android, a port of iOS 1.8 (`ios/Bobby/Sources/V18/`, design law `ios/Bobby/V18-DESIGN.md`): the same rules, limits, ids and words, in six languages. **An unsigned optimized release has now been built in CI; no 1.2.0 real-phone installation or Play publication is claimed.** The release candidate adds API 35 debug/release instrumentation and six locale captures; current results and policy scope belong to the [Play dossier](../docs/play-store/release-1.2.0/policy-audit.md), separately from the earlier debug evidence below.
 
 ### What a person gets
 
@@ -56,7 +56,7 @@ Nothing polls. A rotation no longer repeats the first row (the activity is not r
 - One package per feature under `v18/`: `credits`, `invite`, `theses`, `memory`, `reminders`, `harness` (the follow-ups). `v18/V18.kt` registers them and holds the few lines where one feature tells another something.
 - The page's side: `session.nudge` in every session state, the bridge methods `nudge.seen` and `nudge.act`, and the event `ask.start`. The page takes `ask.start` from every state in which a new read is what the person expects (a finished read, its cards, an open keyboard, another face of the sphere), as if they had closed what was on the glass and asked: the table is in `ios/Bobby/Nucleo/ARCHITECTURE.md` §9.5, and `nucleo/tests/bridge-android.test.mjs` runs every row of it against this copy. The page may open exactly what 1.1.4 could (`V18Routes.PAGE_OPENABLE`); the seven 1.8 routes are native-only.
 - Screens: `ui/v18/V18Sheets.kt` draws each route from its own file, built with `ui/v18/QuietKit.kt` (nothing green: a colour means a verdict only). The 1.1.4 routes `memory` and `invite` are drawn by the 1.8 screens; `ui/BobbySheet.kt` no longer has them.
-- Local notices: `v18/notify/LocalNotifier.kt` and `platform/AndroidLocalNotifier.kt`. WorkManager one-time work, two channels (`thesis-reminders`, `follow-ups`), no exact alarms, no boot receiver, no new permission.
+- Local notices: `v18/notify/LocalNotifier.kt` and `platform/AndroidLocalNotifier.kt`. WorkManager one-time work, two channels (`thesis-reminders`, `follow-ups`), no exact alarms, no Bobby-owned boot receiver, no new runtime permission. WorkManager may merge its own scheduling/boot components; inspect the final merged manifest.
 - Words: `python3 android/tools/build-v18-translations.py` merges every iOS 1.8 translation row into `assets/nucleo/native-android-translations.json`, sorted (`--check` verifies). Rows that name an iPhone, an Apple Account or the App Store are replaced by the Android wording in `android/tools/v18-android-wording.json`. To add a string iOS does not have, add its row to the JSON and run the script.
 
 ### Notifications on a phone that runs late
@@ -312,7 +312,7 @@ Also open and the owner's call: `GET /api/bobby-access` reports no Google paymen
 - A follow-up notice's tap landing on the glass, a real lock screen showing its public version, "Open Settings", a denied permission.
 - TalkBack order and speech; French, Portuguese, Italian and German on a screen; a tablet; any real phone's own fonts and system skin.
 
-**Never built:** a release. CI builds debug only, so R8 and resource shrinking never ran on the 1.8 classes. No signed APK or AAB of 1.2.0 exists, and nothing was uploaded to Play.
+**Release candidate update (2026-10-11):** CI [38137329823](https://github.com/anthonysurfermx/Bobby-Agent-Trader/actions/runs/38137329823) built the R8/resource-shrunk app, unsigned AAB/universal APK, debug/release JVM tests and lint in FCM-off and FCM-on configurations. The FCM-off bundle passed unsigned/manifest/assets/ELF alignment checks. The final candidate additionally runs debug API 34/35, minified release API 35 and six locale release journeys; their actual results and final artifact provenance are handed off through the Play dossier/status log, not inferred from compilation. Test signing is runner-only and disposable. Claude signs the upload artifacts; no Play publication is made here.
 
 **Not reviewed by a native speaker:** the Android wording of the 18 rows that named Apple hardware or stores on iOS, and three Memory rows, in French, Portuguese, Italian and German; the count of follow-ups as a tally in French, Portuguese and Italian; and the Portuguese word for the phone, "telefone" in every row since the second pass ("telemóvel" reads as European Portuguese only; a Brazilian reader says "celular", and both accept "telefone").
 

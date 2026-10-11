@@ -220,6 +220,9 @@ class V18ScreensInstrumentedTest(private val language: String) {
         assertShown("thesis-review-keep")
         assertShown("thesis-review-footer")
         shot("review-after")
+        tap("thesis-review-report")
+        compose.waitUntil(20_000) { stage.route == "reportContent" }
+        assertEquals("Reporting must not ask for another AI review", 1, stage.network.calls.count { it.method == "POST" && it.path == DEBATE })
     }
 
     // ---- Memory ----

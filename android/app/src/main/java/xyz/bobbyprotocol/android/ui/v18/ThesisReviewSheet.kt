@@ -318,6 +318,7 @@ private fun PastRow(host: V18Host, copy: ThesisCopy, revision: ThesisRevision, o
                 Text(name, Modifier.padding(top = 4.dp), color = QuietColors.dim, fontSize = 13.sp)
                 for (item in list.items) Text(item, color = QuietColors.muted, fontSize = 14.sp, lineHeight = 20.sp)
             }
+            QuietChip(host.text("Report this answer", "Reportar esta respuesta"), "thesis-review-past-report-" + revision.id) { host.switchSheet("reportContent") }
         }
     }
 }
