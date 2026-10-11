@@ -126,7 +126,12 @@ final class NucleoSession: ObservableObject {
     private var suggestionsCache: (at: Date, value: [String: Any])?
     let companionPilot = CompanionPilot()
     let companionContext: CompanionContextStore
+    lazy var companionPacing = CompanionPacing(defaults: defaults)
     private var companionAwaitingConsent = false
+    private var companionConsentAccepted = false
+    private var companionSceneStarted = false
+    private var companionAnswerEpoch = 0
+    var companionNotesField: String?
     private var companionQuestionId: String?
     private var vocabularyTask: Task<Void, Never>?
     private var bootSynced = false
@@ -157,7 +162,12 @@ final class NucleoSession: ObservableObject {
         self.telemetry = telemetry
         if fixtures || BobbyApp.isUnitTestHost {
             var data: Data?
-            companionContext = CompanionContextStore(read: { data }, write: { data = $0; return true })
+            companionContext = CompanionContextStore(read: { data }, write: {
+#if DEBUG
+                if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-memory-save-failure") { return false }
+#endif
+                data = $0; return true
+            })
         } else {
 #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-qa-companion-live"),
@@ -209,6 +219,30 @@ final class NucleoSession: ObservableObject {
 #endif
         desk = NucleoDesk(profile: profile, companions: companions, ledger: ledger, fixtures: fixtures)
         nucleoVoice = NucleoVoice(voice: voice)
+#if DEBUG
+        if fixtures {
+            companionPacing.reset()
+            if let scene = BobbyApp.argument(after: "-qa-memory-fixture") {
+                _ = companionPacing.delivered()
+                if scene == "dial" { companionContext.choose(false); companionPacing.declined() }
+                else if scene != "remember" {
+                    companionContext.choose(true); companionContext.answered()
+                    let before: [String]
+                    switch scene {
+                    case "barrier": before = ["interest"]
+                    case "money": before = ["interest", "barrier"]
+                    case "fall": before = ["interest", "barrier", "when", "cushion", "hurry"]
+                    default: before = []
+                    }
+                    if scene == "fall" {
+                        let now = Date(); companionContext.choose(true, now: now.addingTimeInterval(-2*86400))
+                        companionContext.opened(now: now.addingTimeInterval(-86400)); companionContext.opened(now:now); companionContext.answered()
+                    }
+                    for id in before { companionContext.answer(id,value:nil) }
+                }
+            }
+        }
+#endif
         desk.pilot = companionPilot
         companionPilot.transport = { [weak companionPilot] path, method, body in
             let response = try await BobbyAPI.responseWithHeaders(path, method: method, body: body,
@@ -349,34 +383,64 @@ final class NucleoSession: ObservableObject {
             }
 #endif
             return try await desk.ask(p)
+        case "companion.invite":
+            guard profile.acceptedRiskNotice, !companionContext.accepted,
+                  companionContext.allows(companionPilot.capability), CompanionCopy.consent.count == 7,
+                  sheet == nil, openSheet == nil, !desk.isBusy else { return ["status": "unavailable"] }
+            companionPacing.tapInvite()
+            companionAwaitingConsent = true; companionConsentAccepted = false
+            guard openNative(.companionConsent) else { return ["status": "unavailable"] }
+            return ["status": "opened"]
+        case "companion.notes":
+            guard companionContext.accepted, sheet == nil, openSheet == nil else { return ["status": "idle"] }
+            companionNotesField = try p.string("field", required: false, maxLength: 32)
+            _ = openNative(.companionNotes)
+            return ["status": "opened"]
         case "companion.presented":
-            return ["status": "idle"] // I-1: no automatic consent or personal question.
+            if let kind = try p.string("kind", required: false, oneOf: ["invite", "dial"]) {
+                if try p.bool("opened", required: false) == true { companionPacing.tappedChip() }
+                else { companionPacing.shown(kind) }
+
+            } else if let id = try p.string("questionId", required: false, maxLength: 32),
+                      let question = CompanionCatalog.question(id), companionContext.accepted {
+                if try p.bool("opened", required: false) == true {
+                    if !companionSceneStarted { companionPacing.scene(question); companionSceneStarted = true }
+                } else {
+                    companionQuestionId = id; companionSceneStarted = false; companionPacing.shown(question)
+                }
+            }
+            return ["status": "idle"]
         case "companion.answer":
             let id = try p.string("questionId", maxLength: 32)!
-            guard companionContext.allows(companionPilot.capability), companionQuestionId == id, companionContext.next(preferred: id)?.id == id else {
-                throw NucleoFault.invalid("no current check-in")
+            guard profile.acceptedRiskNotice, companionContext.accepted,
+                  companionContext.allows(companionPilot.capability), companionQuestionId == id,
+                  let question = CompanionCatalog.question(id) else { throw NucleoFault.invalid("no current check-in") }
+            if !companionSceneStarted { companionPacing.scene(question); companionSceneStarted = true }
+            if try p.bool("rest", required: false) == true {
+                guard companionContext.restQuestion(id) else { return CompanionPilot.answerFailure() }
+                companionQuestionId = nil
+                return ["status": "rested"]
             }
             if let text = try p.string("text", required: false) {
                 guard !p.has("value"), text.utf16.count <= 400 else { return CompanionPilot.answerFailure() }
-                let revision = companionContext.revision
+                let revision = companionContext.revision, answerEpoch = companionAnswerEpoch
                 let reply = await companionPilot.answer(questionId: id, text: text)
-                guard companionContext.revision == revision, companionQuestionId == id else { return NucleoDesk.cancelledResult }
+                guard profile.acceptedRiskNotice, companionAnswerEpoch == answerEpoch, companionContext.revision == revision, companionQuestionId == id else { return NucleoDesk.cancelledResult }
                 guard reply["status"] as? String == "noted", let patch = reply["patch"] as? [String: Any] else { return reply }
-                guard companionContext.apply(patch, for: id) else {
-                    if companionContext.storageError { return ["message": CompanionCopy.text("storageError")] }
-                    return CompanionPilot.answerFailure()
-                }
-                return companionCheckIn(preferred: reply["checkIn"] as? String, afterAnswer: true)
+                guard companionContext.apply(patch, for: id) else { return CompanionPilot.answerFailure() }
+            } else {
+                guard let value = try p.string("value", required: false, maxLength: 64), question.options.contains(where: { $0.id == value }) else { return CompanionPilot.answerFailure() }
+                companionContext.answer(id, value: value)
+                guard !companionContext.storageError else { return CompanionPilot.answerFailure() }
             }
-            let value = try p.string("value", required: false, maxLength: 64)
-            companionContext.answer(id, value: value)
-            if companionContext.storageError { return ["message": CompanionCopy.text("storageError")] }
-            var next = companionCheckIn(afterAnswer: true)
-            if id == "fall", let value, let label = CompanionCatalog.question(id)?.label(value) {
-                next["explanation"] = CompanionCopy.text("exerciseExplanation").replacingOccurrences(of: "{choice}", with: label)
-            }
-            return next
+            companionPacing.noted()
+            let note = companionContext.state.notes.first { $0.field == id }!
+            let next = question.money ? nil : companionContext.next(afterAnswer: true)
+            companionQuestionId = next?.id
+            return ["status": "noted", "note": ["field": id, "label": question.label(note.value) ?? question.title, "source": note.source],
+                    "next": next.map { $0.json as Any } ?? NSNull()]
         case "cancel":
+            companionAnswerEpoch += 1
             return desk.cancel()
         case "read.rendered":
             return try desk.readRendered(p)
@@ -541,7 +605,7 @@ final class NucleoSession: ObservableObject {
             "textScale": UIFontMetrics(forTextStyle: .body).scaledValue(for: 17) / 17,
             "exampleIndex": exampleIndex(),
             "hasDeliveredRead": SpeakingDial(defaults: defaults).hasDeliveredRead(fixtures ? nil : AccountSession.shared.session?.userId),
-            "companionPilot": ["limit":companionPilot.limitSnapshot().map { $0 as Any } ?? NSNull(), "strings": CompanionCopy.json, "enabled": companionPilot.capability.known ? companionPilot.capability.enabled as Any : NSNull(), "textScale": UIFontMetrics(forTextStyle: .body).scaledValue(for: 17) / 17],
+            "companionPilot": ["limit":companionPilot.limitSnapshot().map { $0 as Any } ?? NSNull(), "strings": CompanionCopy.json, "memoryAllowed": companionContext.allows(companionPilot.capability), "enabled": companionPilot.capability.known ? companionPilot.capability.enabled as Any : NSNull(), "textScale": UIFontMetrics(forTextStyle: .body).scaledValue(for: 17) / 17],
             "nudge": currentNudge().map { $0.json as Any } ?? NSNull(),
         ]
 #if DEBUG
@@ -1269,6 +1333,12 @@ final class NucleoSession: ObservableObject {
         openSheet = nil
         sheet = nil
         sheetClosed(route)
+        if route == .companionConsent, companionAwaitingConsent {
+            let accepted = companionConsentAccepted
+            companionAwaitingConsent = false; companionConsentAccepted = false
+            if accepted { emit("companion.checkIn", companionCheckIn()) }
+            else if !companionContext.decided { companionPacing.shown("invite"); companionPacing.leftInvite() }
+        }
         // One sheet handing over to another (1.8) goes first; a waiting notification tap opens after.
         continueSheetHandoff()
         continueReadHandoff()
@@ -1319,10 +1389,24 @@ final class NucleoSession: ObservableObject {
     }
 
     private func companionDelivered(_ reply: [String: Any]) -> [String: Any] {
-        if ["ok", "companion"].contains(reply["status"] as? String ?? ""), companionContext.allows(companionPilot.capability), companionContext.accepted {
-            companionContext.answered()
+        guard reply["status"] as? String == "companion" else { return reply }
+        var decorated = reply; decorated["invitation"] = NSNull()
+        let closing = reply["followUp"] is NSNull && reply["gist"] as? String == reply["text"] as? String
+        guard !closing else { return decorated }
+        companionPacing.leftInvite()
+        let eligible = companionPacing.delivered()
+        guard profile.acceptedRiskNotice, companionContext.allows(companionPilot.capability) else { return decorated }
+        if companionContext.accepted { companionContext.answered() }
+        guard eligible, !(reply["followUp"] is NSNull && reply["gist"] as? String == reply["text"] as? String) else { return decorated }
+        if companionPacing.remembers(decided: companionContext.accepted || companionPacing.state.declines >= 3) {
+            decorated["invitation"] = ["kind": "remember"]
+        } else if companionContext.accepted, let question = companionContext.next(preferred: reply["checkIn"] as? String), companionPacing.permits(question) {
+            companionQuestionId = question.id; companionSceneStarted = false
+            decorated["invitation"] = question.json
+        } else if companionPacing.dialDue(decided: companionContext.decided) {
+            decorated["invitation"] = ["kind": "dial", "text": CompanionCopy.text("dialTitle")]
         }
-        return reply // I-2 owns all invitations about the person.
+        return decorated
     }
 
     func companionCheckIn(preferred: String? = nil, afterAnswer: Bool = false) -> [String: Any] {
@@ -1336,10 +1420,10 @@ final class NucleoSession: ObservableObject {
     }
 
     func companionConsentFinished(_ accepted: Bool) {
+        companionConsentAccepted = accepted
         if accepted && companionAwaitingConsent { companionContext.answered() }
-        companionAwaitingConsent = false
+        if !accepted { companionPacing.declined() }
         sheet = nil
-        emit("companion.checkIn", companionCheckIn())
     }
 
     // MARK: - Lifecycle

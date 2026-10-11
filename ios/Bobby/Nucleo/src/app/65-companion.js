@@ -57,6 +57,8 @@ function guideRender(){
   if(offer&&(!SES||SES.oneTap!==false)){
    var b=guideButton(guideActions,offer.label,function(){go('SENDING',{token:offer.token,question:READ.question,origin:'chip'});},'companion-read-offer',false);
    var meta=mk('small','conversation-eyebrow',offer.levelLabel+' · '+offer.costLine); b.insertBefore(meta,b.firstChild);
+  }else if(GUIDE.invitation){
+   memoryChip(guideActions,GUIDE.invitation);
   }else if(typeof GUIDE.followUp==='string'){
    var b=guideButton(guideActions,GUIDE.followUp,function(){guideAsk(GUIDE.followUp,false);},'companion-follow-up',false);b.setAttribute('aria-label',tt('aria.ask',{question:GUIDE.followUp}));
   }
@@ -77,7 +79,7 @@ function guideLayout(){
  else{
   guideNarrative.style.height='auto';
   if(guideReply.offsetHeight>96*k&&!error){guideReply.style.fontSize=22*k+'px';guideReply.style.lineHeight=27*k+'px';}
-  var p=guideReply.offsetHeight,d=guideDisclosure.style.display==='none'?0:target,r=clamp((602-12-32-p-4-d-16-slot)/2,Math.max(44,44/scale),98);
+  var p=guideReply.offsetHeight,d=(guideDisclosure.style.display==='none'?0:target)+(GUIDE.notes&&GUIDE.notes.length?target:0),r=clamp((602-12-32-p-4-d-16-slot)/2,Math.max(44,44/scale),98);
   var spare=602-(12+2*r+32+p+4+d+16+slot),top=110+.4*Math.max(0,spare);
   if(!error&&spare<0){GUIDE.reading=true;guideRender();return;}
   moveSphere(top+r,r);guidePanel.style.top=(top+2*r+32)+'px';
@@ -100,7 +102,7 @@ STATES.COMPANION={
    },function(){if(GUIDE){GUIDE.voiceOff=true;GUIDE.voiceDone=true;VOICE.ended=true;hint(tt('cap.voiceUnavailable'));guideRender();}});
   }
  },
- exit:function(next){conversationRetire(guidePanel,'sphere');conversationRetire(guideActions,'pill');GUIDE_EPOCH++;guidePanel.style.display=guideActions.style.display='none';if(VOICE.id&&!VOICE.ended)guideStopVoice();if(['LISTENING','TYPING','PRE_PERMISSION'].indexOf(next)<0&&next!=='COMPANION')GUIDE=null;},
+ exit:function(next){conversationRetire(guidePanel,'sphere');conversationRetire(guideActions,'pill');GUIDE_EPOCH++;guidePanel.style.display=guideActions.style.display='none';if(VOICE.id&&!VOICE.ended)guideStopVoice();if(['LISTENING','TYPING','PRE_PERMISSION'].indexOf(next)<0&&['COMPANION','PERSONAL_QUESTION','PERSONAL_SENDING','SPEAKING_DIAL'].indexOf(next)<0)GUIDE=null;},
  tick:function(){if(!GUIDE||GUIDE.status!=='companion')return;var ready=GUIDE.questionSpoken&&!GUIDE.voiceOff?GUIDE.voiceDone:clk-GUIDE.settledAt>=1.5;if(ready&&!GUIDE.slotReady&&!GUIDE.slotSuppressed){GUIDE.slotReady=true;guideRender();}if(!VOICE.started&&!VOICE.ended&&clk-VOICE.reqT>VOICE_WAIT){guideStopVoice();GUIDE.voiceOff=true;hint(tt('cap.voiceUnavailable'));guideRender();}},
  on:function(name,p){if(name==='voice.start'){pillMode('stop');att(el.sphereA,'aria-label',tt('aria.speaking'));}else if(name==='voice.end'){if(GUIDE)GUIDE.voiceDone=true;pillMode(idleMode());if(p&&p.reason==='failed'){GUIDE.voiceOff=true;hint(tt('cap.voiceUnavailable'));guideRender();}}},
  down:function(hit,p){if(hit==='pill')return pillDown(p,true);if(hit==='avatar')return tapG(function(){guideStopVoice();openNative('account');});if(hit==='close')return tapG(function(){var draft=GUIDE.status==='companion_error'&&READ?READ.question:'',spoken=!!GUIDE.questionSpoken,retry=draft?{retry:GUIDE.requestId}:null;GUIDE=null;READ=null;if(draft)holdDraft(draft,'',spoken,retry);else go('RETURNING');});return null;}

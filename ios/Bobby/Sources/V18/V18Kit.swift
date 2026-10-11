@@ -341,3 +341,97 @@ struct QuietToggle: View {
         .accessibilityIdentifier(id)
     }
 }
+
+/// Equal consent answers and secondary actions share the same geometry and ink.
+struct QuietSecondary: View {
+    let title: String
+    let id: String
+    let action: () -> Void
+    @Environment(\.isEnabled) private var enabled
+    var body: some View {
+        Button(action: action) {
+            Text(title).quietFont(16, .semibold).multilineTextAlignment(.center).quietWraps()
+                .foregroundStyle(Theme.cream).padding(.horizontal, 18).padding(.vertical, 12)
+                .frame(maxWidth: .infinity, minHeight: 50)
+                .background(Capsule().fill(Theme.cream.opacity(0.06)))
+                .overlay(Capsule().stroke(Theme.cream.opacity(0.30)))
+                .opacity(enabled ? 1 : 0.45)
+        }.buttonStyle(.plain).accessibilityIdentifier(id)
+    }
+}
+
+struct QuietSecondaryPair: View {
+    let first: String, second: String
+    let firstID: String, secondID: String
+    let choose: (Bool) -> Void
+    @ScaledMetric private var fontSize = 16.0
+    var body: some View {
+        GeometryReader { geometry in
+            let font = UIFont.systemFont(ofSize: fontSize, weight: .semibold)
+            let width = (geometry.size.width - 12) / 2 - 36
+            let stack = (first as NSString).size(withAttributes: [.font: font]).width > width || (second as NSString).size(withAttributes: [.font: font]).width > width
+            let layout = stack ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))
+            layout {
+                QuietSecondary(title: first, id: firstID) { choose(true) }
+                QuietSecondary(title: second, id: secondID) { choose(false) }
+            }.background(GeometryReader { g in Color.clear.preference(key: QuietPairHeight.self, value: g.size.height) })
+        }.frame(height: height).onPreferenceChange(QuietPairHeight.self) { height = $0 }
+    }
+    @State private var height: CGFloat = 112
+}
+private struct QuietPairHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 112
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+struct QuietChoice: View {
+    let title: String
+    var selected = false
+    let id: String
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                if selected { Image(systemName: "checkmark").accessibilityHidden(true) }
+                Text(title).quietFont(15, .medium).quietWraps()
+            }.foregroundStyle(Theme.cream).padding(.horizontal, 18).padding(.vertical, 10)
+                .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                .background(Capsule().fill(Theme.cream.opacity(0.04)))
+                .overlay(Capsule().stroke(Theme.cream.opacity(selected ? 1 : 0.14)))
+        }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : []).accessibilityIdentifier(id)
+    }
+}
+
+struct QuietDestructive: View {
+    let title: String
+    let id: String
+    let action: () -> Void
+    var body: some View {
+        Button(role: .destructive, action: action) {
+            Text(title).quietFont(16, .semibold).quietWraps().multilineTextAlignment(.center)
+                .foregroundStyle(Color(red: 1, green: 107/255, blue: 107/255))
+                .frame(maxWidth: .infinity, minHeight: 50).contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityIdentifier(id)
+    }
+}
+
+struct QuietTextLink: View {
+    let title: String
+    let id: String
+    var destination: URL? = nil
+    var action: () -> Void = {}
+    var body: some View {
+        Group {
+            if let destination { Link(destination: destination) { label.underline() } }
+            else { Button(action: action) { label }.buttonStyle(.plain) }
+        }.accessibilityIdentifier(id)
+    }
+    private var label: some View {
+        Text(title).quietFont(15).quietWraps().foregroundStyle(Theme.warmMuted)
+            .frame(maxWidth: .infinity, minHeight: 48).contentShape(Rectangle())
+    }
+}
+
+struct QuietMemorySurface: View {
+    var body: some View { LinearGradient(colors: [Color(red:34/255,green:30/255,blue:27/255),Color(red:21/255,green:19/255,blue:18/255)], startPoint: .top, endPoint: .bottom).ignoresSafeArea() }
+}

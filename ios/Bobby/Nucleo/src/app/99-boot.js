@@ -107,7 +107,7 @@ function wire(){
   BR.on('app.state', function(p){ if (p && p.state === 'background'){ conversationSuspend(); } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
   BR.on('companion.checkIn', companionCheckIn);
-  BR.on('companion.revoked', function(){ GUIDE_EPOCH++; CHECKIN = null; GUIDE_INPUT_CHECKIN = false; GUIDE_ANSWER_ERROR = ''; if (GUIDE) { GUIDE.personalized = false; GUIDE.companionCheckIn = null; } if (ST.name === 'COMPANION') guideRender(); else { guidePanel.style.display = 'none'; if (ST.name === 'HANDBACK') readChips(); } });
+  BR.on('companion.revoked', function(){ var hadScene=!!MEMORY_SCENE;MEMORY_AUTO=null;MEMORY_SEND_EPOCH++;MEMORY_SCENE=null;MEMORY_NOTES=[];MEMORY_BUSY=false;memoryPanel.style.display='none';GUIDE_INPUT_CHECKIN=false;CHECKIN=null;if(GUIDE){GUIDE.personalized=false;GUIDE.invitation=null;GUIDE.notes=[];if(hadScene){el.ta.value='';SPEECH.draft='';HELD='';}if(ST.name!=='COMPANION'&&(hadScene||ST.name!=='TYPING'))go('COMPANION',{reply:GUIDE});else guideRender();} });
   /* the read native starts is not the person's own question: startRead() notes it while askStart runs (§3.5) */
   BR.on('ask.start', function(p){ ASK_ORIGIN = 'followUp'; try { askStart(p); } finally { ASK_ORIGIN = null; } });
   BR.on('analysis.level', lvlApply);

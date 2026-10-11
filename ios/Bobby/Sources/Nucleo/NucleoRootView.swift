@@ -192,7 +192,7 @@ private struct NucleoStage: View {
                 .presentationBackground(Theme.nucleoSurface)
         case .companionConsent:
             CompanionConsentView(store: session.companionContext, finished: session.companionConsentFinished)
-                .presentationDetents([.large]).presentationBackground(Theme.nucleoSurface)
+                .presentationBackground { QuietMemorySurface() }
         case .companionNotes:
             CompanionNotesView(store: session.companionContext,
                 questionsAvailable: { session.companionContext.allows(session.companionPilot.capability) },

@@ -131,18 +131,21 @@ final class CompanionContextTests: XCTestCase {
     }
 
     func testMoneyQuestionsWaitForRepliesAfterTapSkipOrTypedAnswer() {
-        let s = store(); s.choose(true); s.answered()
-        s.answer("interest", value: "crypto")
-        XCTAssertEqual(s.next(afterAnswer: true)?.id, "barrier")
-        s.answer("barrier", value: nil)
-        XCTAssertNil(s.next(afterAnswer: true))
-        XCTAssertEqual(s.next()?.id, "when")
-        XCTAssertFalse(s.state.asked.contains("when"))
-        XCTAssertTrue(s.apply(["notes": [["field": "when", "value": "2_to_7y", "source": "said"]], "asked": ["when"]], for: "when"))
-        XCTAssertNil(s.next(preferred: "cushion", afterAnswer: true))
-        XCTAssertEqual(s.next()?.id, "cushion")
-        s.answer("cushion", value: nil)
-        XCTAssertNil(s.next())
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = Date(timeIntervalSince1970: 1_792_000_000), s = store()
+        s.choose(true, now: now, calendar: calendar); s.answered(now: now, calendar: calendar)
+        s.answer("interest", value: "crypto", now: now)
+        XCTAssertEqual(s.next(afterAnswer: true, now: now, calendar: calendar)?.id, "barrier")
+        XCTAssertTrue(s.restQuestion("barrier", now: now, calendar: calendar))
+        XCTAssertFalse(s.state.asked.contains("barrier"), "5.6.4: first Not now rests rather than retires")
+        XCTAssertNil(s.next(afterAnswer: true, now: now, calendar: calendar))
+        XCTAssertEqual(s.next(now: now, calendar: calendar)?.id, "when")
+        XCTAssertTrue(s.apply(["notes": [["field": "when", "value": "2_to_7y", "source": "said"]], "asked": ["when"]], for: "when", now: now))
+        XCTAssertNil(s.next(preferred: "cushion", afterAnswer: true, now: now, calendar: calendar))
+        XCTAssertEqual(s.next(now: now, calendar: calendar)?.id, "cushion")
+        XCTAssertTrue(s.restQuestion("cushion", now: now, calendar: calendar))
+        XCTAssertFalse(s.state.asked.contains("cushion"))
+        XCTAssertNil(s.next(now: now, calendar: calendar))
     }
 
     func testTypedFallKeepsExerciseProvenanceAndCatalogLabelsCoverEveryValue() {
@@ -164,7 +167,8 @@ final class CompanionContextTests: XCTestCase {
         s.choose(true, now: now); s.answered(now: now)
         s.answer("interest", value: "crypto", now: now)
         XCTAssertEqual(s.next()?.id, "barrier")
-        s.answer("barrier", value: nil, now: now)
+        XCTAssertTrue(s.restQuestion("barrier", now: now))
+        XCTAssertFalse(s.state.asked.contains("barrier"))
         XCTAssertEqual(s.next()?.id, "when")
         s.answer("when", value: "under_2y", now: now)
         XCTAssertEqual(s.next()?.id, "cushion")
@@ -256,4 +260,129 @@ final class CompanionContextTests: XCTestCase {
         s.choose(false); XCTAssertFalse(s.apply(patch, for: "interest")); XCTAssertNil(s.wire(capability: live))
     }
 
+}
+
+@MainActor
+final class InvitationPacingTests: XCTestCase {
+    private var calendar: Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(secondsFromGMT: 0)!; return c }
+    private let now = Date(timeIntervalSince1970: 1_792_000_000)
+    private func pacing() -> CompanionPacing { CompanionPacing(defaults: UserDefaults(suiteName: "invitation-test-" + UUID().uuidString)!) }
+    func testSecondEducationalAnswerAndOnlyOncePerLocalDay() {
+        let p = pacing()
+        XCTAssertTrue(p.delivered(now: now, calendar: calendar)); XCTAssertFalse(p.remembers(decided: false, now: now, calendar: calendar))
+        XCTAssertTrue(p.delivered(now: now, calendar: calendar)); XCTAssertTrue(p.remembers(decided: false, now: now, calendar: calendar))
+        p.shown("invite", now: now, calendar: calendar)
+        XCTAssertFalse(p.remembers(decided: false, now: now, calendar: calendar))
+        XCTAssertTrue(p.remembers(decided: false, now: now.addingTimeInterval(86400), calendar: calendar))
+    }
+    func testThreeUntappedInvitesRestSevenDaysAndThreeCyclesRetire() {
+        let p = pacing(); _ = p.delivered(now: now); _ = p.delivered(now: now)
+        var date = now
+        for cycle in 0..<3 {
+            for _ in 0..<3 { p.shown("invite", now: date, calendar: calendar); p.leftInvite(now: date, calendar: calendar); date = date.addingTimeInterval(86400) }
+            XCTAssertEqual(p.state.cycles, cycle + 1)
+            XCTAssertFalse(p.remembers(decided: false, now: date, calendar: calendar))
+            date = date.addingTimeInterval(7*86400)
+        }
+        XCTAssertTrue(p.state.retired)
+        XCTAssertFalse(p.remembers(decided: false, now: date, calendar: calendar))
+    }
+    func testTappingThirdInviteDoesNotCountAsUntapped() {
+        let p = pacing()
+        for _ in 0..<2 { p.shown("invite", now: now); p.leftInvite(now: now) }
+        p.shown("invite", now: now); p.tapInvite(); p.leftInvite(now: now)
+        XCTAssertEqual(p.state.cycles, 0); XCTAssertEqual(p.state.untapped, 2)
+    }
+    func testNotNowRestsThirtyDaysAndThirdDeclineRetires() {
+        let p = pacing(); _ = p.delivered(now: now); _ = p.delivered(now: now)
+        for n in 0..<3 {
+            let date = now.addingTimeInterval(Double(n)*31*86400)
+            p.declined(now: date, calendar: calendar)
+            XCTAssertFalse(p.remembers(decided: false, now: date.addingTimeInterval(29*86400), calendar: calendar))
+            if n<2 { XCTAssertTrue(p.remembers(decided: false, now: date.addingTimeInterval(30*86400), calendar: calendar)) }
+        }
+        XCTAssertTrue(p.state.retired)
+    }
+    func testTwoUntappedQuestionChipsStopTheDayAndTapRollsOneBack() throws {
+        let p = pacing(), q = try XCTUnwrap(CompanionCatalog.question("interest"))
+        p.shown("question", now: now, calendar: calendar); p.shown("question", now: now, calendar: calendar)
+        XCTAssertFalse(p.permits(q, now: now, calendar: calendar))
+        p.scene(q, now: now, calendar: calendar); XCTAssertTrue(p.permits(q, now: now, calendar: calendar))
+        XCTAssertTrue(p.permits(q, now: now.addingTimeInterval(86400), calendar: calendar))
+    }
+    func testTwoScenesMoneyOncePerDayAndNoChipAfterANote() throws {
+        let p = pacing(), q = try XCTUnwrap(CompanionCatalog.question("when")), interest = try XCTUnwrap(CompanionCatalog.question("interest"))
+        p.scene(q, now: now, calendar: calendar)
+        XCTAssertFalse(p.permits(q, now: now, calendar: calendar)); XCTAssertTrue(p.permits(interest, now: now, calendar: calendar))
+        p.noted(); XCTAssertFalse(p.delivered(now: now, calendar: calendar)); XCTAssertTrue(p.delivered(now: now, calendar: calendar))
+        p.scene(interest, now: now, calendar: calendar); XCTAssertFalse(p.permits(interest, now: now, calendar: calendar))
+        XCTAssertTrue(p.permits(q, now: now.addingTimeInterval(86400), calendar: calendar))
+    }
+    func testUntappedMoneyQuestionIsNotOfferedAgainThatLocalDay() throws {
+        let p = pacing(), q = try XCTUnwrap(CompanionCatalog.question("when"))
+        p.shown(q, now: now, calendar: calendar)
+        XCTAssertFalse(p.permits(q, now: now, calendar: calendar))
+        XCTAssertTrue(p.permits(q, now: now.addingTimeInterval(86400), calendar: calendar))
+    }
+    func testAnAnswerToTheVisibleQuestionIsAcceptedAfterMidnight() throws {
+        var bytes: Data?; let store = CompanionContextStore(read: { bytes }, write: { bytes = $0; return true })
+        let evening = calendar.startOfDay(for: now).addingTimeInterval(86399)
+        store.choose(true, now: evening, calendar: calendar); store.answered(now: evening, calendar: calendar)
+        let question = try XCTUnwrap(store.next(now: evening, calendar: calendar))
+        store.answer(question.id, value: question.options[0].id, now: evening.addingTimeInterval(2))
+        XCTAssertEqual(store.state.notes.first?.field, question.id)
+        XCTAssertEqual(store.state.notes.first?.createdAt, evening.addingTimeInterval(2))
+    }
+    func testDialIsOnceAndOnlyAfterMemoryIsResolvedOrResting() {
+        let p = pacing(); XCTAssertFalse(p.dialDue(decided: false, now: now))
+        p.declined(now: now, calendar: calendar); XCTAssertTrue(p.dialDue(decided: false, now: now))
+        p.shown("dial", now: now); XCTAssertFalse(p.dialDue(decided: true, now: now))
+    }
+    func testPacingPersistsAndExplicitEraseNeverBringsInvitationBack() {
+        let defaults = UserDefaults(suiteName: "invitation-test-" + UUID().uuidString)!
+        let p = CompanionPacing(defaults: defaults); p.shown("dial", now: now); p.declined(now: now)
+        let restored = CompanionPacing(defaults: defaults)
+        XCTAssertTrue(restored.state.dialShown); XCTAssertEqual(restored.state.declines,1)
+        restored.reset(retired: true); XCTAssertTrue(restored.state.retired)
+    }
+    func testBuild69RecordWithFourNotesLoadsIntactAndWireKeepsExactlyFiveKeys() throws {
+        let old: [String:Any] = ["notice":"memory-1","accepted":true,"decidedAt":now.timeIntervalSinceReferenceDate,"day":1,"lastOpen":now.timeIntervalSinceReferenceDate,"answeredOn":now.timeIntervalSinceReferenceDate,"asked":["interest","barrier","when","cushion"],"notes":[["field":"interest","value":"crypto","source":"said"],["field":"barrier","value":"words","source":"said"],["field":"when","value":"under_2y","source":"said"],["field":"cushion","value":"would_need_it","source":"said"]].map { $0.merging(["createdAt":now.timeIntervalSinceReferenceDate,"expiresAt":now.addingTimeInterval(30*86400).timeIntervalSinceReferenceDate] as [String:Any]) { _,b in b } }]
+        var bytes: Data? = try JSONSerialization.data(withJSONObject: old)
+        let store = CompanionContextStore(read:{bytes},write:{bytes=$0;return true})
+        XCTAssertTrue(store.accepted); XCTAssertEqual(store.state.notes.count,4); XCTAssertNil(store.state.rest)
+        let wire=try XCTUnwrap(store.wire(capability:.init(enabled:true,context:true,catalog:1,notices:["memory-1"]),now:now))
+        XCTAssertEqual(Set(wire.keys),Set(["version","consent","day","asked","notes"]))
+    }
+    func testRestSkipsUntilNextLocalDayAndSecondRestRetires() throws {
+        var bytes:Data?;let store=CompanionContextStore(read:{bytes},write:{bytes=$0;return true})
+        store.choose(true,now:now,calendar:calendar);store.answered(now:now,calendar:calendar)
+        XCTAssertTrue(store.restQuestion("interest",now:now,calendar:calendar))
+        XCTAssertEqual(store.next(now:now,calendar:calendar)?.id,"barrier")
+        let tomorrow=calendar.date(byAdding:.day,value:1,to:calendar.startOfDay(for:now))!
+        store.answered(now:tomorrow,calendar:calendar); XCTAssertEqual(store.next(now:tomorrow,calendar:calendar)?.id,"interest")
+        XCTAssertTrue(store.restQuestion("interest",now:tomorrow,calendar:calendar));XCTAssertTrue(store.state.asked.contains("interest"))
+        XCTAssertEqual(store.next(now:tomorrow,calendar:calendar)?.id,"barrier")
+    }
+    func testDeletedNoteRetiresButExpiredNoteBecomesAskable() {
+        var bytes:Data?;let store=CompanionContextStore(read:{bytes},write:{bytes=$0;return true})
+        store.choose(true,now:now,calendar:calendar);store.answered(now:now,calendar:calendar);store.answer("interest",value:"crypto",now:now)
+        store.delete("interest");XCTAssertTrue(store.state.asked.contains("interest"))
+        store.answer("barrier",value:CompanionCatalog.question("barrier")!.options[0].id,now:now)
+        store.opened(now:now.addingTimeInterval(31*86400),calendar:calendar)
+        XCTAssertFalse(store.state.asked.contains("barrier"));XCTAssertTrue(store.state.asked.contains("interest"))
+    }
+    func testUndecodableRecordCannotBeOverwrittenBeforeBackup() {
+        var bytes:Data?=Data("broken legacy bytes".utf8)
+        let store=CompanionContextStore(read:{bytes},write:{bytes=$0;return true})
+        store.choose(true);XCTAssertFalse(store.accepted);XCTAssertEqual(bytes,Data("broken legacy bytes".utf8))
+        let defaults=UserDefaults(suiteName:"corrupt-test-"+UUID().uuidString)!;defaults.set(true,forKey:"companion.context.install.v1")
+        store.prepareInstall(defaults:defaults);store.choose(true)
+        XCTAssertEqual(defaults.data(forKey:"companion.context.undecodable.v1"),Data("broken legacy bytes".utf8))
+        XCTAssertTrue(store.accepted)
+    }
+    func testFailedDeclineClosesForTheLaunchAndKeepsWireEmpty() {
+        let store=CompanionContextStore(read:{nil},write:{_ in false})
+        store.choose(true);XCTAssertFalse(store.accepted);store.choose(false)
+        XCTAssertTrue(store.decided);XCTAssertNil(store.wire(capability:.init(enabled:true,context:true,catalog:1,notices:["memory-1"])))
+    }
 }

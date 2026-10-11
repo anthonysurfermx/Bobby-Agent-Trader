@@ -311,6 +311,20 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
 #stage #hint.first-run-meta-caption .roll,#stage #hint.first-run-meta-caption .roll>span{height:36px;line-height:18px;align-items:flex-end}
 #stage #hint.first-run-live-caption{color:#5CE1FF}
 
+/* Memory uses lavender only for Bobby's invitation and its answer/confirmation notes. */
+.memory-chip{display:flex;align-items:center;gap:10px;color:#B9ADEB!important;background:rgba(167,149,239,.09);border-color:rgba(167,149,239,.34)}
+.memory-dot{width:5px;height:5px;border-radius:50%;background:#B9ADEB;flex:none}.memory-chevron{margin-left:auto;color:#B9ADEB}.memory-chip .conversation-chip-label{flex:1}
+.memory-why{margin:10px 0 16px;color:#A39C91;text-align:center}.memory-error{color:#F2EDE4;margin:8px 0}.memory-error:empty{display:none}
+.memory-options{display:flex;gap:8px;overflow-x:auto;overscroll-behavior:contain;touch-action:pan-x;scrollbar-width:none;padding:0 0 4px;-webkit-mask-image:linear-gradient(to right,transparent,#000 var(--left-fade,0px),#000 calc(100% - var(--right-fade,64px)),transparent)}
+.memory-choice{flex:none;min-height:var(--target);min-width:var(--target);padding:10px 18px;border:1px solid rgba(242,237,228,.14);background:rgba(242,237,228,.04);border-radius:22px;white-space:normal;color:#F2EDE4;font-family:var(--sans);touch-action:pan-x}
+.memory-choice.selected{border-color:#F2EDE4}.memory-choice.selected::before{content:'✓ ';display:inline-block;animation:memory-check .28s ease-out}
+@keyframes memory-check{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0)}}
+.memory-scene>button{display:block;margin:8px auto 0}.memory-list .memory-options{display:flex;flex-direction:column;gap:6px;overflow:visible;mask-image:none;-webkit-mask-image:none}.memory-list .memory-choice{text-align:left;width:100%}.memory-list .memory-scroll{overflow-y:auto;touch-action:pan-y;-webkit-mask-image:linear-gradient(to bottom,transparent,#000 var(--fade-top,0px),#000 calc(100% - var(--fade-bottom,24px)),transparent)}
+.memory-noted{min-height:var(--target);display:block;width:100%;font:400 calc(13px * var(--type))/1.385 var(--sans);color:#B9ADEB!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left;padding:0}
+.memory-own-words{color:#A39C91;margin:8px 18px 0;text-align:left;white-space:normal}#companion-spoken-own-words{margin:0}
+#companionPanel:has(.memory-noted[style*="block"]) #companion-read-all{margin-top:0}
+@media(prefers-reduced-motion:reduce){.memory-choice.selected::before{animation:none}}
+
 </style>
 </head>
 <body data-page="onboarding">
@@ -502,7 +516,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
   'use strict';
   var V = 1;
   var METHODS = [
-    'companion.presented', 'companion.answer', 'speaking.choose', 'session', 'roster', 'suggestions', 'ask', 'confirm.refresh', 'cancel', 'read.rendered',
+    'companion.invite', 'companion.notes', 'companion.presented', 'companion.answer', 'speaking.choose', 'session', 'roster', 'suggestions', 'ask', 'confirm.refresh', 'cancel', 'read.rendered',
     'speech.permission', 'speech.requestPermission', 'speech.start', 'speech.stop',
     'speak', 'previewVoice', 'stopSpeaking', 'setMuted', 'haptic',
     'saveThesis', 'island', 'theses', 'record',

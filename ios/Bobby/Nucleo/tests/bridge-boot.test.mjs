@@ -858,3 +858,48 @@ test('first-run handover sends immediately without WAKE or waiting for collectio
     assert.deepEqual(app.errors,[]);
   }
 });
+
+const memoryPanelOf=app=>app.nodes.get('ui').children.find(n=>n.id==='companion-question-scene');
+const interestQuestion={kind:'question',id:'interest',questionId:'interest',text:'Your interest?',why:'The catalog reason.',money:false,options:[{id:'crypto',label:'Crypto'},{id:'companies',label:'Companies'}]};
+function memoryStrings(app){app.session.companionPilot={strings:{invite:'May I get to know you?',bobbyAsks:'Bobby asks you: {question}',notNow:'Not now',options:'Options',answerFailed:'Answer failed',noted:'Noted: {label}',notedMany:'Noted: {n} notes',understood:'I understood: {label}',correct:'Correct',ownWords:'Owner-gated disclosure',typeAnswer:'Type my answer',speakAnswer:'Answer with my voice',answerPlaceholder:'My answer',answerSend:'Send answer'}};}
+test('I-2: a due chip ignored never opens consent or a question and a second question still works',async()=>{
+ const app=await idle();memoryStrings(app);
+ await companionReply(app,{status:'companion',requestId:'90d2564c-6064-4275-95cd-5a3c7c0b5b56',gist:'Learning.',text:'Learning. Explanation.',followUp:'Next?',invitation:{kind:'remember'}});app.advance(2);await flush();
+ assert.equal(guideActionsOf(app).children.length,1);assert.equal(guideActionsOf(app).children[0].id,'companion-bobby-chip');
+ assert.equal(app.calls.filter(c=>c.method==='companion.presented').length,1);
+ app.advance(30);await flush();assert.equal(app.calls.filter(c=>c.method==='companion.invite').length,0);assert.equal(memoryPanelOf(app).style.display,'none');
+ keyboardOf(app)._guideAction();app.nodes.get('ta').value='What is a share?';app.nodes.get('ta').listeners.input();app.nodes.get('taSend').listeners.click({detail:0,stopPropagation(){}});await flush();assert.equal(asksOf(app).at(-1).question,'What is a share?');
+ assert.equal(app.calls.filter(c=>c.method==='companion.answer').length,0);assert.deepEqual(app.errors,[]);
+});
+test('I-2: read offer wins over Bobby and a closing answer suppresses every invitation',async()=>{
+ const app=await idle();memoryStrings(app);
+ await companionReply(app,{status:'companion',gist:'Learning.',text:'Learning. Explanation.',followUp:'Next?',invitation:interestQuestion,readOffer:{token:'token',label:'Read Bitcoin',levelLabel:'Quick',costLine:'Uses one read',costShort:'one read'}});app.advance(2);await flush();
+ assert.equal(guideActionsOf(app).children.length,1);assert.equal(guideActionsOf(app).children[0].id,'companion-read-offer');assert.equal(app.calls.filter(c=>c.method==='companion.presented').length,0);
+ await companionReply(app,{status:'companion',gist:'Understood.',text:'Understood.',followUp:null,invitation:interestQuestion});app.advance(10);await flush();assert.equal(guideActionsOf(app).children.length,0);assert.deepEqual(app.errors,[]);
+});
+test('I-2: catalog options only open by tap, store locally and keep the answer and disclosure',async()=>{
+ const app=await idle({companionAnswer:p=>({status:'noted',note:{field:p.questionId,label:'Crypto',source:'said'},next:null})});memoryStrings(app);
+ await companionReply(app,{status:'companion',gist:'Learning.',text:'Learning. Explanation.',followUp:'Next?',invitation:interestQuestion});app.advance(2);await flush();
+ guideActionsOf(app).children[0]._guideAction();await flush();assert.equal(app.context.nucleo.state(),'PERSONAL_QUESTION');
+ const options=memoryPanelOf(app).children[0].children[3];assert.equal(options.children[0].textContent,'Crypto');assert.equal(memoryPanelOf(app).children[0].children[1].textContent,interestQuestion.why);
+ options.children[0]._guideAction();await flush();assert.equal(app.context.nucleo.state(),'PERSONAL_QUESTION');assert.ok(options.children[0].classList.contains('selected'));assert.equal(options.children[1].style.opacity,'.45');app.advance(.39);assert.equal(app.context.nucleo.state(),'PERSONAL_QUESTION');app.advance(.11);await flush();assert.equal(app.context.nucleo.state(),'COMPANION');
+ assert.equal(companionPanel(app).children[0].children[0].textContent,'Learning.');assert.equal(app.calls.filter(c=>c.method==='ask').length,1);assert.equal(app.calls.filter(c=>c.method==='companion.answer').length,1);assert.deepEqual(app.errors,[]);
+});
+test('I-2: an own-words failure keeps draft and options; revocation drops scene and notes',async()=>{
+ const app=await idle({companionAnswer:()=>({message:'failed'})});memoryStrings(app);
+ await companionReply(app,{status:'companion',gist:'Learning.',text:'Learning. Explanation.',invitation:interestQuestion});app.advance(2);await flush();guideActionsOf(app).children[0]._guideAction();
+ keyboardOf(app)._guideAction();app.nodes.get('ta').value='my private words';app.nodes.get('ta').listeners.input();app.nodes.get('taSend').listeners.click({detail:0,stopPropagation(){}});await flush();
+ assert.equal(app.context.nucleo.state(),'TYPING');assert.equal(app.nodes.get('ta').value,'my private words');assert.equal(memoryPanelOf(app).children[0].children[2].textContent,'Answer failed');
+ app.context.nucleoBridge.emit('companion.revoked',{});await flush();assert.equal(memoryPanelOf(app).style.display,'none');assert.deepEqual(app.errors,[]);
+});
+
+test('I-2: sending once can be cancelled and a late answer never replaces the retained draft',async()=>{
+ let finish;const app=await idle({companionAnswer:()=>new Promise(resolve=>{finish=resolve;})});memoryStrings(app);
+ await companionReply(app,{status:'companion',gist:'Learning.',text:'Learning. Explanation.',invitation:interestQuestion});app.advance(2);await flush();guideActionsOf(app).children[0]._guideAction();
+ keyboardOf(app)._guideAction();app.nodes.get('ta').value='my private words';app.nodes.get('ta').listeners.input();app.nodes.get('taSend').listeners.click({detail:0,stopPropagation(){}});await flush();
+ assert.equal(app.context.nucleo.state(),'PERSONAL_SENDING');assert.equal(app.calls.filter(c=>c.method==='companion.answer').length,1);
+ app.advance(.6);tap(app,app.nodes.get('pill'));await flush();
+ assert.equal(app.context.nucleo.state(),'TYPING');assert.equal(app.nodes.get('ta').value,'my private words');assert.ok(app.calls.some(c=>c.method==='cancel'));
+ finish({status:'noted',note:{field:'interest',label:'Crypto',source:'said'},next:null});await flush();
+ assert.equal(app.context.nucleo.state(),'TYPING');assert.equal(app.nodes.get('ta').value,'my private words');assert.deepEqual(app.errors,[]);
+});

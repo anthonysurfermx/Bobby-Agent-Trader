@@ -3,54 +3,54 @@ import SwiftUI
 struct CompanionConsentView: View {
     @ObservedObject var store: CompanionContextStore
     let finished: (Bool) -> Void
-    @ScaledMetric(relativeTo: .title2) private var titleSize = 24
-    @ScaledMetric(relativeTo: .body) private var bodySize = 16
+    @State private var attempted = false
+    @State private var contentHeight: CGFloat = 480
+    @State private var bottomHeight: CGFloat = 170
+    @State private var detent: PresentationDetent = .height(674)
     var body: some View {
         let words = CompanionCopy.consent
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(spacing: 0) {
             if words.count == 7 {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(words[0]).font(.system(size: titleSize, weight: .light, design: .rounded))
-                            .fixedSize(horizontal: false, vertical: true)
+                    VStack(alignment: .leading, spacing: 20) {
+                        Text(words[0]).quietFont(28, .light, relativeTo: .title).tracking(-0.98).quietWraps()
                             .accessibilityAddTraits(.isHeader).accessibilityIdentifier("companion-consent-title")
                         ForEach(1..<4) { index in
-                            Text(words[index]).font(.system(size: bodySize)).fixedSize(horizontal: false, vertical: true)
+                            HStack(alignment: .top, spacing: 12) {
+                                Circle().fill(Color(red:185/255,green:173/255,blue:235/255)).frame(width: 5,height: 5).padding(.top, 9).accessibilityHidden(true)
+                                Text(words[index]).quietFont(16).lineSpacing(4).quietWraps()
+                            }
                         }
+                    }.padding(24)
+                    .background(GeometryReader { g in Color.clear.preference(key: ConsentContentHeight.self, value: g.size.height) })
+                }.scrollIndicators(.hidden)
+                    .mask(VStack(spacing:0) { Color.black; LinearGradient(colors:[.black,.clear],startPoint:.top,endPoint:.bottom).frame(height:24) })
+                VStack(spacing: 8) {
+                    Rectangle().fill(Theme.cream.opacity(0.08)).frame(height: 1)
+                    if attempted && store.storageError { Text(CompanionCopy.text("notSaved")).quietFont(13).quietWraps().accessibilityIdentifier("companion-consent-error") }
+                    QuietSecondaryPair(first: words[4], second: words[5], firstID: "companion-consent-yes", secondID: "companion-consent-no") { yes in
+                        attempted = true; store.choose(yes)
+                        if !yes || store.accepted { finished(yes) }
                     }
-                }
-                HStack(spacing: 12) {
-                    Button(words[4]) {
-                        store.choose(true)
-                        if store.accepted { finished(true) }
-                    }
-                    .buttonStyle(ConsentChoiceStyle())
-                    .accessibilityIdentifier("companion-consent-yes")
-                    Button(words[5]) {
-                        store.choose(false)
-                        if store.decided { finished(false) }
-                    }
-                    .buttonStyle(ConsentChoiceStyle())
-                    .accessibilityIdentifier("companion-consent-no")
-                }
-                Link(destination: CompanionCopy.privacyURL) {
-                    Text(words[6]).frame(maxWidth: .infinity, minHeight: 44)
-                }.accessibilityIdentifier("companion-consent-details")
-                if store.storageError { Text(CompanionCopy.text("storageError")).font(.footnote) }
+                    QuietTextLink(title: words[6], id: "companion-consent-details", destination: CompanionCopy.privacyURL)
+                }.padding(.horizontal,24).padding(.bottom,12)
+                    .background(GeometryReader { g in Color.clear.preference(key: ConsentBottomHeight.self, value: g.size.height) })
             }
-        }.foregroundStyle(Theme.cream).padding(20)
-        .background(Theme.nucleoSurface.ignoresSafeArea())
-        .interactiveDismissDisabled()
+        }.foregroundStyle(Theme.cream).background(QuietMemorySurface())
+            .environment(\.colorScheme,.dark)
+            .onPreferenceChange(ConsentContentHeight.self) { contentHeight = $0; detent = .height(contentHeight + bottomHeight + 24) }
+            .onPreferenceChange(ConsentBottomHeight.self) { bottomHeight = $0; detent = .height(contentHeight + bottomHeight + 24) }
+            .presentationDetents([.height(contentHeight + bottomHeight + 24), .large], selection: $detent)
+            .presentationDragIndicator(.visible).presentationCornerRadius(34)
     }
 }
-
-private struct ConsentChoiceStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label.font(.body)
-            .frame(maxWidth: .infinity, minHeight: 48)
-            .background(Theme.cream, in: RoundedRectangle(cornerRadius: 16))
-            .foregroundStyle(Theme.bg)
-    }
+private struct ConsentContentHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 480
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+private struct ConsentBottomHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 170
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
 }
 
 struct CompanionNotesView: View {
@@ -169,27 +169,10 @@ private struct NotesDeletionSheet: View {
                     .font(.title2).fixedSize(horizontal: false, vertical: true)
                 Text(CompanionCopy.text(off ? "offBody" : "deleteBody"))
                     .fixedSize(horizontal: false, vertical: true)
-                Button(CompanionCopy.text(off ? "offConfirm" : "deleteAll"), role: .destructive) { finished(true) }
-                    .buttonStyle(NotesDeletionChoiceStyle(destructive: true))
-                    .accessibilityIdentifier("companion-delete-confirm")
-                Button(CompanionCopy.text(off ? "offCancel" : "deleteCancel")) { finished(false) }
-                    .buttonStyle(NotesDeletionChoiceStyle(destructive: false))
-                    .accessibilityIdentifier("companion-delete-cancel")
+                QuietDestructive(title: CompanionCopy.text(off ? "offConfirm" : "deleteAll"), id: "companion-delete-confirm") { finished(true) }
+                QuietSecondary(title: CompanionCopy.text(off ? "offCancel" : "deleteCancel"), id: "companion-delete-cancel") { finished(false) }
                 if store.storageError { Text(CompanionCopy.text("storageError")).font(.footnote) }
             }.foregroundStyle(Theme.cream).padding(24)
         }.background(Theme.nucleoSurface.ignoresSafeArea())
-    }
-}
-
-private struct NotesDeletionChoiceStyle: ButtonStyle {
-    let destructive: Bool
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label.font(.body)
-            .frame(maxWidth: .infinity, minHeight: 48)
-            .padding(.vertical, 8)
-            .background(Theme.warmFill, in: RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.warmHair))
-            .foregroundStyle(destructive ? Theme.down : Theme.cream)
-            .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }

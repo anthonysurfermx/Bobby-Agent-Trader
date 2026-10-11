@@ -168,7 +168,7 @@ final class MemoryCenter: ObservableObject {
     var currentGeneration: () -> UUID = { AccountSession.shared.generation }
     var riskAccepted: () -> Bool = { UserDefaults.standard.integer(forKey: "agent.riskNoticeVersion") >= RiskNotice.currentVersion }
     var now: () -> Date = { Date() }
-    var eraseCompanionNotes: () -> Void = { _ = CompanionContextStore.shared.reset() }
+    var eraseCompanionNotes: () -> Void = { _ = CompanionContextStore.shared.reset(); CompanionPacing(defaults: .standard).reset(retired: true) }
     /// The consent text this build shows. Tests raise it to stand for a reworded sheet.
     var consentVersion = MemoryConsent.currentVersion
     /// This center's consent store: the record the capture gate reads and the sheet writes.

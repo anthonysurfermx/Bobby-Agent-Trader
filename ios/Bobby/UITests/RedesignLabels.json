@@ -230,12 +230,12 @@
       "correct": "Correct",
       "delete": "Delete this note",
       "deleteAll": "Delete all notes",
-      "memory": "Remember on this device",
+      "memory": "Remember on this iPhone",
       "said": "You said it",
       "confirmed": "You confirmed it",
       "shown": "In an exercise",
       "inferred": "Bobby inferred it, awaiting confirmation",
-      "empty": "No notes yet.",
+      "empty": "What Bobby notes from your answers shows up here. Bobby works the same without this.",
       "retention": "Money and inferred notes: 7 days. Other notes: 30 days. Reading does not renew them.",
       "expires": "Expires",
       "storageError": "I could not save the notes. Try again.",
@@ -243,16 +243,127 @@
       "answerPlaceholder": "Your answer to Bobby",
       "answerSend": "Send answer",
       "exerciseExplanation": "I chose “{choice}”. What does a drop like that mean?",
-      "deviceNotes": "These notes stay on this device when you sign out.",
+      "deviceNotes": "These notes stay on this iPhone when you sign out. They are deleted if a different account signs in.",
       "offTitle": "Turn off memory and delete your notes?",
-      "offBody": "All your notes on this device will be deleted. Bobby will stop remembering them.",
+      "offBody": "All your notes on this iPhone will be deleted. Bobby will stop remembering them.",
       "offConfirm": "Turn off and delete my notes",
       "offCancel": "Keep it on",
       "deleteTitle": "Delete all your notes?",
-      "deleteBody": "All your notes on this device will be deleted. Memory will stay on.",
+      "deleteBody": "All your notes on this iPhone will be deleted. Memory will stay on.",
       "deleteCancel": "Keep my notes",
       "answerThis": "Answer this question",
-      "answerHint": "Tap to type; hold to speak your answer"
+      "answerHint": "Tap to type; hold to speak your answer",
+      "invite": "May I get to know you a little, to explain better?",
+      "bobbyAsks": "Bobby asks you: {question}",
+      "notNow": "Not now",
+      "options": "Options",
+      "typeAnswer": "Type my answer",
+      "speakAnswer": "Answer with my voice",
+      "answerSending": "Sending your answer",
+      "ownWords": "Bobby’s AI reads this once to pick an option. Bobby does not keep your words.",
+      "noted": "Noted: {label}",
+      "notedMany": "Noted: {n} notes",
+      "understood": "I understood: {label}",
+      "exerciseFollowUp": "What does a drop like that mean?",
+      "notesLineName": "With your notes. See my notes",
+      "notSaved": "I couldn’t save your choice. Try again.",
+      "on": "On",
+      "off": "Off",
+      "travel": "A short summary of your notes travels with each question Bobby explains, to Bobby’s server and Anthropic.",
+      "toConfirm": "To confirm",
+      "offState": "Memory is off. Bobby keeps no notes.",
+      "needsAI": "Available once you accept the AI notice.",
+      "memoryOff": "Not available right now.",
+      "noteDeleted": "Note deleted",
+      "undo": "Undo",
+      "closeNotes": "Close my notes",
+      "confirmYes": "Yes, that’s right",
+      "leave": "Leave as is",
+      "detail.said": "You said it. It expires on {date}.",
+      "detail.confirmed": "You confirmed it. It expires on {date}.",
+      "detail.shown": "From an exercise. It expires on {date}.",
+      "detail.inferred": "Bobby worked it out from your words. It still needs your confirmation. It expires on {date}.",
+      "dialTitle": "How should I talk to you?"
+    },
+    "catalog": {
+      "interest": {
+        "text": "Does anything catch your eye?",
+        "why": "So my examples are about what already interests you.",
+        "options": {
+          "companies": "Companies I know",
+          "crypto": "Crypto",
+          "government": "Something from the government",
+          "property": "Property",
+          "none": "No idea"
+        }
+      },
+      "barrier": {
+        "text": "What has stopped you until today?",
+        "why": "So I start with what holds you back the most.",
+        "options": {
+          "fear_of_loss": "Fear of losing",
+          "words": "I don't get the words",
+          "where_to_start": "I don't know where to start",
+          "no_money": "I feel I don't have enough",
+          "distrust": "I don't trust it"
+        }
+      },
+      "when": {
+        "text": "When do you think you will need that money?",
+        "why": "I mean the money you might invest. The time frame changes which risks matter.",
+        "options": {
+          "under_2y": "In under 2 years",
+          "2_to_7y": "In 2 to 7 years",
+          "over_7y": "In more than 7 years",
+          "unsure": "I don't know"
+        }
+      },
+      "cushion": {
+        "text": "If an unexpected expense came up tomorrow, would you need that money?",
+        "why": "I mean the money you might invest. If you might need it tomorrow, I explain things differently.",
+        "options": {
+          "would_need_it": "Yes",
+          "would_not": "No",
+          "unsure": "I don't know"
+        }
+      },
+      "hurry": {
+        "text": "How soon would you like to see results?",
+        "why": "So I can explain what tends to move fast and what takes time.",
+        "options": {
+          "soon": "Soon",
+          "no_rush": "No rush",
+          "unsure": "I don't know"
+        }
+      },
+      "fall": {
+        "text": "Just playing: 100 becomes 80. What would you do?",
+        "why": "There is no right answer. It helps me explain what a drop means.",
+        "options": {
+          "pause": "I would stop",
+          "understand": "I would want to know why",
+          "continue": "I would carry on",
+          "unsure": "I don't know"
+        }
+      },
+      "belief": {
+        "text": "What have you always heard about money or investing that you take as true?",
+        "why": "So I can show you what the data says about it.",
+        "options": {
+          "market_is_casino": "The stock market is a casino",
+          "need_lots_of_money": "You need a lot of money",
+          "too_late": "I am already late",
+          "none": "Nothing in particular"
+        }
+      },
+      "format": {
+        "text": "How do I explain best for you?",
+        "why": "So I explain the way that works for you.",
+        "options": {
+          "examples": "With examples",
+          "steps": "Step by step"
+        }
+      }
     },
     "interest": "Does anything catch your eye?",
     "crypto": "Crypto"
@@ -488,12 +599,12 @@
       "correct": "Corregir",
       "delete": "Borrar este apunte",
       "deleteAll": "Borrar todos los apuntes",
-      "memory": "Recordar en este dispositivo",
+      "memory": "Recordar en este iPhone",
       "said": "Lo dijiste",
       "confirmed": "Lo confirmaste",
       "shown": "En un ejercicio",
       "inferred": "Bobby lo dedujo, por confirmar",
-      "empty": "Aún no hay apuntes.",
+      "empty": "Aquí aparece lo que Bobby apunta de tus respuestas. Bobby funciona igual sin esto.",
       "retention": "Dinero y deducciones: 7 días. Otros apuntes: 30 días. Leerlos no renueva el plazo.",
       "expires": "Caduca",
       "storageError": "No pude guardar los apuntes. Intenta de nuevo.",
@@ -501,16 +612,127 @@
       "answerPlaceholder": "Tu respuesta a Bobby",
       "answerSend": "Enviar respuesta",
       "exerciseExplanation": "Elegí «{choice}». ¿Qué significa una caída así?",
-      "deviceNotes": "Estas notas se quedan en este dispositivo cuando cierras sesión.",
+      "deviceNotes": "Estos apuntes se quedan en este iPhone cuando cierras sesión. Se borran si entra otra cuenta.",
       "offTitle": "¿Apagar y borrar tus apuntes?",
-      "offBody": "Se borrarán todos tus apuntes de este dispositivo. Bobby dejará de recordarlos.",
+      "offBody": "Se borrarán todos tus apuntes de este iPhone. Bobby dejará de recordarlos.",
       "offConfirm": "Apagar y borrar mis apuntes",
       "offCancel": "Dejarlo encendido",
       "deleteTitle": "¿Borrar todos tus apuntes?",
-      "deleteBody": "Se borrarán todos tus apuntes de este dispositivo. La memoria seguirá encendida.",
+      "deleteBody": "Se borrarán todos tus apuntes de este iPhone. La memoria seguirá encendida.",
       "deleteCancel": "Conservar mis apuntes",
       "answerThis": "Responder esta pregunta",
-      "answerHint": "Toca para escribir; mantén para responder hablando"
+      "answerHint": "Toca para escribir; mantén para responder hablando",
+      "invite": "¿Puedo conocerte un poco para explicarte mejor?",
+      "bobbyAsks": "Bobby te pregunta: {question}",
+      "notNow": "Ahora no",
+      "options": "Opciones",
+      "typeAnswer": "Escribir mi respuesta",
+      "speakAnswer": "Responder con mi voz",
+      "answerSending": "Enviando tu respuesta",
+      "ownWords": "La IA de Bobby lo lee una vez para elegir una opción. Bobby no guarda tus palabras.",
+      "noted": "Anotado: {label}",
+      "notedMany": "Anotado: {n} apuntes",
+      "understood": "Entendí: {label}",
+      "exerciseFollowUp": "¿Qué significa una caída así?",
+      "notesLineName": "Con tus apuntes. Ver mis apuntes",
+      "notSaved": "No pude guardar tu elección. Inténtalo de nuevo.",
+      "on": "Encendido",
+      "off": "Apagado",
+      "travel": "Un resumen corto de tus apuntes viaja con cada pregunta que Bobby explica, al servidor de Bobby y a Anthropic.",
+      "toConfirm": "Por confirmar",
+      "offState": "La memoria está apagada. Bobby no guarda apuntes.",
+      "needsAI": "Disponible cuando aceptes el aviso de IA.",
+      "memoryOff": "No disponible por ahora.",
+      "noteDeleted": "Apunte borrado",
+      "undo": "Deshacer",
+      "closeNotes": "Cerrar mis apuntes",
+      "confirmYes": "Sí, es correcto",
+      "leave": "Dejar como está",
+      "detail.said": "Lo dijiste. Caduca el {date}.",
+      "detail.confirmed": "Lo confirmaste. Caduca el {date}.",
+      "detail.shown": "De un ejercicio. Caduca el {date}.",
+      "detail.inferred": "Bobby lo dedujo de tus palabras. Falta que lo confirmes. Caduca el {date}.",
+      "dialTitle": "¿Cómo quieres que te hable?"
+    },
+    "catalog": {
+      "interest": {
+        "text": "¿Algo te llama la atención?",
+        "why": "Para ponerte ejemplos de lo que ya te interesa.",
+        "options": {
+          "companies": "Empresas que conozco",
+          "crypto": "Cripto",
+          "government": "Algo del gobierno",
+          "property": "Una propiedad",
+          "none": "Ni idea"
+        }
+      },
+      "barrier": {
+        "text": "¿Qué te ha detenido hasta hoy?",
+        "why": "Para empezar por lo que más te frena.",
+        "options": {
+          "fear_of_loss": "Miedo a perder",
+          "words": "No entiendo las palabras",
+          "where_to_start": "No sé por dónde empezar",
+          "no_money": "Siento que no me alcanza",
+          "distrust": "No confío"
+        }
+      },
+      "when": {
+        "text": "¿Cuándo crees que vas a necesitar ese dinero?",
+        "why": "Hablo del dinero que pensarías invertir. El plazo cambia qué riesgos importan.",
+        "options": {
+          "under_2y": "En menos de 2 años",
+          "2_to_7y": "En 2 a 7 años",
+          "over_7y": "En más de 7 años",
+          "unsure": "No sé"
+        }
+      },
+      "cushion": {
+        "text": "Si mañana te saliera un gasto inesperado, ¿necesitarías ese dinero?",
+        "why": "Hablo del dinero que pensarías invertir. Si podrías necesitarlo mañana, se explica distinto.",
+        "options": {
+          "would_need_it": "Sí",
+          "would_not": "No",
+          "unsure": "No sé"
+        }
+      },
+      "hurry": {
+        "text": "¿Qué tan pronto te gustaría ver resultados?",
+        "why": "Para explicarte qué suele moverse rápido y qué toma tiempo.",
+        "options": {
+          "soon": "Pronto",
+          "no_rush": "Sin prisa",
+          "unsure": "No sé"
+        }
+      },
+      "fall": {
+        "text": "Solo jugando: 100 pasa a 80. ¿Qué harías?",
+        "why": "No hay respuesta correcta. Me ayuda a explicarte qué significa una caída.",
+        "options": {
+          "pause": "Pararía",
+          "understand": "Querría entender por qué",
+          "continue": "Seguiría",
+          "unsure": "No sé"
+        }
+      },
+      "belief": {
+        "text": "¿Qué has oído siempre sobre el dinero o invertir que das por cierto?",
+        "why": "Para mostrarte qué dicen los datos sobre eso.",
+        "options": {
+          "market_is_casino": "La bolsa es un casino",
+          "need_lots_of_money": "Se necesita mucho dinero",
+          "too_late": "Ya voy tarde",
+          "none": "Nada en especial"
+        }
+      },
+      "format": {
+        "text": "¿Cómo te explico mejor?",
+        "why": "Para explicarte como mejor te funcione.",
+        "options": {
+          "examples": "Con ejemplos",
+          "steps": "Paso a paso"
+        }
+      }
     },
     "interest": "¿Algo te llama la atención?",
     "crypto": "Cripto"
@@ -746,12 +968,12 @@
       "correct": "Corriger",
       "delete": "Supprimer cette note",
       "deleteAll": "Supprimer toutes les notes",
-      "memory": "Se souvenir sur cet appareil",
+      "memory": "Se souvenir sur cet iPhone",
       "said": "Tu l’as dit",
       "confirmed": "Tu l’as confirmé",
       "shown": "Dans un exercice",
       "inferred": "Bobby l’a déduit, à confirmer",
-      "empty": "Pas encore de notes.",
+      "empty": "Ce que Bobby note de tes réponses s’affichera ici. Bobby fonctionne pareil sans cela.",
       "retention": "Argent et déductions : 7 jours. Autres notes : 30 jours. Les lire ne prolonge pas le délai.",
       "expires": "Expire",
       "storageError": "Je n'ai pas pu enregistrer les notes. Réessaie.",
@@ -759,16 +981,127 @@
       "answerPlaceholder": "Ta réponse à Bobby",
       "answerSend": "Envoyer la réponse",
       "exerciseExplanation": "J’ai choisi « {choice} ». Que signifie une baisse comme ça ?",
-      "deviceNotes": "Ces notes restent sur cet appareil quand tu te déconnectes.",
+      "deviceNotes": "Ces notes restent sur cet iPhone quand tu te déconnectes. Elles sont supprimées si un autre compte se connecte.",
       "offTitle": "Désactiver et supprimer tes notes ?",
-      "offBody": "Toutes tes notes sur cet appareil seront supprimées. Bobby cessera de les mémoriser.",
+      "offBody": "Toutes tes notes sur cet iPhone seront supprimées. Bobby cessera de les mémoriser.",
       "offConfirm": "Désactiver et supprimer mes notes",
       "offCancel": "Laisser activé",
       "deleteTitle": "Supprimer toutes tes notes ?",
-      "deleteBody": "Toutes tes notes sur cet appareil seront supprimées. La mémoire restera activée.",
+      "deleteBody": "Toutes tes notes sur cet iPhone seront supprimées. La mémoire restera activée.",
       "deleteCancel": "Garder mes notes",
       "answerThis": "Répondre à cette question",
-      "answerHint": "Touche pour écrire ; maintiens pour répondre à voix haute"
+      "answerHint": "Touche pour écrire ; maintiens pour répondre à voix haute",
+      "invite": "Je peux mieux te connaître pour mieux t’expliquer ?",
+      "bobbyAsks": "Une question de Bobby : {question}",
+      "notNow": "Pas maintenant",
+      "options": "Options",
+      "typeAnswer": "Écrire ma réponse",
+      "speakAnswer": "Répondre avec ma voix",
+      "answerSending": "Envoi de ta réponse",
+      "ownWords": "L’IA de Bobby le lit une fois pour choisir une option. Bobby ne garde pas tes mots.",
+      "noted": "Noté : {label}",
+      "notedMany": "Noté : {n} notes",
+      "understood": "J’ai compris : {label}",
+      "exerciseFollowUp": "Que signifie une baisse comme ça ?",
+      "notesLineName": "Avec tes notes. Voir mes notes",
+      "notSaved": "Je n’ai pas pu enregistrer ton choix. Réessaie.",
+      "on": "Activé",
+      "off": "Désactivé",
+      "travel": "Un court résumé de tes notes accompagne chaque question que Bobby explique, vers le serveur de Bobby et Anthropic.",
+      "toConfirm": "À confirmer",
+      "offState": "La mémoire est désactivée. Bobby ne garde aucune note.",
+      "needsAI": "Disponible dès que tu acceptes l’avis sur l’IA.",
+      "memoryOff": "Indisponible pour l’instant.",
+      "noteDeleted": "Note supprimée",
+      "undo": "Rétablir",
+      "closeNotes": "Fermer mes notes",
+      "confirmYes": "Oui, c’est ça",
+      "leave": "Laisser tel quel",
+      "detail.said": "Tu l’as dit. Expire le {date}.",
+      "detail.confirmed": "Tu l’as confirmé. Expire le {date}.",
+      "detail.shown": "Issu d’un exercice. Expire le {date}.",
+      "detail.inferred": "Bobby l’a déduit de tes mots. Il reste à le confirmer. Expire le {date}.",
+      "dialTitle": "Comment veux-tu que je te parle ?"
+    },
+    "catalog": {
+      "interest": {
+        "text": "Quelque chose t'attire ?",
+        "why": "Pour te donner des exemples sur ce qui t'intéresse déjà.",
+        "options": {
+          "companies": "Des entreprises que je connais",
+          "crypto": "Crypto",
+          "government": "Quelque chose de l'État",
+          "property": "L'immobilier",
+          "none": "Aucune idée"
+        }
+      },
+      "barrier": {
+        "text": "Qu'est-ce qui t'a retenu jusqu'ici ?",
+        "why": "Pour commencer par ce qui te freine le plus.",
+        "options": {
+          "fear_of_loss": "La peur de perdre",
+          "words": "Je ne comprends pas les mots",
+          "where_to_start": "Je ne sais pas par où commencer",
+          "no_money": "J'ai l'impression de ne pas avoir assez",
+          "distrust": "Je n'ai pas confiance"
+        }
+      },
+      "when": {
+        "text": "Quand penses-tu avoir besoin de cet argent ?",
+        "why": "Je parle de l'argent que tu penserais placer. L'horizon change les risques qui comptent.",
+        "options": {
+          "under_2y": "Dans moins de 2 ans",
+          "2_to_7y": "Dans 2 à 7 ans",
+          "over_7y": "Dans plus de 7 ans",
+          "unsure": "Je ne sais pas"
+        }
+      },
+      "cushion": {
+        "text": "Si une dépense imprévue arrivait demain, aurais-tu besoin de cet argent ?",
+        "why": "Je parle de l'argent que tu penserais placer. Si tu peux en avoir besoin demain, je l'explique autrement.",
+        "options": {
+          "would_need_it": "Oui",
+          "would_not": "Non",
+          "unsure": "Je ne sais pas"
+        }
+      },
+      "hurry": {
+        "text": "En combien de temps aimerais-tu voir des résultats ?",
+        "why": "Pour t'expliquer ce qui bouge vite et ce qui prend du temps.",
+        "options": {
+          "soon": "Vite",
+          "no_rush": "Sans me presser",
+          "unsure": "Je ne sais pas"
+        }
+      },
+      "fall": {
+        "text": "Juste pour jouer : 100 devient 80. Que ferais-tu ?",
+        "why": "Il n'y a pas de bonne réponse. Ça m'aide à t'expliquer ce qu'est une baisse.",
+        "options": {
+          "pause": "J'arrêterais",
+          "understand": "Je voudrais comprendre pourquoi",
+          "continue": "Je continuerais",
+          "unsure": "Je ne sais pas"
+        }
+      },
+      "belief": {
+        "text": "Qu'as-tu toujours entendu sur l'argent ou l'investissement que tu tiens pour vrai ?",
+        "why": "Pour te montrer ce que disent les données là-dessus.",
+        "options": {
+          "market_is_casino": "La Bourse, c'est un casino",
+          "need_lots_of_money": "Il faut beaucoup d'argent",
+          "too_late": "Je m'y prends trop tard",
+          "none": "Rien de particulier"
+        }
+      },
+      "format": {
+        "text": "Comment je t'explique le mieux ?",
+        "why": "Pour t'expliquer de la façon qui te convient.",
+        "options": {
+          "examples": "Avec des exemples",
+          "steps": "Étape par étape"
+        }
+      }
     },
     "interest": "Quelque chose t'attire ?",
     "crypto": "Crypto"
@@ -1004,12 +1337,12 @@
       "correct": "Corrigir",
       "delete": "Apagar esta anotação",
       "deleteAll": "Apagar todas as anotações",
-      "memory": "Lembrar neste aparelho",
+      "memory": "Lembrar neste iPhone",
       "said": "Você disse",
       "confirmed": "Você confirmou",
       "shown": "Em um exercício",
       "inferred": "O Bobby deduziu, a confirmar",
-      "empty": "Ainda não há anotações.",
+      "empty": "Aqui aparece o que o Bobby anota das suas respostas. O Bobby funciona igual sem isso.",
       "retention": "Dinheiro e deduções: 7 dias. Outras anotações: 30 dias. Ler não renova o prazo.",
       "expires": "Expira",
       "storageError": "Não consegui salvar as anotações. Tente de novo.",
@@ -1017,7 +1350,7 @@
       "answerPlaceholder": "Sua resposta ao Bobby",
       "answerSend": "Enviar resposta",
       "exerciseExplanation": "Escolhi “{choice}”. O que significa uma queda assim?",
-      "deviceNotes": "Estas notas ficam neste dispositivo quando você sai da conta.",
+      "deviceNotes": "Estas anotações ficam neste iPhone quando você sai da conta. Elas são apagadas se outra conta entrar.",
       "offTitle": "Desativar e apagar suas anotações?",
       "offBody": "Todas as suas anotações neste aparelho serão apagadas. O Bobby deixará de lembrá-las.",
       "offConfirm": "Desativar e apagar minhas anotações",
@@ -1026,7 +1359,118 @@
       "deleteBody": "Todas as suas anotações neste aparelho serão apagadas. A memória continuará ativada.",
       "deleteCancel": "Manter minhas anotações",
       "answerThis": "Responder a esta pergunta",
-      "answerHint": "Toque para escrever; segure para responder falando"
+      "answerHint": "Toque para escrever; segure para responder falando",
+      "invite": "Posso te conhecer um pouco para explicar melhor?",
+      "bobbyAsks": "Pergunta do Bobby: {question}",
+      "notNow": "Agora não",
+      "options": "Opções",
+      "typeAnswer": "Escrever minha resposta",
+      "speakAnswer": "Responder com minha voz",
+      "answerSending": "Enviando sua resposta",
+      "ownWords": "A IA do Bobby lê isso uma vez para escolher uma opção. O Bobby não guarda suas palavras.",
+      "noted": "Anotado: {label}",
+      "notedMany": "Anotado: {n} anotações",
+      "understood": "Entendi: {label}",
+      "exerciseFollowUp": "O que significa uma queda assim?",
+      "notesLineName": "Com suas anotações. Ver minhas anotações",
+      "notSaved": "Não consegui salvar sua escolha. Tente de novo.",
+      "on": "Ativado",
+      "off": "Desativado",
+      "travel": "Um resumo curto das suas anotações vai junto com cada pergunta que o Bobby explica, para o servidor do Bobby e a Anthropic.",
+      "toConfirm": "A confirmar",
+      "offState": "A memória está desativada. O Bobby não guarda anotações.",
+      "needsAI": "Disponível quando você aceitar o aviso de IA.",
+      "memoryOff": "Indisponível no momento.",
+      "noteDeleted": "Anotação apagada",
+      "undo": "Desfazer",
+      "closeNotes": "Fechar minhas anotações",
+      "confirmYes": "Sim, está certo",
+      "leave": "Deixar como está",
+      "detail.said": "Você disse. Expira em {date}.",
+      "detail.confirmed": "Você confirmou. Expira em {date}.",
+      "detail.shown": "De um exercício. Expira em {date}.",
+      "detail.inferred": "O Bobby deduziu das suas palavras. Falta você confirmar. Expira em {date}.",
+      "dialTitle": "Como queres que fale contigo?"
+    },
+    "catalog": {
+      "interest": {
+        "text": "Alguma coisa chama sua atenção?",
+        "why": "Para te dar exemplos do que já te interessa.",
+        "options": {
+          "companies": "Empresas que conheço",
+          "crypto": "Cripto",
+          "government": "Algo do governo",
+          "property": "Um imóvel",
+          "none": "Não faço ideia"
+        }
+      },
+      "barrier": {
+        "text": "O que te segurou até hoje?",
+        "why": "Para começar pelo que mais te trava.",
+        "options": {
+          "fear_of_loss": "Medo de perder",
+          "words": "Não entendo os termos",
+          "where_to_start": "Não sei por onde começar",
+          "no_money": "Sinto que não tenho o bastante",
+          "distrust": "Não confio"
+        }
+      },
+      "when": {
+        "text": "Quando você acha que vai precisar desse dinheiro?",
+        "why": "Falo do dinheiro que você pensaria em investir. O prazo muda quais riscos importam.",
+        "options": {
+          "under_2y": "Em menos de 2 anos",
+          "2_to_7y": "Em 2 a 7 anos",
+          "over_7y": "Em mais de 7 anos",
+          "unsure": "Não sei"
+        }
+      },
+      "cushion": {
+        "text": "Se amanhã surgisse um gasto inesperado, você precisaria desse dinheiro?",
+        "why": "Falo do dinheiro que você pensaria em investir. Se puder precisar dele amanhã, a explicação muda.",
+        "options": {
+          "would_need_it": "Sim",
+          "would_not": "Não",
+          "unsure": "Não sei"
+        }
+      },
+      "hurry": {
+        "text": "Em quanto tempo você gostaria de ver resultados?",
+        "why": "Para te explicar o que costuma se mexer rápido e o que leva tempo.",
+        "options": {
+          "soon": "Logo",
+          "no_rush": "Sem pressa",
+          "unsure": "Não sei"
+        }
+      },
+      "fall": {
+        "text": "Só de brincadeira: 100 vira 80. O que você faria?",
+        "why": "Não há resposta certa. Me ajuda a te explicar o que significa uma queda.",
+        "options": {
+          "pause": "Eu pararia",
+          "understand": "Ia querer entender o porquê",
+          "continue": "Eu continuaria",
+          "unsure": "Não sei"
+        }
+      },
+      "belief": {
+        "text": "O que você sempre ouviu sobre dinheiro ou investir e dá como certo?",
+        "why": "Para te mostrar o que os dados dizem sobre isso.",
+        "options": {
+          "market_is_casino": "A bolsa é um cassino",
+          "need_lots_of_money": "Precisa de muito dinheiro",
+          "too_late": "Já é tarde para mim",
+          "none": "Nada em especial"
+        }
+      },
+      "format": {
+        "text": "Como eu te explico melhor?",
+        "why": "Para te explicar do jeito que funciona melhor para você.",
+        "options": {
+          "examples": "Com exemplos",
+          "steps": "Passo a passo"
+        }
+      }
     },
     "interest": "Alguma coisa chama sua atenção?",
     "crypto": "Cripto"
@@ -1262,12 +1706,12 @@
       "correct": "Correggi",
       "delete": "Elimina questo appunto",
       "deleteAll": "Elimina tutti gli appunti",
-      "memory": "Ricorda su questo dispositivo",
+      "memory": "Ricorda su questo iPhone",
       "said": "Lo hai detto",
       "confirmed": "Lo hai confermato",
       "shown": "In un esercizio",
       "inferred": "Bobby lo ha dedotto, da confermare",
-      "empty": "Ancora nessun appunto.",
+      "empty": "Qui compare ciò che Bobby annota dalle tue risposte. Bobby funziona allo stesso modo anche senza.",
       "retention": "Denaro e deduzioni: 7 giorni. Altri appunti: 30 giorni. Leggerli non rinnova la scadenza.",
       "expires": "Scade",
       "storageError": "Non ho potuto salvare gli appunti. Riprova.",
@@ -1275,16 +1719,127 @@
       "answerPlaceholder": "La tua risposta a Bobby",
       "answerSend": "Invia risposta",
       "exerciseExplanation": "Ho scelto «{choice}». Che cosa significa un calo così?",
-      "deviceNotes": "Queste note restano su questo dispositivo quando esci dal tuo account.",
-      "offTitle": "Disattivare e cancellare i tuoi appunti?",
-      "offBody": "Tutti i tuoi appunti su questo dispositivo verranno cancellati. Bobby smetterà di ricordarli.",
-      "offConfirm": "Disattiva e cancella i miei appunti",
+      "deviceNotes": "Questi appunti restano su questo iPhone quando esci. Vengono eliminati se accede un altro account.",
+      "offTitle": "Disattivare ed eliminare i tuoi appunti?",
+      "offBody": "Tutti i tuoi appunti su questo iPhone verranno eliminati. Bobby smetterà di ricordarli.",
+      "offConfirm": "Disattiva ed elimina i miei appunti",
       "offCancel": "Lascia attivo",
-      "deleteTitle": "Cancellare tutti i tuoi appunti?",
-      "deleteBody": "Tutti i tuoi appunti su questo dispositivo verranno cancellati. La memoria resterà attiva.",
+      "deleteTitle": "Eliminare tutti i tuoi appunti?",
+      "deleteBody": "Tutti i tuoi appunti su questo iPhone verranno eliminati. La memoria resterà attiva.",
       "deleteCancel": "Conserva i miei appunti",
       "answerThis": "Rispondi a questa domanda",
-      "answerHint": "Tocca per scrivere; tieni premuto per rispondere a voce"
+      "answerHint": "Tocca per scrivere; tieni premuto per rispondere a voce",
+      "invite": "Posso conoscerti un po’ per spiegarti meglio?",
+      "bobbyAsks": "Bobby ti chiede: {question}",
+      "notNow": "Non ora",
+      "options": "Opzioni",
+      "typeAnswer": "Scrivi la mia risposta",
+      "speakAnswer": "Rispondi con la mia voce",
+      "answerSending": "Invio della tua risposta",
+      "ownWords": "L’IA di Bobby lo legge una volta per scegliere un’opzione. Bobby non conserva le tue parole.",
+      "noted": "Annotato: {label}",
+      "notedMany": "Annotato: {n} appunti",
+      "understood": "Ho capito: {label}",
+      "exerciseFollowUp": "Che cosa significa un calo così?",
+      "notesLineName": "Con i tuoi appunti. Vedi i miei appunti",
+      "notSaved": "Non sono riuscito a salvare la tua scelta. Riprova.",
+      "on": "Attivo",
+      "off": "Disattivato",
+      "travel": "Un breve riassunto dei tuoi appunti viaggia con ogni domanda che Bobby spiega, verso il server di Bobby e Anthropic.",
+      "toConfirm": "Da confermare",
+      "offState": "La memoria è disattivata. Bobby non conserva appunti.",
+      "needsAI": "Disponibile quando accetti l’avviso sull’IA.",
+      "memoryOff": "Non disponibile al momento.",
+      "noteDeleted": "Appunto eliminato",
+      "undo": "Ripristina",
+      "closeNotes": "Chiudi i miei appunti",
+      "confirmYes": "Sì, è giusto",
+      "leave": "Lascia così",
+      "detail.said": "Lo hai detto. Scade il {date}.",
+      "detail.confirmed": "Lo hai confermato. Scade il {date}.",
+      "detail.shown": "Da un esercizio. Scade il {date}.",
+      "detail.inferred": "Bobby lo ha dedotto dalle tue parole. Manca la tua conferma. Scade il {date}.",
+      "dialTitle": "Come vuoi che ti parli?"
+    },
+    "catalog": {
+      "interest": {
+        "text": "C'è qualcosa che ti incuriosisce?",
+        "why": "Per farti esempi su ciò che già ti interessa.",
+        "options": {
+          "companies": "Aziende che conosco",
+          "crypto": "Cripto",
+          "government": "Qualcosa dello Stato",
+          "property": "Una casa",
+          "none": "Non ne ho idea"
+        }
+      },
+      "barrier": {
+        "text": "Che cosa ti ha frenato finora?",
+        "why": "Per partire da ciò che ti frena di più.",
+        "options": {
+          "fear_of_loss": "Paura di perdere",
+          "words": "Non capisco i termini",
+          "where_to_start": "Non so da dove cominciare",
+          "no_money": "Mi sembra di non avere abbastanza",
+          "distrust": "Non mi fido"
+        }
+      },
+      "when": {
+        "text": "Quando pensi che ti servirà quel denaro?",
+        "why": "Parlo dei soldi che penseresti di investire. L'orizzonte cambia quali rischi contano.",
+        "options": {
+          "under_2y": "Tra meno di 2 anni",
+          "2_to_7y": "Tra 2 e 7 anni",
+          "over_7y": "Tra più di 7 anni",
+          "unsure": "Non lo so"
+        }
+      },
+      "cushion": {
+        "text": "Se domani arrivasse una spesa imprevista, ti servirebbe quel denaro?",
+        "why": "Parlo dei soldi che penseresti di investire. Se potrebbero servirti domani, la spiegazione cambia.",
+        "options": {
+          "would_need_it": "Sì",
+          "would_not": "No",
+          "unsure": "Non lo so"
+        }
+      },
+      "hurry": {
+        "text": "Tra quanto vorresti vedere risultati?",
+        "why": "Per spiegarti cosa di solito si muove in fretta e cosa richiede tempo.",
+        "options": {
+          "soon": "Presto",
+          "no_rush": "Senza fretta",
+          "unsure": "Non lo so"
+        }
+      },
+      "fall": {
+        "text": "Solo per gioco: 100 diventa 80. Che cosa faresti?",
+        "why": "Non c'è una risposta giusta. Mi aiuta a spiegarti cosa significa un calo.",
+        "options": {
+          "pause": "Mi fermerei",
+          "understand": "Vorrei capire perché",
+          "continue": "Andrei avanti",
+          "unsure": "Non lo so"
+        }
+      },
+      "belief": {
+        "text": "Che cosa hai sempre sentito sul denaro o sugli investimenti che dai per vero?",
+        "why": "Per mostrarti cosa dicono i dati al riguardo.",
+        "options": {
+          "market_is_casino": "La borsa è un casinò",
+          "need_lots_of_money": "Servono tanti soldi",
+          "too_late": "Ormai è tardi",
+          "none": "Niente di particolare"
+        }
+      },
+      "format": {
+        "text": "Come ti spiego meglio?",
+        "why": "Per spiegarti nel modo che funziona per te.",
+        "options": {
+          "examples": "Con esempi",
+          "steps": "Passo dopo passo"
+        }
+      }
     },
     "interest": "C'è qualcosa che ti incuriosisce?",
     "crypto": "Cripto"
@@ -1520,12 +2075,12 @@
       "correct": "Korrigieren",
       "delete": "Diese Notiz löschen",
       "deleteAll": "Alle Notizen löschen",
-      "memory": "Auf diesem Gerät merken",
+      "memory": "Auf diesem iPhone merken",
       "said": "Du hast es gesagt",
       "confirmed": "Du hast es bestätigt",
       "shown": "In einer Übung",
       "inferred": "Bobby hat es abgeleitet, noch zu bestätigen",
-      "empty": "Noch keine Notizen.",
+      "empty": "Hier erscheint, was Bobby sich aus deinen Antworten notiert. Bobby funktioniert auch ohne das genauso.",
       "retention": "Geld und abgeleitete Notizen: 7 Tage. Andere Notizen: 30 Tage. Lesen verlängert die Frist nicht.",
       "expires": "Läuft ab",
       "storageError": "Ich konnte die Notizen nicht speichern. Versuche es erneut.",
@@ -1533,16 +2088,127 @@
       "answerPlaceholder": "Deine Antwort an Bobby",
       "answerSend": "Antwort senden",
       "exerciseExplanation": "Ich habe „{choice}“ gewählt. Was bedeutet so ein Rückgang?",
-      "deviceNotes": "Diese Notizen bleiben beim Abmelden auf diesem Gerät.",
+      "deviceNotes": "Diese Notizen bleiben auf diesem iPhone, wenn du dich abmeldest. Sie werden gelöscht, wenn sich ein anderes Konto anmeldet.",
       "offTitle": "Ausschalten und deine Notizen löschen?",
-      "offBody": "Alle deine Notizen auf diesem Gerät werden gelöscht. Bobby wird sie sich nicht mehr merken.",
+      "offBody": "Alle deine Notizen auf diesem iPhone werden gelöscht. Bobby wird sie sich nicht mehr merken.",
       "offConfirm": "Ausschalten und meine Notizen löschen",
       "offCancel": "Eingeschaltet lassen",
       "deleteTitle": "Alle deine Notizen löschen?",
-      "deleteBody": "Alle deine Notizen auf diesem Gerät werden gelöscht. Die Erinnerungsfunktion bleibt eingeschaltet.",
+      "deleteBody": "Alle deine Notizen auf diesem iPhone werden gelöscht. Die Erinnerungsfunktion bleibt eingeschaltet.",
       "deleteCancel": "Meine Notizen behalten",
       "answerThis": "Diese Frage beantworten",
-      "answerHint": "Tippen zum Schreiben; gedrückt halten, um deine Antwort zu sprechen"
+      "answerHint": "Tippen zum Schreiben; gedrückt halten, um deine Antwort zu sprechen",
+      "invite": "Darf ich dich etwas kennenlernen, um besser zu erklären?",
+      "bobbyAsks": "Bobby fragt dich: {question}",
+      "notNow": "Jetzt nicht",
+      "options": "Optionen",
+      "typeAnswer": "Meine Antwort schreiben",
+      "speakAnswer": "Mit meiner Stimme antworten",
+      "answerSending": "Deine Antwort wird gesendet",
+      "ownWords": "Bobbys KI liest das einmal, um eine Option zu wählen. Bobby speichert deine Worte nicht.",
+      "noted": "Notiert: {label}",
+      "notedMany": "Notiert: {n} Notizen",
+      "understood": "Verstanden: {label}",
+      "exerciseFollowUp": "Was bedeutet so ein Rückgang?",
+      "notesLineName": "Mit deinen Notizen. Meine Notizen ansehen",
+      "notSaved": "Ich konnte deine Wahl nicht speichern. Versuch es noch einmal.",
+      "on": "Ein",
+      "off": "Aus",
+      "travel": "Eine kurze Zusammenfassung deiner Notizen geht mit jeder Frage, die Bobby erklärt, an Bobbys Server und an Anthropic.",
+      "toConfirm": "Zu bestätigen",
+      "offState": "Das Gedächtnis ist aus. Bobby behält keine Notizen.",
+      "needsAI": "Verfügbar, sobald du den KI-Hinweis akzeptierst.",
+      "memoryOff": "Derzeit nicht verfügbar.",
+      "noteDeleted": "Notiz gelöscht",
+      "undo": "Rückgängig",
+      "closeNotes": "Meine Notizen schließen",
+      "confirmYes": "Ja, das stimmt",
+      "leave": "So lassen",
+      "detail.said": "Du hast es gesagt. Gültig bis {date}.",
+      "detail.confirmed": "Du hast es bestätigt. Gültig bis {date}.",
+      "detail.shown": "Aus einer Übung. Gültig bis {date}.",
+      "detail.inferred": "Bobby hat es aus deinen Worten abgeleitet. Deine Bestätigung fehlt noch. Gültig bis {date}.",
+      "dialTitle": "Wie soll ich mit dir sprechen?"
+    },
+    "catalog": {
+      "interest": {
+        "text": "Gibt es etwas, das dich neugierig macht?",
+        "why": "Damit meine Beispiele zu dem passen, was dich schon interessiert.",
+        "options": {
+          "companies": "Firmen, die ich kenne",
+          "crypto": "Krypto",
+          "government": "Etwas vom Staat",
+          "property": "Immobilien",
+          "none": "Keine Ahnung"
+        }
+      },
+      "barrier": {
+        "text": "Was hat dich bisher abgehalten?",
+        "why": "Damit ich bei dem anfange, was dich am meisten bremst.",
+        "options": {
+          "fear_of_loss": "Angst zu verlieren",
+          "words": "Ich verstehe die Begriffe nicht",
+          "where_to_start": "Ich weiß nicht, wo ich anfangen soll",
+          "no_money": "Ich habe das Gefühl, es reicht nicht",
+          "distrust": "Ich traue dem nicht"
+        }
+      },
+      "when": {
+        "text": "Wann, glaubst du, brauchst du das Geld?",
+        "why": "Ich meine das Geld, das du anlegen würdest. Der Zeitraum verändert, welche Risiken zählen.",
+        "options": {
+          "under_2y": "In weniger als 2 Jahren",
+          "2_to_7y": "In 2 bis 7 Jahren",
+          "over_7y": "In mehr als 7 Jahren",
+          "unsure": "Ich weiß es nicht"
+        }
+      },
+      "cushion": {
+        "text": "Wenn morgen eine unerwartete Ausgabe käme, bräuchtest du dieses Geld?",
+        "why": "Ich meine das Geld, das du anlegen würdest. Wenn du es morgen brauchen könntest, erkläre ich anders.",
+        "options": {
+          "would_need_it": "Ja",
+          "would_not": "Nein",
+          "unsure": "Ich weiß es nicht"
+        }
+      },
+      "hurry": {
+        "text": "Wie schnell möchtest du Ergebnisse sehen?",
+        "why": "Damit ich erkläre, was sich meist schnell bewegt und was Zeit braucht.",
+        "options": {
+          "soon": "Bald",
+          "no_rush": "Ohne Eile",
+          "unsure": "Ich weiß es nicht"
+        }
+      },
+      "fall": {
+        "text": "Nur zum Spiel: Aus 100 werden 80. Was würdest du tun?",
+        "why": "Es gibt keine richtige Antwort. Es hilft mir zu erklären, was ein Rückgang bedeutet.",
+        "options": {
+          "pause": "Ich würde aufhören",
+          "understand": "Ich würde verstehen wollen, warum",
+          "continue": "Ich würde weitermachen",
+          "unsure": "Ich weiß es nicht"
+        }
+      },
+      "belief": {
+        "text": "Was hast du über Geld oder Geldanlage immer gehört und hältst es für wahr?",
+        "why": "Damit ich dir zeige, was die Daten dazu sagen.",
+        "options": {
+          "market_is_casino": "Die Börse ist ein Casino",
+          "need_lots_of_money": "Man braucht viel Geld",
+          "too_late": "Ich bin schon zu spät dran",
+          "none": "Nichts Besonderes"
+        }
+      },
+      "format": {
+        "text": "Wie erkläre ich es dir am besten?",
+        "why": "Damit ich so erkläre, wie es für dich passt.",
+        "options": {
+          "examples": "Mit Beispielen",
+          "steps": "Schritt für Schritt"
+        }
+      }
     },
     "interest": "Gibt es etwas, das dich neugierig macht?",
     "crypto": "Krypto"

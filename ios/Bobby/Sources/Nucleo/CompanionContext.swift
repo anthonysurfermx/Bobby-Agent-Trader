@@ -25,6 +25,7 @@ struct CompanionQuestion: Codable, Identifiable, Equatable {
     var json: [String: Any] {
         var result: [String: Any] = ["id": id, "text": title, "options": options.map { ["id": $0.id, "label": $0.label[L.language] ?? $0.label["en"] ?? ""] }]
         if let reason = why?[L.language] ?? why?["en"] { result["why"] = reason }
+        result["questionId"] = id; result["money"] = money; result["kind"] = "question"
         return result
     }
 }
@@ -62,7 +63,7 @@ enum CompanionCopy {
         return rows?[L.language] ?? rows?["en"] ?? []
     }
     static var json: [String: Any] {
-        let keys = ["retry", "skip", "close", "personalized", "answerFailed", "answerPlaceholder", "answerSend", "exerciseExplanation", "answerThis", "answerHint"]
+        let keys = (copy["texts"] as? [String: Any]).map { Array($0.keys) } ?? []
         return Dictionary(uniqueKeysWithValues: keys.map { ($0, text($0)) })
     }
 }
@@ -91,6 +92,8 @@ final class CompanionContextStore: ObservableObject {
         var answeredOn: Date? = nil
         var asked: [String] = []
         var notes: [Note] = []
+        var rest: [String: Date]? = nil
+        var rests: [String: Int]? = nil
     }
     @Published private(set) var state = State()
     @Published private(set) var storageError = false
@@ -101,16 +104,22 @@ final class CompanionContextStore: ObservableObject {
     private let write: (Data) -> Bool
     private let remove: () -> Bool
     private var installDefaults: UserDefaults?
+    private(set) var undecodableRecord: Data?
+    private var declineForLaunch = false
     init(account: String = "companion-context-device-v1", read: (() -> Data?)? = nil, write: ((Data) -> Bool)? = nil, remove: (() -> Bool)? = nil) {
         self.account = account
         self.read = read ?? { Self.readKeychain(account) }
         self.write = write ?? { Self.writeKeychain(account, $0) }
         self.remove = remove ?? (write.map { writer in { writer(Data()) } } ?? { Self.removeKeychain(account) })
-        if let data = self.read(), let saved = try? JSONDecoder().decode(State.self, from: data) { state = saved }
+        if let data = self.read() {
+            if let saved = try? JSONDecoder().decode(State.self, from: data) { state = saved }
+            else { undecodableRecord = data; storageError = true }
+        }
     }
     /// The install marker is deliberately outside Keychain, so reinstalling drops an old device record.
     func prepareInstall(defaults: UserDefaults) {
         installDefaults = defaults
+        if let undecodableRecord { defaults.set(undecodableRecord, forKey: "companion.context.undecodable.v1") }
         let key = "companion.context.install.v1"
         guard !defaults.bool(forKey: key) else { return }
         if reset() { defaults.set(true, forKey: key) }
@@ -118,7 +127,7 @@ final class CompanionContextStore: ObservableObject {
     @discardableResult func reset() -> Bool {
         let removed = remove()
         if !removed { installDefaults?.removeObject(forKey: "companion.context.install.v1") }
-        state = State(); storageError = !removed; revision = UUID(); changed()
+        state = State(); declineForLaunch = false; storageError = !removed; revision = UUID(); changed()
         return removed
     }
     private static func removeKeychain(_ account: String) -> Bool {
@@ -126,19 +135,22 @@ final class CompanionContextStore: ObservableObject {
         return status == errSecSuccess || status == errSecItemNotFound
     }
     var accepted: Bool { state.accepted && state.notice == Self.notice }
-    var decided: Bool { state.notice == Self.notice && state.decidedAt != nil }
+    var decided: Bool { declineForLaunch || state.notice == Self.notice && state.decidedAt != nil }
     func allows(_ capability: CompanionPilot.Capability) -> Bool {
         capability.context && capability.catalog == CompanionCatalog.bundled.version && capability.notices.contains(Self.notice)
     }
     @discardableResult private func save(_ proposed: State) -> Bool {
-        guard let data = try? JSONEncoder().encode(proposed), write(data) else { storageError = true; return false }
+        guard undecodableRecord == nil || installDefaults?.data(forKey: "companion.context.undecodable.v1") == undecodableRecord,
+              let data = try? JSONEncoder().encode(proposed), write(data) else { storageError = true; return false }
         state = proposed; storageError = false; revision = UUID(); changed(); return true
     }
     func choose(_ yes: Bool, now: Date = Date(), calendar: Calendar = .current) {
         var next = yes && accepted ? state : State()
         next.notice = Self.notice; next.accepted = yes; next.decidedAt = now
         if yes && !accepted { next.lastOpen = calendar.startOfDay(for: now) }
-        _ = save(next)
+        let stored = save(next)
+        if !yes && !stored { declineForLaunch = true; revision = UUID(); changed() }
+        if yes && stored { declineForLaunch = false }
     }
     func opened(now: Date = Date(), calendar: Calendar = .current) {
         guard accepted else { return }
@@ -148,22 +160,24 @@ final class CompanionContextStore: ObservableObject {
             next.day = min(60, next.day + 1)
         }
         next.lastOpen = today
+        let expired = next.notes.filter { $0.expiresAt <= now }.map(\.field)
         next.notes.removeAll { $0.expiresAt <= now }
+        next.asked.removeAll { expired.contains($0) }
         if next != state { _ = save(next) }
     }
-    func answered(now: Date = Date()) {
+    func answered(now: Date = Date(), calendar: Calendar = .current) {
         guard accepted else { return }
-        opened(now: now)
+        opened(now: now, calendar: calendar)
         var next = state
-        next.answeredOn = Calendar.current.startOfDay(for: now)
+        next.answeredOn = calendar.startOfDay(for: now)
         if next != state { _ = save(next) }
     }
     var mayAskToday: Bool {
         accepted && state.answeredOn.map { Calendar.current.isDateInToday($0) } == true
     }
-    func next(preferred: String? = nil, afterAnswer: Bool = false, now: Date = Date()) -> CompanionQuestion? {
-        guard mayAskToday else { return nil }
-        let eligible = CompanionCatalog.questions.filter { question in question.day <= state.day && !state.asked.contains(question.id) && !state.notes.contains(where: { $0.field == question.id }) }
+    func next(preferred: String? = nil, afterAnswer: Bool = false, now: Date = Date(), calendar: Calendar = .current) -> CompanionQuestion? {
+        guard accepted, state.answeredOn.map({ calendar.isDate($0, inSameDayAs: now) }) == true else { return nil }
+        let eligible = CompanionCatalog.questions.filter { question in question.day <= state.day && !state.asked.contains(question.id) && !state.notes.contains(where: { $0.field == question.id }) && (state.rest?[question.id] ?? .distantPast) <= now }
         let question = preferred.flatMap { id in eligible.first { $0.id == id } } ?? eligible.first
         // Stop the chain at money; do not jump ahead to a later question.
         return afterAnswer && question?.money == true ? nil : question
@@ -177,6 +191,9 @@ final class CompanionContextStore: ObservableObject {
             next.notes.removeAll { $0.field == id }
             next.notes.append(Note(field: id, value: value, source: provenance, createdAt: now,
                 expiresAt: now.addingTimeInterval(Double(question.money || provenance == "inferred" ? 7 : 30) * 86400)))
+        }
+        if value == nil {
+            // Compatibility callers mean a retired question; the scene uses restQuestion instead.
         }
         if !next.asked.contains(id) { next.asked.append(id) }
         _ = save(next)
@@ -195,6 +212,17 @@ final class CompanionContextStore: ObservableObject {
         next.notes.append(Note(field: id, value: value, source: source, createdAt: now,
             expiresAt: now.addingTimeInterval(Double(question.money || source == "inferred" ? 7 : 30) * 86400)))
         if !next.asked.contains(id) { next.asked.append(id) }
+        return save(next)
+    }
+    @discardableResult func restQuestion(_ id: String, now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        guard accepted, CompanionCatalog.question(id) != nil else { return false }
+        var next = state
+        var counts = next.rests ?? [:]; counts[id, default: 0] += 1; next.rests = counts
+        if counts[id] == 1 {
+            var rests = next.rest ?? [:]
+            rests[id] = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now))!
+            next.rest = rests
+        } else if !next.asked.contains(id) { next.asked.append(id) }
         return save(next)
     }
     func delete(_ id: String) { var next = state; next.notes.removeAll { $0.field == id }; _ = save(next) }
@@ -222,4 +250,86 @@ final class CompanionContextStore: ObservableObject {
         guard status == errSecItemNotFound else { return false }
         return SecItemAdd(q.merging(attrs) { _, b in b } as CFDictionary, nil) == errSecSuccess
     }
+}
+
+/// Install-local invitation counters. Never included by wire(); dates use the person's calendar.
+@MainActor
+final class CompanionPacing {
+    struct State: Codable {
+        var educational = 0
+        var inviteDay: Date?
+        var inviteRest: Date?
+        var untapped = 0
+        var cycles = 0
+        var declines = 0
+        var retired = false
+        var dialShown = false
+        var day: Date?
+        var chipsUntapped = 0
+        var scenes = 0
+        var moneyShown = false
+        var suppressNextAnswer = false
+    }
+    private(set) var state: State
+    private let defaults: UserDefaults
+    private let key = "companion.pacing.v2"
+    init(defaults: UserDefaults) {
+        self.defaults = defaults
+        state = defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(State.self, from: $0) } ?? State()
+    }
+    private func save() { if let data = try? JSONEncoder().encode(state) { defaults.set(data, forKey: key) } }
+    func reset(retired: Bool = false) { state = State(); state.retired = retired; save() }
+    private func today(_ now: Date, _ calendar: Calendar) {
+        let day = calendar.startOfDay(for: now)
+        if state.day != day { state.day = day; state.chipsUntapped = 0; state.scenes = 0; state.moneyShown = false }
+    }
+    func delivered(now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        today(now, calendar); state.educational += 1
+        let suppressed = state.suppressNextAnswer; state.suppressNextAnswer = false; save()
+        return !suppressed && state.chipsUntapped < 2 && state.scenes < 2
+    }
+    func remembers(decided: Bool, now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        !decided && !state.retired && state.educational >= 2 && state.inviteDay != calendar.startOfDay(for: now) && (state.inviteRest ?? .distantPast) <= now
+    }
+    func dialDue(decided: Bool, now: Date = Date()) -> Bool {
+        !state.dialShown && (decided || state.retired || (state.inviteRest ?? .distantPast) > now)
+    }
+    func permits(_ question: CompanionQuestion, now: Date = Date(), calendar: Calendar = .current) -> Bool {
+        today(now, calendar)
+        return state.scenes < 2 && state.chipsUntapped < 2 && (!question.money || !state.moneyShown)
+    }
+    // A showing is provisionally untapped; the explicit tap rolls it back. No timer records a decision.
+    func shown(_ kind: String, now: Date = Date(), calendar: Calendar = .current) {
+        today(now, calendar)
+        state.chipsUntapped += 1
+        if kind == "invite" { state.inviteDay = calendar.startOfDay(for: now); state.untapped += 1 }
+        else if kind == "dial" { state.dialShown = true }
+        save()
+    }
+    func shown(_ question: CompanionQuestion, now: Date = Date(), calendar: Calendar = .current) {
+        shown("question", now: now, calendar: calendar)
+        if question.money { state.moneyShown = true; save() }
+    }
+    func tapInvite() { state.untapped = max(0, state.untapped - 1); tappedChip() }
+    func tappedChip() { state.chipsUntapped = max(0, state.chipsUntapped - 1); save() }
+    func leftInvite(now: Date = Date(), calendar: Calendar = .current) {
+        if state.untapped >= 3 {
+            state.untapped = 0; state.cycles += 1
+            state.inviteRest = calendar.date(byAdding: .day, value: 7, to: now)
+            if state.cycles >= 3 { state.retired = true }
+        }
+        save()
+    }
+    func declined(now: Date = Date(), calendar: Calendar = .current) {
+        state.declines += 1
+        state.inviteRest = calendar.date(byAdding: .day, value: 30, to: now)
+        if state.declines >= 3 { state.retired = true }
+        save()
+    }
+    func scene(_ question: CompanionQuestion, now: Date = Date(), calendar: Calendar = .current) {
+        today(now, calendar); state.chipsUntapped = max(0, state.chipsUntapped - 1); state.scenes += 1
+        if question.money { state.moneyShown = true }
+        save()
+    }
+    func noted() { state.suppressNextAnswer = true; save() }
 }

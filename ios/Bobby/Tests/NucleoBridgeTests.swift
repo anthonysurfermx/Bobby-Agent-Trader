@@ -999,26 +999,62 @@ final class NucleoBridgeTests: XCTestCase {
         session.companionContext.choose(true)
         let reply = await result(bridge, "ask", ["question": "What does investing mean?"])
         XCTAssertEqual(reply["status"] as? String, "companion")
-        XCTAssertEqual(reply["personalized"] as? Bool, true)
-        XCTAssertNil(reply["companionCheckIn"], "I-1 never puts a personal question on the glass")
-        _ = session.companionCheckIn() // The explicit Profile memory path stays available.
-        XCTAssertNil(session.desk.pendingRead())
-        XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("desk-debate") || $0.contains("voice-tool") })
+        XCTAssertEqual((reply["invitation"] as? [String: Any])?["questionId"] as? String, "interest")
+        _ = await result(bridge,"companion.presented",["questionId":"interest","opened":true])
         let before = NucleoFixtures.log.count
         let next = await result(bridge, "companion.answer", ["questionId": "interest", "value": "crypto"])
-        XCTAssertEqual((next["question"] as? [String: Any])?["id"] as? String, "barrier")
-        let skipped = await result(bridge, "companion.answer", ["questionId": "barrier"])
-        XCTAssertTrue(skipped["question"] is NSNull, "a money question waits for the next reply")
-        XCTAssertEqual(NucleoFixtures.log.count, before, "a tap or skip has no server request")
+        XCTAssertEqual(next["status"] as? String,"noted")
+        XCTAssertEqual((next["note"] as? [String:Any])?["source"] as? String,"said")
+        XCTAssertEqual((next["next"] as? [String: Any])?["id"] as? String, "barrier")
+        let skipped = await result(bridge, "companion.answer", ["questionId": "barrier","rest":true])
+        XCTAssertEqual(skipped["status"] as? String,"rested")
+        XCTAssertEqual(NucleoFixtures.log.count, before, "a tap or rest has no server request")
         XCTAssertEqual(session.companionContext.state.notes.count, 1)
-        XCTAssertEqual(session.companionContext.state.asked, ["interest", "barrier"])
-        let moneyReply = await result(bridge, "ask", ["question": "How does bitcoin work?", "companion": true])
-        XCTAssertNil(moneyReply["companionCheckIn"])
-        XCTAssertEqual((session.companionCheckIn()["question"] as? [String: Any])?["id"] as? String, "when")
-        XCTAssertEqual(session.companionContext.state.asked, ["interest", "barrier"])
-        XCTAssertEqual(NucleoFixtures.log.filter { $0.contains("bobby-asset-search") }.count, 1, "follow-up skips the asset search")
-        XCTAssertEqual(NucleoFixtures.log.filter { $0.contains("GET") && $0.contains("companion-turn") }.count, 1)
+        XCTAssertEqual(session.companionContext.state.asked, ["interest"])
+        XCTAssertNotNil(session.companionContext.state.rest?["barrier"])
+        let following = await result(bridge, "ask", ["question":"How does bitcoin work?","companion":true])
+        XCTAssertTrue(following["invitation"] is NSNull,"5.6.1: no chip directly after a note")
+        XCTAssertNil(session.desk.pendingRead()); XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("desk-debate") })
         session.teardown()
+    }
+
+    func testCancellingAnOwnWordsAnswerNeverAppliesItsLateValidatedNote() async {
+        NucleoFixtures.setScenario("companion-answer-slow")
+        let (session, bridge, _) = make()
+        session.companionContext.choose(true)
+        _ = await result(bridge, "ask", ["question":"What is investing?","companion":true])
+        _ = await result(bridge, "companion.presented", ["questionId":"interest","opened":true])
+        NucleoFixtures.clearLog()
+        let pending = Task { await self.result(bridge, "companion.answer", ["questionId":"interest","text":"my private words"]) }
+        try? await Task.sleep(for: .milliseconds(20))
+        _ = await result(bridge, "cancel", [:])
+        let reply = await pending.value
+        XCTAssertEqual(reply["status"] as? String, "cancelled")
+        XCTAssertTrue(session.companionContext.state.notes.isEmpty)
+        XCTAssertEqual(NucleoFixtures.log.filter { $0.contains("POST /api/companion-turn") }.count, 1)
+        session.teardown()
+    }
+
+    func testInvitationNeedsExplicitTapAndCurrentMemoryCapability() async {
+        NucleoFixtures.setScenario("companion")
+        let (session,bridge,recorder)=make()
+        let first=await result(bridge,"ask",["question":"What is investing?","companion":true])
+        XCTAssertTrue(first["invitation"] is NSNull)
+        let second=await result(bridge,"ask",["question":"What is a share?","companion":true])
+        XCTAssertEqual((second["invitation"] as? [String:Any])?["kind"] as? String,"remember")
+        _ = await result(bridge,"companion.presented",["kind":"invite"])
+        XCTAssertNil(session.sheet);XCTAssertFalse(recorder.events.contains{$0.name=="native.sheet"})
+        let invite=await result(bridge,"companion.invite",[:]);XCTAssertEqual(invite["status"] as? String,"opened")
+        XCTAssertEqual(session.sheet,.companionConsent);XCTAssertFalse(session.companionContext.accepted)
+        session.companionContext.choose(true);session.companionConsentFinished(true);session.sheetDismissed()
+        XCTAssertTrue(session.companionContext.accepted);XCTAssertTrue(recorder.events.contains{$0.name=="companion.checkIn"})
+        session.teardown()
+        for scenario in ["companion-mismatch","companion-plain"] {
+            NucleoFixtures.setScenario(scenario);let (blocked,b,_)=make()
+            _ = await result(b,"ask",["question":"What is investing?","companion":true])
+            let r=await result(b,"companion.invite",[:]);XCTAssertEqual(r["status"] as? String,"unavailable");XCTAssertNil(blocked.sheet)
+            blocked.teardown()
+        }
     }
 
     func testCompanionOfferAndLimitLeaveTheGuessUnspentUntilConfirmation() async {

@@ -7,7 +7,7 @@
 import Foundation
 
 enum NucleoFixtures {
-    static let scenarios: Set<String> = ["companion-probe-recovery","companion-gist-long","companion-limit-today","companion-limit-tomorrow","companion-confirm-last","companion-confirm-unknown","companion-confirm-guest","companion-confirm-deep","companion-confirm-max","companion-pro-deep","companion-confirm-long","companion-no-gist", "companion-wrong-gist", "companion-paused", "companion-retry", "companion-closing", "companion-no-followup", "companion-long", "companion-pro", "companion-waiting", "companion", "companion-fact", "companion-answer-error", "companion-exercise", "companion-belief", "companion-plain", "companion-off", "companion-error", "companion-limit", "companion-mismatch", "companion-offer", "default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline",
+    static let scenarios: Set<String> = ["companion-answer-slow","companion-probe-recovery","companion-gist-long","companion-limit-today","companion-limit-tomorrow","companion-confirm-last","companion-confirm-unknown","companion-confirm-guest","companion-confirm-deep","companion-confirm-max","companion-pro-deep","companion-confirm-long","companion-no-gist", "companion-wrong-gist", "companion-paused", "companion-retry", "companion-closing", "companion-no-followup", "companion-long", "companion-pro", "companion-waiting", "companion", "companion-fact", "companion-answer-error", "companion-exercise", "companion-belief", "companion-plain", "companion-off", "companion-error", "companion-limit", "companion-mismatch", "companion-offer", "default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline",
                                          "signin_required", "subscription_required",
                                          "levels", "upgrade_required", "level_exhausted", "budget_paused"]
     /// Analysis levels (DEBUG QA): `levels` answers a premium desk with a synthesis, a second round, scenarios,
@@ -203,7 +203,7 @@ enum NucleoFixtures {
                 return (Self.json(200, ["version": 1, "kind": "noted",
                     "patch": ["notes": [["field": id, "value": value, "source": text == "???" ? "inferred" : (id == "fall" ? "shown" : "said")]], "asked": [id]],
                     "checkIn": next.map { ["questionId": $0.id] as Any } ?? NSNull(),
-                    "allowance": ["kind": "orientation", "consumed": 1, "remaining": 4]]), quick)
+                    "allowance": ["kind": "orientation", "consumed": 1, "remaining": 4]]), scenario == "companion-answer-slow" ? 30 : quick)
             }
             if scenario == "companion-fact", let root = Bundle.main.url(forResource: "Nucleo", withExtension: nil),
                let data = try? Data(contentsOf: root.appendingPathComponent("fixtures/native/companion-explanation-fact.json")),

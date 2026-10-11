@@ -565,7 +565,7 @@ final class NucleoSpeech {
             guard !Task.isCancelled, let self, self.listening, self.session == token else { return }
             if mode != "empty" {
                 let texts = ["en":"What is investing?", "es":"¿Qué es invertir?", "fr":"C’est quoi, investir ?", "pt":"O que é investir?", "it":"Che cos’è investire?", "de":"Was heißt investieren?"]
-                let text = texts[L.language] ?? texts["en"]!
+                let text = mode == "memory" ? (CompanionCatalog.question("when")?.label("2_to_7y") ?? texts["en"]!) : (texts[L.language] ?? texts["en"]!)
                 self.latestText = String(text.split(separator: " ").dropLast().joined(separator: " "))
                 self.emit("speech.partial", ["text": self.latestText])
                 try? await Task.sleep(nanoseconds: 300_000_000)

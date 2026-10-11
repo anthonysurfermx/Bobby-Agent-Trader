@@ -16,7 +16,7 @@ class ConversationFixtureCase: XCTestCase {
     func button(_ key: String) -> XCUIElement { web.buttons[word(key)] }
     override func setUp() { continueAfterFailure = false }
     override func tearDown() { app?.terminate(); super.tearDown() }
-    func launch(_ scenario: String = "companion-plain", speech: String = "words", voice: Bool = false, permission: String = "granted", notes: Bool = false, voiceFails: Bool = false, level: String = "rapido", home: String = "fresh") {
+    func launch(_ scenario: String = "companion-plain", speech: String = "words", voice: Bool = false, permission: String = "granted", notes: Bool = false, voiceFails: Bool = false, level: String = "rapido", home: String = "fresh", memory: String? = nil, contentSize: String? = nil, memoryFailure: Bool = false) {
         app = XCUIApplication()
         app.launchArguments = ["-nucleo-fixtures", scenario, "-nucleo-page", "app", "-qa-companion", "-qa-speech-fixture", speech, "-qa-speech-permission", permission,
             "-AppleLanguages", "(\(language))", "-app.language", language, "-AppleLocale", ["es":"es_MX", "de":"de_DE", "pt":"pt_PT", "it":"it_IT", "en":"en_US", "fr":"fr_FR"][language]!,
@@ -28,6 +28,9 @@ class ConversationFixtureCase: XCTestCase {
         if home == "nudge" { app.launchArguments += ["-qa-home-nudge"] }
         if voice { app.launchArguments += ["-qa-voice-fixture", voiceFails ? "failure" : "success"] }
         if notes { app.launchArguments += ["-qa-redesign-notes"] }
+        if let memory { app.launchArguments += ["-qa-memory-fixture",memory] }
+        if let contentSize { app.launchArguments += ["-UIPreferredContentSizeCategoryName",contentSize] }
+        if memoryFailure { app.launchArguments += ["-qa-memory-save-failure"] }
         app.launch(); ready(button("aria.type"))
     }
     func ready(_ element: XCUIElement, timeout: Double = 25) {
@@ -145,7 +148,11 @@ final class WithoutHelpUITests: ConversationFixtureCase {
         XCTAssertFalse(app.staticTexts["nucleo-notch"].exists); shot("29-without-help-cost")
     }
     func testFinishWithoutPersonalQuestions() {
-        launch("companion"); ask(); answered(); button("aria.closeAnswer").tap(); ready(button("aria.type")); ask(); answered(); shot("30-without-help-no-personal-questions")
+        launch("companion", memory: "remember"); ask(); answered()
+        ready(web.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",((labels["companion"] as! [String:String])["bobbyAsks"]!).components(separatedBy:"{question}")[0])).firstMatch); shot("30a-due-chip-untouched")
+        XCTAssertFalse(app.buttons["companion-consent-yes"].exists); XCTAssertFalse(web.buttons[labels["crypto"] as! String].exists)
+        button("aria.closeAnswer").tap(); ready(button("aria.type")); ask(); answered()
+        XCTAssertFalse(app.buttons["companion-consent-yes"].exists); shot("30-without-help-no-personal-questions")
     }
 }
 
@@ -499,4 +506,81 @@ final class FirstRunHoldFieldGuarantees: FirstRunFixtureCase {
         XCTAssertEqual(web.textViews.firstMatch.value as? String,firstWords["ex.1"]!)
         physicalControls([web.buttons[firstWords["type.send"]!]],abovePill:false);shot("99-hold-first-run-field-no-microphone")
     }
+}
+
+final class MemoryInvitationShots: ConversationFixtureCase {
+    func copy(_ key: String) -> String { (labels["companion"] as! [String:String])[key]! }
+    var chip: XCUIElement { web.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",copy("bobbyAsks").components(separatedBy:"{question}")[0])).firstMatch }
+    func option(_ id: String, field: String) -> XCUIElement { let question=(labels["catalog"] as! [String:[String:Any]])[field]!;return web.buttons[(question["options"] as! [String:String])[id]!] }
+    var noted: XCUIElement { web.buttons.matching(NSPredicate(format:"label CONTAINS %@ OR label BEGINSWITH %@",copy("noted").components(separatedBy:"{label}")[0],copy("understood").components(separatedBy:"{label}")[0])).firstMatch }
+    var exitScene: XCUIElement { web.buttons[copy("notNow")] }
+    func invite(_ kind: String = "remember", size: String? = nil, failure: Bool = false, scenario: String = "companion") {
+        launch(scenario,speech:kind == "money" ? "memory" : "words",memory:kind,contentSize:size,memoryFailure:failure);ask();answered();ready(chip);physicalControls([chip]);
+    }
+    func openQuestion(_ kind: String = "question", size: String? = nil, scenario: String = "companion") {
+        invite(kind,size:size,scenario:scenario);chip.tap();ready(exitScene)
+        XCTAssertFalse(button("aria.closeAnswer").isHittable);physicalControls([exitScene]);
+    }
+    func test01RememberChip() { invite();shot("01-remember-chip") }
+    func test02QuestionChip() { invite("question");shot("02-question-chip") }
+    func test03DialChip() { invite("dial");shot("03-dial-chip") }
+    func consent(_ size: String?, name: String) {
+        invite(size:size);chip.tap();let yes=app.buttons["companion-consent-yes"],no=app.buttons["companion-consent-no"],details=app.buttons["companion-consent-details"]
+        ready(yes);ready(no);ready(details);physicalControls([yes,no,details],abovePill:false)
+        XCTAssertEqual(yes.frame.width,no.frame.width,accuracy:1);XCTAssertEqual(yes.frame.height,no.frame.height,accuracy:1)
+        shot(name)
+    }
+    func test04ConsentDefault() { consent("UICTContentSizeCategoryL",name:"04-consent-default") }
+    func test05ConsentPlusOne() { consent("UICTContentSizeCategoryXL",name:"05-consent-plus1") }
+    func test06ConsentLargest() { consent("UICTContentSizeCategoryAccessibilityXXXL",name:"06-consent-largest") }
+    func test07ConsentSaveFailsAndNotNowCloses() {
+        invite(failure:true);chip.tap();ready(app.buttons["companion-consent-yes"]);XCTAssertFalse(app.staticTexts["companion-consent-error"].exists)
+        app.buttons["companion-consent-yes"].tap();ready(app.staticTexts["companion-consent-error"]);shot("07-consent-save-failed")
+        app.buttons["companion-consent-no"].tap();ready(button("aria.closeAnswer"));XCTAssertFalse(web.buttons[labels["crypto"] as! String].exists);shot("08-consent-failure-declined")
+    }
+    func test08SwipeConsentRecordsNothing() {
+        invite();chip.tap();ready(app.buttons["companion-consent-no"])
+        app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.15)).press(forDuration:0.1,thenDragTo:app.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.9)))
+        ready(button("aria.closeAnswer"));XCTAssertFalse(option("crypto",field:"interest").exists);shot("09-consent-swiped-no-decision")
+    }
+    func test09YesOpensInterestThenBarrierAndNoted() {
+        invite();chip.tap();ready(app.buttons["companion-consent-yes"]);app.buttons["companion-consent-yes"].tap();ready(exitScene)
+        physicalControls([option("crypto",field:"interest"),exitScene]);shot("10-question-five-options")
+        option("crypto",field:"interest").tap();ready(option("words",field:"barrier"));shot("11-question-barrier")
+        option("words",field:"barrier").tap();ready(noted);physicalControls([noted]);shot("12-noted-two-notes")
+        XCTAssertTrue(button("aria.closeAnswer").exists);XCTAssertFalse(exitScene.exists)
+    }
+    func test10MoneyNeverChains() { openQuestion("money");shot("13-money-question");let option=option("under_2y",field:"when");ready(option);option.tap();ready(noted);shot("14-noted-one-option");XCTAssertFalse(exitScene.exists) }
+    func test11BarrierDragDoesNotChoose() {
+        openQuestion("barrier");let options=web.otherElements[copy("options")]
+        let start=options.coordinate(withNormalizedOffset:CGVector(dx:0.85,dy:0.5)),end=options.coordinate(withNormalizedOffset:CGVector(dx:0.15,dy:0.5))
+        start.press(forDuration:0.1,thenDragTo:end);XCTAssertTrue(exitScene.exists);XCTAssertFalse(noted.exists);shot("15-long-label-row-scrolled")
+    }
+    func test12LargestList() { openQuestion("barrier",size:"UICTContentSizeCategoryAccessibilityXXXL");shot("16-options-list");web.swipeUp();physicalControls([exitScene]);shot("17-options-list-scrolled") }
+    func typeAnswer(_ text: String) {
+        web.buttons[copy("typeAnswer")].tap();ready(web.textViews.firstMatch);web.textViews.firstMatch.tap()
+        if let intro=app.buttons.matching(NSPredicate(format:"label == 'Continue'")).allElementsBoundByIndex.first(where:{$0.isHittable && $0.frame.minY>app.windows.firstMatch.frame.height*0.7}) { intro.tap() }
+        web.textViews.firstMatch.typeText(text);XCTAssertTrue(web.staticTexts[copy("ownWords")].exists)
+    }
+    var ownAnswer: String { ((labels["catalog"] as! [String:[String:Any]])["when"]!["options"] as! [String:String])["2_to_7y"]! }
+    func test13TypedAnswerAndUnderstood() {
+        openQuestion("money");typeAnswer(ownAnswer);shot("18-typed-answer-own-words")
+        ready(web.buttons[copy("answerSend")]);web.buttons[copy("answerSend")].tap();ready(noted);XCTAssertTrue(noted.label.contains(copy("correct")));shot("19-understood-own-words")
+    }
+    func test14SpokenAnswer() {
+        openQuestion("money");web.buttons[copy("speakAnswer")].tap();ready(button("aria.sendSpoken"));Thread.sleep(forTimeInterval:1)
+        XCTAssertTrue(web.staticTexts[copy("ownWords")].exists);shot("20-spoken-answer-own-words");button("aria.sendSpoken").tap();ready(noted);shot("21-understood-spoken")
+    }
+    func test15AnswerErrorKeepsDraftAndOptions() {
+        openQuestion("money",scenario:"companion-answer-error");typeAnswer(ownAnswer);web.buttons[copy("answerSend")].tap();ready(web.textViews.firstMatch)
+        XCTAssertEqual(web.textViews.firstMatch.value as? String,ownAnswer);ready(web.staticTexts[copy("answerFailed")]);shot("22-answer-error-draft-kept")
+    }
+    func test17SendingCancelKeepsDraftAndIgnoresLateAnswer() {
+        openQuestion("money",scenario:"companion-answer-slow");typeAnswer(ownAnswer)
+        web.buttons[copy("answerSend")].tap();ready(button("aria.cancelQuestion"));shot("25-answer-sending-stop",delay:0)
+        button("aria.cancelQuestion").tap();ready(web.textViews.firstMatch)
+        XCTAssertEqual(web.textViews.firstMatch.value as? String,ownAnswer)
+        Thread.sleep(forTimeInterval:1);XCTAssertFalse(noted.exists);shot("26-answer-cancel-draft-kept")
+    }
+    func test16ExerciseFollowUpOnlyOnTap() { openQuestion("fall");shot("23-exercise-question");let option=option("pause",field:"fall");ready(option);option.tap();ready(web.buttons.matching(NSPredicate(format:"label CONTAINS %@",copy("exerciseFollowUp"))).firstMatch);shot("24-exercise-followup") }
 }

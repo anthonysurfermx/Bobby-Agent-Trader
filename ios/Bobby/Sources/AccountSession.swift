@@ -107,7 +107,7 @@ final class AccountSession: ObservableObject {
     var oauthAuthorization: @MainActor (URL) async throws -> URL = {
         try await WebAuthPresenter.shared.run(url: $0, scheme: "bobbyprotocol")
     }
-    var eraseCompanionNotes: () -> Void = { _ = CompanionContextStore.shared.reset() }
+    var eraseCompanionNotes: () -> Void = { _ = CompanionContextStore.shared.reset(); CompanionPacing(defaults: .standard).reset(retired: true) }
     /// Apple's re-authorization for deletion; tests stand in for the sheet.
     var appleDeletionCode: @MainActor () async throws -> String = { try await AppleDeletionAuthorization.shared.authorize() }
 
