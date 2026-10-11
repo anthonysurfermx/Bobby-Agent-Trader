@@ -193,6 +193,13 @@ final class NativeSpeechPipelineTests: XCTestCase {
         let session = NucleoSession(fixtures: true, speech: c.speech, defaults: defaults)
         let recorder = SpeechSessionRecorder(context: c)
         session.emitter = recorder
+        // A fresh install must block off-device recognition before the risk notice,
+        // independently of whichever profile a previous suite left in standard defaults.
+        session.profile.riskNoticeVersion = 0
+        let beforeRisk = try await session.dispatch("speech.start", NucleoParams([:])) as? [String: Any]
+        XCTAssertEqual(beforeRisk?["status"] as? String, "unavailable")
+        XCTAssertNil(c.capture.request)
+        session.profile.riskNoticeVersion = RiskNotice.currentVersion
         // The session installs the native alert; here the test answers in its place.
         var prompts = 0, answer = false
         c.speech.confirmAppleService = { prompts += 1; return answer }
@@ -244,6 +251,13 @@ final class NativeSpeechPipelineTests: XCTestCase {
             XCTAssertEqual(c.speech.start(), .listening)
             c.recognizer.deliver(item.2, final: true)
             await settle()
+            if NucleoTalkMode.tap {
+                XCTAssertFalse(c.speech.isListening)
+                XCTAssertEqual(c.texts("speech.final"), [])
+                XCTAssertTrue(c.events.contains { $0.0 == "speech.error" && $0.1["text"] as? String == item.2 })
+                XCTAssertEqual(c.speech.stop(cancel: false), .idle)
+                continue
+            }
             XCTAssertTrue(c.speech.isListening, "The hold still owns confirmation: " + item.1)
             XCTAssertFalse(c.capture.opened, item.1)
             XCTAssertEqual(c.states, ["listening"], item.1)
@@ -321,13 +335,14 @@ final class NativeSpeechPipelineTests: XCTestCase {
             XCTAssertEqual(c.speech.start(), .listening)
             c.recognizer.deliver(item.2, final: false)
             await settle()
-            XCTAssertEqual(c.clock.waits.map(\.seconds), [60])
+            XCTAssertTrue(c.clock.waits.map(\.seconds).contains(60))
+            XCTAssertEqual(c.clock.waits.map(\.seconds).contains(10), NucleoTalkMode.tap)
             c.clock.resume(seconds: 60)
             await settle()
             XCTAssertFalse(c.capture.opened)
             XCTAssertFalse(c.speech.isListening)
             XCTAssertEqual(c.texts("speech.final"), [])
-            XCTAssertEqual(c.events.last?.1["code"] as? String, "interrupted")
+            XCTAssertTrue(c.events.contains { $0.0 == "speech.error" && $0.1["code"] as? String == "interrupted" })
             c.recognizer.deliver(item.2, final: true)
             c.clock.drain()
             await settle()
@@ -462,7 +477,7 @@ final class NativeSpeechPipelineTests: XCTestCase {
             c.recognizer.deliver(item.2, final: true)
             await settle()
             XCTAssertEqual(c.texts("speech.final"), [])
-            XCTAssertEqual(c.events.last?.1["code"] as? String, "interrupted")
+            XCTAssertTrue(c.events.contains { $0.0 == "speech.error" && $0.1["code"] as? String == "interrupted" })
             XCTAssertEqual(c.speech.start(), .listening)
             NotificationCenter.default.post(name: AVAudioSession.routeChangeNotification, object: nil,
                 userInfo: [AVAudioSessionRouteChangeReasonKey: AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue])

@@ -32,19 +32,19 @@ final class NucleoNotch: ObservableObject {
     func stage(_ payload: [String: Any]) {
         guard let stage = payload["stage"] as? String else { return }
         if stage != "resolving" {
-            guard visible, payload["requestId"] as? String == requestID else { return }
+            guard payload["requestId"] as? String == requestID else { return }
         }
         switch stage {
         case "resolving":
             reset()
             requestID = payload["requestId"] as? String
-            visible = true
-            push(L.t("Finding the asset", "Buscando el activo"))
+            // Neutral routing keeps the notch hidden.
         case "accepted":
             let asset = payload["asset"] as? [String: Any]
             symbol = asset?["symbol"] as? String
             currency = asset?["currency"] as? String
-            push(L.t("Reading \(symbol ?? "the asset")", "Leyendo \(symbol ?? "el activo")"))
+            visible = true
+            push(ConversationCopy.reading(asset?["name"] as? String ?? symbol ?? ""))
         case "market":
             let market = payload["market"] as? [String: Any]
             if let price = market?["price"] as? Double {
@@ -108,15 +108,7 @@ final class NucleoNotch: ObservableObject {
         switch status {
         case "ok":
             mood = .done
-            let agents = result["agents"] as? [String: Any]
-            let direction = agents?["direction"] as? String
-            let lean: String
-            switch direction {
-            case "long": lean = L.t("leans long", "se inclina al alza")
-            case "short": lean = L.t("leans short", "se inclina a la baja")
-            default: lean = L.t("no clear side", "sin lado claro")
-            }
-            push(L.t("Read ready · \(lean)", "Lectura lista · \(lean)"))
+            push(ConversationCopy.ready())
             hide(after: 2.4)
         case "cancelled":
             reset()

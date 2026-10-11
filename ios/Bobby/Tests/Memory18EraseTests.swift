@@ -41,6 +41,7 @@ final class Memory18EraseTests: XCTestCase {
 
     private func center(reply: @escaping (String, String) throws -> (json: Any?, status: Int)) -> MemoryCenter {
         let c = MemoryCenter(observeAccount: false, defaults: defaults)
+        c.eraseCompanionNotes = {}
         c.currentUser = { [unowned self] in self.user }
         c.currentGeneration = { [unowned self] in self.generation }
         c.riskAccepted = { true }
@@ -155,8 +156,11 @@ final class Memory18EraseTests: XCTestCase {
         let c = online()
         await c.refresh()
         calls = []
+        var erasedNotes = 0
+        c.eraseCompanionNotes = { erasedNotes += 1 }
         let unconfirmed = await c.confirmForgetAll()
         XCTAssertFalse(unconfirmed)
+        XCTAssertEqual(erasedNotes, 0)
         XCTAssertEqual(shortcuts("a"), ["NVDA", "BTC"], "nothing is deleted without the confirmation")
         XCTAssertEqual(theses("a"), 1)
         c.requestForgetAll()
@@ -165,6 +169,7 @@ final class Memory18EraseTests: XCTestCase {
         XCTAssertTrue(calls.isEmpty)
         c.requestForgetAll()
         let ok = await c.confirmForgetAll()
+        XCTAssertEqual(erasedNotes, 1)
         XCTAssertTrue(ok)
         XCTAssertEqual(calls.map(\.method), ["DELETE"])
         XCTAssertEqual(calls.first?.path, "api/memory", "a bare DELETE: the contract iOS 1.7 already uses")

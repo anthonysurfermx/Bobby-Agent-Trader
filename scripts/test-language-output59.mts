@@ -96,7 +96,11 @@ for (const dir of ['ios/Bobby/Nucleo', 'nucleo']) {
   const onReply = app.slice(app.indexOf('function onAskReply('), app.indexOf('function onStage('));
   const consumer = { RMOD: RM, LANG: 'en', LOCALE: 'en-US', SES: { signedIn: true }, READ: {} as any,
     fsmEvent() {}, logErr(_name: string, error: unknown) { throw error; } };
-  vm.createContext(consumer); vm.runInContext(onReply, consumer);
+  vm.createContext(consumer);
+  // Build 69 added a companion predicate to the iPhone market consumer.
+  // Load the real predicate without replacing any output assertions.
+  if (dir === 'ios/Bobby/Nucleo') vm.runInContext(app.match(/^function paramsCompanion\(params\).*$/m)![0] + '\nvar GUIDE_RETRIES = 0, CHECKIN = null;', consumer);
+  vm.runInContext(onReply, consumer);
   for (const [lang, locale] of variants) {
     const w = words[lang], r = fixture();
     r.asset = { ...r.asset, symbol: 'MC.PA', name: 'LVMH', isEquity: true, currency: 'EUR' };

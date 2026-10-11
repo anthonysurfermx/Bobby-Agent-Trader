@@ -23,6 +23,7 @@ function applySession(s, first){
   if (s.analysisLevel) lvlApply(s.analysisLevel);
   var prevId = SES && SES.companion ? SES.companion.id : null;
   SES = s;
+  if (typeof guideLayout === 'function') guideLayout();
   SES.mic = SES.mic || { state: 'undetermined', onDevice: true };
   var oldLang = LANG, oldLocale = LOCALE;
   LANG = NucleoLocale.language(s.language); LOCALE = NucleoLocale.locale(LANG, s.locale || s.speechLocale || s.localeRegion);
@@ -92,15 +93,21 @@ function wire(){
   if (!BR) return;
   BR.on('session.changed', function(s){
     var walled = oneTapOff();
+    if(s&&NucleoLocale.language(s.language)!==LANG)conversationReset();
     applySession(s, false);
+    var limit=s&&s.companionPilot&&s.companionPilot.limit;
+    if(GUIDE&&GUIDE.code==='limit'&&limit&&limit.requestId===GUIDE.requestId){GUIDE.limitLine=limit.line;if(ST.name==='COMPANION')guideRender();}
     if (ST.name === 'IDLE') pillMode(idleMode());
     /* the last read was spent, or reads came back: the idle row loses or regains its one-tap chips at once */
     if (oneTapOff() !== walled && ST.name === 'IDLE') showIdleSuggestions(); else nudgeSync();
   });
-  BR.on('account.changed', accountChanged);
-  BR.on('consent.withdrawn', consentWithdrawn);
-  BR.on('app.state', function(p){ if (p && p.state === 'background'){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
+  BR.on('speaking.open', function(){ if (SES && SES.speaking && SES.riskAccepted && ['IDLE','HANDBACK','CARDS','FOLLOWUPS','THESIS_VIEW','FACES'].indexOf(ST.name) >= 0){ clearRead(); glassHome(); go('SPEAKING_DIAL'); } });
+  BR.on('account.changed', function(p){ conversationReset(); dialBusy = false; dialGreeting = false; stage.classList.remove('speaking-greet'); accountChanged(p); });
+  BR.on('consent.withdrawn', function(p){conversationReset();consentWithdrawn(p);});
+  BR.on('app.state', function(p){ if (p && p.state === 'background'){ conversationSuspend(); } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
+  BR.on('companion.checkIn', companionCheckIn);
+  BR.on('companion.revoked', function(){ GUIDE_EPOCH++; CHECKIN = null; GUIDE_INPUT_CHECKIN = false; GUIDE_ANSWER_ERROR = ''; if (GUIDE) { GUIDE.personalized = false; GUIDE.companionCheckIn = null; } if (ST.name === 'COMPANION') guideRender(); else { guidePanel.style.display = 'none'; if (ST.name === 'HANDBACK') readChips(); } });
   /* the read native starts is not the person's own question: startRead() notes it while askStart runs (§3.5) */
   BR.on('ask.start', function(p){ ASK_ORIGIN = 'followUp'; try { askStart(p); } finally { ASK_ORIGIN = null; } });
   BR.on('analysis.level', lvlApply);
@@ -112,6 +119,7 @@ function wire(){
   BR.on('voice.start', function(p){
     if (!p || p.id !== VOICE.id) return;
     VOICE.started = true; VOICE.engine = p.engine || null;
+    if(ST.name==='COMPANION'){K.on=false;fsmEvent('voice.start',p);return;}
     VOICE.lat = clamp(lerp(VOICE.lat, clk - VOICE.reqT, 0.6), 0.15, 5);   /* a slow voice is requested earlier, under the choreography */
     K.on = true; K.t = 0; K.mode = 'read';
     if (fin(p.durationSec) && p.durationSec > 0) kRetime(p.durationSec);

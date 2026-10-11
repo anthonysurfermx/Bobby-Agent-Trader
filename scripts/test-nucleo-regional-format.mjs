@@ -37,6 +37,9 @@ for (const dir of ['ios/Bobby/Nucleo', 'nucleo']) {
   const consumer = { RMOD:RM, LANG:'pt', LOCALE:'pt-BR', SES:{signedIn:true}, READ:{}, fsmEvent(){}, logErr(_name, err){throw err;},
     fin(v){return typeof v==='number'&&Number.isFinite(v);}, E:{fade(){}}, A:{dockAO:{tween(){}}}, el:{dockA:{}} };
   vm.createContext(consumer);
+  // The iPhone market consumer also resets the companion retry counter. Execute
+  // its shipping predicate; this suite still supplies only market replies.
+  if (dir === 'ios/Bobby/Nucleo') vm.runInContext(app.match(/^function paramsCompanion\(params\).*$/m)[0] + '\nvar GUIDE_RETRIES = 0, CHECKIN = null;', consumer);
   vm.runInContext(onAskReply+'\n'+dockAsset+'\n'+tickFmt, consumer);
   const onboardSource=read(dir+'/src/onboarding/60-fsm.js');
   const onboard={RMOD:RM,LANG:'pt',LOCALE:'pt-BR',SESSION:{signedIn:true},W:{state:'THINK_WAIT'},go(){},report(_name,error){throw error;}};

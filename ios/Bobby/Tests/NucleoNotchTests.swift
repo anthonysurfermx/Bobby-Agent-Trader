@@ -152,6 +152,8 @@ final class NucleoNotchTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         let session = NucleoSession(fixtures: true, defaults: defaults)
         session.emit("ask.stage", ["stage": "resolving", "requestId": "read-a"])
+        XCTAssertFalse(session.notch.visible, "I-1: resolving does not show the notch")
+        session.emit("ask.stage", ["stage":"accepted", "requestId":"read-a", "asset":["symbol":"BTC","name":"Bitcoin"]])
         XCTAssertTrue(session.notch.visible)
         session.teardown()
         XCTAssertFalse(session.notch.visible)

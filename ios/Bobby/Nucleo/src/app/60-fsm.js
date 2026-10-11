@@ -46,6 +46,13 @@ function dockOut(){
 }
 var EVENING_HOUR = { es: 20, pt: 20 };   /* "Buenas tardes" / "Boa tarde" run until 20:00; the other four languages turn to the evening at 18:00 */
 function setGreeting(){
+  if (typeof dialGreeting !== "undefined" && dialGreeting){
+    var question = dialWords()[5]; lineSet(A.greet, question, "", el.greetT, el.greetS);
+    att(el.greetT, 'role', 'heading'); att(el.greetT, 'aria-level', '1'); att(el.greetT, 'aria-label', question);
+    Array.prototype.forEach.call(el.greetT.querySelectorAll('span'), function(word){ word.setAttribute('aria-hidden', 'true'); });
+    return;
+  }
+  if (el.greetT && el.greetT.removeAttribute){ ['role','aria-level','aria-label'].forEach(function(k){ el.greetT.removeAttribute(k); }); el.greetT._a = {}; }
   var h = SES && fin(SES.localHour) ? SES.localHour : new Date().getHours();
   var k = (h >= 5 && h < 12) ? 'morning' : (h >= 12 && h < (EVENING_HOUR[LANG] || 18)) ? 'afternoon' : 'evening';
   var sub = LEDGER.length ? tt('greet.saved', { symbol: LEDGER[0].symbol }) : tt(k === 'evening' ? 'greet.sub.night' : 'greet.sub.day');
@@ -117,10 +124,12 @@ function dissolveThink(){
 }
 /* everything a read put on screen goes back where it came from (cards before the sphere moves) */
 function clearRead(){
+  GUIDE_EPOCH++;
+  if (typeof guidePanel !== "undefined") guidePanel.style.display = "none";
   chipsHide();
   var hadCards = A.cardsOn || A.rev.some(function(v){ return v.x > 0.01; });
   if (hadCards){ [2, 0, 1].forEach(function(i, k){ A.rev[i].to(0, 'ret', null, 0.15 + k * 0.04); }); }
-  A.cardsOn = false; A.pullOn = false; A.commit = false; A.viewOnly = false; A.tp.on = false;
+  A.cardsOn = false; A.pullOn = false; A.commit = false; A.viewOnly = false; A.savedReadCard = false; A.tp.on = false;
   dockOut();
   if (A.vCond.t > 0 || A.vCond.x > 0.01){ A.vCond.tween(0, 0.28, E.lin, 0.35); A.ringFill.tween(0, 0.35, E.data, 0.35); A.convO.tween(0, 0.2, E.fade, 0.35); A.ringO.tween(0, 0.12, E.fade, 0.65); }
   if (A.chartT0 < 1e8 && A.chartExit > 1e8) A.chartExit = clk;
@@ -144,6 +153,7 @@ function readShowing(){ return A.cardsOn || A.vCond.t > 0 || U.flood.t > 0 || A.
 function routeReply(r){
   var s = r.reply.status;
   if (s === 'ok'){ go('THINK_WAIT'); return; }
+  if (s === 'companion' || s === 'companion_error'){ go('COMPANION', { reply: r.reply }); return; }
   if (s === 'confirm'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG, { locale:LOCALE }) }); return; }
   /* a level refusal or a premium read that did not finish: one calm line, and a chip the user taps (never silent) */
   if (s === 'level_notice'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG, { locale:LOCALE }) }); return; }
@@ -407,6 +417,7 @@ STATES.LISTENING = {
     if (ST.name !== 'LISTENING') return;
     text = String(text || '').replace(/\s+/g, ' ').trim();
     this.finalWait = 0;
+    if (guideResumeOptions(text)) { txReset(); return; }
     if (!text){ txReset(); go('IDLE', { hint: 'hint.empty', restoreGreet: true }); return; }
     txSet(text, true);
     go('SENDING', { question: text, origin: 'speech' });
@@ -439,7 +450,7 @@ STATES.TYPING = {
     if (!this.d.fromRead) chipsHide();
     A.type.p.set(0); A.type.p.to(1, 'emit'); A.type.o.tween(1, 0.2, E.fade);
     A.pillO.tween(0, 0.16, E.fade);
-    el.ta.value = SPEECH.draft || ''; SPEECH.draft = ''; el.ta.placeholder = tt('type.placeholder'); att(el.taSend, 'aria-label', tt('type.send')); taAutosize();
+    el.ta.value = SPEECH.draft || ''; SPEECH.draft = ''; el.ta.placeholder = GUIDE_INPUT_CHECKIN ? guideWords().answerPlaceholder : tt('type.placeholder'); att(el.taSend, 'aria-label', GUIDE_INPUT_CHECKIN ? guideWords().answerSend : tt('type.send')); if (GUIDE_INPUT_CHECKIN) el.ta.maxLength = 400; else el.ta.removeAttribute('maxlength'); taAutosize();
     showTypeBox(true);
   },
   exit: function(){ A.type.p.to(0, 'ret'); A.type.o.tween(0, 0.16, E.fade); A.pillO.tween(1, 0.2, E.fade); try { el.ta.blur(); } catch (e) {} at(0.2, function(){ if (ST.name !== 'TYPING') showTypeBox(false); }); },
@@ -447,10 +458,11 @@ STATES.TYPING = {
     if (ST.name !== 'TYPING' || TB.composing) return;
     var q = el.ta.value.replace(/\s+/g, ' ').trim();
     if (!q){ this.cancel(); return; }
+    if (guideResumeOptions(q)) return;
     var params = this.d.followUpOf ? { followUpOf: this.d.followUpOf, question: q } : { question: q };
     go('SENDING', { question: q, params: params, origin: 'type', fromRead: !!this.d.fromRead });
   },
-  cancel: function(){ if (ST.name !== 'TYPING') return; if (this.d.fromRead) go('RETURNING'); else go('IDLE', { restoreGreet: true }); },
+  cancel: function(){ if (ST.name !== 'TYPING') return; if (guideResumeOptions()) return; if (this.d.fromRead) go('RETURNING'); else go('IDLE', { restoreGreet: true }); },
   down: function(h){ return tapG(function(){ if (!el.ta.value.trim()) STATES.TYPING.cancel(); else try { el.ta.blur(); } catch (e) {} }); }
 };
 
@@ -547,7 +559,7 @@ STATES.THINK_RESOLVE = {
     /* Allow both bounded persona requests and the native failure event to finish. */
     else if (clk - VOICE.reqT > VOICE_WAIT){ bcall('stopSpeaking').catch(noop); goSilent(); go('TALK_EVIDENCE'); }
   },
-  down: function(h){ if (h === 'close') return tapG(function(){ go('RETURNING'); }); return null; }
+  down: function(h){ var action = readActionDown(h); if (action) return action; if (h === 'close') return tapG(function(){ go('RETURNING'); }); return null; }
 };
 function prepRead(m){
   var res = READ.reply;
@@ -569,12 +581,12 @@ function prepRead(m){
   A.rev.forEach(function(v){ v.set(0); }); A.trk.set(0); A.cardIdx = 0; A.commit = false;
 }
 function speakRead(){
-  var r = READ; if (!r || !r.model) return;
+  var r = READ; if (!r || !r.model || r.voiceSkipped) return;
   VOICE.id = r.requestId; VOICE.started = false; VOICE.ended = false; VOICE.silent = false; VOICE.reqT = clk; VOICE.lvl = 0; VOICE.at = -9;
   bcall('speak', { id: r.requestId, text: r.model.spoken.text }).then(function(res){
     if (READ !== r || VOICE.id !== r.requestId) return;
     if (!res || res.status !== 'queued') goSilent();
-  }, function(){ if (READ === r) goSilent(); });
+  }, function(){ if (READ === r && VOICE.id === r.requestId) goSilent(); });
 }
 function goSilent(){ VOICE.silent = true; VOICE.ended = true; }
 var VOICE_WAIT = 45;   /* s from speak() to voice.start before the read goes on silently */
@@ -599,9 +611,65 @@ function preVerdict(){
   U.filR.tween(0, 0.45, E.inhale, 0.50);
   A.capY.to(592, 'soft', null, 0.30);
 }
+/* Presentation controls only apply to a completed read. They stop narration, never the analysis or its receipt. */
+function readResultReady(){
+  return !!(READ && READ.reply && READ.reply.status === 'ok' && READ.model && READ.requestId &&
+    ['THINK_RESOLVE', 'TALK_EVIDENCE', 'TALK_CHART', 'VERDICT', 'HANDBACK'].indexOf(ST.name) >= 0);
+}
+function stopReadVoice(r){
+  var stopped = r.voiceSkipped;
+  r.voiceSkipped = true;
+  /* Invalidate before native emits voice.end: a queued start/progress can no longer restart the clock. */
+  VOICE.id = null; VOICE.started = false; VOICE.ended = true; VOICE.silent = true; VOICE.lvl = 0; VOICE.at = -9;
+  K.on = false; K.t = K.end + 0.5;
+  if (!stopped) bcall('stopSpeaking').catch(noop);
+}
+function settleReadResult(m){
+  VERD = VC[m.verdict.key] || VC.wait;
+  dissolveThink(); PREV.on = true; PREV.imp = true; gulpCanon(false);
+  A.sat.forEach(function(s){ s.p.to(0, 'ret'); }); A.orbO.to(0); U.compOn.to(0); U.compDepth.to(1);
+  U.filA.to(0); U.filR.to(0); U.braid.to(0); U.swirl.to(0);
+  S.cy.to(210, 'soft'); S.r.to(72, 'soft'); S.pull.to(0, BODY.gulp);
+  U.glow.to(1); U.flood.cfg = UT(0.48); U.flood.to(1.1); U.scrim.to(0.9);
+  U.energy.to(0.3); U.irid.to(0.35); U.wflow.to(0.12); U.breathK.to(1);
+  TINT.amt.to(0); TINT.wash.to(0); ambientCanon(true);
+  A.vCond.to(1); A.ringO.to(1); A.ringFill.to(m.ring.mode === 'conviction' ? clamp(m.ring.pct / 100, 0, 1) : 1);
+  A.convO.to(m.ring.mode === 'conviction' ? 1 : 0); A.ringOff.to(14, 'soft'); A.pctPos.to(0, 'soft');
+  if (m.chart){ A.chartT0 = clk - 6; A.chartExit = 1e9; A.nowS.set(1); }
+  capsOff(); A.metaPin = 54; A.metaDrop.set(0); A.capY.to(592, 'soft');
+  A.qText = READ.question; A.qT0 = clk - 10; A.dockO.to(1); A.closeO.to(1); A.wmO.to(0); dockAsset();
+  att(el.sphereA, 'aria-label', m.aria);
+}
+function skipReadVoice(){
+  if (!readResultReady()) return false;
+  var r = READ;
+  if (r.voiceSkipped && ST.name === 'HANDBACK') return true;
+  stopReadVoice(r); settleReadResult(r.model);
+  go('HANDBACK', { voiceSkipped: true });
+  return true;
+}
+function showReadResult(){
+  if (!readResultReady()) return false;
+  var r = READ;
+  stopReadVoice(r); settleReadResult(r.model);
+  chipsHide(); hint('');
+  if (A.chartT0 < 1e8) A.chartExit = clk;
+  A.metaO.tween(0, 0.17, E.fade);
+  A.cardsOn = true; A.pullOn = false; A.commit = true; A.viewOnly = false;
+  A.cardIdx = 0; A.trk.set(0); A.dscr.set(0);
+  A.rev.forEach(function(v, i){ v.set(i < A.nCards ? 1 : 0); });
+  go('CARDS', { result: true });
+  return true;
+}
+function readActionDown(h, pressV){
+  if ((h !== 'read-voice' && h !== 'read-result') || !readResultReady()) return null;
+  var r = READ;
+  return tapG(function(){ if (READ === r){ if (h === 'read-voice') skipReadVoice(); else showReadResult(); } }, pressV);
+}
 function talkDown(h){
+  var action = readActionDown(h); if (action) return action;
   if (h === 'close') return tapG(function(){ go('RETURNING'); });
-  if (h === 'pill' && A.mode === 'stop') return tapG(function(){ bcall('stopSpeaking').catch(noop); goSilent(); pillMode('mic'); }, A.press);
+  if (h === 'pill' && A.mode === 'stop') return readActionDown('read-voice', A.press);
   return null;
 }
 STATES.TALK_EVIDENCE = {
@@ -667,18 +735,19 @@ STATES.VERDICT = {
    was already there (§3.5). No save is needed first. ---------- */
 STATES.HANDBACK = {
   enter: function(prev, d){
-    if (!d.restored){ sag(); at(0.55, sag); }
+    if (!d.restored && !d.voiceSkipped){ sag(); at(0.55, sag); }
     A.metaO.tween(1, 0.3, E.fade); A.metaY.set(6); A.metaY.to(0, 'emit');
     var vp = SES && SES.hints ? (SES.hints.verdictPull || 0) : 0;
     if (vp < 3){ hint(tt('hint.pull')); if (!HINTED.verdictPull){ HINTED.verdictPull = true; markHint('verdictPull'); } } else hint('');
     pillMode(idleMode()); this.idleT = clk; A.commit = false;
     /* the voice is done: after the second sag its last line goes back into the glass and the row is born in its place
        (at once when the glass is only being put back: a restored read, a pull that was let go) */
-    if (d.restored) readChips(); else cue(1.0, readChips);
+    if (d.restored || d.voiceSkipped) readChips(); else cue(1.0, readChips);
   },
-  tick: function(){ if (clk - this.idleT > 90) go('RETURNING'); },
+  tick: noop,
   down: function(h, p, hitEl){
     this.idleT = clk;
+    var action = readActionDown(h) || postReadActionDown(h); if (action) return action;
     if (h === 'close') return tapG(function(){ go('RETURNING'); });
     if (h === 'pill') return pillDown(p, true);
     if (h === 'avatar') return avatarG();
@@ -695,6 +764,8 @@ function readChips(){
     A.metaPin = h; A.metaDrop.set(0); A.metaDrop.to(54 - h, 'soft');
     capsOff();
   }
+  if (r.reply && r.reply.companionConsentPending) bcall('companion.presented').catch(noop);
+  if (CHECKIN && CHECKIN.question) { companionCheckIn(CHECKIN); return; }
   chipsShow(RMOD.followUps(r.model, SUGG || {}, LANG), false, true);
 }
 /* the row lies where a pull usually starts: a finger that goes down on a chip still pulls the cards, sideways it
@@ -754,9 +825,28 @@ function pullRelease(vy){
   S.cy.to(158, 'soft'); S.r.to(44, 'soft'); A.ringOff.to(10, 'soft'); A.pctPos.to(1, 'soft');
   U.energy.to(0.18); U.wflow.to(0.04); U.breathK.to(0.5);
 }
+function postReadActionDown(h){
+  if (['HANDBACK', 'CARDS', 'SAVING', 'FOLLOWUPS', 'THESIS_VIEW'].indexOf(ST.name) < 0) return null;
+  var read = READ, generation = GEN, state = ST.name;
+  function current(){ return GEN === generation && ST.name === state && READ === read; }
+  if (h === 'read-home') return tapG(function(){ if (!current()) return; if (ST.name === 'THESIS_VIEW') STATES.THESIS_VIEW.leave(); else go('RETURNING'); });
+  if (ST.name === 'THESIS_VIEW' || !read || !read.model) return null;
+  if (h === 'read-save' || h === 'save'){
+    if (read.savePending || (read.save && read.save.status === 'saved')) return null;
+    return tapG(function(){
+      if (!current() || read.savePending || (read.save && read.save.status === 'saved')) return;
+      if (ST.name === 'HANDBACK') showReadResult(); go('SAVING');
+    }, A.savePress);
+  }
+  if (h === 'read-new') return tapG(function(){ if (!current() || read.savePending) return; openTyping({ followUpOf: read.requestId, fromRead: true }); });
+  if (h === 'read-details') return tapG(function(){ if (!current()) return; A.cardIdx = 0; A.trk.to(0, 'glide'); A.dscr.to(0, 'glide'); });
+  if (h === 'read-next') return tapG(function(){ if (!current()) return; var c = readNextAction(); if (c) chipAct(c); });
+  return null;
+}
 function cardsDown(h, p, hitEl){
+  var action = postReadActionDown(h); if (action) return action;
   if (h === 'close') return tapG(function(){ go('RETURNING'); });
-  if (h === 'save') return A.saved.t > 0.5 ? null : tapG(function(){ go('SAVING'); }, A.savePress);
+  if (h === 'save' || h === 'read-save') return null;
   if (h === 'hz') return tapG(function(){ setHorizon(+hitEl.getAttribute('data-h')); tick('selection'); });
   if (h === 'islaGo') return tapG(function(){ openNative('isla'); });
   if (h === 'pill') return pillDown(p, true);
@@ -787,7 +877,7 @@ function cardTrackG(scrollable){
   };
 }
 STATES.CARDS = {
-  enter: function(prev, d){ if (prev === 'PULLING') pullRelease(d.vy); att(el.sphereA, 'aria-label', tt('aria.cards')); pillMode(idleMode()); },
+  enter: function(prev, d){ GUIDE_EPOCH++; guidePanel.style.display = 'none'; if (prev === 'PULLING' || d.result) pullRelease(d.vy); att(el.sphereA, 'aria-label', tt('aria.cards')); pillMode(idleMode()); },
   down: cardsDown
 };
 
@@ -795,25 +885,28 @@ STATES.CARDS = {
 STATES.SAVING = {
   enter: function(){
     var r = READ, m = r.model;
-    A.savePress.to(1, 'emit'); saveRoll.set(m.thesis.savedLabel); A.saved.tween(1, 0.24, E.fade); A.sweepT = clk; tick('success');
+    r.savePending = true; r.save = null;
+    A.savePress.to(1, 'emit'); saveRoll.set(tt('read.saving'));
     A.lnO.tween(0, 0.16, E.fade); op(el.card1.hz, 0);   /* the horizon is chosen: its selector leaves the row to the XP chip */
     var params = { requestId: r.requestId }; if (m.thesis.horizon.show) params.horizonHours = HZ;
     bcall('saveThesis', params).then(function(res){ onSaved(r, res); }, function(){ onSaved(r, { status: 'failed' }); });
-    cue(1.8, function(){ go('FOLLOWUPS'); });
+    /* Stay here until native confirms the write; a slow or failed save cannot show a saved state. */
   },
   down: cardsDown
 };
 function onSaved(r, res){
   if (READ !== r) return;
-  r.save = res;
+  r.savePending = false; r.save = res || { status: 'failed' };
   var m = r.model;
   if (!res || res.status !== 'saved'){
     /* the card goes back to what it showed before the press: the horizon selector, or the note where there is none */
     var hz = m.thesis.horizon.show;
     saveRoll.set(m.thesis.saveLabel); A.saved.tween(0, 0.24, E.fade); A.lnO.tween(hz ? 0 : 1, 0.2, E.fade); op(el.card1.hz, hz ? 1 : 0);
     hint(tt(res && res.status === 'stale' ? 'save.stale' : 'save.failed')); tick('warning');
+    if (ST.name === 'SAVING') go('CARDS');
     return;
   }
+  saveRoll.set(m.thesis.savedLabel); A.saved.tween(1, 0.24, E.fade); A.sweepT = clk; tick('success');
   SAVED = res;
   if (res.thesis){ LEDGER = [res.thesis].concat(LEDGER.filter(function(t){ return t.id !== res.thesis.id; })).slice(0, 20); }
   if (SES){ SES.xp = res.xp; if (res.level) SES.level = res.level; if (fin(res.streak)) SES.streak = res.streak; setXpArc(SES.level && SES.level.progress); }
@@ -823,7 +916,8 @@ function onSaved(r, res){
     : (res.unlocks && res.unlocks.length ? tt('save.unlock', { name: res.unlocks[0].name }) : '');
   if (line) hint(line);
   A.tp.on = true; A.tp.u.set(0); A.tp.u.tween(1, 0.52, E.inhale, 0.6);
-  at(0.6 + 0.52, function(){ gulp(0.04); tick('soft'); A.tp.on = false; A.badge.set(0); });
+  at(0.6 + 0.52, function(){ if (READ !== r) return; gulp(0.04); tick('soft'); A.tp.on = false; A.badge.set(0); });
+  if (ST.name === 'SAVING') go('FOLLOWUPS');
 }
 
 /* ---------- FOLLOWUPS: B9 — chips born from the pill; each sent chip is a paid desk read ---------- */
@@ -865,14 +959,15 @@ function chipAct(c){
   if (a.question){ go('SENDING', { question: a.question, params: { question: a.question, chip: true }, origin: 'chip', cx: cx, cy: cy, fromRead: !a.starter }); }
 }
 STATES.FOLLOWUPS = {
-  enter: function(){ chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow()); },
-  tick: function(){ if (inState() > 45) go('RETURNING'); },
+  enter: function(){ chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow()); if (CHECKIN && CHECKIN.question) companionCheckIn(CHECKIN); },
+  tick: noop,
   down: cardsDown
 };
 
 /* ---------- RETURNING: B10 — cards retract before the sphere moves; the verdict evaporates; the tint returns ---------- */
 STATES.RETURNING = {
   enter: function(prev, d){
+    GUIDE_INPUT_CHECKIN = false; CHECKIN = null;
     var hadVerdict = A.vCond.t > 0 || U.flood.t > 0, hadCards = clearRead();
     var k = hadCards ? 0.80 : hadVerdict ? 0.55 : 0.25;
     txReset(); showTypeBox(false);
@@ -1055,19 +1150,28 @@ function faceAction(id){
 /* ---------- THESIS_VIEW: a saved thesis, read-only, poured from the sphere ---------- */
 STATES.THESIS_VIEW = {
   enter: function(prev, d){
+    /* Every entry point opens a dated snapshot, never the previous live read's receipt. */
+    clearRead(); READ = null;
     this.back = d.back || 'IDLE';
     var v = RMOD.thesisView(d.thesis, LANG, { locale:LOCALE, signedIn: !!(SES && SES.signedIn) });
     v.when = whenLabel(d.thesis.asOf, Date.parse(d.thesis.savedAt));
+    if (v.debate) fillCards({ debate: v.debate, thesis: v, verdict: v.verdict, meta: v.meta });
     fillThesisCard(v, { verdict: v.verdict.key, readOnly: true });
     el.card1.ln.textContent = v.line; A.lnO.set(1);
-    A.nCards = 1; A.viewOnly = true; A.cardsOn = true; A.trk.set(-340); A.rev[0].set(0); A.rev[2].set(0); A.rev[1].set(0); A.rev[1].to(1, 'glide');
+    A.nCards = 1; A.viewOnly = true; A.savedReadCard = !!v.debate; A.cardsOn = true; A.cardIdx = v.debate ? 0 : 1;
+    A.trk.set(v.debate ? 0 : -340); A.dscr.set(0); A.rev.forEach(function(r){ r.set(0); }); A.rev[A.cardIdx].to(1, 'glide');
     if (lineShown(A.greet)) greetOut(); if (A.ftxCur >= 0){ var o = A.ftx[A.ftxCur]; o.o.tween(0, 0.17, E.fade); o.so.tween(0, 0.17, E.fade); o.co.tween(0, 0.12, E.fade); }
     meriOut(); A.satG.o.tween(0, 0.17, E.fade); hint('');
     moveSphere(158, 44, true); U.energy.to(0.18); U.breathK.to(0.5); U.faceOn.to(0);
     A.wmO.tween(0, 0.16, E.fade); A.closeO.tween(1, 0.24, E.fade, 0.1);
   },
-  exit: function(){ A.rev[1].to(0, 'ret'); A.cardsOn = false; A.viewOnly = false; A.closeO.tween(0, 0.16, E.fade); A.wmO.tween(1, 0.16, E.fade, 0.04); moveSphere(340, 120, true); U.energy.to(0.35); U.breathK.to(1); },
-  down: function(h){ return tapG(function(){ STATES.THESIS_VIEW.leave(); }); },
+  exit: function(){ A.rev.forEach(function(r){ r.to(0, 'ret'); }); A.cardsOn = false; A.viewOnly = false; A.savedReadCard = false; A.closeO.tween(0, 0.16, E.fade); A.wmO.tween(1, 0.16, E.fade, 0.04); moveSphere(340, 120, true); U.energy.to(0.35); U.breathK.to(1); },
+  down: function(h, p){
+    if (h === 'close' || h === 'read-home') return postReadActionDown('read-home');
+    if (h === 'pill') return pillDown(p, false);
+    if (h === 'scroll' && A.savedReadCard) return cardTrackG(true);
+    return null;
+  },
   leave: function(){
     var back = this.back; go('IDLE', { restoreGreet: back !== 'FACES' });
     if (back === 'FACES'){ A.th.to(Math.ceil(A.th.x / TAU - 1e-6) * TAU, 'glide'); A.fIdx = 0; faceText(0, -1); meriIn(); }

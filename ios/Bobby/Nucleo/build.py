@@ -87,6 +87,11 @@ def build_page(page, release, companions_payload, fixtures_payload):
     shared = shared_scripts(release)
     parts = sorted(n for n in os.listdir(os.path.join(SRC, page)) if n.endswith(".js"))
     page_js = "\n".join(f"/* ---- {page}/{n} ---- */\n" + read(os.path.join(SRC, page, n)) for n in parts)
+    config = json.load(open(os.path.join(HERE, "talk-mode.json")))
+    switches = "var TALK_MODE=" + js_json(config["TALK_MODE"]) + "; var FIRST_RUN_HANDOVER=" + js_json(config["FIRST_RUN_HANDOVER"]) + "; var READ_CONFIRM=" + js_json(config["READ_CONFIRM"]) + ";\n"
+    page_js = switches + page_js
+    if page in ("app", "onboarding"):
+        tpl = tpl.replace("</style>", read(os.path.join(SRC, "shared", "conversation.css")) + "\n</style>", 1)
     shared_js = "\n".join(f"/* ---- shared/{n} ---- */\n" + body for n, body in shared)
     fixtures_tag = "" if release else f"<script>window.NUCLEO_FIXTURES={fixtures_payload};</script>"
     # Order matters: fixtures before shared (the mock reads them at load), shared before page code.

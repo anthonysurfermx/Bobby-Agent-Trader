@@ -58,6 +58,10 @@ jobs:
       - run: npm run test:dashboard-payments
       - run: npm run test:admin-live
       - run: npm run test:client-telemetry
+      # I-0: all iPhone page regressions, native catalog completeness and six-language copy guards.
+      - run: python3 ios/Bobby/Tests/LocalizationCatalogAudit.py
+      - run: node --test ios/Bobby/Nucleo/tests/*.test.mjs
+      - run: npm run test:language-experience
       - run: npm run test:llm-ledger
       - run: npm run test:app-model-access
       - run: npm run test:briefings

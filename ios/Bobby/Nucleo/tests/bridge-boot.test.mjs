@@ -12,7 +12,8 @@ const bridge = read('../src/shared/10-bridge.js');
 const readModel = read('../src/shared/20-read-model.js');
 const template = read('../src/app/template.html');
 const appFiles = readdirSync(new URL('../src/app/', import.meta.url)).filter((name) => name.endsWith('.js')).sort();
-const engine = appFiles.map((name) => read('../src/app/' + name)).join('\n');
+const switches = JSON.parse(read('../talk-mode.json'));
+const engine = `var TALK_MODE=${JSON.stringify(switches.TALK_MODE)}, READ_CONFIRM=${switches.READ_CONFIRM}, FIRST_RUN_HANDOVER=${switches.FIRST_RUN_HANDOVER};\n` + appFiles.map((name) => read('../src/app/' + name)).join('\n');
 const roster = JSON.parse(read('../fixtures/native/roster.json'));
 const momo = roster.companions.find((companion) => companion.id === 'momo');
 assert.ok(momo, 'the native roster must include Momo');
@@ -34,15 +35,25 @@ class Element {
   get textContent() { return this.text || this.children.map((child) => child.textContent).join(''); }
   get firstChild() { return this.children[0] || this.appendChild(new Element()); }
   appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
+  insertBefore(child, before) { child.parentNode = this; const i = this.children.indexOf(before); if (i < 0) this.children.push(child); else this.children.splice(i,0,child); return child; }
   removeChild(child) { this.children = this.children.filter((node) => node !== child); child.parentNode = null; return child; }
   setAttribute(name, value) { this.attributes[name] = String(value); }
   getAttribute(name) { return this.attributes[name] ?? null; }
   removeAttribute(name) { delete this.attributes[name]; }
   querySelector(selector) {
+    if(selector === ".conversation-eyebrow") {
+      const find = node => node.children.find(child => child.attributes.class === "conversation-eyebrow") || node.children.map(find).find(Boolean);
+      return find(this) || null;
+    }
     if (!this.queries.has(selector)) this.queries.set(selector, this.appendChild(new Element()));
     return this.queries.get(selector);
   }
-  querySelectorAll(selector) { return Array.from({ length: this.attributes.id === 'meri' ? 4 : 3 }, (_, index) => this.querySelector(selector + index)); }
+  querySelectorAll(selector) {
+    if (selector === 'button' && this.id === 'companionPanel') {
+      const collect = node => node.children.flatMap(child => child._guideAction ? [child] : collect(child));
+      return collect(this);
+    }
+    return Array.from({ length: this.attributes.id === 'meri' ? 4 : 3 }, (_, index) => this.querySelector(selector + index)); }
   addEventListener(name, callback) { this.listeners[name] = callback; }
   getBoundingClientRect() { return { left: 0, top: 0, width: 100, height: 30 }; }
   // What a browser would measure; a test hands in `measure` when a height decides something.
@@ -51,7 +62,10 @@ class Element {
   getTotalLength() { return 300; }
   getPointAtLength() { return { x: 0, y: 0 }; }
   getContext() { return null; } // Exercise the engine's supported no-WebGL fallback.
-  closest(selector) { return selector === '[data-hit]' && this.attributes['data-hit'] ? this : null; }
+  closest(selector) {
+    if (selector === '[data-hit]' && this.attributes['data-hit'] || selector === '#' + this.id || selector === 'button' && this._guideAction) return this;
+    return this.parentNode?.closest(selector) || null;
+  }
   contains() { return true; }
   focus() {}
   blur() {}
@@ -59,7 +73,7 @@ class Element {
 
 function harness({ legacyEvents = false, language = 'en', rejectCollections = false, nudgeActive = true,
   suggestions = { v: 1, quickAccess: [] }, holdAsks = false, measure = null, stallCollections = false,
-  theses = { v: 1, items: [] }, saved = null, speak = 'muted' } = {}) {
+  theses = { v: 1, items: [] }, saved = null, speak = 'muted', speaking = null, chooseFails = false, companionAnswer = () => ({question:null}) } = {}) {
   const nodes = new Map(), calls = [], errors = [], pending = [];
   const made = () => Object.assign(new Element(), { measure });
   for (const match of template.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)) {
@@ -72,7 +86,7 @@ function harness({ legacyEvents = false, language = 'en', rejectCollections = fa
     companion: momo, xp: 0, level: { number: 1, progress: 0.2 }, streak: 0,
     signedIn: false, riskAccepted: true, riskVersion: 6, reducedMotion: false,
     mic: { state: 'undetermined', onDevice: true }, hints: {}, pendingRead: null,
-    platform: 'ios', appVersion: '1.5 (45)',
+    platform: 'ios', appVersion: '1.5 (45)', speaking,
     analysisLevel: { id: 'rapido', label: language === 'es' ? 'Rápido' : 'Quick', color: '#A795EF' },
   };
   const document = {
@@ -91,6 +105,15 @@ function harness({ legacyEvents = false, language = 'en', rejectCollections = fa
     setTimeout: () => 0, requestAnimationFrame(callback) { nextFrame = callback; }, Image: class {},
     webkit: { messageHandlers: { nucleo: { postMessage(envelope) {
       calls.push(JSON.parse(JSON.stringify(envelope)));
+      if (envelope.method === 'speech.permission') return Promise.resolve({v:1,ok:true,result:session.mic});
+      if (envelope.method === 'speech.start') return Promise.resolve({v:1,ok:true,result:{status:'listening'}});
+      if (envelope.method === 'speech.stop') return Promise.resolve({v:1,ok:true,result:{status:'processing'}});
+      if (envelope.method === 'companion.answer') return Promise.resolve(companionAnswer(envelope.params)).then(result => ({v:1,ok:true,result}));
+      if (envelope.method === "speaking.choose") {
+        if (chooseFails) return Promise.reject(new Error("storage failed"));
+        session.speaking = { ...session.speaking, value: envelope.params.value, offer: false, refine: false };
+        return Promise.resolve({ v: 1, ok: true, result: session });
+      }
       if (rejectCollections && ['theses', 'roster', 'island', 'suggestions'].includes(envelope.method)) return Promise.reject(new Error('offline'));
       // Native never answers the two collections the page waits for before it starts: the page starts on its own clock.
       if (stallCollections && ['theses', 'roster'].includes(envelope.method)) return new Promise(() => {});
@@ -324,7 +347,7 @@ const nvda = JSON.parse(read('../fixtures/ask/nvda.json'));
 const READ_ID = '11111111-1111-4111-8111-111111111111';
 const synthesis = (followUp) => ({ headline: 'The trend is firm.', why: 'W.', risk: 'R.', watch: 'X.', ...(followUp === undefined ? {} : { followUp }) });
 const okRead = (extra = {}) => ({ ...nvda, requestId: READ_ID, ...extra });
-const OWN = { v: 1, quickAccess: [{ symbol: 'NVDA' }, { symbol: 'BTC' }, { symbol: 'ETH' }], movers: [{ symbol: 'TSLA', name: 'Tesla', changePct: 4.1 }] };
+const OWN = { v: 1, quickAccess: [{ symbol: 'NVDA', name:'NVIDIA' }, { symbol: 'BTC', name:'Bitcoin' }, { symbol: 'ETH', name:'Ethereum' }], movers: [{ symbol: 'TSLA', name: 'Tesla', changePct: 4.1 }] };
 const rowOf = (app) => chipsOf(app).map((node) => node.textContent);
 const asksOf = (app) => app.calls.filter((call) => call.method === 'ask').map((call) => call.params);
 const tap = (app, node) => app.nodes.get('stage').listeners.click({ target: node, detail: 0 });
@@ -381,7 +404,7 @@ for (const language of ['en', 'es']) {
   });
 
   test(language + ': a read native started from a follow-up hands back the person’s own question and assets only', async () => {
-    const movers = { v: 1, quickAccess: [{ symbol: 'NVDA' }], movers: [{ symbol: 'TSLA', name: 'Tesla', changePct: 4.1 }, { symbol: 'AAPL', name: 'Apple', changePct: 2.2 }] };
+    const movers = { v: 1, quickAccess: [{ symbol: 'NVDA', name:'NVIDIA' }], movers: [{ symbol: 'TSLA', name: 'Tesla', changePct: 4.1 }, { symbol: 'AAPL', name: 'Apple', changePct: 2.2 }] };
     // The person's own read, with no other asset of theirs: the day's movers may fill the slots.
     const own = await idle({ language, suggestions: movers });
     await personRead(own, okRead({ language }));
@@ -405,7 +428,7 @@ for (const language of ['en', 'es']) {
 }
 
 test('the thread Bobby started stays his: its next question, asked, still ends without a mover; a new question of the person does not', async () => {
-  const movers = { v: 1, quickAccess: [{ symbol: 'NVDA' }], movers: [{ symbol: 'TSLA', name: 'Tesla', changePct: 4.1 }] };
+  const movers = { v: 1, quickAccess: [{ symbol: 'NVDA', name:'NVIDIA' }], movers: [{ symbol: 'TSLA', name: 'Tesla', changePct: 4.1 }] };
   const app = await idle({ suggestions: movers });
   app.context.nucleoBridge.emit('ask.start', { token: 'tok-1', question: 'What changed in NVDA since I asked?' });
   await handBack(app, okRead({ synthesis: synthesis(NEXT.en.question) }));
@@ -460,7 +483,7 @@ test('a finger that goes down on the row and moves down still pulls the cards; t
 });
 
 test('a restored read stands at the hand-back with its row at once, and never with a mover', async () => {
-  const app = harness({ holdAsks: true, suggestions: { v: 1, quickAccess: [{ symbol: 'NVDA' }], movers: [{ symbol: 'TSLA', name: 'Tesla', changePct: 4.1 }] } });
+  const app = harness({ holdAsks: true, suggestions: { v: 1, quickAccess: [{ symbol: 'NVDA', name:'NVIDIA' }], movers: [{ symbol: 'TSLA', name: 'Tesla', changePct: 4.1 }] } });
   app.session.pendingRead = okRead({ synthesis: synthesis(NEXT.en.question) });
   app.boot(); await flush(); app.advance(0.2); await flush();
   assert.equal(app.context.nucleo.state(), 'HANDBACK');
@@ -473,19 +496,19 @@ test('a restored read stands at the hand-back with its row at once, and never wi
 // for a question the person asked by themselves, so it starts no chain of follow-ups (ARCHITECTURE.md §3.5) ----
 test('a one-tap chip tells native the words were Bobby’s; a typed question and “another question” do not', async () => {
   const app = await idle();
-  assert.deepEqual(rowOf(app), ['NVIDIA', 'BTC', 'ETH']);
+  assert.deepEqual(rowOf(app), ['NVIDIA', 'Bitcoin', 'Ethereum']);
   tap(app, chipsOf(app)[1]);
-  assert.deepEqual(asksOf(app), [{ question: 'How is BTC looking?', chip: true }], 'an asset of the idle home');
+  assert.deepEqual(asksOf(app), [{ question: 'How is Bitcoin looking?', chip: true, confirm: true }], 'an asset of the idle home');
   await handBack(app, okRead({ synthesis: synthesis(NEXT.en.question) }));
   assert.deepEqual(rowOf(app), [NEXT.en.question, 'Another question about NVDA', 'How is BTC looking?']);
   tap(app, chipsOf(app)[2]);
-  assert.deepEqual(asksOf(app)[1], { question: 'How is BTC looking?', chip: true }, 'an asset of the row after a read');
+  assert.deepEqual(asksOf(app)[1], { question: 'How is BTC looking?', chip: true, confirm: true }, 'an asset of the row after a read');
   await handBack(app, okRead({ requestId: '22222222-2222-4222-8222-222222222222' }));
   // A mover asked from the row is Bobby's question too.
-  const movers = await idle({ suggestions: { v: 1, quickAccess: [{ symbol: 'NVDA' }], movers: [{ symbol: 'TSLA', name: 'Tesla', changePct: 4.1 }] } });
+  const movers = await idle({ suggestions: { v: 1, quickAccess: [{ symbol: 'NVDA', name:'NVIDIA' }], movers: [{ symbol: 'TSLA', name: 'Tesla', changePct: 4.1 }] } });
   await personRead(movers, okRead());
   tap(movers, chipsOf(movers)[1]);
-  assert.deepEqual(asksOf(movers)[1], { question: 'How is TSLA looking?', chip: true });
+  assert.deepEqual(asksOf(movers)[1], { question: 'How is TSLA looking?', chip: true, confirm: true });
   // Their own words carry no mark: the keyboard after “another question”, and the CIO's question (native knows it).
   const own = await idle();
   await personRead(own, okRead({ synthesis: synthesis(NEXT.en.question) }));
@@ -525,7 +548,7 @@ test('with no read left the idle home shows no asset chip; they come back when a
   const open = { ...app.session }; delete open.oneTap;
   app.context.nucleoBridge.emit('session.changed', open);
   await flush(); app.advance(1.0); await flush();
-  assert.deepEqual(rowOf(app), ['NVIDIA', 'BTC', 'ETH']);
+  assert.deepEqual(rowOf(app), ['NVIDIA', 'Bitcoin', 'Ethereum']);
   // And the other way: the last read was spent while the home was showing.
   app.context.nucleoBridge.emit('session.changed', { ...open, oneTap: false });
   await flush(); app.advance(1.0); await flush();
@@ -659,5 +682,155 @@ test('a page that is coming home takes a question offered again once it is there
   assert.deepEqual(home.errors.concat(read.errors, typing.errors), []);
 });
 
-askStartCases({ test, assert, flush, Element, idle, handBack, personRead, tap, chipsOf, rowOf, asksOf, okRead, synthesis,
+askStartCases({ confirm:true, test, assert, flush, Element, idle, handBack, personRead, tap, chipsOf, rowOf, asksOf, okRead, synthesis,
   source: (file) => read('../src/' + file), architecture: read('../ARCHITECTURE.md') });
+
+for (const language of ['es','en','fr','pt','it','de']) {
+ test(language + ': first launch stays ready without an automatic speaking dial', async () => {
+  const app = harness({ language, speaking: { owner:'guest', value:null, offer:true, refine:false } });
+  app.boot(); await flush(); app.advance(1.1); await flush();
+  assert.equal(app.context.nucleo.state(), 'IDLE');
+  assert.equal(app.session.speaking.value,null);
+  assert.equal(app.calls.filter(c=>c.method==='speaking.choose').length,0);
+  assert.equal(asksOf(app).length,0); assert.deepEqual(app.errors,[]);
+ });
+}
+test('updating readers stay on home; memory opens the dial and label taps change the preview',async()=>{
+ const app=harness({speaking:{owner:'a',value:null,offer:false,refine:false}});app.boot();await flush();app.advance(1.1);
+ assert.equal(app.context.nucleo.state(),'IDLE');app.context.nucleoBridge.emit('speaking.open',{});
+ assert.equal(app.context.nucleo.state(),'SPEAKING_DIAL');
+ app.nodes.get('speakingRange').listeners.input({target:{value:'2'}});
+ assert.equal(app.nodes.get('speakingRange').getAttribute('aria-valuetext'),'Technical');
+ app.nodes.get('speakingConfirm').listeners.click();await flush();app.advance(2);
+ assert.equal(app.session.speaking.value,'technical');assert.deepEqual(app.errors,[]);
+});
+test('failed persistence keeps the dial open and allows retry',async()=>{
+ const app=harness({chooseFails:true,speaking:{owner:'a',value:null,offer:true,refine:false}});app.boot();await flush();app.advance(1.1);
+ app.context.nucleoBridge.emit('speaking.open',{});
+ app.nodes.get('speakingConfirm').listeners.click();await flush();assert.equal(app.context.nucleo.state(),'SPEAKING_DIAL');
+ assert.equal(app.nodes.get('speakingError').textContent,'Try again');assert.equal(app.session.speaking.value,null);
+});
+
+
+async function companionReply(app, reply) {
+  keyboardOf(app).listeners.click({detail:0,stopPropagation(){}}); app.nodes.get('ta').value = 'What is investing?';
+  app.nodes.get('ta').listeners.input();app.nodes.get('taSend').listeners.click({detail:0,stopPropagation(){}});
+  await flush(); app.advance(1.2); await flush(); app.answer(reply);
+  await flush(); app.advance(1); await flush();
+  assert.equal(app.context.nucleo.state(),'COMPANION');
+}
+const keyboardOf = app => app.nodes.get('ui').children.find(node => node.id === 'conversation-keyboard');
+const companionPanel = app => app.nodes.get('ui').children.find(node => node.id === 'companionPanel');
+const guideActionsOf = app => app.nodes.get('ui').children.find(node => node.id === 'conversation-slot');
+
+test('a catalog question never covers the market read; revocation leaves the shipped row', async () => {
+  const app = await idle();
+  await personRead(app, okRead({companionCheckIn:{question:{id:'interest',text:'Interest?',options:[]}}}));
+  assert.equal(companionPanel(app).style.display,'none');
+  const row = rowOf(app);
+  app.context.nucleoBridge.emit('companion.revoked',{});
+  app.advance(1);await flush();assert.deepEqual(rowOf(app),row); assert.deepEqual(app.errors,[]);
+});
+test('companion text stays out of market cards and a follow-up routes with after', async () => {
+  const app = await idle({speak:'queued'});
+  const id='90d2564c-6064-4275-95cd-5a3c7c0b5b56';
+  await companionReply(app,{status:'companion',requestId:id,gist:'Learning.',text:'Learning. Explanation',followUp:'How does bitcoin work?'});
+  assert.equal(companionPanel(app).children[0].children[0].textContent,'Learning.');
+  app.advance(1); await flush();
+  assert.equal(guideActionsOf(app).children.length,1);
+  guideActionsOf(app).children[0]._guideAction(); await flush();
+  assert.deepEqual(asksOf(app).at(-1),{question:'How does bitcoin work?',companion:true,after:id});
+  assert.deepEqual(app.errors,[]);
+});
+test('companion retry stays available after repeated failures and uses the same id', async () => {
+  const app=await idle(); const id='90d2564c-6064-4275-95cd-5a3c7c0b5b56';
+  const failure={status:'companion_error',requestId:id,code:'unavailable',retryable:true};
+  await companionReply(app,failure);
+  for(let i=0;i<2;i++){
+   assert.equal(guideActionsOf(app).children.length,1);
+   app.advance(15); assert.equal(app.context.nucleo.state(),'COMPANION');
+   guideActionsOf(app).children[0]._guideAction(); await flush();
+   assert.deepEqual(asksOf(app).at(-1),{retry:id});
+   app.advance(1.2);app.answer(failure);await flush();app.advance(1);await flush();
+  }
+  assert.equal(guideActionsOf(app).children.length,1);assert.deepEqual(app.errors,[]);
+});
+test('a spoken failure cancelled into a held draft resends only its retry UUID', async () => {
+ const app=await idle(),id='90d2564c-6064-4275-95cd-5a3c7c0b5b56';
+ await companionReply(app,{status:'companion_error',requestId:id,code:'unavailable',retryable:true,questionSpoken:true});
+ tap(app,app.nodes.get('close'));await flush();assert.equal(app.context.nucleo.state(),'HELD_DRAFT');
+ tap(app,app.nodes.get('pill'));await flush();assert.deepEqual(asksOf(app).at(-1),{retry:id});assert.deepEqual(app.errors,[]);
+});
+for (const input of ['type','speech']) test(`${input}: the next question is never an answer to a hidden personal question`, async () => {
+ const app=await idle();const id='90d2564c-6064-4275-95cd-5a3c7c0b5b56';
+ await companionReply(app,{status:'companion',requestId:id,text:'Explanation',companionCheckIn:{question:{id:'interest',text:'Interest?',options:[]}}});
+ if(input==='type'){
+  keyboardOf(app)._guideAction();app.nodes.get('ta').value='What is a share?';app.nodes.get('ta').listeners.input();app.nodes.get('taSend').listeners.click({detail:0,stopPropagation(){}});
+ }else{
+  app.session.mic.state='granted';tap(app,app.nodes.get('pill'));await flush();
+  app.context.nucleoBridge.emit('speech.partial',{text:'What is a share?'});
+  tap(app,app.nodes.get('pill'));app.context.nucleoBridge.emit('speech.final',{text:'What is a share?'});
+ }
+ await flush();assert.equal(asksOf(app).at(-1).question,'What is a share?');
+ assert.equal(asksOf(app).at(-1).after,id);
+ assert.equal(app.calls.filter(c=>c.method==='companion.answer').length,0);assert.deepEqual(app.errors,[]);
+});
+for (const input of ['type','speech']) test(`${input}: closing the composer keeps the same answer without personal controls`, async () => {
+ const app=await idle();await companionReply(app,{status:'companion',text:'Explanation',companionCheckIn:{question:{id:'interest',text:'Interest?',options:[]}}});
+ if(input==='type'){keyboardOf(app)._guideAction();app.nodes.get('ta').listeners.keydown({key:'Escape',preventDefault(){}});}
+ else{app.session.mic.state='granted';tap(app,app.nodes.get('pill'));await flush();tap(app,app.nodes.get('close'));}
+ await flush();assert.equal(app.context.nucleo.state(),'COMPANION');
+ assert.equal(app.calls.filter(c=>c.method==='companion.answer').length,0);
+ assert.equal(companionPanel(app).children[0].children[1].textContent,'Explanation');assert.deepEqual(app.errors,[]);
+});
+test('cancelling dictation over an answer discards the words and leaves the same answer',async()=>{
+ const app=await idle();await companionReply(app,{status:'companion',text:'Explanation'});
+ app.session.mic.state='granted';tap(app,app.nodes.get('pill'));await flush();
+ app.context.nucleoBridge.emit('speech.partial',{text:'my words'});tap(app,app.nodes.get('close'));await flush();
+ assert.equal(app.context.nucleo.state(),'COMPANION');assert.equal(asksOf(app).length,1);assert.deepEqual(app.errors,[]);
+});
+test('a closing explanation has no disclosure, no default invitation and no personal choices',async()=>{
+ const app=await idle({speak:'queued'});
+ await companionReply(app,{status:'companion',requestId:'90d2564c-6064-4275-95cd-5a3c7c0b5b56',gist:'Understood.',text:'Understood.',followUp:null});
+ app.advance(10);await flush();assert.equal(guideActionsOf(app).children.length,0);
+ assert.equal(companionPanel(app).children[1].style.display,'none');assert.deepEqual(app.errors,[]);
+});
+test('the fact fixture is separate from narration and retains its source and year', async () => {
+  const app=await idle();const fixture=JSON.parse(read('../fixtures/native/companion-explanation-fact.json'));
+  await companionReply(app,{status:'companion',requestId:fixture.requestId,text:fixture.reply.text,fact:fixture.fact});
+  assert.equal(companionPanel(app).children[0].children[2].textContent,fixture.fact.text+'\n'+fixture.fact.source+' · '+fixture.fact.year);
+  assert.equal(app.calls.filter(c=>c.method==='speak').at(-1).params.text,fixture.reply.text);
+  assert.deepEqual(app.errors,[]);
+});
+
+function leaveAndReturn(app){app.context.nucleoBridge.emit('app.state',{state:'background'});app.context.nucleoBridge.emit('app.state',{state:'active'});}
+test('A10: typed background keeps exact Unicode words without any send',async()=>{
+ const app=await idle();app.nodes.get('ui').children.find(node=>node.id==='conversation-keyboard')._guideAction();app.nodes.get('ta').value='¿Qué es un ETF? 123,45 €';
+ leaveAndReturn(app);app.advance(12);await flush();
+ assert.equal(app.context.nucleo.state(),'TYPING');assert.equal(app.nodes.get('ta').value,'¿Qué es un ETF? 123,45 €');assert.equal(asksOf(app).length,0);assert.deepEqual(app.errors,[]);
+});
+test('A10: tap capture cut by background becomes a stopped held draft and rejects the late final',async()=>{
+ const app=await idle();app.session.mic.state='granted';tap(app,app.nodes.get('pill'));await flush();
+ app.context.nucleoBridge.emit('speech.partial',{text:'my complete words'});leaveAndReturn(app);
+ app.context.nucleoBridge.emit('speech.final',{text:'late words'});app.advance(12);await flush();
+ assert.equal(app.context.nucleo.state(),'HELD_DRAFT');assert.equal(app.nodes.get('ui').children.find(node=>node.id==='conversation-draft').textContent,'my complete words');assert.ok(app.nodes.get('hint').textContent.includes('Your question is still here'));assert.equal(asksOf(app).length,0);assert.deepEqual(app.errors,[]);
+});
+test('A10: background keeps the failure and retry id, then explicit retry uses it',async()=>{
+ const app=await idle(),id='90d2564c-6064-4275-95cd-5a3c7c0b5b56';
+ await companionReply(app,{status:'companion_error',requestId:id,code:'unavailable',retryable:true});
+ leaveAndReturn(app);app.advance(12);await flush();assert.equal(app.context.nucleo.state(),'COMPANION');assert.equal(guideActionsOf(app).children.length,1);
+ guideActionsOf(app).children[0]._guideAction();await flush();assert.deepEqual(asksOf(app).at(-1),{retry:id});assert.deepEqual(app.errors,[]);
+});
+test('A10: background keeps the answer and drops an invitation that has not arrived',async()=>{
+ const app=await idle({speak:'queued'});
+ await companionReply(app,{status:'companion',requestId:'90d2564c-6064-4275-95cd-5a3c7c0b5b56',gist:'First sentence.',text:'First sentence. More detail.',followUp:'Next question?',questionSpoken:true});
+ leaveAndReturn(app);app.advance(12);await flush();
+ assert.equal(app.context.nucleo.state(),'COMPANION');assert.equal(companionPanel(app).children[0].children[0].textContent,'First sentence.');assert.equal(guideActionsOf(app).children.length,0);assert.equal(asksOf(app).length,1);assert.deepEqual(app.errors,[]);
+});
+
+test('A10: refreshed native limit text updates the same visible failed turn',async()=>{
+ const app=await idle(),id='90d2564c-6064-4275-95cd-5a3c7c0b5b56';
+ await companionReply(app,{status:'companion_error',requestId:id,code:'limit',retryable:false,limitLine:'Tomorrow at 1:15'});
+ leaveAndReturn(app);app.context.nucleoBridge.emit('session.changed',{...app.session,companionPilot:{limit:{requestId:id,line:'Today at 1:15'}}});
+ assert.equal(companionPanel(app).children[0].children[0].textContent,'Today at 1:15');assert.equal(asksOf(app).length,1);assert.deepEqual(app.errors,[]);
+});
