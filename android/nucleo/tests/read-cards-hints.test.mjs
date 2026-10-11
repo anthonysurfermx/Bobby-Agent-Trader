@@ -53,6 +53,20 @@ function cardWorld(tree, heights = {}) {
 }
 const px = (value) => parseFloat(value);
 
+test('a finished Android debate opens the in-app report sheet without attaching the answer', () => {
+  const { context, el } = cardWorld('android');
+  const calls = [];
+  context.SES = { reportContentLabel: 'Denunciar esta resposta' };
+  context.bcall = (method, params) => { calls.push({ method, params: plain(params) }); return Promise.resolve({}); };
+  context.noop = () => {};
+  context.fillCards(readModel('android').build(fixture('nvda'), { lang: 'pt' }));
+  const button = el.card0.inn.children.at(-1);
+  assert.equal(button.className, 'report-answer');
+  assert.equal(button.textContent, 'Denunciar esta resposta');
+  button.onclick({ stopPropagation() {} });
+  assert.deepEqual(calls, [{ method: 'openNative', params: { route: 'reportContent' } }]);
+});
+
 for (const tree of Object.keys(TREES)) {
   const RM = readModel(tree), STR = appStrings(tree), template = read(tree, 'app/template.html');
 

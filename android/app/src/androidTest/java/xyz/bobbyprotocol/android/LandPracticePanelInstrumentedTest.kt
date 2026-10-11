@@ -208,7 +208,7 @@ class LandPracticePanelInstrumentedTest {
             item.getString("id") to item.getJSONObject("name").getString("en")
         }
         assertEquals(27, catalog.size)
-        val raw = context.assets.open("traderland/practice-fixture.json").bufferedReader().use { it.readText() }
+        val raw = context.assets.open("traderland/practice-starter.json").bufferedReader().use { it.readText() }
         return Bundle(catalog, names, requireNotNull(LandPractice.decodeFixture(raw, catalog)))
     }
 }

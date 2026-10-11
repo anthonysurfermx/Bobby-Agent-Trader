@@ -15,6 +15,7 @@ import xyz.bobbyprotocol.android.data.BobbyRepository
 
 /** App-scoped purchase store. Call identify only after the person accepts the risk notice. */
 class BillingStore(context: Context, private val repository: BobbyRepository) {
+    val canOfferGoogleBilling: Boolean = BillingPolicy.usableKey(BuildConfig.REVENUECAT_ANDROID_API_KEY, BuildConfig.DEBUG) != null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val client = RevenueCatClient(context.applicationContext, BuildConfig.ENTITLEMENT_ID, BuildConfig.DEBUG)
     private val accounts = object : BillingAccounts {

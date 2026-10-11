@@ -2075,6 +2075,14 @@
     "it": "Lingua del rapporto",
     "de": "Berichtssprache"
   },
+  "Report this answer": {
+    "en": "Report this answer",
+    "es": "Reportar esta respuesta",
+    "fr": "Signaler cette réponse",
+    "pt": "Denunciar esta resposta",
+    "it": "Segnala questa risposta",
+    "de": "Diese Antwort melden"
+  },
   "Request failed": {
     "fr": "La demande a échoué",
     "pt": "O pedido falhou",

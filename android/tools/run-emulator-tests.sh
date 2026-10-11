@@ -53,10 +53,14 @@ part() {
   fi
 }
 
-part screens "$argument.class=$screens" "$@"
-part device "$argument.class=$device" "$@"
-part others "$argument.notClass=$screens,$device,$page" "$@"
-part page "$argument.class=$page" "$@"
+if [ "${BOBBY_TEST_LOCALE:-suite}" != suite ]; then
+  part locale "$argument.class=xyz.bobbyprotocol.android.ReleaseLocaleSmokeInstrumentedTest" "$argument.bobbyLocale=$BOBBY_TEST_LOCALE" "$@"
+else
+  part screens "$argument.class=$screens" "$@"
+  part device "$argument.class=$device" "$@"
+  part others "$argument.notClass=$screens,$device,$page" "$@"
+  part page "$argument.class=$page" "$@"
+fi
 
 kill "$logcat" 2>/dev/null || true
 echo "Screenshots collected: $(find "$out/shots" -name '*.png' | wc -l | tr -d ' ')"

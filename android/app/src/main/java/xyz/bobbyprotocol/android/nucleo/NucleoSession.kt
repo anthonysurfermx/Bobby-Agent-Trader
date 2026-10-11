@@ -208,6 +208,7 @@ class NucleoSession(
             "signedIn" to signedIn, "riskAccepted" to riskAccepted, "riskVersion" to riskCatalog.getInt("version"), "muted" to muted,
             "reducedMotion" to reducedMotion, "mic" to json("state" to speechState, "onDevice" to onDevice), "hints" to store.hints(),
             "pendingRead" to if (riskAccepted) pending else null, "fixtures" to false, "platform" to "android", "appVersion" to appVersion(), "analysisLevel" to analysisLevelJSON(),
+            "reportContentLabel" to text("Report this answer", "Reportar esta respuesta"),
             // 1.8: one native-written line and one button, or null. Every session carries it (the page keeps the whole object).
             "nudge" to v18.nudgeJson()).also { session ->
             // Bobby never invites someone into a wall: when the phone KNOWS the next read is refused, the home

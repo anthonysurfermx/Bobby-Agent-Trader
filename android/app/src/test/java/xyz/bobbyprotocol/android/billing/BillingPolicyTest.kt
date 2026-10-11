@@ -85,7 +85,7 @@ class BillingPolicyTest {
 
     @Test fun subscriptionManagementDoesNotOpenAnUntrustedUrl() {
         assertNull(BillingPolicy.managementUrl("stripe", "https://evil.example"))
-        assertEquals("https://apps.apple.com/account/subscriptions", BillingPolicy.managementUrl("apple", null))
+        assertNull(BillingPolicy.managementUrl("apple", null))
         assertEquals("https://play.google.com/store/account/subscriptions", BillingPolicy.managementUrl("google", "https://play.google.com.evil.example/store/account/subscriptions"))
         assertEquals("https://play.google.com/store/account/subscriptions", BillingPolicy.managementUrl("google", "https://evil@play.google.com/store/account/subscriptions"))
     }

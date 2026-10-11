@@ -193,7 +193,7 @@ fun BobbySheet(
                         }
                     }
                     OutlinedButton(onClick = onRestore, enabled = account != null && billingState.canRestore) { Text(t("Restore purchases", "Restaurar compras")) }
-                    if (billingState.subscriptionProvider == "google" || billingState.subscriptionProvider == "apple") {
+                    if (billingState.subscriptionProvider == "google") {
                         billing.managementUri()?.let { url -> Action(t("Manage subscription", "Administrar suscripción")) { onExternal(url.toString()) } }
                     }
                     Action(t("Help", "Ayuda")) { onExternal(BobbySupportLinks.url(BobbySupportLinks.Page.SUPPORT, session.language, session.locale, repository.country)) }
@@ -236,6 +236,7 @@ fun BobbySheet(
                         }
                         objects(report.optJSONArray("sources")).forEach { source -> Text(source.optString("name"), style = MaterialTheme.typography.bodySmall) }
                         Text(report.optString("dataAsOf"), style = MaterialTheme.typography.bodySmall)
+                        Action(t("Report this answer", "Reportar esta respuesta")) { onOpen("reportContent") }
                         if (report.optJSONArray("narrationSegments")?.length()?.let { it > 0 } == true) {
                             Action(if (narrationStatus in setOf("preparing", "playing")) t("Stop audio", "Detener audio") else t("Listen", "Escuchar"), !session.muted) { if (narrationStatus in setOf("preparing", "playing")) onStopNarration() else onNarrate(report) }
                             if (session.muted) Text(t("Voice is off. Turn it on in your profile.", "La voz está apagada. Actívala en tu perfil."), style = MaterialTheme.typography.bodySmall)

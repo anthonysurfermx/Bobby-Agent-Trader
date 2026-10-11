@@ -306,9 +306,9 @@ class MainActivity : ComponentActivity() {
         narrator.stop(); narrationStatus = null
         web?.view?.clearFocus()
         WindowInsetsControllerCompat(window, window.decorView).hide(WindowInsetsCompat.Type.ime())
-        route = name
+        route = if (name == "paywall" && !billing.canOfferGoogleBilling) "credits" else name
         session.setRendererForeground(false)
-        web?.emit("native.sheet", JSONObject().put("route", name).put("state", "open"))
+        web?.emit("native.sheet", JSONObject().put("route", route).put("state", "open"))
     }
 
     private fun closeSheet() {

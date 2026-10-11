@@ -162,7 +162,7 @@ fun TraderLandSheet(
         try {
             val bundled = withContext(Dispatchers.IO) {
                 val catalog = context.assets.open("traderland/practice-catalog.json").bufferedReader().use { JSONArray(it.readText()) }
-                val fixture = context.assets.open("traderland/practice-fixture.json").bufferedReader().use { it.readText() }
+                val fixture = context.assets.open("traderland/practice-starter.json").bufferedReader().use { it.readText() }
                 catalog to fixture
             }
             val catalog = LandJson.objects(bundled.first).associate { it.getString("id") to PracticeFootprint(it.getInt("footprint_w"), it.getInt("footprint_h")) }

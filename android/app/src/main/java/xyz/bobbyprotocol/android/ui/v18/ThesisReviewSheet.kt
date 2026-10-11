@@ -213,6 +213,7 @@ private fun After(host: V18Host, copy: ThesisCopy, result: ThesisReviewResult, r
         QuietNote(host.text("Evidence lists unavailable.", "Listas de evidencia no disponibles."), Modifier.padding(vertical = 8.dp), tag = "thesis-review-lists-unavailable")
     }
     History(host, copy, r().pastReviews(result.thesis.lastReview))
+    QuietChip(host.text("Report this answer", "Reportar esta respuesta"), "thesis-review-report") { host.switchSheet("reportContent") }
     Spacer(Modifier.height(22.dp))
     QuietPrimary(host.text("Keep thesis", "Mantener tesis"), "thesis-review-keep", onClick = onKeep)
     Text(copy.footer, Modifier.fillMaxWidth().padding(top = 14.dp).testTag("thesis-review-footer"), color = QuietColors.dim, fontSize = 12.sp, textAlign = TextAlign.Center)

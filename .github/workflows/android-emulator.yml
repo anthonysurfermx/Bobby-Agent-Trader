@@ -5,12 +5,9 @@ name: Android emulator
 # workflow compiles them; this one runs debug and the optimized release. CI signing is ephemeral.
 
 on:
-  push:
-    branches: ['android/play-rc']
-    paths: ['android/**', '.github/workflows/android*.yml', 'docs/play-store/**']
   pull_request:
     # shared/harness holds the golden file every platform's follow-up planner must pass.
-    paths: ['android/**', 'shared/harness/**', '.github/workflows/android-emulator.yml']
+    paths: ['android/**', 'shared/harness/**', '.github/workflows/android-emulator.yml', 'docs/play-store/**']
   workflow_dispatch:
 
 permissions:
@@ -27,12 +24,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build-type: [Debug, Release]
-        api: [35]
+        include:
+          - { build-type: Debug, api: 34, locale: suite }
+          - { build-type: Debug, api: 35, locale: suite }
+          - { build-type: Release, api: 35, locale: suite }
+          - { build-type: Release, api: 35, locale: en }
+          - { build-type: Release, api: 35, locale: es }
+          - { build-type: Release, api: 35, locale: fr }
+          - { build-type: Release, api: 35, locale: pt }
+          - { build-type: Release, api: 35, locale: it }
+          - { build-type: Release, api: 35, locale: de }
     env:
       BOBBY_TEST_BUILD_TYPE: ${{ matrix.build-type }}
+      BOBBY_TEST_LOCALE: ${{ matrix.locale }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
@@ -89,7 +97,7 @@ jobs:
           working-directory: android
           # A hosted runner has no GPU: the page's WebGL scene is drawn in software, and its cost grows
           # with every pixel. 720x1600 at 320 dpi is a 360x800 dp phone, the most common Android size.
-          pre-emulator-launch-script: bash tools/emulator-screen.sh 720 1600 320
+          pre-emulator-launch-script: bash tools/emulator-screen.sh ${{ matrix.locale == 'suite' && '720 1600 320' || '1080 2400 480' }}
           # What the tests are told about this emulator: it exists for this run only (a test that changes a
           # system setting may use it), and it has no GPU (the suite that drives the WebGL page by script is skipped).
           script: bash tools/run-emulator-tests.sh -PbobbyTestBuildType=${{ matrix.build-type == 'Release' && 'release' || 'debug' }} -Pandroid.testInstrumentationRunnerArguments.bobbyOwnedEmulator=ci-throwaway -Pandroid.testInstrumentationRunnerArguments.bobbySoftwareGpu=true
@@ -97,7 +105,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: android-emulator-${{ matrix.build-type }}-api-${{ matrix.api }}
+          name: android-emulator-${{ matrix.build-type }}-api-${{ matrix.api }}-${{ matrix.locale }}
           path: android/build/emulator
           if-no-files-found: warn
           retention-days: 14

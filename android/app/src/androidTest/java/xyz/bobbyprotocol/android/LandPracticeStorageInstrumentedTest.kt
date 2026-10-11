@@ -42,7 +42,7 @@ class LandPracticeStorageInstrumentedTest {
             val row = rows.getJSONObject(index)
             row.getString("id") to PracticeFootprint(row.getInt("footprint_w"), row.getInt("footprint_h"))
         }
-        val raw = context.assets.open("traderland/practice-fixture.json").bufferedReader().use { it.readText() }
+        val raw = context.assets.open("traderland/practice-starter.json").bufferedReader().use { it.readText() }
         fixture = requireNotNull(LandPractice.decodeFixture(raw, catalog))
     }
 
