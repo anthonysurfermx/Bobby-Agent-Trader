@@ -207,6 +207,14 @@
     "it": "Livello di analisi",
     "de": "Analysestufe"
   },
+  "Android WebView stopped. Reopen Bobby to restore your session.": {
+    "en": "Android WebView stopped. Reopen Bobby to restore your session.",
+    "es": "Android WebView se detuvo. Vuelve a abrir Bobby para recuperar tu sesión.",
+    "fr": "Android WebView s’est arrêté. Rouvrez Bobby pour retrouver votre session.",
+    "pt": "O Android WebView parou. Abra o Bobby novamente para recuperar sua sessão.",
+    "it": "Android WebView si è arrestato. Riapri Bobby per ripristinare la sessione.",
+    "de": "Android WebView wurde beendet. Öffne Bobby erneut, um deine Sitzung wiederherzustellen."
+  },
   "Android checks for ready reports in the background. Delivery time depends on your device settings.": {
     "fr": "Android recherche les rapports disponibles en arrière-plan. L'heure de livraison dépend des réglages de ton appareil.",
     "pt": "O Android verifica os relatórios disponíveis em segundo plano. A hora de entrega depende das definições do dispositivo.",
@@ -2918,6 +2926,14 @@
     "pt": "Deixa de ser usado após {0} dias sem perguntas.",
     "it": "Non viene più usato dopo {0} giorni senza domande.",
     "de": "Wird nach {0} Tagen ohne Frage nicht mehr verwendet."
+  },
+  "Update Android System WebView to use Bobby.": {
+    "en": "Update Android System WebView to use Bobby.",
+    "es": "Actualiza Android System WebView para usar Bobby.",
+    "fr": "Mettez à jour Android System WebView pour utiliser Bobby.",
+    "pt": "Atualize o Android System WebView para usar o Bobby.",
+    "it": "Aggiorna Android System WebView per usare Bobby.",
+    "de": "Aktualisiere Android System WebView, um Bobby zu nutzen."
   },
   "Use a benefit confirmed by your account": {
     "en": "Use a benefit confirmed by your account",

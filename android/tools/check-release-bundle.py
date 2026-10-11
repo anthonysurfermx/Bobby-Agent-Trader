@@ -18,6 +18,11 @@ assert manifest.attrib[android + 'versionName'] == '1.2.0'
 assert manifest.attrib[android + 'versionCode'] == '10'
 assert manifest.find('uses-sdk').attrib[android + 'targetSdkVersion'] == '36'
 app = manifest.find('application')
+permissions = sorted(node.attrib[android + 'name'] for node in manifest.findall('uses-permission'))
+for forbidden in ('ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION', 'CAMERA', 'READ_CONTACTS', 'READ_MEDIA_AUDIO', 'READ_MEDIA_IMAGES', 'READ_MEDIA_VIDEO'):
+    assert 'android.permission.' + forbidden not in permissions, forbidden
+assert 'com.google.android.gms.permission.AD_ID' not in permissions, 'No advertising ID access'
+assert not any('firebase' in node.attrib.get(android + 'name', '').lower() for node in app), 'FCM-off handoff must not contain Firebase components'
 assert app.attrib.get(android + 'debuggable', 'false') == 'false'
 assert app.attrib[android + 'usesCleartextTraffic'] == 'false'
 assert app.attrib[android + 'allowBackup'] == 'false'
@@ -41,8 +46,11 @@ with zipfile.ZipFile(bundle) as archive:
                     alignment = struct.unpack_from(endian + ('Q' if is64 else 'I'), elf, header + (48 if is64 else 28))[0]
                     assert alignment >= 16384, f'{name}: LOAD alignment {alignment}'
             libraries.append(name)
-result = {'file': bundle.name, 'sha256': hashlib.sha256(bundle.read_bytes()).hexdigest(),
+result = {'file': bundle.name, 'sourceCommit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+          'sha256': hashlib.sha256(bundle.read_bytes()).hexdigest(),
           'bytes': bundle.stat().st_size, 'version': '1.2.0 (10)', 'targetSdk': 36,
-          'unsigned': True, 'debuggable': False, 'cleartext': False, 'nativeLibraries': libraries}
+          'package': manifest.attrib['package'], 'minSdk': int(manifest.find('uses-sdk').attrib[android + 'minSdkVersion']),
+          'unsigned': True, 'debuggable': False, 'cleartext': False, 'allowBackup': False,
+          'permissions': permissions, 'firebaseComponents': False, 'nativeLibraries': libraries}
 print(json.dumps(result, indent=2))
 Path('app/build/outputs/bundle/release/evidence.json').write_text(json.dumps(result, indent=2) + '\n')

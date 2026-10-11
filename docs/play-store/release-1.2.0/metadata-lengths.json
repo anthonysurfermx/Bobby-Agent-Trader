@@ -1,0 +1,38 @@
+{
+  "en": {
+    "title": 26,
+    "shortDescription": 75,
+    "fullDescription": 1897,
+    "releaseNotes": 161
+  },
+  "es": {
+    "title": 26,
+    "shortDescription": 78,
+    "fullDescription": 2064,
+    "releaseNotes": 183
+  },
+  "fr": {
+    "title": 29,
+    "shortDescription": 66,
+    "fullDescription": 2094,
+    "releaseNotes": 183
+  },
+  "pt": {
+    "title": 24,
+    "shortDescription": 76,
+    "fullDescription": 1986,
+    "releaseNotes": 183
+  },
+  "it": {
+    "title": 25,
+    "shortDescription": 71,
+    "fullDescription": 1946,
+    "releaseNotes": 175
+  },
+  "de": {
+    "title": 23,
+    "shortDescription": 70,
+    "fullDescription": 2039,
+    "releaseNotes": 180
+  }
+}

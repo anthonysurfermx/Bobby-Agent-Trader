@@ -2,6 +2,9 @@ package xyz.bobbyprotocol.android
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.SystemClock
+import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
@@ -11,6 +14,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -106,15 +111,29 @@ class ReleaseLocaleSmokeInstrumentedTest {
         assertTrue(bridge("acceptRisk", JSONObject().put("version", notice.getInt("version"))).getBoolean("accepted"))
         val starter = bridge("roster").getJSONArray("companions").getJSONObject(0).getString("id")
         bridge("setCompanion", JSONObject().put("id", starter))
-        assertTrue(bridge("finishOnboarding").getBoolean("finished"))
+        // Finishing intentionally replaces the document and fences the old bridge reply.
+        // Check the new shipping page instead of waiting on the destroyed document's promise.
+        js("window.nucleoBridge.call('finishOnboarding',{}).catch(function(){});true")
         waitFor { js("window.nucleo && window.nucleo.state() === 'IDLE'") == true }
         shot("03-home")
+        // A physical tap opens the real IME on API 35, even on the shipped software fallback.
+        tapDom("pill")
+        waitFor { js("window.nucleo.state()==='TYPING' && document.activeElement.id==='ta'") == true }
+        waitFor { var visible = false; onMain { visible = ViewCompat.getRootWindowInsets(web.view)?.isVisible(WindowInsetsCompat.Type.ime()) == true }; visible }
+        val typingBounds = JSONObject(js("JSON.stringify((function(){var r=document.getElementById('typeBox').getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:r.height,viewport:window.visualViewport?window.visualViewport.height:innerHeight};})())") as String)
+        assertTrue(typingBounds.toString(), typingBounds.getDouble("height") >= 48)
+        assertTrue(typingBounds.toString(), typingBounds.getDouble("top") >= 0)
+        assertTrue("Composer is above the keyboard", typingBounds.getDouble("bottom") <= typingBounds.getDouble("viewport") + 2)
+        shot("03b-keyboard")
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_ESCAPE)
+        waitFor { js("window.nucleo.state()==='IDLE'") == true }
         // A real page chip reaches the actual session/asset resolver/desk parser and returns a read.
         waitFor { js("!!document.querySelector('#chipRow [data-hit=chip]')") == true }
         assertEquals(true, js("(function(){var a=Array.from(document.querySelectorAll('#chipRow [data-hit=chip]'));var b=a.find(function(n){return /NVIDIA|NVDA/.test(n.textContent);});if(!b)return false;b.click();return true;})()"))
         waitFor(240_000) { js("window.nucleo && window.nucleo.read() && window.nucleo.read().status === 'ok' && /HANDBACK|FOLLOWUPS|CARDS/.test(window.nucleo.state())") == true }
         assertTrue(network.calls.any { it.path == "/api/desk-debate" })
         assertEquals("ok", JSONObject(js("JSON.stringify(window.nucleo.read())") as String).getString("status"))
+        assertEquals(session.text("Report this answer", "Reportar esta respuesta"), js("document.querySelector('.report-answer').textContent"))
         shot("04-read")
         open("account")
         compose.onNodeWithTag("account-profile").assertExists()
@@ -226,12 +245,24 @@ class ReleaseLocaleSmokeInstrumentedTest {
     }
 
     private fun open(route: String) { bridge("openNative", JSONObject().put("route", route)); Thread.sleep(1000) }
+    private fun tapDom(id: String) {
+        waitFor { js("(function(){var e=document.getElementById(${JSONObject.quote(id)}),r=e.getBoundingClientRect(),s=getComputedStyle(e),h=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.width>0 && r.height>0 && s.visibility==='visible' && s.pointerEvents!=='none' && h && (h===e || e.contains(h));})()") == true }
+        val position = JSONArray(js("JSON.stringify((function(){var r=document.getElementById(${JSONObject.quote(id)}).getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2,innerWidth];})())") as String)
+        val xy = IntArray(2); var width = 0
+        onMain { web.view.getLocationOnScreen(xy); width = web.view.width }
+        val scale = width / position.getDouble(2)
+        val x = (xy[0] + position.getDouble(0)*scale).toFloat()
+        val y = (xy[1] + position.getDouble(1)*scale).toFloat()
+        val down = SystemClock.uptimeMillis()
+        MotionEvent.obtain(down,down,MotionEvent.ACTION_DOWN,x,y,0).also { instrumentation.sendPointerSync(it); it.recycle() }
+        MotionEvent.obtain(down,down+30,MotionEvent.ACTION_UP,x,y,0).also { instrumentation.sendPointerSync(it); it.recycle() }
+    }
     private fun close() { device.pressBack(); Thread.sleep(800) }
     private fun scrollSheet() { device.swipe(device.displayWidth/2, device.displayHeight*4/5, device.displayWidth/2, device.displayHeight/5, 18); compose.waitForIdle() }
     private fun shot(name: String) { compose.waitForIdle(); Thread.sleep(700); V18Shots.save("locale-$language-$name") }
     private fun bridge(method: String, params: JSONObject = JSONObject()): JSONObject {
         js("window.releaseSmoke=null;window.nucleoBridge.call(${JSONObject.quote(method)},$params).then(function(r){window.releaseSmoke=JSON.stringify(r);},function(e){window.releaseSmoke=JSON.stringify({fault:e.code});});true")
-        waitFor { js("window.releaseSmoke !== null") == true }
+        waitFor { js("typeof window.releaseSmoke === 'string'") == true }
         return JSONObject(js("window.releaseSmoke") as String)
     }
     private fun js(script: String): Any? {
