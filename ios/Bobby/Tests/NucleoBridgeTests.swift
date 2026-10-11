@@ -621,24 +621,72 @@ final class NucleoBridgeTests: XCTestCase {
         }
     }
 
-    func testFinishOnboardingNeedsACompanionAndTheRiskNotice() async throws {
+    func testFinishOnboardingAssignsDefaultAfterTheRiskNotice() async throws {
         let (session, bridge, _) = make(riskAccepted: false)
         session.companions.companionId = nil
         let wasOnboarded = session.profile.onboarded
         let incomplete = await result(bridge, "finishOnboarding")
         XCTAssertEqual(incomplete["status"] as? String, "incomplete")
-        XCTAssertEqual(incomplete["missing"] as? [String], ["companion", "risk"])
+        XCTAssertEqual(incomplete["missing"] as? [String], ["risk"])
         XCTAssertEqual(session.profile.onboarded, wasOnboarded)
         _ = await result(bridge, "acceptRisk", ["version": RiskNotice.currentVersion])
-        _ = await result(bridge, "setCompanion", ["id": "byte"])
+        XCTAssertNil(session.companions.companionId)
         var routed: NucleoPage?
         session.onRoute = { routed = $0 }
         let done = await result(bridge, "finishOnboarding")
         XCTAssertEqual(done["next"] as? String, "app")
+        XCTAssertEqual(session.companions.companionId, "byte", "T2/4.7.8 default starter, same roster ordering")
         XCTAssertTrue(session.profile.onboarded)
         try await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertEqual(routed, .app, "then native cross-fades to app.html")
         XCTAssertEqual(session.page, .app)
+    }
+
+    func testFirstAskHandoverIsRAMOnlyAndConsumedOnceByAppSession() async throws {
+        let (session, bridge, _) = make()
+        let question = "handover-" + UUID().uuidString
+        let ask: [String:Any] = ["question": question, "chip": true, "companion": true, "spoken": false]
+        _ = await result(bridge, "finishOnboarding", ["ask": ask])
+        XCTAssertNil(session.sessionJSON()["pendingAsk"], "events cannot consume or expose the question")
+        let onboarding = await result(bridge, "session", ["page":"onboarding"])
+        XCTAssertNil(onboarding["pendingAsk"])
+        let handed = await result(bridge, "session", ["page":"app"])
+        XCTAssertEqual(handed["pendingAsk"] as? NSDictionary, ask as NSDictionary)
+        let again = await result(bridge, "session", ["page":"app"])
+        XCTAssertNil(again["pendingAsk"])
+        XCTAssertFalse(String(describing: defaults.dictionaryRepresentation()).contains(question), "no words in defaults")
+        XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("api/desk-debate") || $0.contains("api/voice-tool") || $0.contains("api/bobby-companion") || $0.contains("api/okx-candles") || $0.contains("api/stock-candles") }, "handover itself sends no ask; post-consent vocabulary boot is allowed")
+    }
+
+    func testFirstAskHandoverDropsOnBackgroundWithdrawalAccountAndDeadline() async throws {
+        for event in ["background", "withdrawal", "account", "deadline"] {
+            let (session, bridge, _) = make()
+            var clock: TimeInterval = 100, owner = UUID()
+            session.handoverNow = { clock }; session.handoverOwner = { owner }
+            _ = await result(bridge, "finishOnboarding", ["ask":["question":"Question " + event]])
+            switch event {
+            case "background": session.appWentBackground()
+            case "withdrawal": session.revokeRiskNoticeConsent()
+            case "account": owner = UUID()
+            default: clock += 30
+            }
+            let next = await result(bridge, "session", ["page":"app"])
+            XCTAssertNil(next["pendingAsk"], event)
+        }
+    }
+
+    func testFirstAskHandoverValidatesPlainQuestionAndStrictFlags() async throws {
+        let (session, _, _) = make()
+        for ask: Any in ["text", ["question":" "], ["question":false], ["question":"Bitcoin", "chip":1],
+                         ["question":"Bitcoin", "spoken":"true"], ["question":"Bitcoin", "confirm":true],
+                         ["question":"Bitcoin", "token":"old"]] {
+            do { _ = try await session.dispatch("finishOnboarding", NucleoParams(["ask":ask])); XCTFail("invalid handover accepted") }
+            catch { }
+        }
+        let long = String(repeating:"x", count:1201)
+        _ = try await session.dispatch("finishOnboarding", NucleoParams(["ask":["question":long]]))
+        let next = try await session.dispatch("session", NucleoParams(["page":"app"])) as! [String:Any]
+        XCTAssertEqual((next["pendingAsk"] as? [String:Any])?["question"] as? String, long, "ask itself answers too_long locally")
     }
 
     func testTheAvatarOpensTheAccountSheet() async throws {

@@ -73,7 +73,7 @@ class Element {
 
 function harness({ legacyEvents = false, language = 'en', rejectCollections = false, nudgeActive = true,
   suggestions = { v: 1, quickAccess: [] }, holdAsks = false, measure = null, stallCollections = false,
-  theses = { v: 1, items: [] }, saved = null, speak = 'muted', speaking = null, chooseFails = false, companionAnswer = () => ({question:null}) } = {}) {
+  theses = { v: 1, items: [] }, saved = null, pendingAsk = null, speak = 'muted', speaking = null, chooseFails = false, companionAnswer = () => ({question:null}) } = {}) {
   const nodes = new Map(), calls = [], errors = [], pending = [];
   const made = () => Object.assign(new Element(), { measure });
   for (const match of template.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)) {
@@ -85,7 +85,7 @@ function harness({ legacyEvents = false, language = 'en', rejectCollections = fa
     v: 1, page: 'app', onboarded: true, firstRun: false, language, localHour: 9,
     companion: momo, xp: 0, level: { number: 1, progress: 0.2 }, streak: 0,
     signedIn: false, riskAccepted: true, riskVersion: 6, reducedMotion: false,
-    mic: { state: 'undetermined', onDevice: true }, hints: {}, pendingRead: null,
+    mic: { state: 'undetermined', onDevice: true }, hints: {}, pendingRead: null, pendingAsk,
     platform: 'ios', appVersion: '1.5 (45)', speaking,
     analysisLevel: { id: 'rapido', label: language === 'es' ? 'Rápido' : 'Quick', color: '#A795EF' },
   };
@@ -563,8 +563,10 @@ test('the onboarding page marks a first question picked on a chip the same way, 
   assert.ok(body, 'firstAsk() is one line of the onboarding engine');
   const firstAsk = (W) => JSON.parse(JSON.stringify(vm.runInNewContext('(' + body[0].replace('function firstAsk', 'function') + ')()', { W })));
   assert.deepEqual(firstAsk({ qSrc: 'chip', question: 'How is NVDA looking?' }), { question: 'How is NVDA looking?', chip: true });
-  for (const qSrc of ['voice', 'type', '']) assert.deepEqual(firstAsk({ qSrc, question: 'Is NVDA expensive?' }), { question: 'Is NVDA expensive?' }, qSrc);
-  assert.equal(source.split('startAsk(firstAsk())').length, 3, 'both places the first question is asked from');
+  for (const qSrc of ['voice', 'type', '']) assert.deepEqual(firstAsk({ qSrc, question: 'Is NVDA expensive?' }), { question: 'Is NVDA expensive?', ...(qSrc==='voice'?{spoken:true}:{}) }, qSrc);
+  assert.deepEqual(firstAsk({qSrc:'chip',qCompanion:true,question:'What does investing mean?'}),{question:'What does investing mean?',chip:true,companion:true});
+  assert.equal(source.split('deliverFirstAsk()').length, 4, 'T1/4.7.8 both first-question paths plus named handover');
+  assert.match(source,/call\('finishOnboarding',\{ask:ask\}\)/,'the payload goes only to native RAM');
   assert.doesNotMatch(source, /startAsk\(\{ ?question:/, 'no ask of a first question goes round it');
   // A first question has three sources, and one of them is a chip.
   const sources = [...source.matchAll(/commitQuestion\([^,()]+, '(\w+)'\)/g)].map((match) => match[1]).sort();
@@ -833,4 +835,26 @@ test('A10: refreshed native limit text updates the same visible failed turn',asy
  await companionReply(app,{status:'companion_error',requestId:id,code:'limit',retryable:false,limitLine:'Tomorrow at 1:15'});
  leaveAndReturn(app);app.context.nucleoBridge.emit('session.changed',{...app.session,companionPilot:{limit:{requestId:id,line:'Today at 1:15'}}});
  assert.equal(companionPanel(app).children[0].children[0].textContent,'Today at 1:15');assert.equal(asksOf(app).length,1);assert.deepEqual(app.errors,[]);
+});
+
+// T4/4.7.8 keeps the ordinary WAKE pin and adds the direct handover route.
+test('first-run handover sends immediately without WAKE or waiting for collections', async () => {
+  for(const companion of [false,true]){
+    const question='What does investing mean?';
+    const app=harness({pendingAsk:{question,chip:true,spoken:false,companion},stallCollections:true,holdAsks:true});
+    app.boot(); await flush();
+    assert.equal(app.context.nucleo.state(),'SENDING');
+    assert.deepEqual(asksOf(app),[{question,chip:true,spoken:false,companion,...(!companion?{confirm:true}:{})}]);
+    app.advance(.02); await flush();
+    assert.equal(app.nodes.get('dockQ').textContent,question);
+    assert.equal(app.context.nucleo.session().pendingAsk,null);
+    assert.ok(!app.context.nucleo.log().some(entry=>String(entry).includes('WAKE')));
+    app.nodes.get('stage').listeners.pointerup({pointerId:1,clientX:195,clientY:770}); assert.equal(asksOf(app).length,1);
+    tap(app,app.nodes.get('pill'));
+    assert.ok(!app.calls.some(c=>c.method==='cancel'),'first half-second ignores the old hold finger');
+    app.advance(.51); await flush();
+    tap(app,app.nodes.get('pill')); await flush();
+    assert.ok(app.calls.some(c=>c.method==='cancel')); assert.equal(app.context.nucleo.state(),'HELD_DRAFT');
+    assert.deepEqual(app.errors,[]);
+  }
 });

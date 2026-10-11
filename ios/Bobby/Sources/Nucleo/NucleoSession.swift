@@ -135,6 +135,10 @@ final class NucleoSession: ObservableObject {
     private var accountGeneration: UUID?
     private var accountUserID: String?
     private var consentGeneration = UUID()
+    private var pendingFirstAsk: (ask: [String: Any], owner: UUID, expires: TimeInterval)?
+    var handoverNow: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+    var handoverOwner: () -> UUID = { AccountSession.shared.generation }
+
 
     init(fixtures: Bool,
          profile: AgentProfile = AgentProfile(),
@@ -441,7 +445,21 @@ final class NucleoSession: ObservableObject {
             throw NucleoFault.unknownMethod(method)
 #endif
         case "finishOnboarding":
-            return finishOnboarding()
+            var ask: [String: Any]?
+            if p.has("ask") {
+                guard let raw = p.value("ask") as? [String: Any],
+                      Set(raw.keys).isSubset(of: ["question", "chip", "companion", "spoken"]) else {
+                    throw NucleoFault.invalid("ask must be a plain question")
+                }
+                let payload = NucleoParams(raw)
+                let question = try payload.string("question")!
+                guard !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw NucleoFault.invalid("question is empty") }
+                ask = ["question": question]
+                for key in ["chip", "companion", "spoken"] {
+                    if let value = try payload.bool(key, required: false) { ask?[key] = value }
+                }
+            }
+            return finishOnboarding(ask: ask)
         case "markHint":
             let key = try p.string("key", pattern: Self.hintPattern)!
             return ["count": markHint(key)]
@@ -514,6 +532,10 @@ final class NucleoSession: ObservableObject {
             "companionPilot": ["limit":companionPilot.limitSnapshot().map { $0 as Any } ?? NSNull(), "strings": CompanionCopy.json, "enabled": companionPilot.capability.known ? companionPilot.capability.enabled as Any : NSNull(), "textScale": UIFontMetrics(forTextStyle: .body).scaledValue(for: 17) / 17],
             "nudge": currentNudge().map { $0.json as Any } ?? NSNull(),
         ]
+#if DEBUG
+        // Review-only composition; impossible outside the offline signed fixture harness.
+        if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-consent-preview") { json["consentPreview"] = true }
+#endif
         // Bobby never invites someone into a wall: when the phone KNOWS the next read is refused, the
         // home offers no chip that asks by itself. Not knowing (a first launch, no network) changes
         // nothing, and without the key the session is what it always was.
@@ -766,7 +788,14 @@ final class NucleoSession: ObservableObject {
         wakeRun += 1
         // After this reply reaches the page: a tap stored at cold launch opens now (emit drops before here).
         scheduleBriefingDrain()
-        return sessionJSON()
+        var json = sessionJSON()
+        if page == NucleoPage.app.name, let pending = pendingFirstAsk {
+            pendingFirstAsk = nil
+            if profile.acceptedRiskNotice, pending.owner == handoverOwner(), handoverNow() < pending.expires {
+                json["pendingAsk"] = pending.ask
+            }
+        }
+        return json
     }
 
     // MARK: - The page wakes up (1.8)
@@ -1030,6 +1059,7 @@ final class NucleoSession: ObservableObject {
         guard !tornDown else { return }
         consentGeneration = UUID()
         profile.riskNoticeVersion = 0
+        pendingFirstAsk = nil
         telemetry.consentChanged()
         AccountSession.shared.cancelPendingSignIn()
         desk.invalidatePending()
@@ -1060,11 +1090,14 @@ final class NucleoSession: ObservableObject {
 
     // MARK: - Onboarding
 
-    func finishOnboarding() -> [String: Any] {
-        var missing: [String] = []
-        if companions.companionId == nil { missing.append("companion") }
-        if !profile.acceptedRiskNotice { missing.append("risk") }
-        guard missing.isEmpty else { return ["status": "incomplete", "missing": missing] }
+    func finishOnboarding(ask: [String: Any]? = nil) -> [String: Any] {
+        guard profile.acceptedRiskNotice else { return ["status": "incomplete", "missing": ["risk"]] }
+        if companions.companionId == nil {
+            let starters = bobbyCompanions.filter { $0.requiredLevel == 1 && companions.isUnlocked($0) }
+            guard let starter = starters.first(where: { $0.id != "orb" }) ?? starters.first,
+                  (try? setCompanion(starter.id)) != nil else { return ["status": "incomplete", "missing": ["companion"]] }
+        }
+        pendingFirstAsk = ask.map { ($0, handoverOwner(), handoverNow() + 30) }
         profile.onboarded = true
         if signedIn {
             Task { [weak self] in
@@ -1448,6 +1481,7 @@ final class NucleoSession: ObservableObject {
     /// not taken yet is dropped, and so is one still waiting for its sheet to go: it never starts
     /// by itself when they come back.
     func appWentBackground() {
+        pendingFirstAsk = nil
         readHandoff = nil
         dropReadOffer()
         speech.cancel()
@@ -1569,6 +1603,7 @@ final class NucleoSession: ObservableObject {
         guard accountGeneration != account.generation else { return }
         let wasAnonymous = accountUserID == nil
         accountGeneration = account.generation
+        pendingFirstAsk = nil
         accountUserID = account.session?.userId
         if wasAnonymous, let owner = accountUserID { SpeakingDial(defaults: defaults).inheritGuest(owner) }
         desk.clearConversation()

@@ -370,7 +370,7 @@ ENTER.COMMIT = function(){
   at(lead + 0.80, function(){ W.emitEv = { t:T, ang:-Math.PI / 2, ext:-0.05, d:0.09 }; after(0.09, function(){ gulpK(0.03); ripple(0.02); }); hap(0.5); crit(W.tintAmt, 0.3); to(W.tintAmt, 0); to(W.wash, 0); });
   at(lead + 0.85, function(){ tb('dock'); });
   at(lead + 0.90, function(){ tb('qwait'); tg('words'); });
-  at(lead + 1.10, function(){ if (SESSION && SESSION.riskAccepted) startAsk(firstAsk()); else go('RISK'); });
+  at(lead + 1.10, function(){ if (SESSION && SESSION.riskAccepted) deliverFirstAsk(); else go('RISK'); });
 };
 
 /* ---------- typing: a real textarea outside the scaled stage ---------- */
@@ -419,7 +419,7 @@ function agreeComplete(){
   var v = RISK_NOTICE ? RISK_NOTICE.version : 0;
   call('acceptRisk', { version:v }).then(function(r){
     if (W.state !== 'RISK') return;
-    if (r && r.accepted){ if (SESSION){ SESSION.riskAccepted = true; SESSION.riskVersion = r.version; } if (W.riskOnly) at(0.6, finish); else at(0.40, function(){ startAsk(firstAsk()); }); }
+    if (r && r.accepted){ if (SESSION){ SESSION.riskAccepted = true; SESSION.riskVersion = r.version; } if (W.riskOnly) at(0.6, finish); else deliverFirstAsk(); }
     else riskFailed();
   }, riskFailed);
 }
@@ -433,7 +433,23 @@ function riskFailed(){
 /* ---------- O5 first read ---------- */
 /* the first question, as the person gave it. Picked on a chip, its words were Bobby's and the ask says so (`chip`),
    as in the app (ARCHITECTURE.md §3.5): native never takes it for a question they asked by themselves. */
-function firstAsk(){ return W.qSrc === 'chip' ? { question:W.question, chip:true } : { question:W.question }; }
+function firstAsk(){ var p={question:W.question}; if(W.qSrc==='chip')p.chip=true; if(W.qCompanion)p.companion=true; if(W.qSrc==='voice')p.spoken=true; return p; }
+function deliverFirstAsk(){
+  if(typeof FIRST_RUN_HANDOVER==='undefined'||!FIRST_RUN_HANDOVER)return startAsk(firstAsk());
+  var ask=firstAsk(); go('HANDOVER');
+  call('finishOnboarding',{ask:ask}).then(function(r){
+    if(r&&r.next==='app')return; W.finishing=false; go('RISK');
+  },function(){ W.finishing=false; go('RISK'); });
+}
+ENTER.HANDOVER=function(){
+  W.finishing=true; W.micBreath=false; tb('dock',T-1); tg('lines'); tg('notice'); tg('agreeRing');
+  setPill('think','',96); setHint('');
+  var wait=document.getElementById('first-run-preparing');
+  if(!wait){wait=document.createElement('p');wait.id='first-run-preparing';wait.className='conversation conversation-status';stage.appendChild(wait);}
+  wait.textContent=Ls('status.preparing');wait.style.top='512px';
+  wait.style.fontSize=(22*Math.max(1,+(SESSION&&SESSION.textScale)||1)/(FIT||1))+'px';
+  wait.style.lineHeight='1.227';wait.style.display='block';
+};
 function startAsk(params){
   var seq = ++W.askSeq; W.reply = null; M = null;
   go('RESOLVING');

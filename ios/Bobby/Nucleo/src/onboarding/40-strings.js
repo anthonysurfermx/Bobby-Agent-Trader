@@ -8,6 +8,7 @@
    ============================================================ */
 var STR = {
   en: {
+    "status.preparing": "Preparing your answer…",
     "risk.notNow": "Not now",
     "risk.kept": "Nothing was sent. Your question is still here.",
     "risk.later": "Bobby answers after you accept the notice.",
@@ -102,6 +103,7 @@ var STR = {
     'pause': 'Paused'
   },
   es: {
+    "status.preparing": "Preparando tu respuesta…",
     "risk.notNow": "Ahora no",
     "risk.kept": "No se envió nada. Tu pregunta sigue aquí.",
     "risk.later": "Bobby responde cuando aceptes el aviso.",
@@ -197,6 +199,7 @@ var STR = {
   }
 ,
   fr: {
+    "status.preparing": "Je prépare ta réponse…",
     "risk.notNow": "Pas maintenant",
     "risk.kept": "Rien n’a été envoyé. Ta question est toujours là.",
     "risk.later": "Bobby répond dès que tu acceptes l’avis.",
@@ -293,6 +296,7 @@ var STR = {
     "pause": "En pause"
   },
   pt: {
+    "status.preparing": "A preparar a tua resposta…",
     "risk.notNow": "Agora não",
     "risk.kept": "Nada foi enviado. A tua pergunta continua aqui.",
     "risk.later": "O Bobby responde quando aceitares o aviso.",
@@ -390,6 +394,7 @@ var STR = {
   }
 ,
   it: {
+    "status.preparing": "Preparo la tua risposta…",
     "risk.notNow": "Non ora",
     "risk.kept": "Non è stato inviato nulla. La tua domanda è ancora qui.",
     "risk.later": "Bobby risponde quando accetti l’avviso.",
@@ -486,6 +491,7 @@ var STR = {
     "pause": "In pausa"
   },
   de: {
+    "status.preparing": "Ich bereite deine Antwort vor…",
     "risk.notNow": "Jetzt nicht",
     "risk.kept": "Es wurde nichts gesendet. Deine Frage ist noch da.",
     "risk.later": "Bobby antwortet, sobald du den Hinweis akzeptierst.",

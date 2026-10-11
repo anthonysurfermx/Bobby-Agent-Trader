@@ -153,6 +153,18 @@ function boot(){
     buildState();
     var gen = OWNER_GEN;
     var started = false;
+    var pendingAsk = SES && SES.pendingAsk;
+    if (pendingAsk && typeof pendingAsk.question === 'string' && pendingAsk.question.trim()){
+      started = true; buildFaces();
+      // The native snapshot is already showing the question; the first daily frame is waiting.
+      A.dim.set(1); A.hdr.set(1); A.pillY.set(0); A.pillO.set(1);
+      S.r.set(98); S.cy.set(300); U.glow.set(1); U.energy.set(0.35); U.irid.set(1); U.wflow.set(0.18); tintHome();
+      var params = {question:pendingAsk.question};
+      ['chip','companion','spoken'].forEach(function(key){ if(typeof pendingAsk[key] === 'boolean') params[key] = pendingAsk[key]; });
+      if(!params.companion) params.confirm = true;
+      SES.pendingAsk = null;
+      go('SENDING', {question:params.question,params:params,origin:'handover',handover:true});
+    }
     function start(){
       if (started) return; started = true;
       buildFaces();

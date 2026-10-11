@@ -228,3 +228,23 @@ final class HoldConversationUITests: ConversationFixtureCase {
         XCTAssertTrue(web.staticTexts[word("ex.1")].exists); shot("52-hold-release-answer")
     }
 }
+
+/// Six review captures for SPEC4.7.6. Does not exercise unapproved new consent actions.
+final class ConsentPreviewShots: ConversationFixtureCase {
+    func testConsentComposition() {
+        app = XCUIApplication()
+        app.launchArguments = ["-nucleo-fixtures", "default", "-nucleo-page", "onboarding", "-nucleo-reset-onboarding",
+            "-qa-consent-preview", "-agent.riskNoticeVersion", "0",
+            "-AppleLanguages", "(\(language))", "-app.language", language,
+            "-AppleLocale", ["es":"es_MX", "de":"de_DE", "it":"it_IT"][language]!,
+            "-avatar.voiceMuted", "YES", "-nucleo.voiceMuteReset.v1", "YES"]
+        app.launch()
+        let words = labels["onboarding"] as! [String:String]
+        let laterQuery = web.buttons.matching(NSPredicate(format:"label == %@", words["risk.notNow"]!))
+        XCTAssertTrue(laterQuery.firstMatch.waitForExistence(timeout:25))
+        let later = laterQuery.allElementsBoundByIndex.last!, agree = web.buttons[words["risk.activate"]!]
+        shot("70-consent-composition-preview")
+        ready(later); ready(agree); physicalControls([later, agree], abovePill: false)
+        ready(web.buttons[words["risk.notice"]!]); ready(web.buttons[words["risk.profile"]!])
+    }
+}

@@ -118,6 +118,7 @@
       "aria.accountPlain": "Account and progress"
     },
     "onboarding": {
+      "status.preparing": "Preparing your answer…",
       "risk.notNow": "Not now",
       "risk.kept": "Nothing was sent. Your question is still here.",
       "risk.later": "Bobby answers after you accept the notice.",
@@ -373,6 +374,7 @@
       "aria.accountPlain": "Cuenta y progreso"
     },
     "onboarding": {
+      "status.preparing": "Preparando tu respuesta…",
       "risk.notNow": "Ahora no",
       "risk.kept": "No se envió nada. Tu pregunta sigue aquí.",
       "risk.later": "Bobby responde cuando aceptes el aviso.",
@@ -628,6 +630,7 @@
       "aria.accountPlain": "Compte et progression"
     },
     "onboarding": {
+      "status.preparing": "Je prépare ta réponse…",
       "risk.notNow": "Pas maintenant",
       "risk.kept": "Rien n’a été envoyé. Ta question est toujours là.",
       "risk.later": "Bobby répond dès que tu acceptes l’avis.",
@@ -883,6 +886,7 @@
       "aria.accountPlain": "Conta e progresso"
     },
     "onboarding": {
+      "status.preparing": "A preparar a tua resposta…",
       "risk.notNow": "Agora não",
       "risk.kept": "Nada foi enviado. A tua pergunta continua aqui.",
       "risk.later": "O Bobby responde quando aceitares o aviso.",
@@ -1138,6 +1142,7 @@
       "aria.accountPlain": "Account e progressi"
     },
     "onboarding": {
+      "status.preparing": "Preparo la tua risposta…",
       "risk.notNow": "Non ora",
       "risk.kept": "Non è stato inviato nulla. La tua domanda è ancora qui.",
       "risk.later": "Bobby risponde quando accetti l’avviso.",
@@ -1393,6 +1398,7 @@
       "aria.accountPlain": "Konto und Fortschritt"
     },
     "onboarding": {
+      "status.preparing": "Ich bereite deine Antwort vor…",
       "risk.notNow": "Jetzt nicht",
       "risk.kept": "Es wurde nichts gesendet. Deine Frage ist noch da.",
       "risk.later": "Bobby antwortet, sobald du den Hinweis akzeptierst.",
