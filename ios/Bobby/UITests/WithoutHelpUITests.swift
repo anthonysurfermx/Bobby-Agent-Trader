@@ -196,7 +196,13 @@ final class WithoutHelpUITests: ConversationFixtureCase {
 }
 
 final class ConversationShots: ConversationFixtureCase {
+    var homeEducation: XCUIElement {
+        web.buttons.matching(NSPredicate(format: "label IN %@", (1...6).map { word("ex.\($0)") })).firstMatch
+    }
     func checkHomeExamples() {
+        // The keyboard door appears before WAKE finishes emitting the examples.
+        // Wait for the actual education control, then inspect the settled row.
+        ready(homeEducation)
         let size=app.windows.firstMatch.frame.size,scale=min(size.width/390,size.height/844),offset=(size.width-390*scale)/2
         let examples=web.buttons.allElementsBoundByIndex.filter { $0.isHittable && $0.frame.minY >= 630*scale && $0.frame.maxY < 710*scale }
         XCTAssertGreaterThan(examples.count,0);XCTAssertLessThanOrEqual(examples.count,3)
@@ -208,7 +214,7 @@ final class ConversationShots: ConversationFixtureCase {
     func test88HomeNudgeWholeExamples() {launch(home:"nudge");checkHomeExamples();XCTAssertTrue(web.staticTexts.matching(NSPredicate(format:"label ==[c] %@",nativeWord("ready"))).firstMatch.exists);shot("88-home-nudge-whole-examples")}
     func test99HomeExplanationsOff() {launch("companion-off");Thread.sleep(forTimeInterval:1);XCTAssertFalse(button("ex.1").isHittable);shot("99-home-explanations-off")}
     func test89HomeWallEducationStays() {
-        launch(home:"wall");checkHomeExamples();XCTAssertTrue(button("ex.1").isHittable)
+        launch(home:"wall");checkHomeExamples();XCTAssertTrue(homeEducation.isHittable)
         let size=app.windows.firstMatch.frame.size,k=min(size.width/390,size.height/844)
         let row=web.buttons.allElementsBoundByIndex.filter { $0.isHittable && $0.frame.minY >= 630*k && $0.frame.maxY < 710*k }
         XCTAssertEqual(row.count,1,"At a known wall only education stays")
