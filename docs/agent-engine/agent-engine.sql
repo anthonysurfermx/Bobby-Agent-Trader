@@ -4,6 +4,9 @@
 -- invariants as the memory store, with real concurrent transactions. Before it becomes a migration the owner
 -- decides: how long a person's question is kept (agent_tasks.question), and the product's own allowance.
 -- All tables are for the service role only.
+-- Applying it to a database in use: statement by statement, or in a quiet moment. Applied in ONE transaction while
+-- errands are being cancelled it can deadlock with them (found on 2026-10-11 with a second session cancelling the whole
+-- time: one side is rolled back and can be retried; statement by statement, 400 of 400 cancels went through).
 
 create table if not exists agent_tasks (
   id text primary key,

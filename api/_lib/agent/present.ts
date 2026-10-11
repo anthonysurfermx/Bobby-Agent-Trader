@@ -55,7 +55,7 @@ const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * A name's number is not a name's when something follows that makes it a quantity: "Dow 30 mil puntos", "IBEX 35 por
  * ciento", "Russell 2000 dólares", "S&P 500 k". Folded text.
  */
-const AFTER_A_NAME = '(?!\\s?[%‰‱٪]|[\\s-]+(?:k|mil|miles|millon(?:es)?|thousand|millions?|billions?|mille|milliers?|milliards?|mila|milion[ei]|miliard[oi]|tausend|millionen|milliarden?|milhao|milhoes|bilhoes|por\\s?cien(?:to)?|percent|per[\\s-]?cent|pour[\\s-]?cent|prozent|per\\s?cento|por\\s?cento|pct|dolar(?:es)?|dollars?|dollar[io]|pesos?|euros?|usd|eur|mxn|usdt|puntos?|points?|punkte?n?|punt[oi]|pontos?|veces|times|fois|volte|vezes|mal)(?![a-z]))';
+const AFTER_A_NAME = '(?!\\s?[%‰‱٪]|[\\s-]+(?:k|mil|miles|millon(?:es)?|thousand|millions?|billions?|mille|milliers?|milliards?|mila|milion[ei]|miliard[oi]|tausend|millionen|milliarden?|milhao|milhoes|bilhoes|por\\s?cien(?:to)?|percent|per[\\s-]?cent|pour[\\s-]?cent|prozent|per\\s?cento|por\\s?cento|pct|dolar(?:es)?|dollars?|dollar[io]|pesos?|euros?|usd|eur|mxn|usdt|puntos?|points?(?!\\s+(?:to|out|at)(?![a-z]))|punkte?n?|punt[oi]|pontos?|veces|times|fois|volte|vezes)(?![a-z]))';
 /** The engine's instruments whose name holds a number, in any spelling of the spaces: "S&P 500", "S&P-500-ETF", "Nasdaq‑100". */
 const INSTRUMENT_NAMES = [...new Set(UNIVERSE.flatMap((instrument) => [instrument.name, ...instrument.aliases]).filter((name) => /\d/.test(name)).map(read))]
   .sort((a, b) => b.length - a.length).map((name) => new RegExp(`(?<![a-z0-9])${name.split(/[\s-]+/).map(escaped).join('[\\s-]*')}(?![a-z0-9])${/\d$/.test(name) ? AFTER_A_NAME : ''}`, 'g'));
@@ -90,16 +90,16 @@ const PERCENT_WORD = 'por\\s?cien(?:to)?|percent|per[\\s-]?cent|pour[\\s-]?cent|
  * percent word, where "once", "cent" or "sei" cannot be anything else. An article ("un por ciento", "a percent") is not
  * here on purpose: the same word opens "Un punto porcentual es…"; that one is the second reader's.
  */
-const SMALL_NUMBER = ['one', 'half(?: an?)?', 'eleven', 'twelve', '[a-z]+teen', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety', 'hundred',
+const SMALL_NUMBER = ['zero', 'cero', 'null', 'dici[a-z]+', '(?:vent|trent|quarant|cinquant|sessant|settant|ottant|novant)(?:uno|otto)', 'vingts', '[a-z]+einhalb', 'anderthalb', 'one', 'half(?: an?)?', 'eleven', 'twelve', '[a-z]+teen', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety', 'hundred',
   'uno', 'medio', 'media', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieci[a-z]+', 'veint[a-z]+', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa', 'cien', 'ciento',
   'demi', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante', 'cent',
   'mezzo', 'undici', '[a-z]+dici', 'venti[a-z]*', 'trenta[a-z]*', 'quaranta[a-z]*', 'cinquanta[a-z]*', 'sessanta[a-z]*', 'settanta[a-z]*', 'ottanta[a-z]*', 'novanta[a-z]*', 'cento',
   'meio', 'meia', 'doze', 'treze', 'catorze', 'dez[a-z]+', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'cem',
   'eins', 'halb[a-z]*', 'elf', 'zwolf', '[a-z]*zehn', '[a-z]*zig', '[a-z]*ssig', 'hundert'].join('|');
 /** A percentage OF something: a number, a placeholder or a number in words, then the sign or the word. The bare word ("a percentage of what you hold") is not one. */
-const WITH_PERCENT = new RegExp(`(\\p{N}+(?:[.,]\\p{N}+)*|[${MARKS}]|(?<![a-z])(?:${NUMBER_WORD}|${SMALL_NUMBER})(?![a-z]))(?:\\s?[%‰‱٪]|[\\s-]+(?:${PERCENT_WORD})(?![a-z]))`, 'gu');
+const WITH_PERCENT = new RegExp(`(\\p{N}+(?:[.,]\\p{N}+)*|[${MARKS}]|(?<![a-z])(?:${NUMBER_WORD}|${SMALL_NUMBER})(?![a-z]))(?:\\s?[%‰‱٪]|[\\s-]*(?:${PERCENT_WORD})(?![a-z]))`, 'gu');
 /** Words that scale the number before them. */
-const SCALE = 'k|bn|mm|mio|mrd|mil|miles|cientos?|hundreds?|millon(?:es)?|billon(?:es)?|trillon(?:es)?|thousand|millions?|billions?|trillions?|mille|milliers?|milliards?|mila|milion[ei]|miliard[oi]|tausend|millionen|milliarden?|billionen?|milhao|milhoes|bilhoes|veces|times|fois|volte|vezes';
+const SCALE = 'k|m|bn|mm|mio|mrd|mil|miles|cientos?|hundreds?|millon(?:es)?|billon(?:es)?|trillon(?:es)?|thousand|millions?|billions?|trillions?|mille|milliers?|milliards?|mila|milion[ei]|miliard[oi]|tausend|millionen|milliarden?|billionen?|milhao|milhoes|bilhoes|veces|times|fois|volte|vezes';
 /**
  * A whole number and the word that scales it are one number: "10 mil" is 10000, "2 millones" is 2000000, "40 mil
  * millones" is 40000000000. Read that way in the question and in the draft alike, so "tus 10 mil" is their 10,000 and
@@ -107,8 +107,8 @@ const SCALE = 'k|bn|mm|mio|mrd|mil|miles|cientos?|hundreds?|millon(?:es)?|billon
  */
 const SCALED: Array<[RegExp, number]> = [
   [/(?<![\p{N}.,])([0-9]{1,9})\s?(?:k|mil|thousand|mille|mila|tausend)(?![a-z'’])/gu, 1e3],
-  [/(?<![\p{N}.,])([0-9]{1,9})\s?(?:millon(?:es)?|millions?|millionen|milion[ei]|milhao|milhoes)(?![a-z])/gu, 1e6],
-  [/(?<![\p{N}.,])([0-9]{1,9})\s?(?:bn|billions?|milliards?|milliarden?|miliard[oi]|bilhoes)(?![a-z])/gu, 1e9],
+  [/(?<![\p{N}.,])([0-9]{1,9})\s*(?:millon(?:es)?|millions?|millionen|milion[ei]|milhao|milhoes)(?![a-z])/gu, 1e6],
+  [/(?<![\p{N}.,])([0-9]{1,9})\s*(?:bn|billions?|milliards?|milliarden?|miliard[oi]|bilhoes)(?![a-z])/gu, 1e9],
 ];
 const unscaled = (folded: string) => SCALED.reduce((text, [pattern, times]) => text.replace(pattern, (_, n: string) => ` ${Number(n) * times} `), folded);
 /** "1 000" (the French way) is one number. */
@@ -123,14 +123,15 @@ const decimalOf = (n: string) => (/^\p{N}+[.,](?:\p{N}{1,2}|\p{N}{4,})$/u.test(n
  *     number: "60{{f:x}}", "{{days}}{{days}}", "60.{{days}}";
  *   · {{days}} and a typed window length count calendar days and nothing else: "60 días" yes, "60 mil dólares" and
  *     "60 sesiones" and "60 días hábiles" no; in the answer itself a typed length is the window that was read and no
- *     other, whoever wrote the number first (`aside` lifts that for a limitation and the next question);
+ *     other, whoever wrote the number first (`aside` lifts that for a limitation and the next question, and
+ *     `explaining` for a text that is no analysis: what a draft IS decides, not whether its thread holds figures);
  *   · a percentage is code's to write. The model may say back a percentage the person wrote ("your 10%") and may
  *     use the bare word ("a percentage of what you hold"); it may not state one of its own, in digits or in words;
  *   · any other number is allowed only when it is part of a name ("S&P 500", "24/7") or is a number the person
  *     wrote, as a whole number of theirs: their 1000 lets 1,000 through, never 100 nor 10.00; a name in their
  *     question ("Nasdaq 100") lends no number at all.
  */
-function refuse(text: string, figures: Map<string, Figure>, question: string, days: number | null, aside = false): Refusal | null {
+function refuse(text: string, figures: Map<string, Figure>, question: string, days: number | null, aside = false, explaining = days === null): Refusal | null {
   // The marks code puts in place of a number (here, and for the second reader) are code's: a draft that types one is refused.
   if (new RegExp(`[${MARKS}\u27E6\u27E7]`).test(text)) return { code: 'bad_placeholder', detail: 'a character only the app writes' };
   for (const match of text.matchAll(PLACEHOLDER)) {
@@ -158,7 +159,7 @@ function refuse(text: string, figures: Map<string, Figure>, question: string, da
   // No emoji (the instructions say so): a counting sign or a flag is not a word.
   const picture = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.exec(own);
   if (picture) return { code: 'typed_number', detail: 'an emoji' };
-  own = withoutNames(own, days === null);
+  own = withoutNames(own, explaining);
   let asked = withoutNames(read(question.replace(new RegExp(`[${MARKS}]`, 'g'), ' ')));
   const sameQuantity = (quantity: string) => quantity.replace(',', '.');
   const theirPercents = new Set([...asked.matchAll(WITH_PERCENT)].map((match) => sameQuantity(match[1])));
@@ -169,16 +170,18 @@ function refuse(text: string, figures: Map<string, Figure>, question: string, da
   asked = unscaled(asked); own = unscaled(own);
   const said = [...asked.matchAll(NUMBER)].map((match) => match[0]);
   const theirs = new Set(said), wholes = new Set(said.map(wholeOf)), decimals = new Set(said.map(decimalOf));
-  const stillScaled = new RegExp(`^\\s?(?:${SCALE})(?![a-z'’])`);
+  const stillScaled = new RegExp(`^\\s*(${SCALE})(?![a-z'’])`);
+  const theirScaled = new Set([...asked.matchAll(new RegExp(`(\\p{N}+(?:[.,]\\p{N}+)*)\\s?(${SCALE})(?![a-z'’])`, 'gu'))].map((pair) => `${pair[1].replace(',', '.')} ${pair[2]}`));
   for (const match of own.matchAll(NUMBER)) {
     const typed = match[0], whole = wholeOf(typed), decimal = decimalOf(typed);
     // A scale word that is still there follows a number that is not a whole one ("1,5 millones"): that is another number, nobody's.
-    if (stillScaled.test(own.slice(match.index! + typed.length))) return { code: 'typed_number', detail: `${typed} and its scale` };
+    const scale = stillScaled.exec(own.slice(match.index! + typed.length));
+    if (scale && !theirScaled.has(`${typed.replace(',', '.')} ${scale[1]}`)) return { code: 'typed_number', detail: `${typed} and its scale` };
     // A typed length that counts days is a statement about a window. In the answer itself it is the window that was
     // read and no other: "en los últimos 60 días" over a 30-day read is false whoever wrote the 60 first, and a list of
     // both ("en 30 y 60 días Bitcoin ganó") is no better. A limitation or the next question may name either, or both.
     if (LENGTHS.has(typed) && countsDays(own, match.index!, typed.length)) {
-      if (aside || days === null || typed === String(days)) continue;
+      if (aside || explaining || typed === String(days)) continue;
       return { code: 'typed_number', detail: `${typed}: the window that was read is ${days} days (write it with {{days}}; name another length only in a limitation or in next)` };
     }
     if (theirs.has(typed) || (whole !== null && wholes.has(whole)) || (decimal !== null && decimals.has(decimal))) continue;
@@ -305,7 +308,7 @@ export function present(draft: Draft, analysis: Analysis | null, question: strin
   const gist = draft.gist.trim(), text = draft.text.trim(), next = draft.next.trim();
   if (!gist || !text) return { ok: false, refusal: { code: 'empty', detail: '' } };
   const days = analysis?.windowDays ?? null;
-  for (const [n, part] of [gist, text, next, ...draft.limitations].entries()) { const refusal = refuse(part, figures, question, days, n > 1); if (refusal) return { ok: false, refusal }; }
+  for (const [n, part] of [gist, text, next, ...draft.limitations].entries()) { const refusal = refuse(part, figures, question, days, n > 1, days === null || draft.kind !== 'analysis'); if (refusal) return { ok: false, refusal }; }
   for (const claim of draft.claims) {
     // The model may name the subject by its name: code turns it into the symbol, as for a tool.
     const top = resolveMention(claim.top)?.symbol ?? claim.top;
@@ -326,7 +329,7 @@ export function present(draft: Draft, analysis: Analysis | null, question: strin
   // stop after a digit ends a sentence ("…que el S&P 500."), which in the written text it may not ("16. September").
   // A full stop after a single letter ("U.S.") never does. A text is never cut to make a sentence: if none ends within
   // 200 characters as written, the draft goes back.
-  const first = /^.{12,}?(?<!(?<!\p{L})\p{L})[.!?…](?=\s|$)/su.exec(text)?.[0] ?? text;
+  const first = new RegExp(`^.{12,}?(?<!(?<!\\p{L})\\p{L}${language === 'de' ? '|(?<!\\p{N})\\p{N}{1,2}' : ''})[.!?…](?=\\s|$)`, 'su').exec(text)?.[0] ?? text;
   const ownFirst = write(first, figures, days, language, locale);
   const opening = written.startsWith(front) ? front : (ownFirst.length <= 200 && written.startsWith(ownFirst) ? ownFirst : null);
   if (opening === null) return { ok: false, refusal: { code: 'too_long', detail: 'gist is not the exact start of text: begin text with the gist sentence, word for word' } };

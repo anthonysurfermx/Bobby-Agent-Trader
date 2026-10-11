@@ -871,6 +871,39 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   } finally { delete process.env.BOBBY_COMPANION_JUDGE; }
 }
 
+// ---------- 7e. what the fifth review found (2026-10-11): regressions of the fourth round's fixes ----------
+{
+  type L = 'es' | 'en' | 'de' | 'fr' | 'it';
+  const no = (over: Record<string, unknown>, question = 'Compara Bitcoin y Ethereum', language: L = 'es') => { const r = present(draft(over), crypto, question, language); return 'refusal' in r ? `${r.refusal.code}:${r.refusal.detail}` : 'shown'; };
+  // An explanation that follows a comparison: `crypto` is the analysis on the table, the draft cites nothing of it.
+  const after = (text: string, question: string, language: L = 'es') => { const r = present({ kind: 'explanation', gist: text, text, limitations: [], next: '', claims: [] }, crypto, question, language); return 'refusal' in r ? `${r.refusal.code}:${r.refusal.detail}` : 'shown'; };
+  const code = (said: string) => said.split(':')[0];
+  // What a draft IS decides which names and lengths it may use, not whether its thread holds figures.
+  eq([after('Una cartera 60/40 reparte el dinero entre acciones y bonos, y también puede perder.', '¿Y qué es una cartera 60/40?'), after('Porque Bitcoin se negocia las 24 horas, todos los días.', '¿Por qué se mueve el fin de semana?'), after('Aquí puedo leer 30 o 60 días de precios de cierre.', '¿Qué más puedes leer?'), code(no({ text: 'La mezcla quedó 60/40; Bitcoin cambió {{f:return_BTC}}.' }))], ['shown', 'shown', 'shown', 'typed_number'], 'an explanation asked after a comparison is still an explanation: its names and the two lengths are its own; an analysis is held as before');
+  // Number words before a percent word: the ones the list missed.
+  eq([no({ text: 'Perde in media il diciotto per cento.' }, 'Confronta', 'it'), no({ text: 'Sale del ventuno per cento.' }, 'Confronta', 'it'), no({ text: 'It moved zero percent.' }, 'Compare', 'en'), no({ text: 'Es stieg um anderthalb Prozent.' }, 'Vergleiche', 'de'), no({ text: 'Subió 12por ciento.' })].map(code), ['typed_number', 'typed_number', 'typed_number', 'typed_number', 'typed_number'], 'zero, the Italian teens and tens that change their vowel, a half more, and a digit glued to the word are a percentage in words too');
+  // A number, its scale and the scale after it; the person's own scaled number said back as they said it.
+  eq([code(no({ text: 'Su mercado vale 40 mil millones.' })), no({ text: 'Con tus 1,5 millones, Bitcoin cambió {{f:return_BTC}}.' }, 'Tengo 1,5 millones. Compara Bitcoin y Ethereum'), code(no({ text: 'Bitcoin vale 1,5 millones.' }, 'Tengo 1.5 bitcoin. Compara Bitcoin y Ethereum')), code(no({ text: 'Bitcoin cerró en {{f:close_BTC}} m.' }))], ['typed_number', 'shown', 'typed_number', 'bad_placeholder'], '"40 mil millones" is one number; their "1,5 millones" may be said back; their 1.5 of something else is not 1,5 millones; a figure takes no "m" after it');
+  // A verb is not a unit.
+  eq(after('The S&P 500 points to how large companies are doing as a group.', 'What does the S&P 500 tell me?', 'en'), 'shown', '"points to" after a name is a verb: the name is still a name');
+  // A German ordinal does not end the first sentence.
+  {
+    const pillar = present({ kind: 'explanation', gist: 'Das ist die private Vorsorge.', text: 'Die 3. Säule ist die private Vorsorge. Sie ist freiwillig.', limitations: [], next: '', claims: [] }, null, 'Was ist die 3. Säule?', 'de') as any;
+    eq(pillar.presentation.gist, 'Die 3. Säule ist die private Vorsorge.', 'in German a full stop after one or two digits is an ordinal, not the end of the sentence in front');
+  }
+  // The reader switched off: a promise or advice is read in the text as written; only "figure" is read on the words.
+  process.env.BOBBY_COMPANION_JUDGE = 'off';
+  try {
+    const st = new MemoryAgentStore(6), d = depsFor(st);
+    d.read = companionReader(st, { partition: 'agent', capUsd: 1, taskCapUsd: 0.25 }, () => clock);
+    script = [() => answer({ kind: 'explanation', gist: 'Sí. Un fondo indexado es 100% seguro.', text: 'Sí. Un fondo indexado es 100% seguro porque reparte el dinero entre muchas empresas.' })];
+    const promise = await ask(d, 'ana', '¿Un fondo indexado es 100% seguro?', 'off5a');
+    script = [() => answer({ kind: 'explanation', gist: 'Un ETF es un fondo que se compra y se vende como una acción.', text: 'Un ETF es un fondo que se compra y se vende como una acción. Con tus 500 € o con cualquier monto, su valor puede bajar.' })];
+    const own = await ask(d, 'ana', 'Tengo 500 euros. ¿Qué es un ETF?', 'off5b');
+    eq([taskResult(promise)!.presentation.composedByCode, promise.steps.at(-1)!.data.reader !== 'pass', taskResult(own)!.presentation.composedByCode, own.steps.at(-1)!.data.reader], [true, true, false, 'pass'], 'with the reader off a promise is read with its digits ("100% seguro" is not shown), and the person\'s own amount with its currency sign is not a figure');
+  } finally { delete process.env.BOBBY_COMPANION_JUDGE; }
+}
+
 // ---------- 8. the door ----------
 {
   const { default: handler, __setAgentTestDeps } = await import('../api/agent-task.ts');

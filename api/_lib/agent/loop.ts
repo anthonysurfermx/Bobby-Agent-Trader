@@ -362,8 +362,9 @@ export function companionReader(store: AgentStore, budget: Budget, now: () => nu
       if (measured) return 'unchecked';
       // Every digit in a text that reaches here already passed present() (a name's, a window length, the person's own):
       // the lists read the words (advice, promises, amounts in words, a market "now").
-      const words = (part: string) => part.replace(/[$€£¥]?\s?\p{N}+(?:[.,/+]\p{N}+)*/gu, ' ');
-      const reviewed = reviewCompanionReply(numbersFrom ?? question, { text: words(text), followUp: words(next ?? '') }, language);
+      const words = (part: string) => part.replace(/[$€£¥]?\s?\p{N}+(?:[.,/+]\p{N}+)*(?:\s?[$€£¥])?/gu, ' ');
+      const asWritten = reviewCompanionReply(numbersFrom ?? question, { text, followUp: next ?? '' }, language);
+      const reviewed = 'rejected' in asWritten && asWritten.rejected !== 'figure' ? asWritten : reviewCompanionReply(numbersFrom ?? question, { text: words(text), followUp: words(next ?? '') }, language);
       return 'rejected' in reviewed ? { verdict: reviewed.rejected === 'shape' ? 'advice' : reviewed.rejected, keepNext: false, by: 'lists' } : { verdict: 'pass', keepNext: reviewed.followUp !== null, by: 'lists' };
     }
     const [pIn, , pOut] = modelPrice(model, 2000);
