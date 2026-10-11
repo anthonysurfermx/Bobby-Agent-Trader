@@ -1031,7 +1031,7 @@ final class NucleoBridgeTests: XCTestCase {
         let reply = await pending.value
         XCTAssertEqual(reply["status"] as? String, "cancelled")
         XCTAssertTrue(session.companionContext.state.notes.isEmpty)
-        XCTAssertEqual(NucleoFixtures.log.filter { $0.contains("POST /api/companion-turn") }.count, 1)
+        XCTAssertEqual(NucleoFixtures.log.filter { $0.contains("POST bobbyprotocol.xyz/api/companion-turn") }.count, 1)
         session.teardown()
     }
 
