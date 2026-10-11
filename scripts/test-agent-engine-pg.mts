@@ -153,11 +153,11 @@ try {
   const again = await createTask(deps, { owner: 'lia', address: 'addr-lia', session: 'sess', requestId: 'e1', question: 'Compara Bitcoin y Ethereum', language: 'es', model: 'claude-test' });
   await runTask(deps, 'lia', begun.task.id);
   eq([again.state, calls.length - callsBefore, (await big.latestCompleted('lia', 'sess'))?.id, await big.latestCompleted('eva', 'sess'), await big.get('eva', begun.task.id), await count('agent_reads', "owner = 'lia'"), await count('agent_attempts', "partition = 'errand' and state = 'settled'")], ['replay', 0, begun.task.id, null, null, 1, 2], 'coming back returns the stored result with no call and no read; another owner sees nothing; two attempts, both settled');
-  script = [(request) => { assert.ok(JSON.parse(request.messages[0].content as string).previous.figures.length > 5); return turn([{ type: 'tool_use', id: 'u_f', name: 'answer', input: { kind: 'analysis', gist: 'Ethereum se movió más.', text: 'Ethereum se movió más: {{f:volatility_ETH}} frente a {{f:volatility_BTC}}.', claims: [{ metric: 'volatility', top: 'Ethereum' }], limitations: [], next: '' } }]); }];
+  script = [(request) => { assert.ok(JSON.parse(request.messages[0].content as string).previous.figures.length > 5); return turn([{ type: 'tool_use', id: 'u_f', name: 'answer', input: { kind: 'analysis', gist: 'Ethereum se movió más.', text: 'Ethereum se movió más: {{f:move_ETH}} frente a {{f:move_BTC}}.', claims: [{ metric: 'move', top: 'Ethereum' }], limitations: [], next: '' } }]); }];
   const follow = await createTask(deps, { owner: 'lia', session: 'sess', requestId: 'e2', question: '¿Y cuál se movió más?', language: 'es', followsLatest: true, model: 'claude-test' }) as { task: import('../api/_lib/agent/types.ts').Task };
   await runTask(deps, 'lia', follow.task.id);
   const followed = (await big.get('lia', follow.task.id))!;
-  eq([followed.parent, taskState(followed, T0), taskResult(followed)!.presentation.figures, taskUsage(followed).reads, await count('agent_reads', "owner = 'lia'")], [begun.task.id, 'completed', ['volatility_ETH', 'volatility_BTC'], 0, 1], 'a follow-up reads the result on the table from the database: no tool, no second read');
+  eq([followed.parent, taskState(followed, T0), taskResult(followed)!.presentation.figures, taskUsage(followed).reads, await count('agent_reads', "owner = 'lia'")], [begun.task.id, 'completed', ['move_ETH', 'move_BTC'], 0, 1], 'a follow-up reads the result on the table from the database: no tool, no second read');
 
   // 8. What the second review found (2026-10-11): where the database answered differently from the memory store.
   const { MemoryAgentStore } = await import('../api/_lib/agent/store.ts');

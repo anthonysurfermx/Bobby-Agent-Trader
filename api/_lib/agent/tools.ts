@@ -20,7 +20,7 @@
 //   · Percent is always percent (12.3 means 12.3 %), never a fraction; a price is in the series' own currency.
 //   · A figure is computed only from a series the reader accepted. A refused series gives evidence with a
 //     quality other than `valid`, figures with value null, and a limitation: never a zero.
-//   · Instruments of different trading calendars are compared on the days both traded, and the figure says so.
+//   · Every instrument is measured on its own days of the window; only the correlation uses the days both traded, and says so.
 //   · The window is the same for every instrument and is stated in every figure's basis.
 // ============================================================
 import { z } from 'zod';
@@ -75,13 +75,6 @@ export function resolveMention(mention: string): Instrument | null {
 
 // ---------- arithmetic ----------
 const pct = (ratio: number) => 100 * ratio;
-/** Sample standard deviation; null under two values. */
-function stdev(values: number[]): number | null {
-  if (values.length < 2) return null;
-  const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
-  const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (values.length - 1);
-  return Number.isFinite(variance) ? Math.sqrt(variance) : null;
-}
 function correlation(a: number[], b: number[]): number | null {
   if (a.length !== b.length || a.length < 2) return null;
   const ma = a.reduce((s, v) => s + v, 0) / a.length, mb = b.reduce((s, v) => s + v, 0) / b.length;
@@ -93,7 +86,8 @@ function correlation(a: number[], b: number[]): number | null {
 /** Fewer daily changes than this say nothing about how much something moves. */
 export const MIN_CHANGES = 15;
 const dayMs = (day: string) => Date.parse(`${day}T00:00:00Z`);
-export interface Metrics { first: DailyBar; last: DailyBar; changes: number[]; totalReturn: number; volatility: number | null; maxDrawdown: number; worst: { pct: number; day: string } | null; best: { pct: number; day: string } | null }
+/** `move` is the average SIZE of the daily changes (the mean of their absolute values): what a person hears in "it moved about X% a day". A standard deviation is a different number and is not told. */
+export interface Metrics { first: DailyBar; last: DailyBar; changes: number[]; totalReturn: number; move: number | null; maxDrawdown: number; worst: { pct: number; day: string } | null; best: { pct: number; day: string } | null }
 /** What a run of closes did. Percent everywhere; a change is close over the previous close of the run. */
 export function metrics(bars: DailyBar[]): Metrics | null {
   if (bars.length < 2 || bars.some((bar) => !(bar.close > 0) || !Number.isFinite(bar.close))) return null;
@@ -107,7 +101,7 @@ export function metrics(bars: DailyBar[]): Metrics | null {
     peak = Math.max(peak, bars[i].close);
     maxDrawdown = Math.min(maxDrawdown, pct(bars[i].close / peak - 1));
   }
-  return { first: bars[0], last: bars.at(-1)!, changes, totalReturn: pct(bars.at(-1)!.close / bars[0].close - 1), volatility: changes.length >= MIN_CHANGES ? stdev(changes) : null, maxDrawdown, worst, best };
+  return { first: bars[0], last: bars.at(-1)!, changes, totalReturn: pct(bars.at(-1)!.close / bars[0].close - 1), move: changes.length >= MIN_CHANGES ? changes.reduce((sum, change) => sum + Math.abs(change), 0) / changes.length : null, maxDrawdown, worst, best };
 }
 /** The whole window must be sound, not only the reader's last 22 bars: no missing crypto day, no equity gap over five days, no impossible jump. */
 function windowSound(bars: DailyBar[], assetClass: AssetClass): boolean {
@@ -192,26 +186,27 @@ export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<T
   const usable = reads.filter((read) => read.bars);
   const mixed = new Set(usable.map((read) => read.instrument.assetClass)).size > 1;
   if (mixed) limitations.push('mixed_calendars');
-  // Days every usable instrument traded inside the window: what a mixed comparison, and every correlation, is computed on.
+  // Days every usable instrument traded inside the window: what every correlation is computed on (and nothing else).
   const common = usable.length ? usable.map((read) => new Set(inWindow(read).map((bar) => bar.day))).reduce((a, b) => new Set([...a].filter((day) => b.has(day)))) : new Set<string>();
   const figures: Figure[] = [];
   const used = new Map<string, DailyBar[]>();
   for (const read of reads) {
     const symbol = read.instrument.symbol, ev = [`ev_${symbol}`], item = evidence.find((entry) => entry.id === ev[0])!;
-    let bars = read.bars ? inWindow(read) : null;
-    if (bars && mixed) bars = bars.filter((bar) => common.has(bar.day));
+    // Each instrument is measured on its OWN days of the window, so a coin's day is one day whatever it is read beside.
+    // Only the correlation, below, is computed on the days both traded.
+    const bars = read.bars ? inWindow(read) : null;
     let quality: Quality = read.quality;
     const m = bars ? metrics(bars) : null;
-    if (bars && !m) { quality = 'missing'; item.quality = 'missing'; item.note = 'too few days both traded in the window'; }
+    if (bars && !m) { quality = 'missing'; item.quality = 'missing'; item.note = 'too few days in the window'; }
     if (!m) limitations.push(`no_series:${symbol}`);
     // The evidence is dated by the day its figures end on, which is not always the source's newest bar.
     else { used.set(symbol, bars!); item.asOf = m.last.day; }
-    const basis = m ? `${mixed ? 'days both traded' : read.instrument.assetClass === 'crypto' ? 'UTC days' : 'exchange sessions'} from ${m.first.day} to ${m.last.day} (${m.changes.length} daily changes, close to close)` : `no usable series (${item.note ?? 'too few days in the window'})`;
+    const basis = m ? `${read.instrument.assetClass === 'crypto' ? 'UTC days' : 'exchange sessions'} from ${m.first.day} to ${m.last.day} (${m.changes.length} daily changes, close to close)` : `no usable series (${item.note ?? 'too few days in the window'})`;
     const figure = (metric: string, value: number | null, unit: Figure['unit'], extra = ''): Figure => ({ id: `${metric}_${symbol}`, metric, subject: symbol, value: m && value !== null && Number.isFinite(value) ? value : null, unit, currency: unit === 'price' ? read.series?.currency ?? null : null, basis: basis + extra, from: m?.first.day ?? null, to: m?.last.day ?? null, days: m ? m.changes.length : null, evidence: ev, quality: m && value !== null && Number.isFinite(value) ? quality : quality === 'valid' ? 'missing' : quality });
     figures.push(
       figure('close', m?.last.close ?? null, 'price'),
       figure('return', m?.totalReturn ?? null, 'percent', '; last close over first close of the window, minus one'),
-      figure('volatility', m?.volatility ?? null, 'percent', `; sample standard deviation of the daily changes, not annualised${m && m.volatility === null ? `; needs ${MIN_CHANGES} changes` : ''}`),
+      figure('move', m?.move ?? null, 'percent', `; average size of the daily changes, up or down (the mean of their absolute values)${m && m.move === null ? `; needs ${MIN_CHANGES} changes` : ''}`),
       figure('drawdown', m?.maxDrawdown ?? null, 'percent', '; largest fall from a previous high inside the window'),
       { ...figure('worst', m?.worst?.pct ?? null, 'percent', m?.worst ? `; the day was ${m.worst.day}` : ''), day: m?.worst?.day ?? null },
       { ...figure('best', m?.best?.pct ?? null, 'percent', m?.best ? `; the day was ${m.best.day}` : ''), day: m?.best?.day ?? null },
@@ -249,7 +244,7 @@ export const TOOLS: Record<string, Tool<any>> = {
   },
   read_assets: {
     name: 'read_assets', metered: true, schema: Read, prepare: prepareRead,
-    description: 'Reads the daily closes of one, two or three instruments over the last 30 or 60 days and measures them by code: change over the window, how much each moved day to day, its largest fall from a high, its worst and best day and, for two or three, how alike their daily changes were. Give each instrument by the name or ticker the person wrote. Uses one read of the person\'s allowance: the app asks them before it runs. Returns figures with ids; cite a figure only by its id.',
+    description: 'Reads the daily closes of one, two or three instruments over the last 30 or 60 days and measures them by code: change over the window (return), the average size of its daily changes, up or down (move), its largest fall from a high (drawdown), its worst and best day and, for two or three, how alike their daily changes were (correlation). Give each instrument by the name or ticker the person wrote. Uses one read of the person\'s allowance: the app asks them before it runs. Returns figures with ids; cite a figure only by its id.',
     wire: { type: 'object', additionalProperties: false, required: ['assets', 'windowDays'], properties: { assets: { type: 'array', minItems: 1, maxItems: 3, items: { type: 'string' } }, windowDays: { type: 'integer', enum: [30, 60] } } },
     scope: (args: ReadArgs) => ({ action: 'read_assets', assets: [...args.symbols], windowDays: args.windowDays, depth: 'standard', consumption: { reads: 1 } }),
     run: readAssets,

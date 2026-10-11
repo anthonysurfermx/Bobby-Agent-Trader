@@ -147,7 +147,7 @@ function refuse(text: string, figures: Map<string, Figure>, question: string, da
   const lettered = /\p{Nl}/u.exec(text);
   if (lettered) return { code: 'typed_number', detail: lettered[0] };
   let own = read(text.replace(PLACEHOLDER, (_, key: string) => (key === 'days' ? COUNT : MARK)));
-  if (/\{\{|\}\}/.test(own)) return { code: 'bad_placeholder', detail: own.match(/\{\{[^}]{0,30}|[^{]{0,30}\}\}/)?.[0] ?? '' };
+  if (/\{\{|\}\}/.test(own)) return { code: 'bad_placeholder', detail: `${own.match(/\{\{[^}]{0,30}\}{0,2}|[^{]{0,30}\}\}/)?.[0] ?? ''}: a placeholder is exactly {{f:ID}} (the number), {{d:ID}} (its day), {{from:ID}}, {{to:ID}} or {{days}}, with the id as the tool gave it` };
   const glued = new RegExp(`[\\p{L}\\p{N}%+\\-−$€£¥₿][${MARKS}]|[${MARKS}][\\p{L}\\p{N}%]`, 'u').exec(own);
   if (glued) return { code: 'bad_placeholder', detail: `glued: ${marksShown(glued[0])}` };
   // A figure is whole as code writes it: a word after it that scales it ("millones", "k") makes another number.
@@ -213,9 +213,9 @@ const write = (text: string, figures: Map<string, Figure>, days: number | null, 
 
 const LIMITATION: Record<string, Record<AppLanguage, (subject: string) => string>> = {
   mixed_calendars: {
-    en: () => 'They trade on different calendars, so they are compared only on the days both traded.', es: () => 'Cotizan en calendarios distintos: se comparan solo los días en que ambos operaron.',
-    fr: () => 'Ils ne cotent pas les mêmes jours : la comparaison porte sur les jours où les deux ont coté.', pt: () => 'Negociam em calendários diferentes: a comparação usa só os dias em que ambos negociaram.',
-    it: () => 'Hanno calendari diversi: il confronto usa solo i giorni in cui entrambi hanno scambiato.', de: () => 'Sie werden an unterschiedlichen Tagen gehandelt: verglichen werden nur die Tage, an denen beide gehandelt wurden.',
+    en: () => 'They trade on different calendars: how alike they moved is measured only on the days both traded.', es: () => 'Cotizan en calendarios distintos: el parecido entre sus movimientos se mide solo en los días en que ambos operaron.',
+    fr: () => 'Ils ne cotent pas les mêmes jours : la ressemblance de leurs mouvements est mesurée seulement sur les jours où les deux ont coté.', pt: () => 'Negociam em calendários diferentes: a semelhança entre os movimentos é medida só nos dias em que ambos negociaram.',
+    it: () => 'Hanno calendari diversi: la somiglianza dei movimenti è misurata solo nei giorni in cui entrambi hanno scambiato.', de: () => 'Sie werden an unterschiedlichen Tagen gehandelt: Wie ähnlich sie sich bewegten, wird nur an den Tagen gemessen, an denen beide gehandelt wurden.',
   },
   no_series: {
     en: (s) => `I could not read a reliable series for ${s}.`, es: (s) => `No pude leer una serie fiable de ${s}.`, fr: (s) => `Je n’ai pas pu lire une série fiable pour ${s}.`,
@@ -249,6 +249,15 @@ const COMPOSED_ONE: Record<AppLanguage, (a: string) => string> = {
   it: (a) => `Negli ultimi {{days}} giorni, ${a} è variato del {{f:return_A}}. Il suo calo più ampio da un massimo è stato del {{f:drawdown_A}}.`,
   de: (a) => `In den letzten {{days}} Tagen hat sich ${a} um {{f:return_A}} verändert. Der größte Rückgang von einem Hoch betrug {{f:drawdown_A}}.`,
 };
+/** Added for one instrument when both days exist: the fallback then answers "which was the best day" as well. */
+const COMPOSED_DAYS: Record<AppLanguage, string> = {
+  en: ' Its worst day was {{d:worst_A}}, at {{f:worst_A}}, and its best was {{d:best_A}}, at {{f:best_A}}.',
+  es: ' Su peor día fue el {{d:worst_A}}, con {{f:worst_A}}, y el mejor fue el {{d:best_A}}, con {{f:best_A}}.',
+  fr: ' Son pire jour a été le {{d:worst_A}}, avec {{f:worst_A}}, et son meilleur le {{d:best_A}}, avec {{f:best_A}}.',
+  pt: ' O pior dia foi o dia {{d:worst_A}}, com {{f:worst_A}}, e o melhor foi o dia {{d:best_A}}, com {{f:best_A}}.',
+  it: ' Il giorno peggiore è stato il {{d:worst_A}}, con {{f:worst_A}}, e il migliore il {{d:best_A}}, con {{f:best_A}}.',
+  de: ' Der schwächste Tag war der {{d:worst_A}} mit {{f:worst_A}}, der stärkste der {{d:best_A}} mit {{f:best_A}}.',
+};
 /** Three read, three told: the same two sentences as a list. */
 const AND: Record<AppLanguage, string> = { en: 'and', es: 'y', fr: 'et', pt: 'e', it: 'e', de: 'und' };
 const listed = (parts: string[], language: AppLanguage) => `${parts.slice(0, -1).join(', ')} ${AND[language]} ${parts.at(-1)}`;
@@ -271,8 +280,16 @@ export const UNANSWERED: Record<AppLanguage, string> = {
   fr: 'Cette fois, je n’ai pas réussi à répondre avec le soin qu’il faut. Ta question est toujours là.', pt: 'Desta vez não consegui responder com o cuidado que isso pede. A tua pergunta continua aqui.',
   it: 'Questa volta non sono riuscito a rispondere con la cura che serve. La tua domanda è ancora qui.', de: 'Diesmal konnte ich das nicht mit der nötigen Sorgfalt beantworten. Deine Frage ist noch da.',
 };
+/** For an explanation whose words held a number no figure supports (what a fund holds, a fee, a price): it says what is missing and what Bobby can do. */
+export const UNVERIFIED: Record<AppLanguage, string> = {
+  en: 'I have no verified figure to answer that here. I can explain the idea, or read how an asset moved.', es: 'No tengo un dato comprobado para responder eso aquí. Puedo explicarte la idea o leer cómo se movió un activo.',
+  fr: 'Je n’ai pas de donnée vérifiée pour répondre à cela ici. Je peux t’expliquer l’idée ou lire comment un actif a évolué.', pt: 'Não tenho um dado verificado para responder a isso aqui. Posso explicar a ideia ou ler como um ativo se moveu.',
+  it: 'Non ho un dato verificato per rispondere a questo qui. Posso spiegarti l’idea o leggere come si è mosso un asset.', de: 'Dafür habe ich hier keine geprüfte Zahl. Ich kann dir die Idee erklären oder lesen, wie sich ein Wert bewegt hat.',
+};
 /** What is served when the model's words cannot be shown and there are no figures to tell instead. */
 export const unanswered = (language: AppLanguage): Presentation => ({ kind: 'unavailable', gist: UNANSWERED[language], text: UNANSWERED[language], figures: [], references: [], limitations: [], next: null, composedByCode: true });
+/** The same, when the reason is known to be a number of the model's own: a plain limit instead of a failure. */
+export const unverified = (language: AppLanguage): Presentation => ({ kind: 'explanation', gist: UNVERIFIED[language], text: UNVERIFIED[language], figures: [], references: [], limitations: [], next: null, composedByCode: true });
 
 function references(analysis: Analysis | null, used: string[]): Presentation['references'] {
   if (!analysis) return [];
@@ -293,9 +310,10 @@ export function composeByCode(analysis: Analysis | null, language: AppLanguage, 
     return { kind: 'analysis', gist: text.slice(0, text.indexOf('. ') + 1) || text, text, figures: used, references: references(analysis, used), limitations: limitationsInWords(analysis, language), next: null, composedByCode: true };
   }
   const [a, b] = ready;
-  const draft = (b ? COMPOSED[language](instrumentName(a), instrumentName(b)) : COMPOSED_ONE[language](instrumentName(a))).replace(/_A\}\}/g, `_${a}}}`).replace(/_B\}\}/g, `_${b}}}`);
+  const days = !b && ['worst', 'best'].every((metric) => { const figure = figures.get(`${metric}_${a}`); return figure?.value != null && Boolean(figure.day); });
+  const draft = (b ? COMPOSED[language](instrumentName(a), instrumentName(b)) : COMPOSED_ONE[language](instrumentName(a)) + (days ? COMPOSED_DAYS[language] : '')).replace(/_A\}\}/g, `_${a}}}`).replace(/_B\}\}/g, `_${b}}}`);
   const text = write(draft, figures, analysis.windowDays, language, locale);
-  const used = b ? [`return_${a}`, `return_${b}`, `drawdown_${a}`, `drawdown_${b}`] : [`return_${a}`, `drawdown_${a}`];
+  const used = b ? [`return_${a}`, `return_${b}`, `drawdown_${a}`, `drawdown_${b}`] : [`return_${a}`, `drawdown_${a}`, ...(days ? [`worst_${a}`, `best_${a}`] : [])];
   return { kind: 'analysis', gist: text.slice(0, text.indexOf('. ') + 1) || text, text, figures: used, references: references(analysis, used), limitations: limitationsInWords(analysis, language), next: null, composedByCode: true };
 }
 
@@ -305,6 +323,10 @@ export function composeByCode(analysis: Analysis | null, language: AppLanguage, 
  */
 export function present(draft: Draft, analysis: Analysis | null, question: string, language: AppLanguage, locale?: string | null): { ok: true; presentation: Presentation; own: OwnWords } | { ok: false; refusal: Refusal } {
   const figures = new Map((analysis?.figures ?? []).map((figure) => [figure.id, figure]));
+  // An id is code's: typed in another case it is still that id, and is written back as the tool gave it. Nothing else is repaired.
+  const byFold = new Map([...figures.keys()].map((id) => [id.toLowerCase(), id]));
+  const exact = (part: string) => part.replace(/\{\{\s*(f|d|from|to)\s*:\s*([A-Za-z0-9_~]+)\s*\}\}/gi, (whole, kind: string, id: string) => (byFold.has(id.toLowerCase()) ? `{{${kind.toLowerCase()}:${byFold.get(id.toLowerCase())}}}` : whole)).replace(/\{\{\s*days\s*\}\}/gi, '{{days}}');
+  draft = { ...draft, gist: exact(draft.gist), text: exact(draft.text), next: exact(draft.next), limitations: draft.limitations.map(exact) };
   const gist = draft.gist.trim(), text = draft.text.trim(), next = draft.next.trim();
   if (!gist || !text) return { ok: false, refusal: { code: 'empty', detail: '' } };
   const days = analysis?.windowDays ?? null;

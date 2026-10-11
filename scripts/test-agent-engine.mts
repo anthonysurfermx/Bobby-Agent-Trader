@@ -12,7 +12,7 @@ process.env.RATE_LIMIT_SALT = 'test-salt-test-salt-test-salt';
 const { MemoryAgentStore, FileAgentStore, waitingApproval } = await import('../api/_lib/agent/store.ts');
 const { taskState, taskResult, taskEvents, taskUsage, taskError } = await import('../api/_lib/agent/state.ts');
 const { metrics, readAssets, resolveMention, TOOLS, MIN_CHANGES } = await import('../api/_lib/agent/tools.ts');
-const { present, composeByCode, formatFigure, limitationsInWords } = await import('../api/_lib/agent/present.ts');
+const { present, composeByCode, formatFigure, formatDay, limitationsInWords } = await import('../api/_lib/agent/present.ts');
 const { createTask, runTask, rebuild, agentPrompt, scopeDigest, taskView, engineDeps, companionReader, WIRE_TOOLS } = await import('../api/_lib/agent/loop.ts');
 const { worstCaseUsd, reservedCall, callAnthropicOnce } = await import('../api/_lib/agent/provider.ts');
 type ModelAttempt = import('../api/_lib/agent/provider.ts').ModelAttempt;
@@ -66,6 +66,7 @@ const refReturn = (c: number[]) => 100 * (c.at(-1)! / c[0] - 1);
 const refDrawdown = (c: number[]) => { let worst = 0; for (let i = 0; i < c.length; i++) for (let j = i + 1; j < c.length; j++) worst = Math.min(worst, 100 * (c[j] / c[i] - 1)); return worst; };
 const refChanges = (c: number[]) => c.slice(1).map((v, i) => 100 * (v / c[i] - 1));
 const refStdev = (v: number[]) => { const m = v.reduce((a, b) => a + b, 0) / v.length; return Math.sqrt(v.map((x) => (x - m) ** 2).reduce((a, b) => a + b, 0) / (v.length - 1)); };
+const refMove = (v: number[]) => { let total = 0; for (const x of v) total += x < 0 ? -x : x; return total / v.length; };
 
 // ---------- 1. arithmetic ----------
 const bars = (closes: number[]): DailyBar[] => closes.map((close, i) => ({ day: dayOf(Date.parse('2026-09-01T00:00:00Z') + i * DAY), open: close, high: close, low: close, close, volume: 1, closedAt: '' }));
@@ -73,9 +74,14 @@ const small = metrics(bars([100, 110, 99, 99, 120]))!;
 near(small.totalReturn, 20, 'the change over a run is last over first, in percent');
 near(small.maxDrawdown, -10, 'the largest fall from a previous high');
 eq([small.worst!.day, small.best!.day, small.changes[2]], ['2026-09-03', '2026-09-05', 0], 'the worst and the best day are dated, and a day with no change is a zero, a real value');
-eq([small.volatility, metrics(bars([100]))], [null, null], `fewer than ${MIN_CHANGES} changes say nothing about how much it moves, and one close is no run`);
+eq([small.move, metrics(bars([100]))], [null, null], `fewer than ${MIN_CHANGES} changes say nothing about how much it moves, and one close is no run`);
 eq(metrics(bars([100, 0, 100])), null, 'a close of zero is not a price: no figure');
-near(metrics(bars(BTC))!.volatility, refStdev(refChanges(BTC)), 'day-to-day movement is the sample standard deviation of the daily changes');
+near(metrics(bars(BTC))!.move, refMove(refChanges(BTC)), 'day-to-day movement is the average size of the daily changes, up or down');
+// What a person hears in "it moved about X% a day" is that average. A standard deviation is another, larger number
+// (the independent evaluation of 2026-10-11 found it told as "on average"): the two are pinned apart here.
+const zigzag = Array.from({ length: 21 }, (_, i) => 100 * 1.1 ** Math.ceil(i / 2) * 0.9 ** Math.floor(i / 2));
+near(metrics(bars(zigzag))!.move, 10, 'a price that goes up ten percent and down ten percent, day after day, moved ten percent on an average day');
+ok(refStdev(refChanges(zigzag)) > 10.2 && Math.abs(metrics(bars(BTC))!.move! - refStdev(refChanges(BTC))) > 0.05, 'which is not its standard deviation');
 
 const analysisOf = async (symbols: string[], windowDays: 30 | 60) => (await readAssets({ symbols, windowDays }, tools)).analysis!;
 const fig = (analysis: Analysis, id: string) => analysis.figures.find((figure) => figure.id === id)!;
@@ -83,7 +89,8 @@ const crypto = await analysisOf(['BTC', 'ETH'], 30);
 const btc30 = BTC.slice(-30), eth30 = ETH.slice(-30);
 near(fig(crypto, 'return_BTC').value, refReturn(btc30), 'the window is the last thirty calendar days of completed bars');
 near(fig(crypto, 'drawdown_ETH').value, refDrawdown(eth30), 'the largest fall, checked by brute force');
-near(fig(crypto, 'volatility_BTC').value, refStdev(refChanges(btc30)), 'movement over the same window');
+near(fig(crypto, 'move_BTC').value, refMove(refChanges(btc30)), 'movement over the same window');
+ok(/average size of the daily changes/.test(fig(crypto, 'move_BTC').basis), 'and the figure says what it is');
 eq([fig(crypto, 'return_BTC').unit, fig(crypto, 'close_BTC').unit, fig(crypto, 'close_BTC').currency, fig(crypto, 'return_BTC').currency, fig(crypto, 'corr_BTC_ETH').unit], ['percent', 'price', 'USDT', null, 'ratio'], 'every figure says its unit; a price says its currency; a percent has none');
 eq([fig(crypto, 'return_BTC').from, fig(crypto, 'return_BTC').to, fig(crypto, 'return_BTC').days], ['2026-09-09', LAST, 29], 'a figure says the days it covers and how many changes it rests on');
 ok(/UTC days from 2026-09-09 to 2026-10-08 \(29 daily changes, close to close\); last close over first close/.test(fig(crypto, 'return_BTC').basis), 'and how it was computed, in words');
@@ -92,11 +99,15 @@ ok(crypto.evidence.every((item) => item.url!.startsWith('https://www.okx.com/api
 eq(crypto.limitations, ['past_window_only'], 'two instruments of one calendar: the only limit is that a past window says nothing of what comes next');
 ok(fig(crypto, 'corr_BTC_ETH').value! >= -1 && fig(crypto, 'corr_BTC_ETH').value! <= 1, 'how alike their daily changes were is between minus one and one');
 
-// Different calendars: only the days both traded.
+// Different calendars: each instrument is measured on its own days; only how alike they moved needs the days both traded.
 const mixed = await analysisOf(['BTC', 'SPY'], 30);
 ok(mixed.limitations.includes('mixed_calendars'), 'a coin and a fund trade on different days: said as a limitation');
-eq(fig(mixed, 'return_BTC').days, fig(mixed, 'return_SPY').days, 'both are measured on the same days');
-ok(fig(mixed, 'return_BTC').days! < 29 && /days both traded/.test(fig(mixed, 'return_BTC').basis), 'which are fewer than the calendar days, and the figure says so');
+ok(fig(mixed, 'return_BTC').days! > fig(mixed, 'return_SPY').days! && /UTC days/.test(fig(mixed, 'return_BTC').basis) && /exchange sessions/.test(fig(mixed, 'return_SPY').basis), 'each is measured on its own days of the window, and its figure says which');
+// The independent evaluation found a coin's "best day" spanning a weekend when it was read beside a stock (+7.1% against +6.7%).
+const coinAlone = await analysisOf(['BTC'], 30);
+if (fig(mixed, 'return_BTC').to === fig(coinAlone, 'return_BTC').to) eq(['return', 'move', 'drawdown', 'worst', 'best'].map((metric) => [fig(mixed, `${metric}_BTC`).value, fig(mixed, `${metric}_BTC`).day ?? null]), ['return', 'move', 'drawdown', 'worst', 'best'].map((metric) => [fig(coinAlone, `${metric}_BTC`).value, fig(coinAlone, `${metric}_BTC`).day ?? null]), 'a coin read beside a fund has the figures it has alone: a day is one day');
+else ok(false, `the two windows end on different days (${fig(mixed, 'return_BTC').to} and ${fig(coinAlone, 'return_BTC').to}): this check needs them equal`);
+eq([fig(mixed, 'corr_BTC_SPY').days, /days both traded/.test(fig(mixed, 'corr_BTC_SPY').basis)], [fig(mixed, 'return_SPY').days, true], 'how alike they moved is measured on the days both traded, and says so');
 // A series that cannot be trusted gives no number, and never a zero.
 world.down.add('ETH');
 const asksBefore = world.fetched.length;
@@ -117,7 +128,7 @@ world.series.ETH = () => okx(ETH.slice(-10));
 eq((await analysisOf(['BTC', 'ETH'], 30)).evidence[1].quality, 'missing', 'too few days is missing data, not an error and not a zero');
 world.series.ETH = () => okx(ETH.map(() => 2500));
 const flat = await analysisOf(['BTC', 'ETH'], 30);
-eq([fig(flat, 'return_ETH').value, fig(flat, 'return_ETH').quality, fig(flat, 'volatility_ETH').value, fig(flat, 'corr_BTC_ETH').value, fig(flat, 'corr_BTC_ETH').quality], [0, 'valid', 0, null, 'missing'], 'a price that did not move is a real zero, valid; a correlation with something that never moved does not exist');
+eq([fig(flat, 'return_ETH').value, fig(flat, 'return_ETH').quality, fig(flat, 'move_ETH').value, fig(flat, 'corr_BTC_ETH').value, fig(flat, 'corr_BTC_ETH').quality], [0, 'valid', 0, null, 'missing'], 'a price that did not move is a real zero, valid; a correlation with something that never moved does not exist');
 world.series.ETH = () => okx(ETH);
 
 eq(['Bitcoin', 'el bitcoin', 'BTC', 'acciones de Nvidia', 'S&P 500', 'el Nasdaq', 'Ethereum?', 'dogecoin', 'mi abuela'].map((mention) => resolveMention(mention)?.symbol ?? null), ['BTC', 'BTC', 'BTC', 'NVDA', 'SPY', 'QQQ', 'ETH', null, null], 'a mention is an instrument only when it is exactly one the engine can read');
@@ -126,7 +137,7 @@ for (const [what, input] of [['no instrument', { assets: [], windowDays: 30 }], 
 eq([TOOLS.read_assets.prepare!({ assets: ['el Bitcoin', 'Ethereum?'], windowDays: 30 }), TOOLS.read_assets.prepare!({ assets: ['Bitcoin', 'Dogecoin'], windowDays: 30 }), TOOLS.read_assets.prepare!({ assets: ['Bitcoin', 'BTC'], windowDays: 30 }), TOOLS.read_assets.prepare!({ assets: ['https://evil.example/BTC'], windowDays: 30 })],
   [{ ok: true, args: { symbols: ['BTC', 'ETH'], windowDays: 30 } }, { ok: false, reason: 'unknown_asset', detail: 'Dogecoin' }, { ok: false, reason: 'same_asset_twice', detail: 'BTC' }, { ok: false, reason: 'unknown_asset', detail: 'https://evil.example/BTC' }], 'the server turns names into symbols before anything is asked of the person; a name it cannot read, or the same instrument twice, stops there');
 const alone = await analysisOf(['BTC'], 30);
-eq([alone.kind, alone.subjects, alone.figures.map((figure) => figure.id), alone.limitations], ['single', ['BTC'], ['close_BTC', 'return_BTC', 'volatility_BTC', 'drawdown_BTC', 'worst_BTC', 'best_BTC'], ['past_window_only']], 'one instrument alone: its own figures, and no figure about a pair');
+eq([alone.kind, alone.subjects, alone.figures.map((figure) => figure.id), alone.limitations], ['single', ['BTC'], ['close_BTC', 'return_BTC', 'move_BTC', 'drawdown_BTC', 'worst_BTC', 'best_BTC'], ['past_window_only']], 'one instrument alone: its own figures, and no figure about a pair');
 near(fig(alone, 'return_BTC').value, refReturn(btc30), '…the same arithmetic');
 
 // ---------- 2. the presentation ----------
@@ -137,7 +148,7 @@ const P = (shown as { presentation: import('../api/_lib/agent/types.ts').Present
 const pctEs = (value: number) => new Intl.NumberFormat('es-MX', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: 'exceptZero' }).format(value / 100);
 ok(P.text.includes(pctEs(refReturn(btc30))) && P.text.includes(pctEs(refDrawdown(eth30))) && P.text.includes(' 30 días') && !P.text.includes('{{'), 'code writes each number from the canonical value, with its unit, and the window');
 eq([P.figures, P.references.map((r) => [r.evidence, r.source, r.asOf, r.quality]), P.limitations, P.next, P.composedByCode, P.text.startsWith(P.gist)], [['return_BTC', 'return_ETH', 'drawdown_ETH'], [['ev_BTC', 'okx', LAST, 'valid'], ['ev_ETH', 'okx', LAST, 'valid']], ['Es lo que pasó en ese periodo; no dice lo que viene.'], null, false, true], 'the figures used, the evidence behind them, the analysis\'s own limit in code\'s words, no next question, the gist in front');
-eq([formatFigure(fig(crypto, 'return_BTC'), 'de').includes(','), formatFigure(fig(crypto, 'return_BTC'), 'en').includes('.'), /^\D?\d/.test(formatFigure(fig(crypto, 'volatility_BTC'), 'en')), formatFigure(fig(crypto, 'close_BTC'), 'en').endsWith(' USDT')], [true, true, true, true], 'a figure is written the way the person\'s language writes numbers; movement has no sign; a price says its currency');
+eq([formatFigure(fig(crypto, 'return_BTC'), 'de').includes(','), formatFigure(fig(crypto, 'return_BTC'), 'en').includes('.'), /^\D?\d/.test(formatFigure(fig(crypto, 'move_BTC'), 'en')), formatFigure(fig(crypto, 'close_BTC'), 'en').endsWith(' USDT')], [true, true, true, true], 'a figure is written the way the person\'s language writes numbers; movement has no sign; a price says its currency');
 const refused = (over: Record<string, unknown>, question = 'Compara Bitcoin y Ethereum') => { const r = present(draft(over), crypto, question, 'es', 'es-MX'); return 'refusal' in r ? r.refusal.code : 'shown'; };
 eq(refused({ text: 'Bitcoin cambió {{f:return_BTC}} y subió 12% después.' }), 'typed_number', 'a number the model typed itself is refused');
 eq(refused({ text: 'Bitcoin cambió {{f:return_DOGE}}.' }), 'unknown_figure', 'a figure that does not exist is refused');
@@ -161,8 +172,10 @@ eq('refusal' in halfRefusal ? [halfRefusal.refusal.code, halfRefusal.refusal.det
 for (const language of ['en', 'es', 'fr', 'pt', 'it', 'de'] as const) {
   const byCode = composeByCode(crypto, language);
   ok(byCode.kind === 'analysis' && byCode.composedByCode && !/\{\{|\}\}/.test(byCode.text) && byCode.figures.length === 4 && byCode.limitations.length === 1 && byCode.text.includes('Bitcoin') && byCode.text.includes('Ethereum') && byCode.text.includes('30'), `${language}: code can tell the comparison by itself, from the figures`);
-  eq([composeByCode(half, language).kind, composeByCode(half, language).figures, composeByCode(half, language).text.includes('Ethereum'), composeByCode(null, language).kind, limitationsInWords(half, language).length], ['analysis', ['return_BTC', 'drawdown_BTC'], false, 'unavailable', 2], `${language}: with one of two unreadable, code tells the one that came back and names the other as a limit; with nothing, it says it could not`);
-  ok(composeByCode(alone, language).kind === 'analysis' && composeByCode(alone, language).figures.join() === 'return_BTC,drawdown_BTC' && !/\{\{/.test(composeByCode(alone, language).text) && composeByCode(alone, language).text.includes('Bitcoin'), `${language}: and one instrument alone can be told by code as well`);
+  eq([composeByCode(half, language).kind, composeByCode(half, language).figures, composeByCode(half, language).text.includes('Ethereum'), composeByCode(null, language).kind, limitationsInWords(half, language).length], ['analysis', ['return_BTC', 'drawdown_BTC', 'worst_BTC', 'best_BTC'], false, 'unavailable', 2], `${language}: with one of two unreadable, code tells the one that came back and names the other as a limit; with nothing, it says it could not`);
+  ok(composeByCode(alone, language).kind === 'analysis' && composeByCode(alone, language).figures.join() === 'return_BTC,drawdown_BTC,worst_BTC,best_BTC' && !/\{\{/.test(composeByCode(alone, language).text) && composeByCode(alone, language).text.includes('Bitcoin'), `${language}: and one instrument alone can be told by code as well`);
+  // The independent evaluation: "which was the best day?" got change and largest fall, never the day. Told by code, one instrument now carries both days.
+  ok([fig(alone, 'worst_BTC'), fig(alone, 'best_BTC')].every((figure) => composeByCode(alone, language).text.includes(formatDay(figure.day!, language)) && composeByCode(alone, language).text.includes(formatFigure(figure, language))), `${language}: with its worst and its best day, dated`);
 }
 
 // ---------- 3. the store ----------
@@ -268,13 +281,13 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   script = [(request) => {
     const last = request.messages.at(-1)!;
     assert.ok(Array.isArray(last.content) && last.content[0].type === 'tool_result' && last.content[0].tool_use_id === 'u_cmp');
-    return answer({ kind: 'analysis', gist: 'En {{days}} días Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}.', text: 'En {{days}} días Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}. Ethereum se movió más día a día, {{f:volatility_ETH}} frente a {{f:volatility_BTC}}. Eso es lo que muestran los datos; qué significa depende de para qué lo mires.', claims: [{ metric: 'volatility', top: 'ETH' }], next: '¿Cuál de los dos cayó más desde su máximo?' });
+    return answer({ kind: 'analysis', gist: 'En {{days}} días Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}.', text: 'En {{days}} días Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}. Ethereum se movió más día a día, {{f:move_ETH}} frente a {{f:move_BTC}}. Eso es lo que muestran los datos; qué significa depende de para qué lo mires.', claims: [{ metric: 'move', top: 'ETH' }], next: '¿Cuál de los dos cayó más desde su máximo?' });
   }];
   await runTask(deps, 'ana', waiting.id);
   const done = (await store.get('ana', waiting.id))!, result = taskResult(done)!;
   eq([taskState(done, clock), result.presentation.kind, result.presentation.composedByCode, result.analysis!.subjects, world.fetched.length - fetchedBefore, store.readsTaken(), await store.remaining('ana', clock)], ['completed', 'analysis', false, ['BTC', 'ETH'], 2, 1, 5], 'after the yes: two sources read, one read of the allowance, a comparison');
   ok(result.presentation.text.includes(pctEs(refReturn(btc30))) && result.presentation.text.includes(pctEs(refReturn(eth30))) && !/\{\{/.test(result.presentation.text), 'the numbers in the answer are the code\'s');
-  eq([result.presentation.figures.sort(), result.presentation.references.map((r) => r.evidence), result.presentation.next, result.presentation.limitations], [['return_BTC', 'return_ETH', 'volatility_BTC', 'volatility_ETH'], ['ev_BTC', 'ev_ETH'], '¿Cuál de los dos cayó más desde su máximo?', ['Es lo que pasó en ese periodo; no dice lo que viene.']], 'the answer names its figures, its evidence, one next question and its limit');
+  eq([result.presentation.figures.sort(), result.presentation.references.map((r) => r.evidence), result.presentation.next, result.presentation.limitations], [['move_BTC', 'move_ETH', 'return_BTC', 'return_ETH'], ['ev_BTC', 'ev_ETH'], '¿Cuál de los dos cayó más desde su máximo?', ['Es lo que pasó en ese periodo; no dice lo que viene.']], 'the answer names its figures, its evidence, one next question and its limit');
   const ran = done.steps.find((s) => s.kind === 'tool_call' && s.data.tool === 'read_assets')!;
   eq([ran.data.args, ran.data.useId, ran.data.metered, ran.data.refunded, done.steps.filter((s) => s.kind === 'model_call').length], [{ symbols: ['BTC', 'ETH'], windowDays: 30 }, 'u_cmp', true, false, 2], 'what ran is exactly what was approved, and the model was not asked again before it ran');
   eq(taskUsage(done), { modelCalls: 2, toolCalls: 1, usd: 0.008, unknownUsd: 0, reads: 1 }, 'the task says what it used: two model calls, one tool, one read');
@@ -497,7 +510,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   const found = (await second.store.get('ana', begun.task.id))!;
   eq([taskState(found, clock), waitingApproval(found)!.assets, waitingApproval(found)!.windowDays], ['waiting_approval', ['SPY', 'QQQ'], 60], 'another process finds the task where it was left: waiting for the person');
   await second.store.approve('ana', begun.task.id, waitingApproval(found)!.digest, clock);
-  script = [() => answer({ kind: 'analysis', gist: 'El fondo del Nasdaq se movió más: {{f:volatility_QQQ}} frente a {{f:volatility_SPY}}.', text: 'El fondo del Nasdaq se movió más: {{f:volatility_QQQ}} frente a {{f:volatility_SPY}} en {{days}} días.', claims: [{ metric: 'volatility', top: 'QQQ' }] })];
+  script = [() => answer({ kind: 'analysis', gist: 'El fondo del Nasdaq se movió más: {{f:move_QQQ}} frente a {{f:move_SPY}}.', text: 'El fondo del Nasdaq se movió más: {{f:move_QQQ}} frente a {{f:move_SPY}} en {{days}} días.', claims: [{ metric: 'move', top: 'QQQ' }] })];
   await runTask(second, 'ana', begun.task.id);
   const third = new FileAgentStore(path, 6), stored = taskResult((await third.get('ana', begun.task.id))!)!;
   ok(stored.presentation.kind === 'analysis' && stored.analysis!.evidence.every((item) => item.source === 'yahoo' && item.currency === 'USD' && item.asOf === LAST) && stored.presentation.text.includes('60 días') && third.readsTaken() === 1, 'and a third one reads the finished result, its evidence and the one read it used');
@@ -507,7 +520,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
 {
   // A number of the model's own cannot ride on what is allowed.
   const no = (over: Record<string, unknown>, question = 'Compara Bitcoin y Ethereum') => { const r = present(draft(over), crypto, question, 'es', 'es-MX'); return 'refusal' in r ? `${r.refusal.code}:${r.refusal.detail}` : 'shown'; };
-  eq([no({ text: 'Bitcoin subió 60% en el periodo.' }), no({ text: 'Pasó en el {{days}}% de los días.' }), no({ text: 'Se movió 60{{f:volatility_BTC}}.' }), no({ text: 'Bitcoin{{f:return_BTC}} cambió.' })],
+  eq([no({ text: 'Bitcoin subió 60% en el periodo.' }), no({ text: 'Pasó en el {{days}}% de los días.' }), no({ text: 'Se movió 60{{f:move_BTC}}.' }), no({ text: 'Bitcoin{{f:return_BTC}} cambió.' })],
     ['typed_number:60%', 'bad_placeholder:glued: {{…}}%', 'bad_placeholder:glued: 0{{…}}', 'bad_placeholder:glued: n{{…}}'], 'a window length is not a percentage, and nothing may be glued to a placeholder');
   eq([no({ text: 'Bitcoin rindió 10.00 puntos.' }, 'Tengo 1000 pesos. Compara Bitcoin y Ethereum'), no({ text: 'Con tus 1,000 pesos habría cambiado {{f:return_BTC}}.' }, 'Tengo 1000 pesos. Compara Bitcoin y Ethereum'), no({ text: 'Subió 20.25 en el año.' }, '¿Y en 2025? Compara Bitcoin y Ethereum')],
     ['typed_number:10.00', 'shown', 'typed_number:20.25'], 'the person\'s 1000 lets 1,000 through and never 10.00; their 2025 never lets 20.25 through');
@@ -982,6 +995,42 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
     eq([Object.keys(body).sort(), body.version, JSON.stringify(body).includes('usd')], [['allowance', 'approval', 'engine', 'error', 'events', 'requestId', 'result', 'state', 'taskId', 'version'], 1, false], `${name} has the keys of the door's view and no provider money`);
     if (body.result) ok(body.result.text.startsWith(body.result.gist) && !/\{\{/.test(body.result.text) && (body.result.kind !== 'analysis' || body.result.references.every((r: any) => r.quality === 'valid' && /^\d{4}-\d{2}-\d{2}$/.test(r.asOf))), `${name}: the sentence in front starts the text, no placeholder is left, and an analysis names dated evidence`);
   }
+}
+
+// ---------- 7f. what the independent evaluation of 2026-10-11 found (Codex's 48 sessions, graded by Codex) ----------
+{
+  const { UNVERIFIED, UNANSWERED } = await import('../api/_lib/agent/present.ts');
+  const { TOOLS } = await import('../api/_lib/agent/tools.ts');
+  const store = new MemoryAgentStore(6), deps = depsFor(store);
+  // "Which one holds more Nvidia?" got the companion's sentence about how investing works. The engine now says its own.
+  verdicts = ['figure'];
+  script = [() => answer({ kind: 'explanation', gist: 'El fondo del Nasdaq lleva más Nvidia.', text: 'El fondo del Nasdaq lleva más Nvidia, cerca de una décima parte de su cartera.' })];
+  const held = taskResult(await ask(deps, 'eva', '¿Cuál trae más Nvidia adentro?', 'e1'))!.presentation;
+  eq([held.text, held.kind, held.composedByCode, /invertir/.test(held.text)], [UNVERIFIED.es, 'explanation', true, false], 'an explanation that stated a number nobody computed is replaced by a sentence about THAT: no verified figure here, and what Bobby can do');
+  verdicts = ['advice'];
+  script = [() => answer({ kind: 'explanation', gist: 'Te conviene el fondo.', text: 'Te conviene el fondo, es lo más sensato para ti.' })];
+  const advised = taskResult(await ask(deps, 'eva', '¿Qué hago?', 'e2'))!.presentation;
+  eq([advised.text, advised.kind, advised.composedByCode], [UNANSWERED.es, 'unavailable', true], 'any other verdict leaves the plain "not this time": never a sentence about something else');
+  for (const language of ['en', 'es', 'fr', 'pt', 'it', 'de'] as const) ok(UNVERIFIED[language].length > 40 && !/\d/.test(UNVERIFIED[language]), `${language}: the sentence exists and holds no number`);
+
+  // "{{best_spy" twice ended in a fallback that did not answer. An id typed in another case is still code's id; a
+  // placeholder with no kind is told how one is written.
+  const lower = present({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_btc}}.', text: 'Bitcoin cambió {{f:return_btc}}. Su mejor día fue el {{D:BEST_btc}}, con {{F:best_BTC}}, en {{ days }} días.', limitations: [], next: '', claims: [] }, crypto, 'Compara Bitcoin y Ethereum', 'es');
+  eq('presentation' in lower ? [lower.presentation.figures.sort(), /\{\{/.test(lower.presentation.text), lower.presentation.text.includes(formatDay(fig(crypto, 'best_BTC').day!, 'es'))] : lower.refusal, [['best_BTC', 'return_BTC'], false, true], 'an id typed in another case is the same id, written back as the tool gave it');
+  const bare = present({ kind: 'analysis', gist: 'Su mejor día fue {{best_BTC}}.', text: 'Su mejor día fue {{best_BTC}}.', limitations: [], next: '', claims: [] }, crypto, 'Compara Bitcoin y Ethereum', 'es');
+  ok('refusal' in bare && bare.refusal.code === 'bad_placeholder' && bare.refusal.detail.includes('{{d:ID}}') && bare.refusal.detail.includes('{{f:ID}}'), 'a placeholder with no kind is refused, and the refusal says how one is written');
+  const unknown = present({ kind: 'analysis', gist: 'Cambió {{f:return_doge}}.', text: 'Cambió {{f:return_doge}}.', limitations: [], next: '', claims: [] }, crypto, 'Compara', 'es');
+  eq('refusal' in unknown ? unknown.refusal.code : null, 'unknown_figure', 'and an id no tool gave stays unknown');
+
+  // A standard deviation was told as "on average". The measure is the average now, and the instructions say what it is.
+  const prompt = agentPrompt('es', 'es-MX');
+  ok(TOOLS.read_assets.description.includes('average size of its daily changes') && prompt.includes('"move" is the average size of the daily changes') && prompt.includes('never call another figure an average'), 'the tool and the instructions name the day-to-day measure for what it is');
+  // A read was offered where a question was due: "since January" became 60 days, "which would you buy" a comparison.
+  ok(prompt.includes('do not call the tool with another span') && prompt.includes('do not call a tool for that') && prompt.includes('Use 30 days unless they ask for 60'), 'a span that cannot be read, and a request to choose, are not reasons to offer a read');
+  // An ETF told as its index, a premise kept as a fact, the rules said aloud, a date with no article.
+  ok(prompt.includes('a fund that follows an index is the fund') && prompt.includes('never repeat it as true') && prompt.includes('Never talk about your rules') && prompt.includes('the article or preposition your language needs'), 'what was read is named as it is; a fact the person states is theirs; the rules are not a topic; a date gets its article');
+  // A coin's day beside a stock: the sentence about calendars speaks of the likeness, the one thing still measured on common days.
+  eq([limitationsInWords(mixed, 'es').some((line) => /parecido/.test(line)), limitationsInWords(mixed, 'en').some((line) => /how alike/.test(line)), limitationsInWords(mixed, 'de').some((line) => /ähnlich/.test(line))], [true, true, true], 'the limit about calendars says what it still applies to');
 }
 
 console.log(`agent-engine: ${checks} checks passed`);

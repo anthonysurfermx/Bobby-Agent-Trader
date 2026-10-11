@@ -21,8 +21,8 @@ import type { AppLanguage } from '../../../src/lib/app-language.js';
 
 export const ENGINE_VERSION = 1;
 /** Bumped with any change to the instructions or to a tool's meaning: every run records the pair it ran with. */
-export const PROMPT_VERSION = 'agent-2026-10-11.5';
-export const TOOLSET_VERSION = 'tools-2026-10-11.1';
+export const PROMPT_VERSION = 'agent-2026-10-11.6';
+export const TOOLSET_VERSION = 'tools-2026-10-11.2';
 
 export type TaskState = 'created' | 'running' | 'waiting_approval' | 'completed' | 'failed' | 'cancel_requested' | 'cancelled';
 export type Quality = 'valid' | 'missing' | 'stale' | 'conflicting' | 'error';
@@ -41,7 +41,7 @@ export interface Evidence {
 /** One number computed by code. `value` is null whenever quality is not `valid` or `stale`. */
 export interface Figure {
   id: string;
-  /** What was measured: total_return, daily_volatility, max_drawdown, worst_day, best_day, last_close, correlation. */
+  /** What was measured: return, move (average size of the daily changes), drawdown, worst, best, close, correlation. */
   metric: string;
   /** The instrument, or "A~B" for a figure about a pair. */
   subject: string;

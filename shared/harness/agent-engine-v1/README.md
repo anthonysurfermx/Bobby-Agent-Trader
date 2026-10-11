@@ -2,6 +2,8 @@
 
 `/api/agent-task`, off unless `BOBBY_AGENT_ENGINE=on`. No app uses it yet. The JSON files here are **real replies** of the engine on 2026-10-11 (`claude-sonnet-5-5`, OKX and Yahoo), kept as examples of the shape; the numbers in them are that day's.
 
+They were recorded at `658c9e46`. Since the independent evaluation of 2026-10-11 the day-to-day figure is `move_*` (the average size of the daily changes) and no longer `volatility_*` (a standard deviation), and a coin read beside a stock is measured on its own days: the shape is the same, those ids and values are not. They are recorded again when the fix round has been measured.
+
 ## Requests
 
 | File | What it does |
