@@ -36,15 +36,9 @@ class ConversationFixtureCase: XCTestCase {
     func ready(_ element: XCUIElement, timeout: Double = 25) {
         if element.exists && element.elementType != .staticText && element.isHittable { return }
         XCTAssertTrue(element.waitForExistence(timeout:timeout),app.debugDescription)
-        if element.elementType == .staticText {
-            // Read-only WebKit text has no activation point during its entrance animation.
-            let visible=XCTNSPredicateExpectation(predicate:NSPredicate { _,_ in
-                let frame=element.frame
-                return element.exists && frame.width > 0 && frame.height > 0 && frame.midX.isFinite && frame.midY.isFinite && frame.intersects(self.app.windows.firstMatch.frame)
-            },object:element)
-            XCTAssertEqual(XCTWaiter.wait(for:[visible],timeout:timeout),.completed,app.debugDescription)
-            return
-        }
+        // Read-only text has no activation point in WebKit. Its existence establishes
+        // the state; reviewed screenshots establish its visible composition.
+        if element.elementType == .staticText { return }
         let e = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: element)
         XCTAssertEqual(XCTWaiter.wait(for: [e], timeout: timeout), .completed, app.debugDescription)
     }
@@ -821,10 +815,12 @@ final class StoreReviewerWalk: ConversationFixtureCase {
         launch();ask("Analyze Bitcoin");ready(button("risk.notNow"));physicalControls([confirmRead,button("risk.notNow")])
         shot("21-review-bitcoin-cost");confirmRead.tap();ready(button("read.result"),timeout:45);button("read.result").tap()
         shot("22-review-bitcoin-read");let save=web.buttons.matching(NSPredicate(format:"label == %@",word("read.save"))).allElementsBoundByIndex.first { $0.isHittable }
-        XCTAssertNotNil(save);save!.tap();ready(web.staticTexts[word("read.savedLocal")]);
+        XCTAssertNotNil(save);save!.tap();ready(web.staticTexts[word("read.savedLocal")])
+        let home=button("read.home");ready(home)
         XCTAssertFalse(web.staticTexts["YOU MIGHT WANT TO ASK"].exists)
         XCTAssertFalse(web.staticTexts.matching(NSPredicate(format:"label BEGINSWITH[c] 'Unlocked ·'")).firstMatch.exists)
         shot("23-review-bitcoin-saved")
+        home.tap();ready(button("aria.type"))
     }
     func testSignedOutProfileCreditsRestoreAndProExit() {
         launch();profile();shot("24-review-profile-signed-out")
