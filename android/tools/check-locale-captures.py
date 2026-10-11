@@ -25,4 +25,8 @@ for name in names:
     assert (width, height) == (720, 1280), f'{path}: expected native CI display, got {width}x{height}'
     assert max(width, height) <= 3840 and max(width, height) <= 2 * min(width, height), f'{path}: invalid Play dimensions'
     assert header[24] == 8 and header[25] == 2, f'{path}: Play needs 24-bit RGB PNG without alpha'
+    original = root / 'shots/raw' / path.name
+    source_header = original.read_bytes()[:26]
+    assert source_header[:8] == b'\x89PNG\r\n\x1a\n' and source_header[24] == 8 and source_header[25] in (2, 6), original
+    assert struct.unpack('>II', source_header[16:24]) == (width, height), f'{path}: source frame was resized'
 print(f'{language}: one passed release journey, {len(names)} native 720x1280 RGB captures; below Play recommendation resolution')
