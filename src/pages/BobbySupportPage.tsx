@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import KineticShell from '@/components/kinetic/KineticShell';
 import { Helmet } from 'react-helmet-async';
 import { lang, LANGS, LANG_NAME, htmlLang, translateText, type Lang } from '@/lib/companions/i18n';
@@ -33,6 +33,18 @@ export default function BobbySupportPage() {
   const [email, setEmail] = useState('');
   const [kind, setKind] = useState('support');
   const [status, setStatus] = useState<'idle' | 'sending' | 'saved' | 'error'>('idle');
+  // The page is drawn after it loads, so the browser has nothing to scroll to when the address carries a section
+  // (#delete-account is the address given to Google Play for deletion requests; #contact is linked from the apps).
+  useEffect(() => {
+    let frame = 0;
+    const toSection = () => {
+      const id = window.location.hash.slice(1);
+      if (id === 'delete-account' || id === 'contact') frame = requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView());
+    };
+    toSection();
+    window.addEventListener('hashchange', toSection);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener('hashchange', toSection); };
+  }, []);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (status === 'sending' || message.trim().length < 3) return;
