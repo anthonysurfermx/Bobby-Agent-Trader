@@ -25,3 +25,11 @@ test('first-run intro deadline cannot revive a ready title over consent after an
 test('first-run intro deadline retires after touch instead of restarting the ready title',()=>{
   const{c,timers,calls}=intro();c.firstRunTitle();timers.forEach(fn=>fn());assert.deepEqual(calls,['ready title']);
 });
+
+test('the folding C1 copy keeps its real title geometry after losing the title id',()=>{
+  const box={left:'20px',top:'512px',width:'350px',height:'27px',fontFamily:'display',fontSize:'22px',fontWeight:'300',lineHeight:'27px',letterSpacing:'-.77px',textAlign:'center',whiteSpace:'normal',textWrap:'balance'};
+  const echo={style:{},removeAttribute:()=>{},setAttribute:()=>{},animate:()=>({}),remove:()=>{}};
+  const c={FIRST_HELLO_UNTIL:2,RM:false,FIRST_HELLO_FOLD:0,T:1,titleEl:{style:{},cloneNode:()=>echo},getComputedStyle:()=>box,stage:{appendChild:()=>{}},W:{},Ls:k=>k,tb:()=>{}};
+  vm.createContext(c);vm.runInContext(source.slice(source.indexOf('function firstRunTitle(){'),source.indexOf('ENTER.ASK_TEACH=function')),c);c.firstRunTitle();
+  assert.deepEqual(echo.style,box);assert.equal(c.FIRST_HELLO_UNTIL,0);
+});

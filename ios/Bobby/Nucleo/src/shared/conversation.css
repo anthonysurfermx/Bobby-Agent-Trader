@@ -71,3 +71,8 @@
 
 #first-run-field-mic.quiet-glyph{position:static;flex:none;width:44px;height:44px;min-width:44px;min-height:44px;background:transparent;border:0}
 #stage header #close.quiet-glyph{left:8px;top:0;background:transparent;border:0}
+
+/* Sentence captions keep the stage row, two complete lines, bottom at741; SPEC8.3/A9.7. */
+#stage:not(.consent-preview) #hint.first-run-meta-caption{top:705px;height:36px;font-family:var(--sans);font-size:max(13px,calc(11px / var(--first-fit,1)));font-weight:400;line-height:18px;letter-spacing:normal;text-transform:none;color:#A39C91}
+#stage #hint.first-run-meta-caption .roll,#stage #hint.first-run-meta-caption .roll>span{height:36px;line-height:18px;align-items:flex-end}
+#stage #hint.first-run-live-caption{color:#5CE1FF}

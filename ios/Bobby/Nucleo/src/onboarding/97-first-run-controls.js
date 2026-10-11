@@ -40,3 +40,12 @@ function firstRunUnavailable(){
   if(firstRunBase)firstRunHold(firstRunBase,'hint.micOff');else{go('ASK_TEACH',{quiet:true});setHint(Ls('hint.micOff'));}
   if(firstRunKeyboard&&firstRunKeyboard.animate)firstRunKeyboard.animate([{transform:'scale(1)'},{transform:'scale(1.1)'},{transform:'scale(1)'}],{duration:320});
 }
+
+/* A9.7: automatic-stop sentences use meta; microphone-on captions use the listening tint. */
+var firstRunControlHint=renderHint;
+renderHint=function(){
+  firstRunControlHint();
+  var meta=TALK_MODE==='tap'&&W.state==='HELD_DRAFT'&&(W.heldCaption==='cap.minute'||W.heldCaption==='cap.stopped');
+  $('hint').classList.toggle('first-run-meta-caption',meta);
+  $('hint').classList.toggle('first-run-live-caption',TALK_MODE==='tap'&&W.state==='LISTENING');
+};

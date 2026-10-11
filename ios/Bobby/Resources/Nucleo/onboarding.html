@@ -306,6 +306,11 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
 #first-run-field-mic.quiet-glyph{position:static;flex:none;width:44px;height:44px;min-width:44px;min-height:44px;background:transparent;border:0}
 #stage header #close.quiet-glyph{left:8px;top:0;background:transparent;border:0}
 
+/* Sentence captions keep the stage row, two complete lines, bottom at741; SPEC8.3/A9.7. */
+#stage:not(.consent-preview) #hint.first-run-meta-caption{top:705px;height:36px;font-family:var(--sans);font-size:max(13px,calc(11px / var(--first-fit,1)));font-weight:400;line-height:18px;letter-spacing:normal;text-transform:none;color:#A39C91}
+#stage #hint.first-run-meta-caption .roll,#stage #hint.first-run-meta-caption .roll>span{height:36px;line-height:18px;align-items:flex-end}
+#stage #hint.first-run-live-caption{color:#5CE1FF}
+
 </style>
 </head>
 <body data-page="onboarding">
@@ -4566,7 +4571,7 @@ ENTER.HELLO=function(){enterBorn();go('ASK_TEACH',{hello:!RM});};
 var firstRunAskEnter=ENTER.ASK_TEACH;
 var FIRST_HELLO_FOLD=0;
 function firstRunTitle(){
-  if(FIRST_HELLO_UNTIL&&!RM){FIRST_HELLO_FOLD=T;var echo=titleEl.cloneNode(true);echo.removeAttribute('id');echo.setAttribute('aria-hidden','true');stage.appendChild(echo);var fold=echo.animate([{opacity:1,transform:'translateY(0) scale(1)'},{opacity:0,transform:'translateY(-90px) scale(.5)'}],{duration:220});fold.onfinish=function(){echo.remove();};}
+  if(FIRST_HELLO_UNTIL&&!RM){FIRST_HELLO_FOLD=T;var echo=titleEl.cloneNode(true),box=getComputedStyle(titleEl);['left','top','width','height','fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','textAlign','whiteSpace','textWrap'].forEach(function(key){echo.style[key]=box[key];});echo.removeAttribute('id');echo.setAttribute('aria-hidden','true');stage.appendChild(echo);var fold=echo.animate([{opacity:1,transform:'translateY(0) scale(1)'},{opacity:0,transform:'translateY(-90px) scale(.5)'}],{duration:220});fold.onfinish=function(){echo.remove();};}
   FIRST_HELLO_UNTIL=0;W.title=[Ls('ask.title'),W.riskLater?Ls('risk.later'):Ls('ask.sub')];
   titleEl.style.fontSize='34px';titleEl.style.lineHeight='36px';titleEl.style.whiteSpace='normal';
   tb('title');
@@ -4586,7 +4591,7 @@ ENTER.ASK_TEACH=function(a){
   if(!firstRunKeyboard){
     firstRunKeyboard=document.createElement('button');firstRunKeyboard.className='quiet-glyph';
     firstRunKeyboard.id='first-run-keyboard';firstRunKeyboard.innerHTML='<svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true"><rect x="1" y="1" width="18" height="12" rx="2" fill="none" stroke="currentColor"/><path d="M4 4h2m2 0h2m2 0h2m2 0h1M4 7h2m2 0h2m2 0h2m2 0h1M6 10h8" stroke="currentColor"/></svg>';
-    firstRunKeyboard.addEventListener('click',firstRunType);
+    firstRunKeyboard.setAttribute('data-hit','type');
     stage.appendChild(firstRunKeyboard);
   }
   firstRunKeyboard.setAttribute('aria-label',Ls('aria.type'));
@@ -4642,6 +4647,7 @@ renderRiskProfile=function(){
 };
 var firstRunAction=action;
 action=function(hit,idx){
+  if(hit==='type'){firstRunType();return;}
   if(hit==='profile'&&SESSION&&!SESSION.riskAccepted&&(W.state==='ASK_TEACH'||W.state==='HELD_DRAFT')){fire('openNative',{route:'account'});return;}
   firstRunAction(hit,idx);
 };
@@ -6046,6 +6052,15 @@ function firstRunUnavailable(){
   if(firstRunBase)firstRunHold(firstRunBase,'hint.micOff');else{go('ASK_TEACH',{quiet:true});setHint(Ls('hint.micOff'));}
   if(firstRunKeyboard&&firstRunKeyboard.animate)firstRunKeyboard.animate([{transform:'scale(1)'},{transform:'scale(1.1)'},{transform:'scale(1)'}],{duration:320});
 }
+
+/* A9.7: automatic-stop sentences use meta; microphone-on captions use the listening tint. */
+var firstRunControlHint=renderHint;
+renderHint=function(){
+  firstRunControlHint();
+  var meta=TALK_MODE==='tap'&&W.state==='HELD_DRAFT'&&(W.heldCaption==='cap.minute'||W.heldCaption==='cap.stopped');
+  $('hint').classList.toggle('first-run-meta-caption',meta);
+  $('hint').classList.toggle('first-run-live-caption',TALK_MODE==='tap'&&W.state==='LISTENING');
+};
 
 /* ---- onboarding/99-boot.js ---- */
 

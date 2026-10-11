@@ -12,7 +12,7 @@ ENTER.HELLO=function(){enterBorn();go('ASK_TEACH',{hello:!RM});};
 var firstRunAskEnter=ENTER.ASK_TEACH;
 var FIRST_HELLO_FOLD=0;
 function firstRunTitle(){
-  if(FIRST_HELLO_UNTIL&&!RM){FIRST_HELLO_FOLD=T;var echo=titleEl.cloneNode(true);echo.removeAttribute('id');echo.setAttribute('aria-hidden','true');stage.appendChild(echo);var fold=echo.animate([{opacity:1,transform:'translateY(0) scale(1)'},{opacity:0,transform:'translateY(-90px) scale(.5)'}],{duration:220});fold.onfinish=function(){echo.remove();};}
+  if(FIRST_HELLO_UNTIL&&!RM){FIRST_HELLO_FOLD=T;var echo=titleEl.cloneNode(true),box=getComputedStyle(titleEl);['left','top','width','height','fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','textAlign','whiteSpace','textWrap'].forEach(function(key){echo.style[key]=box[key];});echo.removeAttribute('id');echo.setAttribute('aria-hidden','true');stage.appendChild(echo);var fold=echo.animate([{opacity:1,transform:'translateY(0) scale(1)'},{opacity:0,transform:'translateY(-90px) scale(.5)'}],{duration:220});fold.onfinish=function(){echo.remove();};}
   FIRST_HELLO_UNTIL=0;W.title=[Ls('ask.title'),W.riskLater?Ls('risk.later'):Ls('ask.sub')];
   titleEl.style.fontSize='34px';titleEl.style.lineHeight='36px';titleEl.style.whiteSpace='normal';
   tb('title');
@@ -32,7 +32,7 @@ ENTER.ASK_TEACH=function(a){
   if(!firstRunKeyboard){
     firstRunKeyboard=document.createElement('button');firstRunKeyboard.className='quiet-glyph';
     firstRunKeyboard.id='first-run-keyboard';firstRunKeyboard.innerHTML='<svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true"><rect x="1" y="1" width="18" height="12" rx="2" fill="none" stroke="currentColor"/><path d="M4 4h2m2 0h2m2 0h2m2 0h1M4 7h2m2 0h2m2 0h2m2 0h1M6 10h8" stroke="currentColor"/></svg>';
-    firstRunKeyboard.addEventListener('click',firstRunType);
+    firstRunKeyboard.setAttribute('data-hit','type');
     stage.appendChild(firstRunKeyboard);
   }
   firstRunKeyboard.setAttribute('aria-label',Ls('aria.type'));
@@ -88,6 +88,7 @@ renderRiskProfile=function(){
 };
 var firstRunAction=action;
 action=function(hit,idx){
+  if(hit==='type'){firstRunType();return;}
   if(hit==='profile'&&SESSION&&!SESSION.riskAccepted&&(W.state==='ASK_TEACH'||W.state==='HELD_DRAFT')){fire('openNative',{route:'account'});return;}
   firstRunAction(hit,idx);
 };
