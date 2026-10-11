@@ -2,6 +2,10 @@ import XCTest
 
 /// T17: the preference opens from Bobby's chip; neither exit replays the answer.
 final class SpeakingDialUITests: ConversationFixtureCase {
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        throw XCTSkip("SPEC 5.10 deferred at the owner deadline; wake, invitation and Memory doors are disabled")
+    }
     private var testLanguage: String?
     override var language: String { testLanguage ?? super.language }
     func testSpanishDialAndPersistence() { testLanguage="es";exercise() }

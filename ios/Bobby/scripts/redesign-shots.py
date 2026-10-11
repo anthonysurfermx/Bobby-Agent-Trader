@@ -19,6 +19,7 @@ ROOT = IOS.parents[1]
 HARNESS = ROOT.parent / '_harness'
 DEVICES = {
     'se': ('Bobby-Redesign-SE3', 'com.apple.CoreSimulator.SimDeviceType.iPhone-SE-3rd-generation', 'iphone-se3'),
+    'max': ('Bobby-Redesign-17ProMax', 'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max', 'iphone-17-pro-max'),
     'pro': ('Bobby-Redesign-17Pro', 'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro', 'iphone-17-pro'),
 }
 LOCALES = {'en':'en_US', 'es':'es_MX', 'fr':'fr_FR', 'pt':'pt_PT', 'it':'it_IT', 'de':'de_DE'}
@@ -33,11 +34,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', required=True, type=Path, help='Output root; captures go in <device>-<language> (with -plus1 when requested)')
     parser.add_argument('--language', choices=LOCALES, default='es')
-    parser.add_argument('--device', choices=['se', 'pro', 'all'], default='all')
+    parser.add_argument('--device', choices=['se', 'pro', 'max', 'all'], default='all')
     parser.add_argument('--text-size', choices=['default', '+1'], default='default')
     parser.add_argument('--test', '--tests', dest='tests', action='append', help='UI test class or Class/method; repeat or comma-separate (default RedesignShots)')
     parser.add_argument('--record', action='store_true', help='Record the full selected UI run (offline simulator)')
     parser.add_argument('--settle-system', type=int, choices=range(0,61), default=0, help='Wait up to 60s after boot for transient system notifications before a final matrix')
+    parser.add_argument('--permission-state', choices=['default','microphone-denied','speech-denied'], default='default', help='Set actual simulator TCC permissions before offline tests')
     parser.add_argument('--cleanup', action='store_true', help='Delete only simulators created by this invocation')
     parser.add_argument('--derived-data', type=Path, default=HARNESS / 'ios/dd')
     parser.add_argument('--package-cache', type=Path, default=Path.home() / 'Library/Developer/Xcode/DerivedData/Bobby-ebrmosnbrttmoldliysreeksjobv/SourcePackages')
@@ -69,15 +71,16 @@ def main():
         available = [r for r in runtimes if r.get('isAvailable') and r['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-')]
         if not available: raise RuntimeError('No available iOS simulator runtime')
         runtime = max(available, key=lambda r: tuple(int(x) for x in r['version'].split('.')))['identifier']
-        # Always prepare both named devices. Never reuse or delete a user's differently named phone.
-        for key, (name, device_type, _) in DEVICES.items():
+        # Prepare only the requested evidence phones; never touch a user's differently named phone.
+        selected = ['se', 'pro'] if args.device == 'all' else [args.device]
+        for key in selected:
+            name, device_type, _ = DEVICES[key]
             matches = [d for d in inventory.get(runtime, []) if d['name'] == name and d.get('deviceTypeIdentifier') == device_type]
             if len(matches) > 1: raise RuntimeError(f'Ambiguous simulator name {name}')
             if matches: phones[key] = matches[0]['udid']
             else:
                 udid = run(['xcrun', 'simctl', 'create', name, device_type, runtime], stdout=subprocess.PIPE).stdout.strip()
                 phones[key] = udid; created.append(udid)
-        selected = list(DEVICES) if args.device == 'all' else [args.device]
         product = args.derived_data / 'Build/Products'
         common = ['xcodebuild', '-project', IOS / 'Bobby.xcodeproj', '-scheme', 'Bobby', '-configuration', 'Debug',
                   '-derivedDataPath', args.derived_data, '-clonedSourcePackagesDirPath', args.package_cache,
@@ -99,6 +102,7 @@ def main():
             targets = [t for c in config.get('TestConfigurations', []) for t in c['TestTargets']] if 'TestConfigurations' in config else [v for v in config.values() if isinstance(v, dict) and 'BlueprintName' in v]
             for target in targets:
                 target.setdefault('EnvironmentVariables', {})['REDESIGN_LANGUAGE'] = args.language
+                target['EnvironmentVariables']['REDESIGN_PERMISSION_STATE'] = args.permission_state
                 target['TestLanguage'] = args.language
                 target['TestRegion'] = LOCALES[args.language].split('_')[1]
             plan.write_bytes(plistlib.dumps(config))
@@ -113,6 +117,11 @@ def main():
                 run(['xcrun', 'simctl', 'bootstatus', udid, '-b'])
                 run(['xcrun', 'simctl', 'ui', udid, 'content_size', 'extra-large' if args.text_size == '+1' else 'large'])
                 run(['xcrun', 'simctl', 'status_bar', udid, 'override', '--time', '9:41', '--dataNetwork', 'wifi', '--wifiMode', 'active', '--wifiBars', '3', '--batteryState', 'charged', '--batteryLevel', '100'])
+                if args.permission_state != 'default':
+                    run(['xcrun','simctl','install',udid,product / 'Debug-iphonesimulator/Bobby.app'])
+                    for service in ['microphone','speech-recognition']:
+                        denied = (service == 'microphone') == (args.permission_state == 'microphone-denied')
+                        run(['xcrun','simctl','privacy',udid,'revoke' if denied else 'grant',service,'xyz.bobbyprotocol.bobby'])
                 if args.settle_system: time.sleep(args.settle_system)
                 result = folder / 'result.xcresult'
                 command = ['xcodebuild', '-xctestrun', plan, '-destination', f'platform=iOS Simulator,id={udid}',

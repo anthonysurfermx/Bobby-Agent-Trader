@@ -339,6 +339,7 @@ final class NucleoSession: ObservableObject {
     var page: NucleoPage { NucleoPage.route(onboarded: profile.onboarded, companionId: companions.companionId, riskAccepted: profile.acceptedRiskNotice) }
 
     func openSpeakingDial() {
+        guard Self.invitationDialEnabled else { return }
         guard profile.acceptedRiskNotice, !desk.isBusy else { return }
         sheet = nil
         let generation = accountGeneration

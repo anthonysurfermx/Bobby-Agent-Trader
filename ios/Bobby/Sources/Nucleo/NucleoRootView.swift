@@ -35,6 +35,11 @@ final class NucleoHost: ObservableObject {
             defaults.set(true, forKey: "bobby.speaking.fresh")
         }
 #endif
+#if DEBUG
+        if options.fixtures != nil && ProcessInfo.processInfo.arguments.contains("-qa-nucleo-signed-in") {
+            AccountSession.shared.acceptQAFixture(userId: "offline-review-owner", appleUserId: "offline-review-apple")
+        }
+#endif
         session = NucleoSession(fixtures: options.fixtures != nil)
         let defaults = UserDefaults.standard
         if !defaults.bool(forKey: Self.voiceMuteResetKey) {
@@ -215,7 +220,7 @@ private struct NucleoStage: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
         case .memory:
-            MemoryView(riskAccepted: session.profile.acceptedRiskNotice, onEducationalNotes: { session.companionNotesField = nil; session.switchSheet(to: .companionNotes) }, onSpeaking: { session.openSpeakingDial() }, onClose: { session.sheet = nil })
+            MemoryView(riskAccepted: session.profile.acceptedRiskNotice, onEducationalNotes: { session.companionNotesField = nil; session.switchSheet(to: .companionNotes) }, onSpeaking: nil, onClose: { session.sheet = nil })
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)

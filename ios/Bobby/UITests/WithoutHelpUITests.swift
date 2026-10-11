@@ -283,10 +283,10 @@ final class ConsentPreviewShots: ConversationFixtureCase {
 
 class FirstRunFixtureCase: ConversationFixtureCase {
     var firstWords: [String:String] { labels["onboarding"] as! [String:String] }
-    func fresh(_ scenario: String = "companion-plain", speech: String = "words", stale: Bool = false, wait: Bool = true, permission: String = "granted") {
+    func fresh(_ scenario: String = "companion-plain", speech: String = "words", stale: Bool = false, wait: Bool = true, permission: String = "granted", voice: Bool = false) {
         app = XCUIApplication()
         app.launchArguments = ["-nucleo-fixtures", scenario, "-nucleo-page", "onboarding", "-nucleo-reset-onboarding", "-qa-speech-fixture", speech, "-qa-speech-permission", permission,
-            "-agent.riskNoticeVersion", "0", "-avatar.voiceMuted", "YES", "-nucleo.voiceMuteReset.v1", "YES",
+            "-agent.riskNoticeVersion", "0", "-avatar.voiceMuted", voice ? "NO" : "YES", "-nucleo.voiceMuteReset.v1", "YES",
             "-AppleLanguages", "(\(language))", "-app.language", language,
             "-AppleLocale", ["es":"es_MX","de":"de_DE","en":"en_US","pt":"pt_PT"][language]!]
         if stale { app.launchArguments += ["-qa-stale-consent", "-companion.id", "momo", "-companion.selected.v2.local", "momo", "-agent.riskNoticeVersion", "5"] }
@@ -523,7 +523,12 @@ final class MemoryInvitationShots: ConversationFixtureCase {
     }
     func test01RememberChip() { invite();shot("01-remember-chip") }
     func test02QuestionChip() { invite("question");shot("02-question-chip") }
-    func test03DialChip() { invite("dial");shot("03-dial-chip") }
+    func test03DialChip() {
+        launch("companion",memory:"dial");ask();answered()
+        let chip=web.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",copy("bobbyAsks").components(separatedBy:"{question}")[0])).firstMatch
+        XCTAssertFalse(chip.exists);XCTAssertFalse(web.sliders.firstMatch.exists);shot("03-dial-disabled-at-owner-cutoff")
+    }
+
     func consent(_ size: String?, name: String) {
         invite(size:size);chip.tap();let yes=app.buttons["companion-consent-yes"],no=app.buttons["companion-consent-no"],details=app.buttons["companion-consent-details"]
         ready(yes);ready(no);ready(details);physicalControls([yes,no,details],abovePill:false)
@@ -617,6 +622,10 @@ final class MemoryInvitationShots: ConversationFixtureCase {
 }
 
 final class MemoryNotesShots: ConversationFixtureCase {
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        throw XCTSkip("SPEC 5.8 deferred at the owner deadline; the new detail screen has no route")
+    }
     func copy(_ key:String)->String { (labels["companion"] as! [String:String])[key]! }
     func notes(_ seeded:Bool = true, scenario:String = "companion", ownerReset:Bool = false) {
         launch(scenario,notes:seeded, memory:ownerReset ? "owner-reset" : nil)
@@ -676,5 +685,161 @@ final class MemoryNotesShots: ConversationFixtureCase {
     }
     func test08AccountChangeResetHasNoOldNotes() {
         notes(true,ownerReset:true);ready(app.staticTexts["companion-notes-off"]);XCTAssertFalse(row("interest").exists);XCTAssertFalse(row("barrier").exists);shot("56-account-change-reset")
+    }
+}
+
+/// Store compositions use the shipping views and offline fixture transport at native resolution.
+final class StoreScreenShots: ConversationFixtureCase {
+    func testFiveCurrentStoreCompositions() {
+        launch("companion",voice:true,home:"fresh",memory:"remember")
+        shot("01-rest")
+        ask();answered();ready(button("answer.readAll"));shot("02-answer")
+        app.terminate();launch("companion-plain");ask("Bitcoin")
+        ready(button("risk.notNow"));shot("03-read-offer")
+        app.terminate();launch("companion",memory:"barrier");ask();answered()
+        let words=labels["companion"] as! [String:String]
+        let chip=web.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",words["bobbyAsks"]!.components(separatedBy:"{question}")[0])).firstMatch
+        ready(chip);chip.tap();ready(web.buttons[words["notNow"]!]);shot("04-personal-question")
+        app.terminate();launch("companion",notes:true)
+        let profile=web.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Momo.'")).firstMatch
+        ready(profile);profile.tap()
+        let memory=app.buttons["account-memory"]
+        for _ in 0..<6 where !memory.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        ready(memory);memory.tap();ready(app.buttons["memory-educational-notes"]);app.buttons["memory-educational-notes"].tap()
+        ready(app.staticTexts["companion-notes-title"]);shot("05-notes")
+    }
+}
+
+/// English fixture review of the bounded build; no purchase, account deletion or external link is submitted.
+final class StoreFirstLaunchWalk: FirstRunFixtureCase {
+    func testCleanEnglishETFQuestionNoticeAndReadAll() {
+        XCTAssertEqual(language,"en")
+        fresh("companion",voice:true);shot("01-review-clean-first-launch")
+        web.buttons[firstWords["aria.type"]!].tap();ready(web.textViews.firstMatch)
+        web.textViews.firstMatch.tap();web.textViews.firstMatch.typeText("What is an ETF?")
+        shot("02-review-typed-etf")
+        web.buttons[firstWords["type.send"]!].tap();ready(web.buttons[firstWords["risk.activate"]!])
+        shot("03-review-ai-disclosure")
+        web.buttons[firstWords["risk.notice"]!].tap();ready(app.buttons["risk-close"])
+        shot("04-review-full-risk-notice");app.buttons["risk-close"].tap()
+        ready(web.buttons[firstWords["risk.activate"]!]);web.buttons[firstWords["risk.activate"]!].press(forDuration:1.8)
+        answered();shot("05-review-first-answer")
+        let readAll=button("answer.readAll")
+        ready(readAll);readAll.tap();ready(button("aria.closeAnswer"))
+        shot("06-review-read-all")
+        button("aria.closeAnswer").tap();ask("What does investing mean?");answered();shot("07-review-second-question")
+    }
+}
+
+final class StoreReviewerWalk: ConversationFixtureCase {
+    func gone(_ element:XCUIElement) {
+        let e=XCTNSPredicateExpectation(predicate:NSPredicate(format:"exists == false"),object:element)
+        XCTAssertEqual(XCTWaiter.wait(for:[e],timeout:8),.completed,app.debugDescription)
+    }
+    func copy(_ key:String)->String { (labels["companion"] as! [String:String])[key]! }
+    func reach(_ element:XCUIElement) {
+        for _ in 0..<7 where !element.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        ready(element)
+    }
+    func profile() {
+        if app.buttons["account-close"].exists { return }
+        let avatar=web.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Momo.'")).firstMatch
+        ready(avatar);avatar.tap();ready(app.buttons["account-close"])
+    }
+    func notes() {
+        profile();let memory=app.buttons["account-memory"];reach(memory);memory.tap()
+        let door=app.buttons["memory-educational-notes"];reach(door);door.tap();ready(app.staticTexts["companion-notes-title"])
+    }
+    func testPersonalConsentOptionAndOwnWords() {
+        launch("companion",memory:"remember");ask();answered()
+        let chip=web.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",copy("bobbyAsks").components(separatedBy:"{question}")[0])).firstMatch
+        ready(chip);shot("08-review-personal-chip");chip.tap()
+        ready(app.buttons["companion-consent-details"]);shot("09-review-memory-disclosure-details")
+        // Its exact six-language destination is pinned in CompanionNotesOwnershipTests; do not make a live request.
+        app.buttons["companion-consent-yes"].tap()
+        let catalog=labels["catalog"] as! [String:[String:Any]]
+        let crypto=(catalog["interest"]!["options"] as! [String:String])["crypto"]!
+        ready(web.buttons[crypto]);shot("10-review-question-options");web.buttons[crypto].tap()
+        let words=(catalog["barrier"]!["options"] as! [String:String])["words"]!
+        ready(web.buttons[words]);web.buttons[words].tap();ready(button("aria.closeAnswer"));shot("11-review-noted")
+        app.terminate();launch("companion",memory:"money");ask();answered();ready(chip);chip.tap()
+        let typeAnswer=web.buttons[copy("typeAnswer")];ready(typeAnswer);typeAnswer.tap();ready(web.textViews.firstMatch)
+        web.textViews.firstMatch.tap();web.textViews.firstMatch.typeText("In two to seven years")
+        shot("12-review-personal-own-words");web.buttons[copy("answerSend")].tap()
+        ready(button("aria.closeAnswer"));shot("13-review-understood")
+    }
+    func testLegacyNotesCorrectionsDeletionAndMemoryOffHaveNoUnfinishedDetail() {
+        launch("companion",notes:true);notes();shot("14-review-shipping-notes")
+        XCTAssertFalse(app.buttons["companion-note-row-interest"].exists)
+        XCTAssertFalse(app.staticTexts["companion-detail-value"].exists)
+        let correct=app.buttons["companion-correct-interest"];reach(correct);correct.tap()
+        let choice=app.buttons["companion-correct-option-companies"];reach(choice);choice.tap()
+        ready(app.buttons["companion-correct-interest"]);shot("15-review-corrected-note")
+        app.buttons["companion-delete-interest"].tap();XCTAssertFalse(app.staticTexts["companion-note-interest"].exists)
+        XCTAssertFalse(app.buttons["companion-note-undo"].exists);shot("16-review-deleted-no-unfinished-undo")
+        let all=app.buttons["companion-delete-all"];reach(all);all.tap();ready(app.buttons["companion-delete-confirm"])
+        shot("17-review-delete-all-confirm");app.buttons["companion-delete-confirm"].tap()
+        ready(app.staticTexts[copy("empty")]);shot("18-review-notes-empty")
+        let toggle=app.switches["companion-memory-toggle"];reach(toggle);toggle.tap();ready(app.buttons["companion-delete-confirm"])
+        app.buttons["companion-delete-confirm"].tap();XCTAssertEqual(toggle.value as? String,"0");shot("19-review-memory-off")
+    }
+    func testDialHasNoInvitationOrMemoryDoor() {
+        launch("companion",memory:"dial");ask();answered()
+        let chip=web.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",copy("bobbyAsks").components(separatedBy:"{question}")[0])).firstMatch
+        XCTAssertFalse(chip.exists);XCTAssertFalse(web.sliders.firstMatch.exists)
+        button("aria.closeAnswer").tap();profile();let memory=app.buttons["account-memory"];reach(memory);memory.tap()
+        XCTAssertFalse(app.buttons["memory-speaking"].exists);shot("20-review-dial-doors-disabled")
+    }
+    func testBitcoinOfferConfirmReadAndSave() {
+        launch();ask("Analyze Bitcoin");ready(button("risk.notNow"));physicalControls([confirmRead,button("risk.notNow")])
+        shot("21-review-bitcoin-cost");confirmRead.tap();ready(button("read.result"),timeout:45);button("read.result").tap()
+        shot("22-review-bitcoin-read");let save=web.buttons.matching(NSPredicate(format:"label == %@",word("read.save"))).allElementsBoundByIndex.first { $0.isHittable }
+        XCTAssertNotNil(save);save!.tap();shot("23-review-bitcoin-saved")
+    }
+    func testSignedOutProfileCreditsRestoreAndProExit() {
+        launch();profile();shot("24-review-profile-signed-out")
+        let credits=app.buttons["account-credits"];reach(credits);credits.tap();ready(app.buttons["credits-close"])
+        shot("25-review-credits");let restore=app.buttons["account-restore"];reach(restore);restore.tap();shot("26-review-restore-fixture")
+        // Recorded guest access can be unknown: no fabricated balance or product price.
+        app.buttons["credits-close"].tap();app.terminate();app.launchArguments += ["-nucleo-paywall"];app.launch();ready(app.buttons["paywall-close"])
+        XCTAssertTrue(app.buttons["paywall-terms"].exists);XCTAssertTrue(app.buttons["paywall-privacy"].exists)
+        XCTAssertTrue(app.buttons["paywall-restore"].exists);shot("27-review-pro-fixture-unavailable")
+        app.buttons["paywall-close"].tap()
+    }
+    func testProfileThesesRemindersRiskAndAppleSheet() {
+        launch();profile();let theses=app.buttons["account-theses"];reach(theses);theses.tap();ready(app.buttons["theses-close"])
+        shot("28-review-theses");app.buttons["theses-close"].tap();gone(app.buttons["theses-close"]);profile()
+        let reminders=app.buttons["account-reminders"];reach(reminders);reminders.tap();ready(app.buttons["reminders-close"])
+        shot("29-review-reminders");app.buttons["reminders-close"].tap();gone(app.buttons["reminders-close"]);profile()
+        let risk=app.buttons["account-risk"];reach(risk);risk.tap();ready(app.buttons["risk-close"])
+        shot("30-review-risk");app.buttons["risk-close"].tap();gone(app.buttons["risk-close"]);profile()
+        let apple=app.buttons["account-apple-sign-in"];reach(apple);apple.tap();Thread.sleep(forTimeInterval:2)
+        shot("31-review-apple-system-sheet")
+        let springboard=XCUIApplication(bundleIdentifier:"com.apple.springboard")
+        if springboard.buttons["Cancel"].isHittable { springboard.buttons["Cancel"].tap() }
+        else if app.buttons["Cancel"].isHittable { app.buttons["Cancel"].tap() }
+    }
+    func testSignedInDeleteDialogIsReachableWithoutSubmitting() {
+        launch();app.terminate();app.launchArguments += ["-qa-nucleo-signed-in"];app.launch();ready(button("aria.type"));profile()
+        let deletion=app.buttons["account-delete"];reach(deletion);shot("32-review-profile-signed-in")
+        deletion.tap();ready(app.buttons["Delete account permanently"]);shot("33-review-delete-account-dialog")
+        if app.buttons["Cancel"].isHittable { app.buttons["Cancel"].tap() }
+        else { app.otherElements["PopoverDismissRegion"].coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.2)).tap() }
+        gone(app.buttons["Delete account permanently"])
+    }
+}
+
+final class StoreOSPermissionWalk: ConversationFixtureCase {
+    func testActualOSDenialKeepsTypingAndExplainsPermission() throws {
+        let state=ProcessInfo.processInfo.environment["REDESIGN_PERMISSION_STATE"] ?? "default"
+        guard state != "default" else { throw XCTSkip("Requires the runner's actual simulator TCC denial") }
+        launch();app.terminate()
+        if let index=app.launchArguments.firstIndex(of:"-qa-speech-fixture") { app.launchArguments.removeSubrange(index...index+1) }
+        if let index=app.launchArguments.firstIndex(of:"-qa-speech-permission") { app.launchArguments.removeSubrange(index...index+1) }
+        app.launch();ready(button("aria.type"));button("aria.talk").tap()
+        ready(button("aria.type"));XCTAssertFalse(button("aria.sendSpoken").exists)
+        XCTAssertTrue(web.staticTexts[word("hint.micOff")].waitForExistence(timeout:8),app.debugDescription)
+        shot(state == "microphone-denied" ? "34-review-os-microphone-denied" : "35-review-os-speech-denied")
+        ask("What is an ETF?");answered();shot("36-review-os-denied-typing-works")
     }
 }
