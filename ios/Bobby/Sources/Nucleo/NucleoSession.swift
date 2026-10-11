@@ -197,12 +197,18 @@ final class NucleoSession: ObservableObject {
         SpeakingDial(defaults: defaults).prepare(existing: profile.onboarded)
 #if DEBUG
         if (fixtures || ProcessInfo.processInfo.arguments.contains("-qa-companion-live")) && ProcessInfo.processInfo.arguments.contains("-qa-companion") {
-            SpeakingDial(defaults: defaults).choose("plain", owner: nil)
+            // Plain is the absence of a stored choice; fixtures do not create one.
         }
 #endif
         desk = NucleoDesk(profile: profile, companions: companions, ledger: ledger, fixtures: fixtures)
         nucleoVoice = NucleoVoice(voice: voice)
         desk.pilot = companionPilot
+        companionPilot.transport = { [weak companionPilot] path, method, body in
+            let response = try await BobbyAPI.responseWithHeaders(path, method: method, body: body,
+                extraHeaders: BobbyAccessAPI.headers(bearer: nil), timeout: 45)
+            companionPilot?.responseHeaders = response.headers
+            return (response.json, response.status)
+        }
         companionPilot.revision = { [weak self] in self?.companionContext.revision ?? UUID() }
         companionPilot.context = { [weak self] in
             guard let self else { return nil }
@@ -218,6 +224,17 @@ final class NucleoSession: ObservableObject {
         }
         desk.speakingLevel = { [weak self] in guard let self else { return nil }; return SpeakingDial(defaults: self.defaults).value(self.fixtures ? nil : self.desk.userID()) }
         if fixtures {
+            if NucleoFixtures.scenario?.hasPrefix("companion") == true {
+                desk.readAccess = {
+                    let scenario=NucleoFixtures.scenario ?? "", pro=scenario.hasPrefix("companion-pro")
+                    if scenario == "companion-confirm-unknown" { return nil }
+                    let n=scenario == "companion-confirm-last" ? 1 : scenario == "companion-confirm-guest" ? 3 : 5
+                    return BobbyReadAccess(tier: pro ? "pro" : scenario == "companion-confirm-guest" ? "anon" : "free", used: 5, limit: pro ? nil : 10, remaining: pro ? nil : n, resetsAt: nil, paywall: false)
+                }
+                if ["companion-confirm-deep", "companion-confirm-max", "companion-pro-deep"].contains(NucleoFixtures.scenario ?? "") {
+                    desk.readMeter = { level in NucleoLevelMeter(json:["used":0,"limit":5,"remaining": level == .maximo ? 2 : 5,"windowDays":7]) }
+                }
+            }
             // Fixture mode is always the signed-out path: no ProgressSync, no island, no Apple, no bearer.
             desk.isSignedIn = { false }
             desk.userID = { nil }
@@ -313,17 +330,12 @@ final class NucleoSession: ObservableObject {
             dial.choose(value, owner: owner, feedback: try p.bool("feedback", required: false) ?? false)
             nucleoVoice.stop()
             return sessionChanged()
+        case "confirm.refresh":
+            return try desk.refreshConfirmation(p)
         case "ask":
             return try await desk.ask(p)
         case "companion.presented":
-            if companionAwaitingConsent && !companionContext.decided && companionContext.allows(companionPilot.capability) {
-                DispatchQueue.main.async { [weak self] in
-                    guard let self, self.companionAwaitingConsent, self.profile.acceptedRiskNotice,
-                          !self.companionContext.decided, !self.desk.isBusy, self.sheet == nil else { return }
-                    _ = self.openNative(.companionConsent)
-                }
-            }
-            return ["status": "ok"]
+            return ["status": "idle"] // I-1: no automatic consent or personal question.
         case "companion.answer":
             let id = try p.string("questionId", maxLength: 32)!
             guard companionContext.allows(companionPilot.capability), companionQuestionId == id, companionContext.next(preferred: id)?.id == id else {
@@ -360,6 +372,7 @@ final class NucleoSession: ObservableObject {
             sessionChanged()
             return result
         case "speech.start":
+            if !profile.acceptedRiskNotice && !speech.permission().onDevice { return ["status": "unavailable"] }
             return ["status": speech.start().rawValue]
         case "speech.stop":
             let cancel = try p.bool("cancel", required: false) ?? false
@@ -368,7 +381,7 @@ final class NucleoSession: ObservableObject {
             let id = try p.string("id", pattern: NucleoVoice.idPattern)!
             let text = try p.string("text")!
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw NucleoFault.invalid("text is empty") }
-            return ["status": speak(id: id, text: text).rawValue]
+            return ["status": speak(id: id, text: text, spoken: try p.bool("spoken", required: false) ?? true).rawValue]
         case "previewVoice":
             let id = try p.string("companionId", maxLength: 32)!
             guard let companion = bobbyCompanions.first(where: { $0.id == id }) else { throw NucleoFault.invalid("unknown companion") }
@@ -465,6 +478,16 @@ final class NucleoSession: ObservableObject {
         (defaults.dictionary(forKey: Self.hintsKey) as? [String: Int]) ?? [:]
     }
 
+    private func exampleIndex() -> Int {
+        let day = Calendar.current.startOfDay(for: Date())
+        let key = "conversation.example.day", indexKey = "conversation.example.index"
+        if let prior = defaults.object(forKey: key) as? Date, prior != day {
+            defaults.set((defaults.integer(forKey: indexKey) + 1) % 6, forKey: indexKey)
+        }
+        defaults.set(day, forKey: key)
+        return defaults.integer(forKey: indexKey) % 6
+    }
+
     func sessionJSON() -> [String: Any] {
         synchronizeAccountState()
         let c = companions.companion
@@ -483,7 +506,9 @@ final class NucleoSession: ObservableObject {
             "pendingRead": desk.pendingRead() ?? NSNull(), "fixtures": fixtures, "platform": "ios", "appVersion": appVersion,
             "analysisLevel": NucleoLevelCenter.shared.level.pageJSON,
             "speaking": SpeakingDial(defaults: defaults).json(fixtures ? nil : AccountSession.shared.session?.userId),
-            "companionPilot": ["strings": CompanionCopy.json, "textScale": UIFontMetrics(forTextStyle: .body).scaledValue(for: 17) / 17],
+            "textScale": UIFontMetrics(forTextStyle: .body).scaledValue(for: 17) / 17,
+            "exampleIndex": exampleIndex(),
+            "companionPilot": ["strings": CompanionCopy.json, "enabled": companionPilot.capability.known ? companionPilot.capability.enabled as Any : NSNull(), "textScale": UIFontMetrics(forTextStyle: .body).scaledValue(for: 17) / 17],
             "nudge": currentNudge().map { $0.json as Any } ?? NSNull(),
         ]
         // Bobby never invites someone into a wall: when the phone KNOWS the next read is refused, the
@@ -798,10 +823,21 @@ final class NucleoSession: ObservableObject {
     }
 
     /// After consent only (R11): the dictation vocabulary, the account check and one sync.
+    private func refreshCompanionCapability() {
+        guard profile.acceptedRiskNotice else { return }
+        let consent = consentGeneration
+        Task { [weak self] in
+            guard let self else { return }
+            _ = await self.companionPilot.probe()
+            guard self.profile.acceptedRiskNotice, self.consentGeneration == consent, !self.tornDown else { return }
+            self.sessionChanged()
+        }
+    }
+
     private func bootOnce() {
         guard profile.acceptedRiskNotice else { return }
         let consent = consentGeneration
-        Task { [weak self] in _ = await self?.companionPilot.probe() }
+        refreshCompanionCapability()
         if vocabularyTask == nil {
             vocabularyTask = Task { [weak self] in
                 let words = await BobbyAPI.dictationVocabulary()
@@ -880,14 +916,20 @@ final class NucleoSession: ObservableObject {
 
     /// The quick-access row as the page gets it. `own` tells an asset the person asked about from a starter that
     /// only pads the row: a read Bobby started offers their own assets only (ARCHITECTURE.md §3.5).
-    static func quickAccess(_ memory: DeskMemory, fallback: [String]) -> [[String: Any]] {
+    static func quickAccess(_ memory: DeskMemory, fallback: [String], names: [String: String] = [:]) -> [[String: Any]] {
         let asked = Set(memory.watchlist.map(\.symbol))
-        return memory.quickAccess(fallback: fallback).map { ["symbol": $0, "own": asked.contains($0)] }
+        let regional = ["MC.PA":"LVMH", "OR.PA":"L’Oréal", "EDP.LS":"EDP", "GALP.LS":"Galp", "PETR4.SA":"Petrobras", "VALE3.SA":"Vale", "ISP.MI":"Intesa Sanpaolo", "ENEL.MI":"Enel", "SAP.DE":"SAP", "SIE.DE":"Siemens"]
+        return memory.quickAccess(fallback: fallback).map { symbol in
+            let member = HarnessSectors.sector(of: symbol)?.members.first { $0.symbol == symbol }
+            return ["symbol": symbol, "name": names[symbol] ?? member?.name ?? regional[symbol] ?? symbol, "own": asked.contains(symbol)]
+        }
     }
 
     func suggestions() async -> [String: Any] {
         let consent = consentGeneration
-        let quick = Self.quickAccess(DeskMemory(), fallback: BobbyViewModel.defaultQuickAccess)
+        let saved = desk.ledger.items(owner: desk.userID())
+        let names = Dictionary(saved.map { ($0.symbol, $0.name) }, uniquingKeysWith: { first, _ in first })
+        let quick = Self.quickAccess(DeskMemory(), fallback: BobbyViewModel.defaultQuickAccess, names: names)
         // R11: before consent nothing reaches the network; the local row is all there is.
         guard profile.acceptedRiskNotice else { return ["quickAccess": quick, "movers": [Any]()] }
         if let cache = suggestionsCache, Date().timeIntervalSince(cache.at) < Self.suggestionsCacheSeconds {
@@ -906,10 +948,10 @@ final class NucleoSession: ObservableObject {
 
     // MARK: - Voice
 
-    func speak(id: String, text: String) -> NucleoVoice.Status {
+    func speak(id: String, text: String, spoken: Bool = true) -> NucleoVoice.Status {
         // R11: the network voice sends the text out for speech; before consent the page reads silently.
         guard profile.acceptedRiskNotice else { return .muted }
-        return nucleoVoice.speak(id: id, text: text, voiceId: profile.voiceId, persona: companions.companion?.voicePersona, vibe: profile.vibeId)
+        return nucleoVoice.speak(id: id, text: text, voiceId: profile.voiceId, persona: companions.companion?.voicePersona, vibe: profile.vibeId, spoken: spoken)
     }
 
     /// Public pick lines: bundled EN/ES audio. A language without clips uses the companion's network
@@ -1006,6 +1048,7 @@ final class NucleoSession: ObservableObject {
         inviteReason = nil
         // Close through the bridge too: otherwise the page keeps its sheet pause forever.
         sheetDismissed()
+        desk.clearConversation()
         emit("consent.withdrawn", [:])
         sessionChanged()
     }
@@ -1214,17 +1257,10 @@ final class NucleoSession: ObservableObject {
     }
 
     private func companionDelivered(_ reply: [String: Any]) -> [String: Any] {
-        guard ["ok", "companion"].contains(reply["status"] as? String ?? ""), companionContext.allows(companionPilot.capability) else { return reply }
-        var result = reply
-        if companionContext.accepted {
+        if ["ok", "companion"].contains(reply["status"] as? String ?? ""), companionContext.allows(companionPilot.capability), companionContext.accepted {
             companionContext.answered()
-            let preferred = reply["checkIn"] as? String
-            result["companionCheckIn"] = companionCheckIn(preferred: preferred)
-        } else if !companionContext.decided {
-            companionAwaitingConsent = true
-            result["companionConsentPending"] = true
         }
-        return result
+        return reply // I-2 owns all invitations about the person.
     }
 
     func companionCheckIn(preferred: String? = nil, afterAnswer: Bool = false) -> [String: Any] {
@@ -1247,6 +1283,8 @@ final class NucleoSession: ObservableObject {
     // MARK: - Lifecycle
 
     func appBecameActive() {
+        companionPilot.invalidateProbe()
+        refreshCompanionCapability()
         companionContext.opened()
         emit("app.state", ["state": "active"])
         if signedIn { Task { await AccountSession.shared.checkAppleCredential() } }
@@ -1408,6 +1446,7 @@ final class NucleoSession: ObservableObject {
         readHandoff = nil
         dropReadOffer()
         speech.cancel()
+        desk.clearConversation()
         nucleoVoice.stop()
         emit("app.state", ["state": "background"])
     }
@@ -1527,6 +1566,7 @@ final class NucleoSession: ObservableObject {
         accountGeneration = account.generation
         accountUserID = account.session?.userId
         if wasAnonymous, let owner = accountUserID { SpeakingDial(defaults: defaults).inheritGuest(owner) }
+        desk.clearConversation()
         desk.invalidatePending(preservingAnonymousSignInRetries: wasAnonymous && accountUserID != nil)
         notch.reset()
         speech.cancel()

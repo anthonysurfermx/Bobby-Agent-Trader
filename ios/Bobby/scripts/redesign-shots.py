@@ -54,6 +54,8 @@ def main():
     created, phones, active = [], {}, None
     result = None
     try:
+        if shutil.disk_usage(HARNESS).free < 5 * 1024**3:
+            raise RuntimeError('Less than 5 GiB free: clean owned result bundles before capturing')
         inventory = data(['xcrun', 'simctl', 'list', 'devices', 'available', '-j'])['devices']
         booted = [d for devices in inventory.values() for d in devices if d['state'] == 'Booted']
         if booted:
@@ -96,6 +98,8 @@ def main():
                 target['TestRegion'] = LOCALES[args.language].split('_')[1]
             plan.write_bytes(plistlib.dumps(config))
             for key in selected:
+                if shutil.disk_usage(HARNESS).free < 5 * 1024**3:
+                    raise RuntimeError('Less than 5 GiB free: capture stopped before boot')
                 udid = phones[key]; active = udid
                 folder = args.output / (DEVICES[key][2] + '-' + args.language + ('-plus1' if args.text_size == '+1' else ''))
                 folder.mkdir(parents=True, exist_ok=True)
@@ -110,7 +114,7 @@ def main():
                            '-disableAutomaticPackageResolution', '-skipPackageUpdates',
                            '-parallel-testing-enabled', 'NO', '-collect-test-diagnostics', 'never', '-resultBundlePath', result,
                            '-testLanguage', args.language, '-testRegion', LOCALES[args.language].split('_')[1]]
-                command += ['-only-testing:' + (t if t.startswith('BobbyUITests/') else 'BobbyUITests/' + t) for t in tests]
+                command += ['-only-testing:' + (t if t == 'BobbyTests' or t.startswith(('BobbyUITests/', 'BobbyTests/')) else 'BobbyUITests/' + t) for t in tests]
                 command += ['-skip-testing:BobbyUITests/CompanionBuild69UITests/' + t for t in skips]
                 with (folder / 'test.log').open('w') as log:
                     outcome = subprocess.run([str(x) for x in command + ['test-without-building']], text=True, stdout=log, stderr=subprocess.STDOUT)

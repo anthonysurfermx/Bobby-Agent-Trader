@@ -11,6 +11,11 @@ final class SpeakingDialUITests: XCTestCase {
         app.launchArguments = base + ["-qa-speaking-reset"]
         app.launch()
         let web = app.webViews.firstMatch
+        let keyboard=web.buttons[language == "es" ? "Escribir" : "Type"]
+        XCTAssertTrue(keyboard.waitForExistence(timeout:30)); XCTAssertFalse(named(web,language == "es" ? "Sencillo" : "Plain").exists)
+        web.buttons[language == "es" ? "Momo. Cuenta y progreso" : "Momo. Account and progress"].tap()
+        XCTAssertTrue(app.buttons["account-memory"].waitForExistence(timeout:10)); app.buttons["account-memory"].tap()
+        XCTAssertTrue(app.buttons["memory-speaking"].waitForExistence(timeout:10)); app.buttons["memory-speaking"].tap()
         let plain = named(web, language == "es" ? "Sencillo" : "Plain")
         XCTAssertTrue(plain.waitForExistence(timeout: 30), app.debugDescription)
         shot(app, "dial68-\(language)-plain")
@@ -23,7 +28,7 @@ final class SpeakingDialUITests: XCTestCase {
         XCTAssertTrue(named(web, language == "es" ? "¿Qué quieres entender hoy?" : "What do you want to understand today?").waitForExistence(timeout: 10))
         app.terminate(); app.launchArguments = base; app.launch()
         XCTAssertTrue(web.waitForExistence(timeout: 30))
-        let ask = web.buttons.matching(NSPredicate(format: "label == %@ OR label == %@", language == "es" ? "Escribe una pregunta" : "Type a question", language == "es" ? "Pregúntale a Bobby, mantén para hablar" : "Ask Bobby, hold to talk")).firstMatch
+        let ask = web.buttons.matching(NSPredicate(format: "label == %@ OR label == %@", language == "es" ? "Escribir" : "Type", language == "es" ? "Pregúntale a Bobby, mantén para hablar" : "Ask Bobby, hold to talk")).firstMatch
         XCTAssertTrue(ask.waitForExistence(timeout: 20))
         XCTAssertFalse(named(web, language == "es" ? "Sencillo" : "Plain").exists)
         app.terminate()

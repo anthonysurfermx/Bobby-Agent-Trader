@@ -49,7 +49,7 @@
 		<string>instagram-stories</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Bobby listens only while you hold the button, to hear your question or what you answer to Bobby.</string>
+	<string>Bobby listens only after you tap the microphone, and stops when you send, cancel or go quiet, to hear your question or what you answer to Bobby.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Bobby saves your skin card to Photos only when you tap Save Image.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

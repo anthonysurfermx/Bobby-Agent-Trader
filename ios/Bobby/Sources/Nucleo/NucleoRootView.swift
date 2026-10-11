@@ -109,6 +109,7 @@ private struct NucleoStage: View {
             .onReceive(NotificationCenter.default.publisher(for: L.didChange)) { _ in
                 session.voice.stop()
                 session.speech.cancel()
+                session.desk.clearConversation()
                 _ = session.desk.cancel()
                 _ = session.sessionChanged()
                 if session.profile.acceptedRiskNotice, AccountSession.shared.isSignedIn {

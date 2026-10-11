@@ -1,170 +1,114 @@
-/* Educational replies share the sphere, but never enter the verdict, save or market-read states. */
-var GUIDE = null, CHECKIN = null, GUIDE_RETRIES = 0, GUIDE_BUSY = false, GUIDE_INPUT_CHECKIN = false, GUIDE_EPOCH = 0, GUIDE_ANSWER_ERROR = '';
-var guidePanel = mk('section'), guideReply = mk('p'), guideMark = mk('small'), guideFact = mk('p'), guideQuestion = mk('p'), guideOptions = mk('div'), guideActions = mk('div');
-guidePanel.id = 'companionPanel'; guidePanel.setAttribute('aria-live', 'polite'); guidePanel.style.cssText = 'position:absolute;left:24px;top:360px;bottom:118px;width:342px;z-index:18;display:none;flex-direction:column;gap:10px;touch-action:none;pointer-events:auto;color:var(--ink);font:16px/1.5 var(--sans)';
-var guideNarrative = mk('div'); guideNarrative.style.cssText = 'min-height:0;overflow-y:auto;overscroll-behavior:contain;flex:1';
-guideReply.style.cssText = 'font-size:17px;line-height:1.5;white-space:pre-wrap;margin:0';
-guideMark.style.cssText = 'display:block;font-size:11px;color:var(--ink3);margin-top:8px';
-guideFact.id = 'companion-fact'; guideFact.setAttribute('role','note');
-guideFact.style.cssText = 'font-size:13px;line-height:1.5;white-space:pre-wrap;color:var(--ink2);border:1px solid var(--hair);border-radius:14px;padding:14px;background:rgba(242,237,228,.04);margin:12px 0 0';
-guideQuestion.style.cssText = 'font-size:17px;line-height:1.45;margin:0;flex:none';
-guideOptions.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;gap:6px;flex:none';
-guideActions.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;gap:6px;flex:none';
-[guideReply,guideMark,guideFact].forEach(function(e){ guideNarrative.appendChild(e); });
-[guideNarrative,guideQuestion,guideOptions,guideActions].forEach(function(e){ guidePanel.appendChild(e); }); uiEl.appendChild(guidePanel);
-function guideWords(){ return SES && SES.companionPilot && SES.companionPilot.strings || {}; }
-function guideButton(host, text, action, id, primary){
-  var b = mk('button', null, text); b.type = 'button'; b.id = id;
-  b.style.cssText = 'min-height:44px;width:100%;text-align:left;padding:10px 14px;border-radius:16px;white-space:normal;overflow-wrap:anywhere;line-height:1.4;font-size:14px;background:' + (primary ? 'rgba(242,237,228,.10)' : 'transparent') + ';border:1px solid var(--hair)';
-  b._guideAction = action; host.appendChild(b); return b;
+/* I-1: one answer, optional depth, and exactly one invitation. All copy is keyed. */
+var GUIDE=null, CHECKIN=null, GUIDE_RETRIES=0, GUIDE_BUSY=false, GUIDE_INPUT_CHECKIN=false, GUIDE_EPOCH=0, GUIDE_ANSWER_ERROR='';
+var guidePanel=mk('section','conversation'), guideReply=mk('p','conversation-phrase'), guideMark=mk('p','conversation-meta'), guideFact=mk('p','conversation-body'), guideBody=mk('p','conversation-body');
+var guideNarrative=mk('div'), guideActions=mk('div','conversation-slot'), guideQuestion=mk('p'), guideOptions=mk('div');
+guidePanel.id='companionPanel'; guideReply.id='companion-reply'; guideNarrative.id='conversation-reading'; guideBody.id='conversation-body'; guideActions.id='conversation-slot';
+[guideReply,guideBody,guideFact,guideMark].forEach(function(e){guideNarrative.appendChild(e);}); guidePanel.appendChild(guideNarrative); uiEl.appendChild(guidePanel); uiEl.appendChild(guideActions);
+guidePanel.style.display=guideActions.style.display='none';
+var guideDisclosure=mk('button','quiet-link'); guideDisclosure.id='companion-read-all'; guidePanel.appendChild(guideDisclosure);
+function quietAction(b, action){
+  b._guideAction=action;
+  var down=null;
+  b.addEventListener('pointerdown',function(e){e.stopPropagation(); if(e.cancelable)e.preventDefault(); down={x:e.clientX,y:e.clientY}; try{b.setPointerCapture(e.pointerId);}catch(_){}});
+  b.addEventListener('pointerup',function(e){e.stopPropagation(); var p=down;down=null;if(p&&Math.hypot(e.clientX-p.x,e.clientY-p.y)<8&&!b.disabled)action();});
+  b.addEventListener('pointercancel',function(){down=null;});
+  b.addEventListener('click',function(e){e.stopPropagation();if(e.detail===0&&!b.disabled)action();});
 }
-/* The stage owns gestures. Keep this scrollable text panel's gestures inside it, including VoiceOver clicks. */
-var guidePointer = null;
-guidePanel.addEventListener('pointerdown', function(e){
-  var answer = e.target.closest('#companion-answer-input');
-  if (answer) {
-    e.stopPropagation(); if (e.cancelable) e.preventDefault();
-    if (GUIDE_BUSY) return;
-    PTR.id = e.pointerId; PTR.realT = performance.now();
-    try { stage.setPointerCapture(e.pointerId); } catch (_) {}
-    var point = toStage(e.clientX, e.clientY); inDown(point[0], point[1], answer); return;
-  }
-  e.stopPropagation(); if (e.cancelable) e.preventDefault();
-  guidePointer = { y:e.clientY, top:guideNarrative.scrollTop, button:e.target.closest('button'), moved:false, id:e.pointerId };
-  try { guidePanel.setPointerCapture(e.pointerId); } catch (_) {}
-});
-guidePanel.addEventListener('pointermove', function(e){
-  e.stopPropagation(); if (!guidePointer) return;
-  var delta = (e.clientY - guidePointer.y) / (fitS || 1);
-  if (Math.abs(delta) > 7) guidePointer.moved = true;
-  if (guidePointer.moved) guideNarrative.scrollTop = guidePointer.top - delta;
-});
-guidePanel.addEventListener('pointerup', function(e){
-  e.stopPropagation();
-  if (PTR.id === e.pointerId && GUIDE_INPUT_CHECKIN) { PTR.id = null; var point = toStage(e.clientX,e.clientY); inUp(point[0],point[1]); return; }
-  var p = guidePointer; guidePointer = null;
-  if (p && !p.moved && p.button && !p.button.disabled && p.button._guideAction) p.button._guideAction();
-});
-guidePanel.addEventListener('pointercancel', function(){ guidePointer = null; });
-guidePanel.addEventListener('click', function(e){
-  e.stopPropagation(); if (e.detail !== 0) return;
-  var b = e.target.closest('button'); if (b && !b.disabled && b._guideAction) b._guideAction();
-});
-function guideAsk(question, retry){
-  if (GUIDE_BUSY) return;
-  if (retry) GUIDE_RETRIES++; else GUIDE_RETRIES = 0;
-  CHECKIN = null;
-  go('SENDING', { params:{question:question,companion:true}, question:question, origin:'person', cx:195,cy:660 });
+quietAction(guideDisclosure,function(){ if(!GUIDE)return;var oldTop=guidePanel.getBoundingClientRect().top; GUIDE.reading=true; guideRender();if(guidePanel.animate){var dy=(oldTop-guidePanel.getBoundingClientRect().top)/(fitS||1);guidePanel.animate(RM?[{opacity:0},{opacity:1}]:[{transform:'translateY('+dy+'px)'},{transform:'translateY(0)'}],{duration:RM?200:600,easing:'cubic-bezier(.2,.75,.25,1)'});}conversationBorn(guideBody,'sphere',25); });
+function guideWords(){return SES&&SES.companionPilot&&SES.companionPilot.strings||{};}
+function guideButton(host,text,action,id,primary){var b=mk('button',primary?'quiet-primary':'quiet-chip',text);b.type='button';b.id=id;quietAction(b,action);if(!primary){b.textContent='';b.appendChild(mk('span','conversation-chip-label',text));}host.appendChild(b);return b;}
+function guideAsk(question,retry){
+ if(GUIDE_BUSY)return;
+ var after=GUIDE&&GUIDE.requestId, params=retry&&after?{retry:after}:retry&&READ?Object.assign({},READ.params):{question:question,companion:true};if(!retry&&after)params.after=after;
+ go('SENDING',{params:params,question:question,origin:'person'});
 }
+function guideFailureLine(){var code=GUIDE.code||'unavailable';return code==='limit'?GUIDE.limitLine||GUIDE.message:tt({'offline':'fail.offline','explain_off':'fail.cantExplain','paused':'fail.paused'}[code]||'fail.answer');}
+var conversationCurves={soft:'cubic-bezier(.2,.75,.25,1)',emit:'cubic-bezier(.16,1,.3,1)',inhale:'cubic-bezier(.55,0,.7,.35)'};
+function conversationBorn(node,origin,lineHeight){
+ if(!node||!node.animate)return;
+ if(RM){node.animate([{opacity:0},{opacity:1}],{duration:200});return;}
+ var displacement=origin==='pill'?Math.max(14,742-(parseFloat(node.style.top)||640)):14;
+ node.animate([{opacity:0,transform:'translateY('+(origin==='pill'?displacement:-14)+'px)',filter:'blur(6px)'},{opacity:1,transform:'translateY(0)',filter:'blur(0)'}],{duration:origin==='pill'?480:240,easing:conversationCurves[origin==='pill'?'emit':'soft'],fill:'backwards'});
+ if(lineHeight){var lines=Math.max(1,Math.ceil((node.offsetHeight||lineHeight)/lineHeight));node.animate([{clipPath:'inset(0 0 100% 0)'},{clipPath:'inset(0 0 0 0)'}],{duration:Math.min(600,lines*45),easing:'steps('+lines+',end)',fill:'backwards'});}
+}
+function conversationRetire(node,origin){
+ if(!node||!node.animate||!node.cloneNode||node.style.display==='none')return;
+ var ghost=node.cloneNode(true);ghost.removeAttribute('id');ghost.setAttribute('aria-hidden','true');ghost.style.pointerEvents='none';ghost.classList.add('conversation-retiring');
+ if(ghost.querySelectorAll)Array.prototype.forEach.call(ghost.querySelectorAll('[id]'),function(e){e.removeAttribute('id');});
+ node.parentNode.appendChild(ghost);var dy=origin==='pill'?Math.max(14,742-(parseFloat(node.style.top)||640)):-14;
+ var animation=ghost.animate(RM?[{opacity:1},{opacity:0}]:[{opacity:1,transform:'translateY(0)',filter:'blur(0)'},{opacity:0,transform:'translateY('+dy+'px)',filter:'blur(6px)'}],{duration:RM?200:240,easing:conversationCurves.inhale,fill:'forwards'});
+ animation.onfinish=function(){ghost.remove();};
+}
+function conversationClearReturns(){if(D.querySelectorAll)Array.prototype.forEach.call(D.querySelectorAll('.conversation-retiring'),function(e){e.remove();});}
 function guideRender(){
-  if (!GUIDE) return;
-  var words = guideWords(), question = CHECKIN && CHECKIN.question;
-  guideReply.textContent = GUIDE_ANSWER_ERROR || GUIDE.text || GUIDE.message || '';
-  guideMark.textContent = !GUIDE_ANSWER_ERROR && GUIDE.personalized ? words.personalized || '' : '';
-  guideFact.textContent = '';
-  if (GUIDE.fact && typeof GUIDE.fact.text === 'string' && typeof GUIDE.fact.source === 'string' && typeof GUIDE.fact.year === 'string') {
-    guideFact.textContent = GUIDE.fact.text + '\n' + GUIDE.fact.source + ' · ' + GUIDE.fact.year;
+ if(!GUIDE)return;
+ var error=GUIDE.status==='companion_error', gist=GUIDE.gist, text=GUIDE.text||'';
+ var hasLead=typeof gist==='string'&&text.indexOf(gist)===0,oneSentence=hasLead&&gist===text;
+ GUIDE.reading=!!GUIDE.reading||(!error&&(!hasLead||!oneSentence&&GUIDE.voiceOff||(SES&&SES.textScale||1)>1.35));
+ guideReply.textContent=error?guideFailureLine():(hasLead?gist:GUIDE.reading?'':text);
+ guideBody.textContent=!error&&GUIDE.reading?(hasLead?text.slice(gist.length).trim():text):'';
+ guideFact.textContent=GUIDE.reading&&GUIDE.fact?GUIDE.fact.text+'\n'+GUIDE.fact.source+' · '+GUIDE.fact.year:'';
+ guideMark.textContent=GUIDE.reading&&GUIDE.personalized?guideWords().personalized||'':'';guideMark.classList.toggle('conversation-noted',!!GUIDE.personalized);
+ guideDisclosure.textContent=tt('answer.readAll')+' ⌄';guideDisclosure.setAttribute('aria-label',tt('answer.readAll'));  guideDisclosure.style.display=!error&&!GUIDE.reading&&hasLead&&gist!==text?'block':'none';
+ guidePanel.style.display='block';guideActions.textContent='';guideActions.style.display='block';
+ if(error){if(GUIDE.retryable)guideButton(guideActions,tt('fail.retry'),function(){guideAsk(READ&&READ.question,true);},'companion-retry',true);}
+ else if(GUIDE.slotReady&&!(GUIDE.followUp==null&&gist===text)){
+  var offer=GUIDE.readOffer;
+  if(offer&&(!SES||SES.oneTap!==false)){
+   var b=guideButton(guideActions,offer.label,function(){go('SENDING',{token:offer.token,question:READ.question,origin:'chip'});},'companion-read-offer',false);
+   var meta=mk('small','conversation-eyebrow',offer.levelLabel+' · '+offer.costLine); b.insertBefore(meta,b.firstChild);
+  }else if(typeof GUIDE.followUp==='string'){
+   var b=guideButton(guideActions,GUIDE.followUp,function(){guideAsk(GUIDE.followUp,false);},'companion-follow-up',false);b.setAttribute('aria-label',tt('aria.ask',{question:GUIDE.followUp}));
   }
-  guideFact.style.display = guideFact.textContent ? 'block' : 'none';
-  guideQuestion.textContent = question ? question.text : '';
-  guideActions.style.flexDirection = question ? 'row' : 'column';
-  guideOptions.textContent = ''; guideActions.textContent = '';
-  if (question){
-    (question.options || []).forEach(function(option){
-      guideButton(guideOptions, option.label, function(){ guideAnswer(question.id,option.id); }, 'companion-option-' + option.id, true);
-    });
-    var answer = guideButton(guideActions, words.answerThis || '', function(){ GUIDE_INPUT_CHECKIN = true; openTyping({fromRead:true}); }, 'companion-answer-input', false);
-    answer.setAttribute('data-hit', 'companion-answer'); answer.setAttribute('aria-description', words.answerHint || '');
-    guideButton(guideActions, words.skip || '', function(){ guideAnswer(question.id,null); }, 'companion-skip', false);
-  } else if (GUIDE.status === 'companion_error') {
-    if (GUIDE.retryable && GUIDE_RETRIES < 1) guideButton(guideActions, words.retry || '', function(){ guideAsk(READ.question,true); }, 'companion-retry', true);
-  } else if (GUIDE.followUp) {
-    guideButton(guideActions, GUIDE.followUp, function(){ guideAsk(GUIDE.followUp,false); }, 'companion-follow-up', true);
-  }
-  if (!question) guideButton(guideActions, words.close || '', function(){ CHECKIN = null; GUIDE_RETRIES = 0; go('RETURNING'); }, 'companion-close', false);
-  guidePanel.style.display = 'flex';
-  guideLayout();
+ }
+ guideLayout();if(!GUIDE.phraseBorn){GUIDE.phraseBorn=true;conversationBorn(guidePanel,'sphere',GUIDE.reading?27:32);}if(GUIDE.slotReady&&!GUIDE.slotBorn&&guideActions.children.length){GUIDE.slotBorn=true;el.live.textContent=guideActions.textContent;conversationBorn(guideActions,'pill');}var eyebrow=guideActions.querySelector('.conversation-eyebrow');if(eyebrow&&GUIDE.readOffer&&eyebrow.scrollWidth>eyebrow.clientWidth)eyebrow.textContent=GUIDE.readOffer.levelLabel+' · '+GUIDE.readOffer.costShort;guideFade();
 }
-/* Reserve the microphone's whole strip. Actions never scroll with a long reply.
-   Five-option check-ins borrow space from the sphere, with physical 44pt tap targets. */
 function guideLayout(){
-  if (!GUIDE || guidePanel.style.display === 'none') return;
-  var scale = Math.max(0.5, fitS || 1), type = SES && SES.companionPilot && SES.companionPilot.textScale || 1;
-  var font = type / scale;
-  guideReply.style.fontSize = (17 * font) + 'px';
-  guideQuestion.style.fontSize = (17 * font) + 'px';
-  guideMark.style.fontSize = (11 * font) + 'px';
-  guideFact.style.fontSize = (13 * font) + 'px';
-  Array.prototype.forEach.call(guidePanel.querySelectorAll('button'), function(b){
-    b.style.fontSize = (14 * font) + 'px'; b.style.minHeight = (44 / scale) + 'px';
-  });
-  var question = CHECKIN && CHECKIN.question;
-  guideQuestion.style.display = question ? 'block' : 'none';
-  guideOptions.style.display = question ? 'flex' : 'none';
-  var fixed = guideActions.offsetHeight + (question ? guideQuestion.offsetHeight + guideOptions.offsetHeight + 20 : 10);
-  var narrative = Math.min(guideNarrative.scrollHeight, (question ? 64 : 250) / scale);
-  var top = Math.max(148, Math.min(464, 726 - fixed - narrative - 10));
-  guidePanel.style.top = top + 'px';
-  if (ST.name === 'COMPANION') {
-    var radius = Math.max(28, Math.min(110, (top - 142) / 2));
-    moveSphere(top - radius - 24, radius);
+ if(!GUIDE||guidePanel.style.display==='none')return;
+ var scale=Math.max(.5,fitS||1),k=(SES&&SES.textScale||1)/scale, target=44/scale, slot=Math.max(target,(GUIDE.readOffer?86:68)*k),error=GUIDE.status==='companion_error';
+ [guidePanel,guideActions].forEach(function(e){e.style.setProperty('--target',target+'px');e.style.setProperty('--type',k);});
+ guideActions.style.top=(700-slot)+'px';guideActions.style.minHeight=slot+'px';
+ guideReply.style.fontSize=((GUIDE.reading||error)?22:26)*k+'px';guideReply.style.lineHeight=((GUIDE.reading||error)?27:32)*k+'px';
+ guideBody.style.fontSize=guideFact.style.fontSize=17*k+'px';guideBody.style.lineHeight=guideFact.style.lineHeight=25*k+'px';
+ guideDisclosure.style.fontSize=15*k+'px';guideDisclosure.style.minHeight=target+'px';
+ guideNarrative.classList.toggle('conversation-reading',!!GUIDE.reading);guideNarrative.setAttribute('role','region');guideNarrative.setAttribute('aria-label',tt('aria.answer'));
+ guideReply.style.textAlign=GUIDE.reading?'left':'center';guideReply.style.display=guideReply.textContent?'block':'none';
+ if(GUIDE.reading){guidePanel.style.top='240px';guideNarrative.style.height=(Math.floor((700-slot-16-240)/(25*k))*25*k)+'px';moveSphere(160,48);}
+ else{
+  guideNarrative.style.height='auto';
+  if(guideReply.offsetHeight>96*k&&!error){guideReply.style.fontSize=22*k+'px';guideReply.style.lineHeight=27*k+'px';}
+  var p=guideReply.offsetHeight,d=guideDisclosure.style.display==='none'?0:target,r=clamp((602-12-32-p-4-d-16-slot)/2,44,98);
+  var spare=602-(12+2*r+32+p+4+d+16+slot),top=110+.4*Math.max(0,spare);
+  if(!error&&spare<0){GUIDE.reading=true;guideRender();return;}
+  moveSphere(top+r,r);guidePanel.style.top=(top+2*r+32)+'px';
+ }
+}
+function companionCheckIn(){CHECKIN=null;if(ST.name==='HANDBACK')readChips();} // I-2 owns personal invitations.
+function guideResumeOptions(){return false;}
+function guideAnswer(){} // Profile memory is native; nothing about the person is drawn in I-1.
+function guideStopVoice(){bcall('stopSpeaking').catch(noop);VOICE.ended=true;VOICE.id=null;K.on=false;if(GUIDE)GUIDE.voiceDone=true;pillMode(idleMode());}
+STATES.COMPANION={
+ enter:function(prev,data){
+  GUIDE=data.reply||GUIDE;if(!GUIDE)return;CHECKIN=null;dissolveThink();glassHome();chipsHide();greetOut();meriOut();hint('');chromeUp();dockIn();
+  pillMode(idleMode());att(el.close,'aria-label',tt('aria.closeAnswer'));att(el.sphereA,'aria-label',tt('aria.answer'));
+  if(!GUIDE.settledAt)GUIDE.settledAt=clk;
+  guideRender();
+  if(GUIDE.status==='companion'&&GUIDE.requestId&&GUIDE.text&&!GUIDE.spoken){
+   GUIDE.spoken=true;VOICE.id=GUIDE.requestId;VOICE.started=false;VOICE.ended=false;VOICE.reqT=clk;
+   bcall('speak',{id:GUIDE.requestId,text:GUIDE.text,spoken:!!GUIDE.questionSpoken}).then(function(r){
+    if(GUIDE&&r&&r.status!=='queued'){GUIDE.voiceOff=true;GUIDE.voiceDone=true;VOICE.ended=true;guideRender();}
+   },function(){if(GUIDE){GUIDE.voiceOff=true;GUIDE.voiceDone=true;VOICE.ended=true;hint(tt('cap.voiceUnavailable'));guideRender();}});
   }
-}
-function guideAnswer(id,value,text){
-  if (GUIDE_BUSY) return; GUIDE_BUSY = true; var epoch = GUIDE_EPOCH;
-  Array.prototype.forEach.call(guidePanel.querySelectorAll('button'), function(b){ b.disabled = true; });
-  var params = {questionId:id}; if (text != null) params.text = text; else if (value != null) params.value = value;
-  bcall('companion.answer',params).then(function(result){
-    GUIDE_BUSY = false; if (epoch !== GUIDE_EPOCH) return;
-    if (result && result.status === 'cancelled') return;
-    if (result && !result.message) { CHECKIN = result; GUIDE_ANSWER_ERROR = ''; }
-    else GUIDE_ANSWER_ERROR = result && result.message || guideWords().answerFailed || '';
-    if (result && result.explanation) { guideAsk(result.explanation, false); return; }
-    if ((!CHECKIN || !CHECKIN.question) && ST.name !== 'COMPANION') {
-      guidePanel.style.display = 'none';
-      if (ST.name === 'HANDBACK') readChips(); else if (ST.name === 'FOLLOWUPS') chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow());
-      return;
-    }
-    if (GUIDE) GUIDE.companionCheckIn = CHECKIN;
-    guideRender();
-    guideNarrative.scrollTop = 0;
-  },function(){ GUIDE_BUSY = false; if (epoch === GUIDE_EPOCH) { GUIDE_ANSWER_ERROR = guideWords().answerFailed || ''; guideRender(); } });
-}
-function companionCheckIn(payload){
-  if (!payload || !payload.question) { CHECKIN = null; if (ST.name === 'COMPANION') guideRender(); return; }
-  CHECKIN = payload; GUIDE_ANSWER_ERROR = '';
-  if (ST.name === 'COMPANION') { guideRender(); return; }
-  /* A market reply keeps its own cards. The check-in lives beside it and leaves when that reply leaves. */
-  if (['HANDBACK','FOLLOWUPS'].indexOf(ST.name) >= 0){
-    chipsHide(); GUIDE = { status:'companion', text:'' }; guideRender();
-  }
-}
-STATES.COMPANION = {
-  enter:function(prev,data){
-    if (prev !== 'TYPING' && prev !== 'LISTENING') GUIDE_ANSWER_ERROR = '';
-    GUIDE = data.reply || GUIDE; CHECKIN = data.reply ? (GUIDE.companionCheckIn || null) : CHECKIN;
-    dissolveThink(); glassHome(); moveSphere(320,110); hint(''); pillMode(idleMode()); att(el.sphereA,'aria-label',tt('aria.speaking'));
-    guideRender(); guideNarrative.scrollTop = 0; if (GUIDE.companionConsentPending) bcall('companion.presented').catch(noop);
-    if (GUIDE.status === 'companion' && GUIDE.requestId && GUIDE.text && !GUIDE.spoken){
-      GUIDE.spoken = true; VOICE.id = GUIDE.requestId; VOICE.started = false; VOICE.ended = false; VOICE.reqT = clk;
-      kInit(GUIDE.text);
-      bcall('speak',{id:GUIDE.requestId,text:GUIDE.text}).then(function(reply){
-        if (reply && reply.status !== 'queued') { VOICE.ended = true; if (ST.name === 'COMPANION') pillMode(idleMode()); }
-      }).catch(function(){ VOICE.ended = true; });
-    }
-  },
-  exit:function(){ GUIDE_EPOCH++; guidePanel.style.display = 'none'; if (VOICE.id && !VOICE.ended) bcall('stopSpeaking').catch(noop); VOICE.id=null; K.on=false; },
-  tick:noop,
-  on:function(name){ if (name === 'voice.start') pillMode('stop'); else if (name === 'voice.end') pillMode(idleMode()); },
-  down:function(hit,p){ if (hit === 'pill'){ if (VOICE.started && !VOICE.ended) return tapG(function(){ bcall('stopSpeaking').catch(noop); VOICE.ended=true; pillMode(idleMode()); }); GUIDE_INPUT_CHECKIN=false; return pillDown(p,true); } if (hit === 'close') return tapG(function(){ CHECKIN=null;go('RETURNING'); }); return null; }
+ },
+ exit:function(next){conversationRetire(guidePanel,'sphere');conversationRetire(guideActions,'pill');GUIDE_EPOCH++;guidePanel.style.display=guideActions.style.display='none';if(VOICE.id&&!VOICE.ended)guideStopVoice();if(['LISTENING','TYPING','PRE_PERMISSION'].indexOf(next)<0&&next!=='COMPANION')GUIDE=null;},
+ tick:function(){if(!GUIDE||GUIDE.status!=='companion')return;var ready=GUIDE.questionSpoken&&!GUIDE.voiceOff?GUIDE.voiceDone:clk-GUIDE.settledAt>=1.5;if(ready&&!GUIDE.slotReady){GUIDE.slotReady=true;guideRender();}if(!VOICE.started&&!VOICE.ended&&clk-VOICE.reqT>VOICE_WAIT){guideStopVoice();GUIDE.voiceOff=true;hint(tt('cap.voiceUnavailable'));guideRender();}},
+ on:function(name,p){if(name==='voice.start'){pillMode('stop');att(el.sphereA,'aria-label',tt('aria.speaking'));}else if(name==='voice.end'){if(GUIDE)GUIDE.voiceDone=true;pillMode(idleMode());if(p&&p.reason==='failed'){GUIDE.voiceOff=true;hint(tt('cap.voiceUnavailable'));guideRender();}}else if(name==='app.state'&&p.state==='background')conversationReset();},
+ down:function(hit,p){if(hit==='pill')return pillDown(p,true);if(hit==='avatar')return tapG(function(){guideStopVoice();openNative('account');});if(hit==='close')return tapG(function(){var draft=GUIDE.status==='companion_error'&&READ?READ.question:'',spoken=!!GUIDE.questionSpoken,retry=draft?{retry:GUIDE.requestId}:null;GUIDE=null;READ=null;if(draft)holdDraft(draft,'',spoken,retry);else go('RETURNING');});return null;}
 };
-
-function guideResumeOptions(text){
-  if (!GUIDE_INPUT_CHECKIN || !GUIDE || !CHECKIN || !CHECKIN.question) return false;
-  GUIDE_INPUT_CHECKIN = false;
-  var id = CHECKIN.question.id;
-  GUIDE.companionCheckIn = CHECKIN;
-  go('COMPANION',{reply:GUIDE}); guideNarrative.scrollTop = 0;
-  if (text) guideAnswer(id, null, text);
-  return true;
-}
+function guideFade(){var more=guideNarrative.scrollTop+guideNarrative.clientHeight<guideNarrative.scrollHeight-1;guideNarrative.style.setProperty('--fade-top',guideNarrative.scrollTop>0?'20px':'0px');guideNarrative.style.setProperty('--fade-bottom',more?'28px':'0px');}
+var guideDrag=null;
+guideNarrative.addEventListener('pointerdown',function(e){if(!GUIDE||!GUIDE.reading)return;e.stopPropagation();guideDrag={y:e.clientY,top:guideNarrative.scrollTop};try{guideNarrative.setPointerCapture(e.pointerId);}catch(_){}});
+guideNarrative.addEventListener('pointermove',function(e){if(!guideDrag)return;e.stopPropagation();var line=25*(SES&&SES.textScale||1)/Math.max(.5,fitS||1);guideNarrative.scrollTop=Math.max(0,Math.round((guideDrag.top+(guideDrag.y-e.clientY)/(fitS||1))/line)*line);guideFade();});
+guideNarrative.addEventListener('pointerup',function(e){if(guideDrag)e.stopPropagation();guideDrag=null;guideFade();});
+guideNarrative.addEventListener('pointercancel',function(){guideDrag=null;});
+guideNarrative.addEventListener('scroll',guideFade);

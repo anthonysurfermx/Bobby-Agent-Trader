@@ -278,6 +278,48 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #speakingRefine{position:absolute;top:790px;left:12px;width:366px;display:none;justify-content:center;gap:6px;z-index:30}
 #speakingRefine.on{display:flex} #speakingRefine button{background:#0B0A09;border:1px solid #F2EDE426;border-radius:20px;color:#F2EDE4;font:400 12px var(--sans);padding:12px 8px;min-height:44px}
 
+/* Quiet control roles, SPEC 9. One source injected in both iPhone pages. */
+.conversation{position:absolute;left:20px;width:350px;z-index:18;color:#F2EDE4;--target:44px;--type:1;pointer-events:auto}
+.conversation button,.quiet-glyph{min-height:var(--target);min-width:var(--target);color:#F2EDE4;font-family:var(--sans);touch-action:manipulation}
+.quiet-primary{background:#F2EDE4;color:#141210!important;border:0;border-radius:999px;width:100%;padding:15px 24px;font-weight:600}
+.quiet-secondary{background:rgba(242,237,228,.06);border:1px solid rgba(242,237,228,.30);border-radius:999px}
+.quiet-chip{background:rgba(242,237,228,.04);border:1px solid rgba(242,237,228,.14);border-radius:28px;text-align:left;width:100%;padding:14px 18px;font-weight:500;white-space:normal}
+.quiet-link,.quiet-level{border:0;background:transparent;padding:8px;color:#A39C91!important}
+.quiet-glyph{position:absolute;z-index:21;left:83px;top:748px;width:44px;height:44px;display:grid;place-items:center;background:rgba(242,237,228,.04);border:1px solid rgba(242,237,228,.14);border-radius:50%;color:#A39C91}
+.conversation-phrase{font-family:var(--serif);font-weight:300;letter-spacing:-.035em;text-align:center;text-wrap:balance;margin:0;white-space:pre-wrap;color:#FFF8EC}
+.conversation-body{font-family:var(--sans);white-space:pre-wrap;margin:14px 0 0;color:#F2EDE4}
+.conversation-reading{overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-mask-image:linear-gradient(to bottom,transparent,#000 var(--fade-top,0px),#000 calc(100% - var(--fade-bottom,0px)),transparent)}
+.conversation-slot{position:absolute;left:20px;width:350px;z-index:19;pointer-events:auto}
+.conversation-slot button{min-height:var(--target);min-width:var(--target);font:500 calc(15px * var(--type))/1.333 var(--sans);color:#F2EDE4}
+.conversation-meta{font:400 calc(13px * var(--type))/1.385 var(--sans);color:#A39C91;margin:10px 0 0}
+.conversation-tail{color:#A39C91}
+#pill .send-icon{position:absolute;inset:0;display:none;place-items:center;color:#F2EDE4}
+#pill.conversation-send .send-icon{display:grid}
+#pill.conversation-send .mic,#pill.conversation-send .stop,#pill.conversation-send .bars,#pill.conversation-send .kbd{visibility:hidden!important;opacity:0!important}
+
+.conversation-status{font-family:var(--serif);font-weight:300;text-align:center;margin:0;color:#F2EDE4}
+.conversation-top-fade{-webkit-mask-image:linear-gradient(to bottom,transparent,#000 20px)}
+#conversation-field-mic{position:absolute;left:auto;top:auto;right:50px;bottom:5px;background:transparent;border:0}
+#typeBox:has(#conversation-field-mic[style*="block"]) #ta{padding-right:105px}
+
+.conversation-eyebrow{display:block;font:500 calc(11px * var(--type))/1.273 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:#A39C91;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.conversation-slot .quiet-chip{max-height:calc(110px * var(--type));overflow:hidden}
+
+.conversation-noted::before{content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:#B9ADEB;margin:0 7px 2px 0}
+
+.conversation-slot .quiet-primary{font:600 calc(16px * var(--type))/1.25 var(--sans)}
+.conversation button:disabled,.quiet-glyph:disabled{opacity:.45}
+.conversation button:focus-visible,.quiet-glyph:focus-visible{outline:2px solid #F2EDE4;outline-offset:3px}
+.conversation button:active,.quiet-glyph:active{filter:brightness(1.15)}
+
+#taSend{width:44px;height:44px;right:4px;bottom:3px}
+
+.conversation-chip-label{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.conversation-eyebrow{margin-bottom:calc(4px * var(--type))}
+
+#companion-read-all{margin:4px auto 0}
+.quiet-level{color:#F2EDE4!important}
+
 </style>
 </head>
 <body data-page="app">
@@ -541,7 +583,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   'use strict';
   var V = 1;
   var METHODS = [
-    'companion.presented', 'companion.answer', 'speaking.choose', 'session', 'roster', 'suggestions', 'ask', 'cancel', 'read.rendered',
+    'companion.presented', 'companion.answer', 'speaking.choose', 'session', 'roster', 'suggestions', 'ask', 'confirm.refresh', 'cancel', 'read.rendered',
     'speech.permission', 'speech.requestPermission', 'speech.start', 'speech.stop',
     'speak', 'previewVoice', 'stopSpeaking', 'setMuted', 'haptic',
     'saveThesis', 'island', 'theses', 'record',
@@ -1854,6 +1896,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 
 </script>
 <script>
+var TALK_MODE="tap"; var FIRST_RUN_HANDOVER=true; var READ_CONFIRM=true;
 /* ---- app/10-core.js ---- */
 (function(){
 'use strict';
@@ -2611,6 +2654,44 @@ function buildIslaRing(n){
    ===================================================================== */
 var STR = /*STRINGS-BEGIN*/{
   en: {
+    "risk.notNow": "Not now",
+    "risk.kept": "Nothing was sent. Your question is still here.",
+    "risk.later": "Bobby answers after you accept the notice.",
+    "risk.holdHint": "Press and hold to agree",
+    "ex.1": "What is investing?",
+    "ex.2": "What is a stock?",
+    "ex.3": "What is inflation?",
+    "ex.4": "What is an index fund?",
+    "ex.5": "What does risk mean?",
+    "ex.6": "Why do prices move?",
+    "cap.listening": "I’m listening · tap to send",
+    "cap.cancel": "Tap to cancel",
+    "cap.costCancel": "{cost} · tap to cancel",
+    "cap.stillWorking": "Still working · tap to cancel",
+    "cap.stopVoice": "Tap to stop the voice",
+    "cap.tapToTalk": "Tap to talk",
+    "cap.holdToTalk": "Hold to talk",
+    "cap.empty": "I didn’t catch that · tap and try again",
+    "cap.minute": "That was one minute. Your question is still here.",
+    "cap.stopped": "I stopped listening. Your question is still here.",
+    "cap.voiceUnavailable": "Voice unavailable · here is the text",
+    "status.preparing": "Preparing your answer…",
+    "answer.readAll": "Read it all",
+    "fail.answer": "I couldn’t answer. Your question is still here.",
+    "fail.retry": "Try again",
+    "fail.cantExplain": "I can’t explain right now. Your question is still here.",
+    "fail.offline": "No connection. Your question is still here.",
+    "fail.paused": "I’m pausing explanations for a while. Your question is still here.",
+    "aria.talk": "Talk",
+    "aria.type": "Type",
+    "aria.sendSpoken": "Send what I said",
+    "aria.discardSpoken": "Discard what I said",
+    "aria.cancelQuestion": "Cancel the question",
+    "aria.closeAnswer": "Close the answer",
+    "aria.preparing": "Bobby is preparing your answer",
+    "aria.ask": "Ask: {question}",
+    "aria.answer": "Bobby’s answer",
+
     "read.new": 'Another question',
     "read.skipVoice": "Skip voice",
     "read.result": "Read analysis",
@@ -2623,7 +2704,7 @@ var STR = /*STRINGS-BEGIN*/{
     "read.savedLocal": "Saved on this phone.",
 
     'greet.morning': 'Good morning.', 'greet.afternoon': 'Good afternoon.', 'greet.evening': 'Good evening.',
-    'greet.sub.day': 'What are you weighing today?', 'greet.sub.night': 'What are you weighing tonight?',
+    "greet.sub.day": "What do you want to understand today?", "greet.sub.night": "What do you want to understand tonight?",
     'greet.saved': '{symbol} is saved.',
     'hint.idleType': 'Tap to type', 'hint.hold': 'Hold to ask',
     'hint.release': 'Release to send', 'hint.debating': 'Three agents debating', 'hint.debatingS': 'Three agents debating · {s} s',
@@ -2631,8 +2712,8 @@ var STR = /*STRINGS-BEGIN*/{
     'hint.pull': 'Pull down for the full read ⌄', 'hint.swipe': 'Swipe the sphere',
     'hint.empty': 'I didn’t catch that · hold and try again', 'hint.micStopped': 'The mic stopped · hold to try again',
     'hint.micOff': 'Voice input isn’t available right now · tap to type',
-    'perm.title': 'I only listen while you hold.', 'perm.body': 'iOS will ask for the microphone and speech recognition once.', 'perm.cta': 'Continue',
-    'type.placeholder': 'Ask about a stock or a crypto…', 'type.send': 'Send question',
+    "perm.title": "I listen only after you tap, until you send.", 'perm.body': 'iOS will ask for the microphone and speech recognition once.', 'perm.cta': 'Continue',
+    "type.placeholder": "Ask anything…", 'type.send': 'Send question',
     'think.forming': 'Verdict forming',
     'chips.eyebrow': 'You might want to ask',
     'face.desk': 'Desk', 'face.isla': 'Island', 'face.squad': 'Squad', "face.theses": "Saved reads",
@@ -2652,6 +2733,44 @@ var STR = /*STRINGS-BEGIN*/{
     'aria.account': '{name}. Account and progress', 'aria.accountPlain': 'Account and progress'
   },
   es: {
+    "risk.notNow": "Ahora no",
+    "risk.kept": "No se envió nada. Tu pregunta sigue aquí.",
+    "risk.later": "Bobby responde cuando aceptes el aviso.",
+    "risk.holdHint": "Mantén presionado para aceptar",
+    "ex.1": "¿Qué es invertir?",
+    "ex.2": "¿Qué es una acción?",
+    "ex.3": "¿Qué es la inflación?",
+    "ex.4": "¿Qué es un fondo indexado?",
+    "ex.5": "¿Qué significa riesgo?",
+    "ex.6": "¿Por qué se mueven los precios?",
+    "cap.listening": "Te escucho · toca para enviar",
+    "cap.cancel": "Toca para cancelar",
+    "cap.costCancel": "{cost} · toca para cancelar",
+    "cap.stillWorking": "Sigo en ello · toca para cancelar",
+    "cap.stopVoice": "Toca para detener la voz",
+    "cap.tapToTalk": "Toca para hablar",
+    "cap.holdToTalk": "Mantén para hablar",
+    "cap.empty": "No te escuché · toca y vuelve a intentar",
+    "cap.minute": "Ya pasó un minuto. Tu pregunta sigue aquí.",
+    "cap.stopped": "Dejé de escuchar. Tu pregunta sigue aquí.",
+    "cap.voiceUnavailable": "Voz no disponible · aquí está el texto",
+    "status.preparing": "Preparando tu respuesta…",
+    "answer.readAll": "Leer completa",
+    "fail.answer": "No pude responder. Tu pregunta sigue aquí.",
+    "fail.retry": "Reintentar",
+    "fail.cantExplain": "Ahora no puedo explicar. Tu pregunta sigue aquí.",
+    "fail.offline": "Sin conexión. Tu pregunta sigue aquí.",
+    "fail.paused": "Estoy pausando las explicaciones un rato. Tu pregunta sigue aquí.",
+    "aria.talk": "Hablar",
+    "aria.type": "Escribir",
+    "aria.sendSpoken": "Enviar lo que dije",
+    "aria.discardSpoken": "Descartar lo que dije",
+    "aria.cancelQuestion": "Cancelar la pregunta",
+    "aria.closeAnswer": "Cerrar la respuesta",
+    "aria.preparing": "Bobby está preparando tu respuesta",
+    "aria.ask": "Preguntar: {question}",
+    "aria.answer": "Respuesta de Bobby",
+
     "read.skipVoice": "Saltar voz",
     "read.result": "Ver análisis",
     "read.new": "Otra pregunta",
@@ -2664,7 +2783,7 @@ var STR = /*STRINGS-BEGIN*/{
     "read.savedLocal": "Guardada en este teléfono.",
 
     'greet.morning': 'Buenos días.', 'greet.afternoon': 'Buenas tardes.', 'greet.evening': 'Buenas noches.',
-    'greet.sub.day': '¿Qué estás evaluando hoy?', 'greet.sub.night': '¿Qué estás evaluando esta noche?',
+    "greet.sub.day": "¿Qué quieres entender hoy?", "greet.sub.night": "¿Qué quieres entender esta noche?",
     'greet.saved': '{symbol} quedó guardada.',
     'hint.idleType': 'Toca para escribir', 'hint.hold': 'Mantén para preguntar',
     'hint.release': 'Suelta para enviar', 'hint.debating': 'Tres agentes debatiendo', 'hint.debatingS': 'Tres agentes debatiendo · {s} s',
@@ -2672,8 +2791,8 @@ var STR = /*STRINGS-BEGIN*/{
     'hint.pull': 'Desliza hacia abajo para verlo completo ⌄', 'hint.swipe': 'Desliza la esfera',
     'hint.empty': 'No te escuché · mantén y vuelve a intentar', 'hint.micStopped': 'El micrófono se detuvo · mantén para reintentar',
     'hint.micOff': 'La entrada de voz no está disponible ahora · toca para escribir',
-    'perm.title': 'Solo escucho mientras mantienes.', 'perm.body': 'iOS pedirá el micrófono y el reconocimiento de voz una vez.', 'perm.cta': 'Continuar',
-    'type.placeholder': 'Pregunta por una acción o cripto…', 'type.send': 'Enviar pregunta',
+    "perm.title": "Solo escucho desde que tocas hasta que envías.", 'perm.body': 'iOS pedirá el micrófono y el reconocimiento de voz una vez.', 'perm.cta': 'Continuar',
+    "type.placeholder": "Pregunta lo que quieras…", 'type.send': 'Enviar pregunta',
     'think.forming': 'Veredicto en formación',
     'chips.eyebrow': 'Quizá quieras preguntar',
     'face.desk': 'Escritorio', 'face.isla': 'Isla', 'face.squad': 'Escuadrón', "face.theses": "Tus lecturas",
@@ -2694,6 +2813,44 @@ var STR = /*STRINGS-BEGIN*/{
   }
 ,
   fr: {
+    "risk.notNow": "Pas maintenant",
+    "risk.kept": "Rien n’a été envoyé. Ta question est toujours là.",
+    "risk.later": "Bobby répond dès que tu acceptes l’avis.",
+    "risk.holdHint": "Maintiens appuyé pour accepter",
+    "ex.1": "C’est quoi, investir ?",
+    "ex.2": "C’est quoi, une action ?",
+    "ex.3": "C’est quoi, l’inflation ?",
+    "ex.4": "C’est quoi, un fonds indiciel ?",
+    "ex.5": "Que veut dire « risque » ?",
+    "ex.6": "Pourquoi les prix bougent ?",
+    "cap.listening": "Je t’écoute · touche pour envoyer",
+    "cap.cancel": "Touche pour annuler",
+    "cap.costCancel": "{cost} · touche pour annuler",
+    "cap.stillWorking": "J’y travaille encore · touche pour annuler",
+    "cap.stopVoice": "Touche pour arrêter la voix",
+    "cap.tapToTalk": "Touche pour parler",
+    "cap.holdToTalk": "Maintiens pour parler",
+    "cap.empty": "Je n’ai pas compris · touche et réessaie",
+    "cap.minute": "Une minute est passée. Ta question est toujours là.",
+    "cap.stopped": "J’ai arrêté d’écouter. Ta question est toujours là.",
+    "cap.voiceUnavailable": "Voix indisponible · voici le texte",
+    "status.preparing": "Je prépare ta réponse…",
+    "answer.readAll": "Tout lire",
+    "fail.answer": "Je n’ai pas pu répondre. Ta question est toujours là.",
+    "fail.retry": "Réessayer",
+    "fail.cantExplain": "Je ne peux pas expliquer pour l’instant. Ta question est toujours là.",
+    "fail.offline": "Pas de connexion. Ta question est toujours là.",
+    "fail.paused": "Je mets les explications en pause un moment. Ta question est toujours là.",
+    "aria.talk": "Parler",
+    "aria.type": "Écrire",
+    "aria.sendSpoken": "Envoyer ce que j’ai dit",
+    "aria.discardSpoken": "Effacer ce que j’ai dit",
+    "aria.cancelQuestion": "Annuler la question",
+    "aria.closeAnswer": "Fermer la réponse",
+    "aria.preparing": "Bobby prépare ta réponse",
+    "aria.ask": "Demander : {question}",
+    "aria.answer": "Réponse de Bobby",
+
     "read.new": 'Autre question',
     "read.skipVoice": "Passer la voix",
     "read.result": "Lire l’analyse",
@@ -2708,8 +2865,8 @@ var STR = /*STRINGS-BEGIN*/{
     "greet.morning": "Bonjour.",
     "greet.afternoon": "Bonjour.",
     "greet.evening": "Bonsoir.",
-    "greet.sub.day": "Que veux-tu évaluer aujourd’hui ?",
-    "greet.sub.night": "Que veux-tu évaluer ce soir ?",
+    "greet.sub.day": "Que veux-tu comprendre aujourd’hui ?",
+    "greet.sub.night": "Que veux-tu comprendre ce soir ?",
     "greet.saved": "{symbol} est enregistré.",
     "hint.idleType": "Touche pour écrire",
     "hint.hold": "Maintiens pour demander",
@@ -2723,10 +2880,10 @@ var STR = /*STRINGS-BEGIN*/{
     "hint.empty": "Je n’ai pas compris · maintiens et réessaie",
     "hint.micStopped": "Le micro s’est arrêté · maintiens pour réessayer",
     "hint.micOff": "Saisie vocale indisponible pour l’instant · touche pour écrire",
-    "perm.title": "J’écoute seulement pendant l’appui.",
+    "perm.title": "J’écoute seulement de ton appui jusqu’à l’envoi.",
     "perm.body": "iOS demandera une fois l’accès au micro et à la reconnaissance vocale.",
     "perm.cta": "Continuer",
-    "type.placeholder": "Une question sur une action ou une crypto…",
+    "type.placeholder": "Demande ce que tu veux…",
     "type.send": "Envoyer la question",
     "think.forming": "Conclusion en préparation",
     "chips.eyebrow": "Tu pourrais demander",
@@ -2775,6 +2932,44 @@ var STR = /*STRINGS-BEGIN*/{
     "aria.accountPlain": "Compte et progression"
   },
   pt: {
+    "risk.notNow": "Agora não",
+    "risk.kept": "Nada foi enviado. A tua pergunta continua aqui.",
+    "risk.later": "O Bobby responde quando aceitares o aviso.",
+    "risk.holdHint": "Mantém premido para aceitar",
+    "ex.1": "O que é investir?",
+    "ex.2": "O que é uma ação?",
+    "ex.3": "O que é a inflação?",
+    "ex.4": "O que é um fundo indexado?",
+    "ex.5": "O que significa risco?",
+    "ex.6": "Porque é que os preços se movem?",
+    "cap.listening": "Estou a ouvir · toca para enviar",
+    "cap.cancel": "Toca para cancelar",
+    "cap.costCancel": "{cost} · toca para cancelar",
+    "cap.stillWorking": "Ainda a preparar · toca para cancelar",
+    "cap.stopVoice": "Toca para parar a voz",
+    "cap.tapToTalk": "Toca para falar",
+    "cap.holdToTalk": "Mantém para falar",
+    "cap.empty": "Não percebi · toca e tenta novamente",
+    "cap.minute": "Passou um minuto. A tua pergunta continua aqui.",
+    "cap.stopped": "Deixei de ouvir. A tua pergunta continua aqui.",
+    "cap.voiceUnavailable": "Voz indisponível · aqui está o texto",
+    "status.preparing": "A preparar a tua resposta…",
+    "answer.readAll": "Ler tudo",
+    "fail.answer": "Não consegui responder. A tua pergunta continua aqui.",
+    "fail.retry": "Tentar novamente",
+    "fail.cantExplain": "Agora não consigo explicar. A tua pergunta continua aqui.",
+    "fail.offline": "Sem ligação. A tua pergunta continua aqui.",
+    "fail.paused": "Estou a pausar as explicações por um bocado. A tua pergunta continua aqui.",
+    "aria.talk": "Falar",
+    "aria.type": "Escrever",
+    "aria.sendSpoken": "Enviar o que eu disse",
+    "aria.discardSpoken": "Descartar o que eu disse",
+    "aria.cancelQuestion": "Cancelar a pergunta",
+    "aria.closeAnswer": "Fechar a resposta",
+    "aria.preparing": "O Bobby está a preparar a tua resposta",
+    "aria.ask": "Perguntar: {question}",
+    "aria.answer": "Resposta do Bobby",
+
     "read.new": 'Outra pergunta',
     "read.skipVoice": "Pular voz",
     "read.result": "Ver análise",
@@ -2789,8 +2984,8 @@ var STR = /*STRINGS-BEGIN*/{
     "greet.morning": "Bom dia.",
     "greet.afternoon": "Boa tarde.",
     "greet.evening": "Boa noite.",
-    "greet.sub.day": "O que queres avaliar hoje?",
-    "greet.sub.night": "O que queres avaliar esta noite?",
+    "greet.sub.day": "O que queres entender hoje?",
+    "greet.sub.night": "O que queres entender esta noite?",
     "greet.saved": "{symbol} foi guardado.",
     "hint.idleType": "Toca para escrever",
     "hint.hold": "Mantém para perguntar",
@@ -2804,10 +2999,10 @@ var STR = /*STRINGS-BEGIN*/{
     "hint.empty": "Não percebi · mantém e tenta novamente",
     "hint.micStopped": "O microfone parou · mantém para tentar novamente",
     "hint.micOff": "Entrada de voz indisponível de momento · toca para escrever",
-    "perm.title": "Só ouço enquanto manténs o botão.",
+    "perm.title": "Só ouço desde que tocas até enviares.",
     "perm.body": "O iOS pedirá uma vez acesso ao microfone e ao reconhecimento de voz.",
     "perm.cta": "Continuar",
-    "type.placeholder": "Pergunta sobre uma ação ou cripto…",
+    "type.placeholder": "Pergunta o que quiseres…",
     "type.send": "Enviar pergunta",
     "think.forming": "Conclusão em preparação",
     "chips.eyebrow": "Talvez queiras perguntar",
@@ -2857,6 +3052,44 @@ var STR = /*STRINGS-BEGIN*/{
   }
 ,
   it: {
+    "risk.notNow": "Non ora",
+    "risk.kept": "Non è stato inviato nulla. La tua domanda è ancora qui.",
+    "risk.later": "Bobby risponde quando accetti l’avviso.",
+    "risk.holdHint": "Continua a tenere premuto per accettare",
+    "ex.1": "Che cos’è investire?",
+    "ex.2": "Che cos’è un’azione?",
+    "ex.3": "Che cos’è l’inflazione?",
+    "ex.4": "Che cos’è un fondo indicizzato?",
+    "ex.5": "Cosa significa rischio?",
+    "ex.6": "Perché i prezzi si muovono?",
+    "cap.listening": "Ti ascolto · tocca per inviare",
+    "cap.cancel": "Tocca per annullare",
+    "cap.costCancel": "{cost} · tocca per annullare",
+    "cap.stillWorking": "Ci sto ancora lavorando · tocca per annullare",
+    "cap.stopVoice": "Tocca per fermare la voce",
+    "cap.tapToTalk": "Tocca per parlare",
+    "cap.holdToTalk": "Tieni premuto per parlare",
+    "cap.empty": "Non ho capito · tocca e riprova",
+    "cap.minute": "È passato un minuto. La tua domanda è ancora qui.",
+    "cap.stopped": "Ho smesso di ascoltare. La tua domanda è ancora qui.",
+    "cap.voiceUnavailable": "Voce non disponibile · ecco il testo",
+    "status.preparing": "Preparo la tua risposta…",
+    "answer.readAll": "Leggi tutto",
+    "fail.answer": "Non sono riuscito a rispondere. La tua domanda è ancora qui.",
+    "fail.retry": "Riprova",
+    "fail.cantExplain": "Ora non riesco a spiegare. La tua domanda è ancora qui.",
+    "fail.offline": "Nessuna connessione. La tua domanda è ancora qui.",
+    "fail.paused": "Metto in pausa le spiegazioni per un po’. La tua domanda è ancora qui.",
+    "aria.talk": "Parla",
+    "aria.type": "Scrivi",
+    "aria.sendSpoken": "Invia quello che ho detto",
+    "aria.discardSpoken": "Scarta quello che ho detto",
+    "aria.cancelQuestion": "Annulla la domanda",
+    "aria.closeAnswer": "Chiudi la risposta",
+    "aria.preparing": "Bobby sta preparando la tua risposta",
+    "aria.ask": "Chiedi: {question}",
+    "aria.answer": "Risposta di Bobby",
+
     "read.new": 'Un’altra domanda',
     "read.skipVoice": "Salta la voce",
     "read.result": "Leggi l’analisi",
@@ -2871,8 +3104,8 @@ var STR = /*STRINGS-BEGIN*/{
     "greet.morning": "Buongiorno.",
     "greet.afternoon": "Buon pomeriggio.",
     "greet.evening": "Buonasera.",
-    "greet.sub.day": "Cosa vuoi valutare oggi?",
-    "greet.sub.night": "Cosa vuoi valutare stasera?",
+    "greet.sub.day": "Cosa vuoi capire oggi?",
+    "greet.sub.night": "Cosa vuoi capire stasera?",
     "greet.saved": "{symbol} è stato salvato.",
     "hint.idleType": "Tocca per scrivere",
     "hint.hold": "Tieni premuto per chiedere",
@@ -2886,10 +3119,10 @@ var STR = /*STRINGS-BEGIN*/{
     "hint.empty": "Non ho capito · tieni premuto e riprova",
     "hint.micStopped": "Il microfono si è fermato · tieni premuto per riprovare",
     "hint.micOff": "Input vocale non disponibile al momento · tocca per scrivere",
-    "perm.title": "Ascolto solo mentre tieni premuto.",
+    "perm.title": "Ascolto solo da quando tocchi a quando invii.",
     "perm.body": "iOS chiederà una volta l’accesso al microfono e al riconoscimento vocale.",
     "perm.cta": "Continua",
-    "type.placeholder": "Chiedi di un’azione o una cripto…",
+    "type.placeholder": "Chiedi quello che vuoi…",
     "type.send": "Invia domanda",
     "think.forming": "Conclusione in preparazione",
     "chips.eyebrow": "Potresti chiedere",
@@ -2938,6 +3171,44 @@ var STR = /*STRINGS-BEGIN*/{
     "aria.accountPlain": "Account e progressi"
   },
   de: {
+    "risk.notNow": "Jetzt nicht",
+    "risk.kept": "Es wurde nichts gesendet. Deine Frage ist noch da.",
+    "risk.later": "Bobby antwortet, sobald du den Hinweis akzeptierst.",
+    "risk.holdHint": "Gedrückt halten zum Zustimmen",
+    "ex.1": "Was heißt investieren?",
+    "ex.2": "Was ist eine Aktie?",
+    "ex.3": "Was ist Inflation?",
+    "ex.4": "Was ist ein Indexfonds?",
+    "ex.5": "Was bedeutet Risiko?",
+    "ex.6": "Warum bewegen sich Preise?",
+    "cap.listening": "Ich höre zu · zum Senden tippen",
+    "cap.cancel": "Zum Abbrechen tippen",
+    "cap.costCancel": "{cost} · zum Abbrechen tippen",
+    "cap.stillWorking": "Ich bin noch dran · zum Abbrechen tippen",
+    "cap.stopVoice": "Zum Stoppen tippen",
+    "cap.tapToTalk": "Zum Sprechen tippen",
+    "cap.holdToTalk": "Zum Sprechen halten",
+    "cap.empty": "Nicht verstanden · tippen und erneut versuchen",
+    "cap.minute": "Das war eine Minute. Deine Frage ist noch da.",
+    "cap.stopped": "Ich höre nicht mehr zu. Deine Frage ist noch da.",
+    "cap.voiceUnavailable": "Stimme nicht verfügbar · hier ist der Text",
+    "status.preparing": "Ich bereite deine Antwort vor…",
+    "answer.readAll": "Alles lesen",
+    "fail.answer": "Ich konnte nicht antworten. Deine Frage ist noch da.",
+    "fail.retry": "Erneut versuchen",
+    "fail.cantExplain": "Ich kann gerade nichts erklären. Deine Frage ist noch da.",
+    "fail.offline": "Keine Verbindung. Deine Frage ist noch da.",
+    "fail.paused": "Ich pausiere die Erklärungen für eine Weile. Deine Frage ist noch da.",
+    "aria.talk": "Sprechen",
+    "aria.type": "Schreiben",
+    "aria.sendSpoken": "Senden, was ich gesagt habe",
+    "aria.discardSpoken": "Verwerfen, was ich gesagt habe",
+    "aria.cancelQuestion": "Frage abbrechen",
+    "aria.closeAnswer": "Antwort schließen",
+    "aria.preparing": "Bobby bereitet deine Antwort vor",
+    "aria.ask": "Fragen: {question}",
+    "aria.answer": "Bobbys Antwort",
+
     "read.new": 'Weitere Frage',
     "read.skipVoice": "Stimme überspringen",
     "read.result": "Analyse lesen",
@@ -2952,8 +3223,8 @@ var STR = /*STRINGS-BEGIN*/{
     "greet.morning": "Guten Morgen.",
     "greet.afternoon": "Guten Tag.",
     "greet.evening": "Guten Abend.",
-    "greet.sub.day": "Was möchtest du heute bewerten?",
-    "greet.sub.night": "Was möchtest du heute Abend bewerten?",
+    "greet.sub.day": "Was möchtest du heute verstehen?",
+    "greet.sub.night": "Was möchtest du heute Abend verstehen?",
     "greet.saved": "{symbol} wurde gespeichert.",
     "hint.idleType": "Zum Schreiben tippen",
     "hint.hold": "Zum Fragen halten",
@@ -2967,10 +3238,10 @@ var STR = /*STRINGS-BEGIN*/{
     "hint.empty": "Nicht verstanden · halten und erneut versuchen",
     "hint.micStopped": "Mikrofon gestoppt · zum Wiederholen halten",
     "hint.micOff": "Spracheingabe gerade nicht verfügbar · zum Schreiben tippen",
-    "perm.title": "Ich höre nur zu, solange du hältst.",
+    "perm.title": "Ich höre nur zu, vom Antippen bis zum Senden.",
     "perm.body": "iOS fragt einmal nach Mikrofon und Spracherkennung.",
     "perm.cta": "Weiter",
-    "type.placeholder": "Frage zu einer Aktie oder Kryptowährung…",
+    "type.placeholder": "Frag, was du möchtest…",
     "type.send": "Frage senden",
     "think.forming": "Fazit entsteht",
     "chips.eyebrow": "Du könntest fragen",
@@ -3217,6 +3488,7 @@ function startRead(params, question){
   var prev = READ, origin = ASK_ORIGIN || ((params.token || params.followUpOf) && prev && prev.origin) || 'person';
   var r = { id: ++READ_SEQ, params: params, question: question, stageId: null, accepted: false, asset: null, market: null, reply: null, model: null,
             requestId: null, askT: clk, save: null, cancelling: false, origin: origin };
+  r.questionSpoken=!!(params.spoken||params.token&&prev&&(prev.questionSpoken||prev.reply&&prev.reply.questionSpoken));
   READ = r;
   bcall('ask', params).then(function(res){ onAskReply(r, res); },
     function(err){ onAskReply(r, { v: 1, status: 'error', code: 'bad_response', message: null, fault: err && err.code }); });
@@ -3556,17 +3828,15 @@ function showIdleSuggestions(){
   if (ST.name !== 'IDLE') return;
   /* A starter chip reads as the company; its action keeps the exchange symbol the server resolves
      (src/lib/regional-stocks.ts). A symbol without an entry shows as itself. */
-  var CHIP_NAMES = { 'NVDA':'NVIDIA', 'MC.PA':'LVMH', 'OR.PA':'L’Oréal', 'EDP.LS':'EDP', 'GALP.LS':'Galp',
-    'PETR4.SA':'Petrobras', 'VALE3.SA':'Vale', 'ISP.MI':'Intesa Sanpaolo', 'ENEL.MI':'Enel', 'SAP.DE':'SAP', 'SIE.DE':'Siemens' };
   var list = [], seen = {};
   /* Bobby never invites someone into a wall: when native says the next read would be refused (`oneTap: false` in the
      session) the home offers no chip that asks by itself. The pill still takes their own question. */
   ((oneTapOff() ? [] : (SUGG && SUGG.quickAccess)) || []).forEach(function(item){
-    var sym = String(item && item.symbol || '').toUpperCase();
-    if (list.length >= 3 || seen[sym] || !/^[A-Z0-9.^=-]{1,20}$/.test(sym)) return;
+    var sym = String(item && item.symbol || '').toUpperCase(),name=String(item&&item.name||sym);
+    if (!name || list.length >= 3 || seen[sym] || !/^[A-Z0-9.^=-]{1,20}$/.test(sym)) return;
     seen[sym] = 1;
-    var question = RMOD.t(LANG, 'follow.how', { symbol:sym });
-    list.push({ label:CHIP_NAMES.hasOwnProperty(sym) ? CHIP_NAMES[sym] : sym, ariaLabel:question, action:{ question:question, symbol:sym, starter:true } });
+    var question = RMOD.t(LANG, 'follow.how', { symbol:name });
+    list.push({ label:name, ariaLabel:question, action:{ question:question, symbol:sym, starter:true } });
   });
   list = withNudge(list);
   if (list.length) chipsShow(list, nudgeEyebrow()); else chipsHide();
@@ -3959,7 +4229,7 @@ STATES.WAKE = {
     cue(0.55, function(){ meriIn(); });
     cue(0.70, function(){ A.pillY.to(0, 'soft'); A.pillO.tween(1, 0.3, E.fade); });
     cue(0.85, function(){ S.lean.to(4, BODY.gaze); S.lean.to(0, BODY.gaze, null, 0.26); });
-    cue(0.90, function(){ go(SES && SES.riskAccepted && SES.speaking && SES.speaking.offer ? 'SPEAKING_DIAL' : 'IDLE'); });
+    cue(0.90, function(){ go('IDLE'); });
   },
   down: function(h, p){ if (h === 'pill' || h === 'surface') return STATES.IDLE.down(h, p); return null; }
 };
@@ -4951,176 +5221,120 @@ var ARIA = { BOOT: 'aria.waking', WAKE: 'aria.waking', IDLE: 'aria.idle', PRE_PE
 function ariaState(){ var k = ARIA[ST.name]; if (k) att(el.sphereA, 'aria-label', tt(k)); }
 
 /* ---- app/65-companion.js ---- */
-/* Educational replies share the sphere, but never enter the verdict, save or market-read states. */
-var GUIDE = null, CHECKIN = null, GUIDE_RETRIES = 0, GUIDE_BUSY = false, GUIDE_INPUT_CHECKIN = false, GUIDE_EPOCH = 0, GUIDE_ANSWER_ERROR = '';
-var guidePanel = mk('section'), guideReply = mk('p'), guideMark = mk('small'), guideFact = mk('p'), guideQuestion = mk('p'), guideOptions = mk('div'), guideActions = mk('div');
-guidePanel.id = 'companionPanel'; guidePanel.setAttribute('aria-live', 'polite'); guidePanel.style.cssText = 'position:absolute;left:24px;top:360px;bottom:118px;width:342px;z-index:18;display:none;flex-direction:column;gap:10px;touch-action:none;pointer-events:auto;color:var(--ink);font:16px/1.5 var(--sans)';
-var guideNarrative = mk('div'); guideNarrative.style.cssText = 'min-height:0;overflow-y:auto;overscroll-behavior:contain;flex:1';
-guideReply.style.cssText = 'font-size:17px;line-height:1.5;white-space:pre-wrap;margin:0';
-guideMark.style.cssText = 'display:block;font-size:11px;color:var(--ink3);margin-top:8px';
-guideFact.id = 'companion-fact'; guideFact.setAttribute('role','note');
-guideFact.style.cssText = 'font-size:13px;line-height:1.5;white-space:pre-wrap;color:var(--ink2);border:1px solid var(--hair);border-radius:14px;padding:14px;background:rgba(242,237,228,.04);margin:12px 0 0';
-guideQuestion.style.cssText = 'font-size:17px;line-height:1.45;margin:0;flex:none';
-guideOptions.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;gap:6px;flex:none';
-guideActions.style.cssText = 'display:flex;flex-direction:column;align-items:stretch;gap:6px;flex:none';
-[guideReply,guideMark,guideFact].forEach(function(e){ guideNarrative.appendChild(e); });
-[guideNarrative,guideQuestion,guideOptions,guideActions].forEach(function(e){ guidePanel.appendChild(e); }); uiEl.appendChild(guidePanel);
-function guideWords(){ return SES && SES.companionPilot && SES.companionPilot.strings || {}; }
-function guideButton(host, text, action, id, primary){
-  var b = mk('button', null, text); b.type = 'button'; b.id = id;
-  b.style.cssText = 'min-height:44px;width:100%;text-align:left;padding:10px 14px;border-radius:16px;white-space:normal;overflow-wrap:anywhere;line-height:1.4;font-size:14px;background:' + (primary ? 'rgba(242,237,228,.10)' : 'transparent') + ';border:1px solid var(--hair)';
-  b._guideAction = action; host.appendChild(b); return b;
+/* I-1: one answer, optional depth, and exactly one invitation. All copy is keyed. */
+var GUIDE=null, CHECKIN=null, GUIDE_RETRIES=0, GUIDE_BUSY=false, GUIDE_INPUT_CHECKIN=false, GUIDE_EPOCH=0, GUIDE_ANSWER_ERROR='';
+var guidePanel=mk('section','conversation'), guideReply=mk('p','conversation-phrase'), guideMark=mk('p','conversation-meta'), guideFact=mk('p','conversation-body'), guideBody=mk('p','conversation-body');
+var guideNarrative=mk('div'), guideActions=mk('div','conversation-slot'), guideQuestion=mk('p'), guideOptions=mk('div');
+guidePanel.id='companionPanel'; guideReply.id='companion-reply'; guideNarrative.id='conversation-reading'; guideBody.id='conversation-body'; guideActions.id='conversation-slot';
+[guideReply,guideBody,guideFact,guideMark].forEach(function(e){guideNarrative.appendChild(e);}); guidePanel.appendChild(guideNarrative); uiEl.appendChild(guidePanel); uiEl.appendChild(guideActions);
+guidePanel.style.display=guideActions.style.display='none';
+var guideDisclosure=mk('button','quiet-link'); guideDisclosure.id='companion-read-all'; guidePanel.appendChild(guideDisclosure);
+function quietAction(b, action){
+  b._guideAction=action;
+  var down=null;
+  b.addEventListener('pointerdown',function(e){e.stopPropagation(); if(e.cancelable)e.preventDefault(); down={x:e.clientX,y:e.clientY}; try{b.setPointerCapture(e.pointerId);}catch(_){}});
+  b.addEventListener('pointerup',function(e){e.stopPropagation(); var p=down;down=null;if(p&&Math.hypot(e.clientX-p.x,e.clientY-p.y)<8&&!b.disabled)action();});
+  b.addEventListener('pointercancel',function(){down=null;});
+  b.addEventListener('click',function(e){e.stopPropagation();if(e.detail===0&&!b.disabled)action();});
 }
-/* The stage owns gestures. Keep this scrollable text panel's gestures inside it, including VoiceOver clicks. */
-var guidePointer = null;
-guidePanel.addEventListener('pointerdown', function(e){
-  var answer = e.target.closest('#companion-answer-input');
-  if (answer) {
-    e.stopPropagation(); if (e.cancelable) e.preventDefault();
-    if (GUIDE_BUSY) return;
-    PTR.id = e.pointerId; PTR.realT = performance.now();
-    try { stage.setPointerCapture(e.pointerId); } catch (_) {}
-    var point = toStage(e.clientX, e.clientY); inDown(point[0], point[1], answer); return;
-  }
-  e.stopPropagation(); if (e.cancelable) e.preventDefault();
-  guidePointer = { y:e.clientY, top:guideNarrative.scrollTop, button:e.target.closest('button'), moved:false, id:e.pointerId };
-  try { guidePanel.setPointerCapture(e.pointerId); } catch (_) {}
-});
-guidePanel.addEventListener('pointermove', function(e){
-  e.stopPropagation(); if (!guidePointer) return;
-  var delta = (e.clientY - guidePointer.y) / (fitS || 1);
-  if (Math.abs(delta) > 7) guidePointer.moved = true;
-  if (guidePointer.moved) guideNarrative.scrollTop = guidePointer.top - delta;
-});
-guidePanel.addEventListener('pointerup', function(e){
-  e.stopPropagation();
-  if (PTR.id === e.pointerId && GUIDE_INPUT_CHECKIN) { PTR.id = null; var point = toStage(e.clientX,e.clientY); inUp(point[0],point[1]); return; }
-  var p = guidePointer; guidePointer = null;
-  if (p && !p.moved && p.button && !p.button.disabled && p.button._guideAction) p.button._guideAction();
-});
-guidePanel.addEventListener('pointercancel', function(){ guidePointer = null; });
-guidePanel.addEventListener('click', function(e){
-  e.stopPropagation(); if (e.detail !== 0) return;
-  var b = e.target.closest('button'); if (b && !b.disabled && b._guideAction) b._guideAction();
-});
-function guideAsk(question, retry){
-  if (GUIDE_BUSY) return;
-  if (retry) GUIDE_RETRIES++; else GUIDE_RETRIES = 0;
-  CHECKIN = null;
-  go('SENDING', { params:{question:question,companion:true}, question:question, origin:'person', cx:195,cy:660 });
+quietAction(guideDisclosure,function(){ if(!GUIDE)return;var oldTop=guidePanel.getBoundingClientRect().top; GUIDE.reading=true; guideRender();if(guidePanel.animate){var dy=(oldTop-guidePanel.getBoundingClientRect().top)/(fitS||1);guidePanel.animate(RM?[{opacity:0},{opacity:1}]:[{transform:'translateY('+dy+'px)'},{transform:'translateY(0)'}],{duration:RM?200:600,easing:'cubic-bezier(.2,.75,.25,1)'});}conversationBorn(guideBody,'sphere',25); });
+function guideWords(){return SES&&SES.companionPilot&&SES.companionPilot.strings||{};}
+function guideButton(host,text,action,id,primary){var b=mk('button',primary?'quiet-primary':'quiet-chip',text);b.type='button';b.id=id;quietAction(b,action);if(!primary){b.textContent='';b.appendChild(mk('span','conversation-chip-label',text));}host.appendChild(b);return b;}
+function guideAsk(question,retry){
+ if(GUIDE_BUSY)return;
+ var after=GUIDE&&GUIDE.requestId, params=retry&&after?{retry:after}:retry&&READ?Object.assign({},READ.params):{question:question,companion:true};if(!retry&&after)params.after=after;
+ go('SENDING',{params:params,question:question,origin:'person'});
 }
+function guideFailureLine(){var code=GUIDE.code||'unavailable';return code==='limit'?GUIDE.limitLine||GUIDE.message:tt({'offline':'fail.offline','explain_off':'fail.cantExplain','paused':'fail.paused'}[code]||'fail.answer');}
+var conversationCurves={soft:'cubic-bezier(.2,.75,.25,1)',emit:'cubic-bezier(.16,1,.3,1)',inhale:'cubic-bezier(.55,0,.7,.35)'};
+function conversationBorn(node,origin,lineHeight){
+ if(!node||!node.animate)return;
+ if(RM){node.animate([{opacity:0},{opacity:1}],{duration:200});return;}
+ var displacement=origin==='pill'?Math.max(14,742-(parseFloat(node.style.top)||640)):14;
+ node.animate([{opacity:0,transform:'translateY('+(origin==='pill'?displacement:-14)+'px)',filter:'blur(6px)'},{opacity:1,transform:'translateY(0)',filter:'blur(0)'}],{duration:origin==='pill'?480:240,easing:conversationCurves[origin==='pill'?'emit':'soft'],fill:'backwards'});
+ if(lineHeight){var lines=Math.max(1,Math.ceil((node.offsetHeight||lineHeight)/lineHeight));node.animate([{clipPath:'inset(0 0 100% 0)'},{clipPath:'inset(0 0 0 0)'}],{duration:Math.min(600,lines*45),easing:'steps('+lines+',end)',fill:'backwards'});}
+}
+function conversationRetire(node,origin){
+ if(!node||!node.animate||!node.cloneNode||node.style.display==='none')return;
+ var ghost=node.cloneNode(true);ghost.removeAttribute('id');ghost.setAttribute('aria-hidden','true');ghost.style.pointerEvents='none';ghost.classList.add('conversation-retiring');
+ if(ghost.querySelectorAll)Array.prototype.forEach.call(ghost.querySelectorAll('[id]'),function(e){e.removeAttribute('id');});
+ node.parentNode.appendChild(ghost);var dy=origin==='pill'?Math.max(14,742-(parseFloat(node.style.top)||640)):-14;
+ var animation=ghost.animate(RM?[{opacity:1},{opacity:0}]:[{opacity:1,transform:'translateY(0)',filter:'blur(0)'},{opacity:0,transform:'translateY('+dy+'px)',filter:'blur(6px)'}],{duration:RM?200:240,easing:conversationCurves.inhale,fill:'forwards'});
+ animation.onfinish=function(){ghost.remove();};
+}
+function conversationClearReturns(){if(D.querySelectorAll)Array.prototype.forEach.call(D.querySelectorAll('.conversation-retiring'),function(e){e.remove();});}
 function guideRender(){
-  if (!GUIDE) return;
-  var words = guideWords(), question = CHECKIN && CHECKIN.question;
-  guideReply.textContent = GUIDE_ANSWER_ERROR || GUIDE.text || GUIDE.message || '';
-  guideMark.textContent = !GUIDE_ANSWER_ERROR && GUIDE.personalized ? words.personalized || '' : '';
-  guideFact.textContent = '';
-  if (GUIDE.fact && typeof GUIDE.fact.text === 'string' && typeof GUIDE.fact.source === 'string' && typeof GUIDE.fact.year === 'string') {
-    guideFact.textContent = GUIDE.fact.text + '\n' + GUIDE.fact.source + ' · ' + GUIDE.fact.year;
+ if(!GUIDE)return;
+ var error=GUIDE.status==='companion_error', gist=GUIDE.gist, text=GUIDE.text||'';
+ var hasLead=typeof gist==='string'&&text.indexOf(gist)===0,oneSentence=hasLead&&gist===text;
+ GUIDE.reading=!!GUIDE.reading||(!error&&(!hasLead||!oneSentence&&GUIDE.voiceOff||(SES&&SES.textScale||1)>1.35));
+ guideReply.textContent=error?guideFailureLine():(hasLead?gist:GUIDE.reading?'':text);
+ guideBody.textContent=!error&&GUIDE.reading?(hasLead?text.slice(gist.length).trim():text):'';
+ guideFact.textContent=GUIDE.reading&&GUIDE.fact?GUIDE.fact.text+'\n'+GUIDE.fact.source+' · '+GUIDE.fact.year:'';
+ guideMark.textContent=GUIDE.reading&&GUIDE.personalized?guideWords().personalized||'':'';guideMark.classList.toggle('conversation-noted',!!GUIDE.personalized);
+ guideDisclosure.textContent=tt('answer.readAll')+' ⌄';guideDisclosure.setAttribute('aria-label',tt('answer.readAll'));  guideDisclosure.style.display=!error&&!GUIDE.reading&&hasLead&&gist!==text?'block':'none';
+ guidePanel.style.display='block';guideActions.textContent='';guideActions.style.display='block';
+ if(error){if(GUIDE.retryable)guideButton(guideActions,tt('fail.retry'),function(){guideAsk(READ&&READ.question,true);},'companion-retry',true);}
+ else if(GUIDE.slotReady&&!(GUIDE.followUp==null&&gist===text)){
+  var offer=GUIDE.readOffer;
+  if(offer&&(!SES||SES.oneTap!==false)){
+   var b=guideButton(guideActions,offer.label,function(){go('SENDING',{token:offer.token,question:READ.question,origin:'chip'});},'companion-read-offer',false);
+   var meta=mk('small','conversation-eyebrow',offer.levelLabel+' · '+offer.costLine); b.insertBefore(meta,b.firstChild);
+  }else if(typeof GUIDE.followUp==='string'){
+   var b=guideButton(guideActions,GUIDE.followUp,function(){guideAsk(GUIDE.followUp,false);},'companion-follow-up',false);b.setAttribute('aria-label',tt('aria.ask',{question:GUIDE.followUp}));
   }
-  guideFact.style.display = guideFact.textContent ? 'block' : 'none';
-  guideQuestion.textContent = question ? question.text : '';
-  guideActions.style.flexDirection = question ? 'row' : 'column';
-  guideOptions.textContent = ''; guideActions.textContent = '';
-  if (question){
-    (question.options || []).forEach(function(option){
-      guideButton(guideOptions, option.label, function(){ guideAnswer(question.id,option.id); }, 'companion-option-' + option.id, true);
-    });
-    var answer = guideButton(guideActions, words.answerThis || '', function(){ GUIDE_INPUT_CHECKIN = true; openTyping({fromRead:true}); }, 'companion-answer-input', false);
-    answer.setAttribute('data-hit', 'companion-answer'); answer.setAttribute('aria-description', words.answerHint || '');
-    guideButton(guideActions, words.skip || '', function(){ guideAnswer(question.id,null); }, 'companion-skip', false);
-  } else if (GUIDE.status === 'companion_error') {
-    if (GUIDE.retryable && GUIDE_RETRIES < 1) guideButton(guideActions, words.retry || '', function(){ guideAsk(READ.question,true); }, 'companion-retry', true);
-  } else if (GUIDE.followUp) {
-    guideButton(guideActions, GUIDE.followUp, function(){ guideAsk(GUIDE.followUp,false); }, 'companion-follow-up', true);
-  }
-  if (!question) guideButton(guideActions, words.close || '', function(){ CHECKIN = null; GUIDE_RETRIES = 0; go('RETURNING'); }, 'companion-close', false);
-  guidePanel.style.display = 'flex';
-  guideLayout();
+ }
+ guideLayout();if(!GUIDE.phraseBorn){GUIDE.phraseBorn=true;conversationBorn(guidePanel,'sphere',GUIDE.reading?27:32);}if(GUIDE.slotReady&&!GUIDE.slotBorn&&guideActions.children.length){GUIDE.slotBorn=true;el.live.textContent=guideActions.textContent;conversationBorn(guideActions,'pill');}var eyebrow=guideActions.querySelector('.conversation-eyebrow');if(eyebrow&&GUIDE.readOffer&&eyebrow.scrollWidth>eyebrow.clientWidth)eyebrow.textContent=GUIDE.readOffer.levelLabel+' · '+GUIDE.readOffer.costShort;guideFade();
 }
-/* Reserve the microphone's whole strip. Actions never scroll with a long reply.
-   Five-option check-ins borrow space from the sphere, with physical 44pt tap targets. */
 function guideLayout(){
-  if (!GUIDE || guidePanel.style.display === 'none') return;
-  var scale = Math.max(0.5, fitS || 1), type = SES && SES.companionPilot && SES.companionPilot.textScale || 1;
-  var font = type / scale;
-  guideReply.style.fontSize = (17 * font) + 'px';
-  guideQuestion.style.fontSize = (17 * font) + 'px';
-  guideMark.style.fontSize = (11 * font) + 'px';
-  guideFact.style.fontSize = (13 * font) + 'px';
-  Array.prototype.forEach.call(guidePanel.querySelectorAll('button'), function(b){
-    b.style.fontSize = (14 * font) + 'px'; b.style.minHeight = (44 / scale) + 'px';
-  });
-  var question = CHECKIN && CHECKIN.question;
-  guideQuestion.style.display = question ? 'block' : 'none';
-  guideOptions.style.display = question ? 'flex' : 'none';
-  var fixed = guideActions.offsetHeight + (question ? guideQuestion.offsetHeight + guideOptions.offsetHeight + 20 : 10);
-  var narrative = Math.min(guideNarrative.scrollHeight, (question ? 64 : 250) / scale);
-  var top = Math.max(148, Math.min(464, 726 - fixed - narrative - 10));
-  guidePanel.style.top = top + 'px';
-  if (ST.name === 'COMPANION') {
-    var radius = Math.max(28, Math.min(110, (top - 142) / 2));
-    moveSphere(top - radius - 24, radius);
+ if(!GUIDE||guidePanel.style.display==='none')return;
+ var scale=Math.max(.5,fitS||1),k=(SES&&SES.textScale||1)/scale, target=44/scale, slot=Math.max(target,(GUIDE.readOffer?86:68)*k),error=GUIDE.status==='companion_error';
+ [guidePanel,guideActions].forEach(function(e){e.style.setProperty('--target',target+'px');e.style.setProperty('--type',k);});
+ guideActions.style.top=(700-slot)+'px';guideActions.style.minHeight=slot+'px';
+ guideReply.style.fontSize=((GUIDE.reading||error)?22:26)*k+'px';guideReply.style.lineHeight=((GUIDE.reading||error)?27:32)*k+'px';
+ guideBody.style.fontSize=guideFact.style.fontSize=17*k+'px';guideBody.style.lineHeight=guideFact.style.lineHeight=25*k+'px';
+ guideDisclosure.style.fontSize=15*k+'px';guideDisclosure.style.minHeight=target+'px';
+ guideNarrative.classList.toggle('conversation-reading',!!GUIDE.reading);guideNarrative.setAttribute('role','region');guideNarrative.setAttribute('aria-label',tt('aria.answer'));
+ guideReply.style.textAlign=GUIDE.reading?'left':'center';guideReply.style.display=guideReply.textContent?'block':'none';
+ if(GUIDE.reading){guidePanel.style.top='240px';guideNarrative.style.height=(Math.floor((700-slot-16-240)/(25*k))*25*k)+'px';moveSphere(160,48);}
+ else{
+  guideNarrative.style.height='auto';
+  if(guideReply.offsetHeight>96*k&&!error){guideReply.style.fontSize=22*k+'px';guideReply.style.lineHeight=27*k+'px';}
+  var p=guideReply.offsetHeight,d=guideDisclosure.style.display==='none'?0:target,r=clamp((602-12-32-p-4-d-16-slot)/2,44,98);
+  var spare=602-(12+2*r+32+p+4+d+16+slot),top=110+.4*Math.max(0,spare);
+  if(!error&&spare<0){GUIDE.reading=true;guideRender();return;}
+  moveSphere(top+r,r);guidePanel.style.top=(top+2*r+32)+'px';
+ }
+}
+function companionCheckIn(){CHECKIN=null;if(ST.name==='HANDBACK')readChips();} // I-2 owns personal invitations.
+function guideResumeOptions(){return false;}
+function guideAnswer(){} // Profile memory is native; nothing about the person is drawn in I-1.
+function guideStopVoice(){bcall('stopSpeaking').catch(noop);VOICE.ended=true;VOICE.id=null;K.on=false;if(GUIDE)GUIDE.voiceDone=true;pillMode(idleMode());}
+STATES.COMPANION={
+ enter:function(prev,data){
+  GUIDE=data.reply||GUIDE;if(!GUIDE)return;CHECKIN=null;dissolveThink();glassHome();chipsHide();greetOut();meriOut();hint('');chromeUp();dockIn();
+  pillMode(idleMode());att(el.close,'aria-label',tt('aria.closeAnswer'));att(el.sphereA,'aria-label',tt('aria.answer'));
+  if(!GUIDE.settledAt)GUIDE.settledAt=clk;
+  guideRender();
+  if(GUIDE.status==='companion'&&GUIDE.requestId&&GUIDE.text&&!GUIDE.spoken){
+   GUIDE.spoken=true;VOICE.id=GUIDE.requestId;VOICE.started=false;VOICE.ended=false;VOICE.reqT=clk;
+   bcall('speak',{id:GUIDE.requestId,text:GUIDE.text,spoken:!!GUIDE.questionSpoken}).then(function(r){
+    if(GUIDE&&r&&r.status!=='queued'){GUIDE.voiceOff=true;GUIDE.voiceDone=true;VOICE.ended=true;guideRender();}
+   },function(){if(GUIDE){GUIDE.voiceOff=true;GUIDE.voiceDone=true;VOICE.ended=true;hint(tt('cap.voiceUnavailable'));guideRender();}});
   }
-}
-function guideAnswer(id,value,text){
-  if (GUIDE_BUSY) return; GUIDE_BUSY = true; var epoch = GUIDE_EPOCH;
-  Array.prototype.forEach.call(guidePanel.querySelectorAll('button'), function(b){ b.disabled = true; });
-  var params = {questionId:id}; if (text != null) params.text = text; else if (value != null) params.value = value;
-  bcall('companion.answer',params).then(function(result){
-    GUIDE_BUSY = false; if (epoch !== GUIDE_EPOCH) return;
-    if (result && result.status === 'cancelled') return;
-    if (result && !result.message) { CHECKIN = result; GUIDE_ANSWER_ERROR = ''; }
-    else GUIDE_ANSWER_ERROR = result && result.message || guideWords().answerFailed || '';
-    if (result && result.explanation) { guideAsk(result.explanation, false); return; }
-    if ((!CHECKIN || !CHECKIN.question) && ST.name !== 'COMPANION') {
-      guidePanel.style.display = 'none';
-      if (ST.name === 'HANDBACK') readChips(); else if (ST.name === 'FOLLOWUPS') chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow());
-      return;
-    }
-    if (GUIDE) GUIDE.companionCheckIn = CHECKIN;
-    guideRender();
-    guideNarrative.scrollTop = 0;
-  },function(){ GUIDE_BUSY = false; if (epoch === GUIDE_EPOCH) { GUIDE_ANSWER_ERROR = guideWords().answerFailed || ''; guideRender(); } });
-}
-function companionCheckIn(payload){
-  if (!payload || !payload.question) { CHECKIN = null; if (ST.name === 'COMPANION') guideRender(); return; }
-  CHECKIN = payload; GUIDE_ANSWER_ERROR = '';
-  if (ST.name === 'COMPANION') { guideRender(); return; }
-  /* A market reply keeps its own cards. The check-in lives beside it and leaves when that reply leaves. */
-  if (['HANDBACK','FOLLOWUPS'].indexOf(ST.name) >= 0){
-    chipsHide(); GUIDE = { status:'companion', text:'' }; guideRender();
-  }
-}
-STATES.COMPANION = {
-  enter:function(prev,data){
-    if (prev !== 'TYPING' && prev !== 'LISTENING') GUIDE_ANSWER_ERROR = '';
-    GUIDE = data.reply || GUIDE; CHECKIN = data.reply ? (GUIDE.companionCheckIn || null) : CHECKIN;
-    dissolveThink(); glassHome(); moveSphere(320,110); hint(''); pillMode(idleMode()); att(el.sphereA,'aria-label',tt('aria.speaking'));
-    guideRender(); guideNarrative.scrollTop = 0; if (GUIDE.companionConsentPending) bcall('companion.presented').catch(noop);
-    if (GUIDE.status === 'companion' && GUIDE.requestId && GUIDE.text && !GUIDE.spoken){
-      GUIDE.spoken = true; VOICE.id = GUIDE.requestId; VOICE.started = false; VOICE.ended = false; VOICE.reqT = clk;
-      kInit(GUIDE.text);
-      bcall('speak',{id:GUIDE.requestId,text:GUIDE.text}).then(function(reply){
-        if (reply && reply.status !== 'queued') { VOICE.ended = true; if (ST.name === 'COMPANION') pillMode(idleMode()); }
-      }).catch(function(){ VOICE.ended = true; });
-    }
-  },
-  exit:function(){ GUIDE_EPOCH++; guidePanel.style.display = 'none'; if (VOICE.id && !VOICE.ended) bcall('stopSpeaking').catch(noop); VOICE.id=null; K.on=false; },
-  tick:noop,
-  on:function(name){ if (name === 'voice.start') pillMode('stop'); else if (name === 'voice.end') pillMode(idleMode()); },
-  down:function(hit,p){ if (hit === 'pill'){ if (VOICE.started && !VOICE.ended) return tapG(function(){ bcall('stopSpeaking').catch(noop); VOICE.ended=true; pillMode(idleMode()); }); GUIDE_INPUT_CHECKIN=false; return pillDown(p,true); } if (hit === 'close') return tapG(function(){ CHECKIN=null;go('RETURNING'); }); return null; }
+ },
+ exit:function(next){conversationRetire(guidePanel,'sphere');conversationRetire(guideActions,'pill');GUIDE_EPOCH++;guidePanel.style.display=guideActions.style.display='none';if(VOICE.id&&!VOICE.ended)guideStopVoice();if(['LISTENING','TYPING','PRE_PERMISSION'].indexOf(next)<0&&next!=='COMPANION')GUIDE=null;},
+ tick:function(){if(!GUIDE||GUIDE.status!=='companion')return;var ready=GUIDE.questionSpoken&&!GUIDE.voiceOff?GUIDE.voiceDone:clk-GUIDE.settledAt>=1.5;if(ready&&!GUIDE.slotReady){GUIDE.slotReady=true;guideRender();}if(!VOICE.started&&!VOICE.ended&&clk-VOICE.reqT>VOICE_WAIT){guideStopVoice();GUIDE.voiceOff=true;hint(tt('cap.voiceUnavailable'));guideRender();}},
+ on:function(name,p){if(name==='voice.start'){pillMode('stop');att(el.sphereA,'aria-label',tt('aria.speaking'));}else if(name==='voice.end'){if(GUIDE)GUIDE.voiceDone=true;pillMode(idleMode());if(p&&p.reason==='failed'){GUIDE.voiceOff=true;hint(tt('cap.voiceUnavailable'));guideRender();}}else if(name==='app.state'&&p.state==='background')conversationReset();},
+ down:function(hit,p){if(hit==='pill')return pillDown(p,true);if(hit==='avatar')return tapG(function(){guideStopVoice();openNative('account');});if(hit==='close')return tapG(function(){var draft=GUIDE.status==='companion_error'&&READ?READ.question:'',spoken=!!GUIDE.questionSpoken,retry=draft?{retry:GUIDE.requestId}:null;GUIDE=null;READ=null;if(draft)holdDraft(draft,'',spoken,retry);else go('RETURNING');});return null;}
 };
-
-function guideResumeOptions(text){
-  if (!GUIDE_INPUT_CHECKIN || !GUIDE || !CHECKIN || !CHECKIN.question) return false;
-  GUIDE_INPUT_CHECKIN = false;
-  var id = CHECKIN.question.id;
-  GUIDE.companionCheckIn = CHECKIN;
-  go('COMPANION',{reply:GUIDE}); guideNarrative.scrollTop = 0;
-  if (text) guideAnswer(id, null, text);
-  return true;
-}
+function guideFade(){var more=guideNarrative.scrollTop+guideNarrative.clientHeight<guideNarrative.scrollHeight-1;guideNarrative.style.setProperty('--fade-top',guideNarrative.scrollTop>0?'20px':'0px');guideNarrative.style.setProperty('--fade-bottom',more?'28px':'0px');}
+var guideDrag=null;
+guideNarrative.addEventListener('pointerdown',function(e){if(!GUIDE||!GUIDE.reading)return;e.stopPropagation();guideDrag={y:e.clientY,top:guideNarrative.scrollTop};try{guideNarrative.setPointerCapture(e.pointerId);}catch(_){}});
+guideNarrative.addEventListener('pointermove',function(e){if(!guideDrag)return;e.stopPropagation();var line=25*(SES&&SES.textScale||1)/Math.max(.5,fitS||1);guideNarrative.scrollTop=Math.max(0,Math.round((guideDrag.top+(guideDrag.y-e.clientY)/(fitS||1))/line)*line);guideFade();});
+guideNarrative.addEventListener('pointerup',function(e){if(guideDrag)e.stopPropagation();guideDrag=null;guideFade();});
+guideNarrative.addEventListener('pointercancel',function(){guideDrag=null;});
+guideNarrative.addEventListener('scroll',guideFade);
 
 /* ---- app/70-input.js ---- */
 /* =====================================================================
@@ -5263,6 +5477,128 @@ el.ta.addEventListener('blur', function(){ setTimeout(function(){ if (ST.name ==
 el.taSend.addEventListener('pointerdown', function(e){ e.preventDefault(); });
 el.taSend.addEventListener('click', function(){ if (ST.name === 'TYPING' && !TB.composing) STATES.TYPING.send(); });
 try { if (W.visualViewport){ W.visualViewport.addEventListener('resize', placeTypeBox); W.visualViewport.addEventListener('scroll', placeTypeBox); } } catch (e) {}
+
+/* ---- app/75-conversation-input.js ---- */
+/* iPhone-only controls beside the pinned stage/desk blocks. */
+var HELD='',HELD_CAP='',HELD_SPOKEN=false,HELD_PARAMS=null,CONV_RETURN=null,CONV_BASE='',CONV_PARTIAL='',CONV_WORD_AT=0,CONV_HOLD=false,CONV_LISTEN_SEQ=0;
+var keyboardButton=mk('button','quiet-glyph');keyboardButton.innerHTML='<svg width="22" height="16" viewBox="0 0 22 16" aria-hidden="true"><rect x="1" y="1" width="20" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 5h1m4 0h1m4 0h1M5 8h1m4 0h1m4 0h1M6 11h10" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';keyboardButton.id='conversation-keyboard';uiEl.appendChild(keyboardButton);
+var fieldMic=mk('button','quiet-glyph');fieldMic.innerHTML='<svg width="18" height="22" viewBox="0 0 18 22" aria-hidden="true"><rect x="6" y="1" width="6" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 9v2a6 6 0 0 0 12 0V9M9 17v4M6 21h6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';fieldMic.id='conversation-field-mic';el.typeBox.appendChild(fieldMic);
+var sendIcon=mk('span','send-icon','↑');el.pill.appendChild(sendIcon);
+var draftPanel=mk('section','conversation'),draftPhrase=mk('p','conversation-phrase');draftPanel.id='conversation-draft';draftPanel.appendChild(draftPhrase);uiEl.appendChild(draftPanel);draftPanel.style.display='none';
+function conversationAnnounce(key){el.live.textContent=tt(key);}
+function conversationReturn(){
+ var back=CONV_RETURN;CONV_RETURN=null;
+ if(back&&back.name==='COMPANION'&&GUIDE){go('COMPANION',{reply:GUIDE});}
+ else if(back&&back.name==='READ_CONFIRM')go('READ_CONFIRM',back.data);
+ else go('IDLE',{restoreGreet:true});
+}
+function conversationReset(){conversationClearReturns();HELD='';HELD_CAP='';HELD_SPOKEN=false;HELD_PARAMS=null;CONV_BASE='';CONV_PARTIAL='';CONV_RETURN=null;GUIDE=null;READ=null;el.ta.value='';draftPanel.style.display='none';bcall('stopSpeaking').catch(noop);bcall('cancel').catch(noop);go('IDLE',{restoreGreet:true});conversationClearReturns();}
+function holdDraft(text,caption,spoken,params){HELD_PARAMS=params||null;HELD_SPOKEN=!!spoken;HELD=String(text||'').trim();HELD_CAP=caption||'';SPEECH.draft=HELD;go('HELD_DRAFT');}
+function convSend(text,spoken){
+ var params=HELD_PARAMS&&text.trim()===HELD?Object.assign({},HELD_PARAMS):{question:text};if(!params.retry){if(READ_CONFIRM&&!params.companion)params.confirm=true;if(spoken)params.spoken=true;else delete params.spoken;if(GUIDE&&GUIDE.requestId&&!params.after)params.after=GUIDE.requestId;}
+ HELD='';HELD_CAP='';HELD_PARAMS=null;SPEECH.draft='';CONV_RETURN=null;go('SENDING',{question:text,params:params,origin:spoken?'speech':'type'});
+}
+function convType(){
+ CONV_RETURN={name:ST.name,data:ST.data};
+ if(ST.name==='LISTENING'){SPEECH.draft=TALK_MODE==='hold'?txText():(CONV_BASE+' '+CONV_PARTIAL).trim();STATES.LISTENING.startSeq++;CONV_LISTEN_SEQ++;bcall('speech.stop',{cancel:true}).catch(noop);CONV_RETURN=STATES.LISTENING.back;}
+ else if(ST.name==='HELD_DRAFT')SPEECH.draft=HELD;
+ else if(ST.name==='READ_CONFIRM')SPEECH.draft=READ&&READ.question||'';
+ else SPEECH.draft=SPEECH.draft||'';
+ openTyping({conversation:true,fromRead:!!GUIDE});try{el.ta.selectionStart=el.ta.selectionEnd=el.ta.value.length;}catch(_){}
+}
+quietAction(keyboardButton,convType);
+quietAction(el.taSend,function(){if(ST.name==='TYPING'&&!TB.composing)STATES.TYPING.send();});
+quietAction(fieldMic,function(){CONV_BASE=el.ta.value.trim();SPEECH.draft=CONV_BASE;CONV_RETURN=CONV_RETURN||{name:'IDLE',data:{}};convListen(false,true);});
+function convListen(held,append){
+ var back=CONV_RETURN||{name:ST.name,data:ST.data},seq=++CONV_LISTEN_SEQ;
+ CONV_BASE=append?(HELD||SPEECH.draft||CONV_BASE):'';CONV_PARTIAL='';CONV_HOLD=held;
+ if(VOICE.id&&!VOICE.ended){bcall('stopSpeaking').catch(noop);VOICE.ended=true;}
+ bcall('speech.permission').then(function(m){
+  if(seq!==CONV_LISTEN_SEQ)return;if(m&&m.state)SES.mic=m;
+  var state=m&&m.state||'unavailable';CONV_RETURN=back;
+  if(state==='granted')go('LISTENING',{conversation:true,back:back});
+  else if(state==='undetermined')go('PRE_PERMISSION',{conversation:true,back:back});
+  else if(state==='consent')bcall('speech.requestPermission').then(function(m){if(seq===CONV_LISTEN_SEQ){if(m&&m.state)SES.mic=m;hint(tt(m&&m.state==='granted'?'cap.tapToTalk':'hint.micOff'));}}).catch(noop);
+  else {hint(tt('hint.micOff'));keyboardButton.animate([{transform:'scale(1)'},{transform:'scale(1.1)'},{transform:'scale(1)'}],{duration:320});}
+ }).catch(function(){if(seq===CONV_LISTEN_SEQ)hint(tt('hint.micOff'));});
+}
+var holdPillDown=pillDown;
+pillDown=function(p,fromRead){
+ if(TALK_MODE==='hold')return holdPillDown(p,fromRead);
+ var ended=false,started=false,t0=nowT(),name=ST.name;
+ if(name==='LISTENING')return tapG(function(){STATES.LISTENING.release(false,false);},A.press);
+ if(['SENDING','RESOLVING','THINK_WAIT'].indexOf(name)>=0)return tapG(function(){cancelRead();},A.press);
+ var speaking=VOICE.id&&VOICE.started&&!VOICE.ended;
+ if(!speaking&&name!=='HELD_DRAFT'){started=true;convListen(false,false);}
+ at(.35,function(){if(ended)return;CONV_HOLD=true;if(ST.name==='LISTENING'&&STATES.LISTENING.live)hint(tt('hint.release'));if(!started){started=true;convListen(true,name==='HELD_DRAFT');}});
+ return {move:function(p){if(Math.hypot(p.x-p.x0,p.y-p.y0)>32)this.cancel();},up:function(){
+  if(ended)return;ended=true;A.press.to(1,'emit');
+  if(nowT()-t0>=.35){CONV_HOLD=true;if(ST.name==='LISTENING'&&(CONV_BASE+' '+CONV_PARTIAL).trim())STATES.LISTENING.release(false,false);else{CONV_HOLD=false;if(ST.name==='LISTENING')hint(tt('cap.listening'));}}
+  else if(speaking){guideStopVoice();}
+  else if(name==='HELD_DRAFT')convSend(HELD,HELD_SPOKEN);
+ },cancel:function(){if(ended)return;ended=true;CONV_LISTEN_SEQ++;if(ST.name==='LISTENING'){bcall('speech.stop',{cancel:true}).catch(noop);conversationReturn();}else if(ST.name==='PRE_PERMISSION')conversationReturn();}};
+};
+var legacyListen=STATES.LISTENING;
+if(TALK_MODE==='tap')STATES.LISTENING={
+ enter:function(prev,d){
+  this.back=d.back||CONV_RETURN||{name:prev,data:{}};this.startSeq=++CONV_LISTEN_SEQ;this.live=false;this.released=false;this.finalWait=0;CONV_WORD_AT=clk;
+  chromeUp();greetOut();chipsHide();meriOut();guidePanel.style.display=guideActions.style.display='none';moveSphere(300,98);A.pillW.set(96);pillMode(idleMode());
+  draftPhrase.textContent=CONV_BASE;draftPanel.style.display='block';draftPanel.style.top='438px';conversationBorn(draftPanel,'sphere',32);A.closeO.set(1);att(el.close,'aria-label',tt('aria.discardSpoken'));
+  var self=this,seq=this.startSeq;bcall('speech.start').then(function(r){if(seq!==self.startSeq||ST.name!=='LISTENING')return;self.live=r&&r.status==='listening';if(self.live){conversationAnnounce('cap.listening');U.listenIr.to(1);hint(tt(CONV_HOLD?'hint.release':'cap.listening'));}else{hint(tt('hint.micOff'));conversationReturn();}},function(){if(seq===self.startSeq)conversationReturn();});
+ },
+ exit:function(){this.startSeq++;U.listenIr.to(0);draftPanel.style.display='none';},
+ release:function(isTap,cancelled){if(cancelled){CONV_LISTEN_SEQ++;bcall('speech.stop',{cancel:true}).catch(noop);HELD=SPEECH.draft=CONV_BASE=CONV_PARTIAL='';conversationReturn();return;}if(this.released)return;this.released=true;this.live=false;U.listenIr.to(0);this.finalWait=clk||.001;var self=this;bcall('speech.stop',{}).then(function(r){if(r&&r.status==='idle')self.gotFinal(CONV_PARTIAL);}).catch(function(){self.gotFinal(CONV_PARTIAL);});},
+ gotFinal:function(text){if(ST.name!=='LISTENING'||!this.released)return;var q=(CONV_BASE+' '+String(text||CONV_PARTIAL||'')).replace(/\s+/g,' ').trim();this.finalWait=0;if(q)convSend(q,true);else{conversationReturn();hint(tt('cap.empty'));conversationAnnounce('cap.empty');}},
+ autoEnd:function(caption){var q=(CONV_BASE+' '+CONV_PARTIAL).trim();conversationAnnounce(q?caption:'cap.empty');this.live=false;this.startSeq++;bcall('speech.stop',{cancel:true}).catch(noop);tick('soft');if(q)holdDraft(q,caption,true);else{conversationReturn();hint(tt('cap.empty'));}},
+ interrupt:function(){conversationReset();},
+ on:function(name,p){
+  if(name==='speech.partial'){
+   var text=String(p&&p.text||''),hadPartial=!!CONV_PARTIAL,previous=CONV_PARTIAL.split(/\s+/),next=text.split(/\s+/),common=0;while(common<previous.length&&previous[common]===next[common])common++;
+   if(text!==CONV_PARTIAL)CONV_WORD_AT=clk;CONV_PARTIAL=text;draftPhrase.textContent='';draftPhrase.appendChild(D.createTextNode((CONV_BASE+' '+next.slice(0,(hadPartial?common:Math.max(0,next.length-1))).join(' ')).trim()+' '));draftPhrase.appendChild(mk('span','conversation-tail',next.slice((hadPartial?common:Math.max(0,next.length-1))).join(' ')));conversationBorn(draftPhrase,'sphere',32);
+  }else if(name==='speech.final'&&this.released)this.gotFinal(p&&p.text);
+  else if(name==='speech.error'||name==='speech.state'&&p.state==='stopped'&&!this.released)this.autoEnd(p&&p.reason==='minute'?'cap.minute':'cap.stopped');
+  else if(name==='app.state'&&p.state==='background')conversationReset();
+ },
+ tick:function(){if(this.finalWait&&clk-this.finalWait>=2)this.gotFinal(CONV_PARTIAL);else if(this.live&&clk-CONV_WORD_AT>=10)this.autoEnd('cap.stopped');},
+ down:function(h){if(h==='pill')return tapG(function(){STATES.LISTENING.release(false,false);});if(h==='close')return tapG(function(){STATES.LISTENING.release(false,true);});return null;}
+};
+if(TALK_MODE==='hold'){
+ var holdListenEnter=legacyListen.enter,holdListenExit=legacyListen.exit,holdListenOn=legacyListen.on;
+ legacyListen.enter=function(prev,d){CONV_BASE='';CONV_PARTIAL='';holdListenEnter.call(this,prev,d);draftPanel.style.display='block';draftPanel.style.top='438px';draftPhrase.textContent='';moveSphere(300,98);};
+ legacyListen.exit=function(next){draftPanel.style.display='none';if(holdListenExit)holdListenExit.call(this,next);};
+ legacyListen.on=function(name,p){if(name==='speech.partial'){var next=String(p&&p.text||'').split(/\s+/),old=CONV_PARTIAL.split(/\s+/),n=0;while(n<old.length&&old[n]===next[n])n++;draftPhrase.textContent='';draftPhrase.appendChild(D.createTextNode(next.slice(0,(CONV_PARTIAL?n:Math.max(0,next.length-1))).join(' ')+' '));draftPhrase.appendChild(mk('span','conversation-tail',next.slice((CONV_PARTIAL?n:Math.max(0,next.length-1))).join(' ')));CONV_PARTIAL=String(p&&p.text||'');}holdListenOn.call(this,name,p);};
+}
+STATES.HELD_DRAFT={enter:function(){chromeUp();greetOut();chipsHide();meriOut();dissolveThink();glassHome();moveSphere(300,98);draftPanel.style.display='block';draftPanel.style.top='438px';draftPhrase.textContent=HELD;A.closeO.set(1);hint(HELD_CAP?tt(HELD_CAP):'');pillMode(idleMode());},exit:function(){draftPanel.style.display='none';},down:function(h,p){if(h==='pill')return pillDown(p,false);if(h==='close')return tapG(function(){HELD='';SPEECH.draft='';CONV_BASE='';CONV_PARTIAL='';conversationReturn();});if(h==='avatar')return avatarG();return null;},on:function(n,p){if(n==='app.state'&&p.state==='background')conversationReset();}};
+var oldTypingCancel=STATES.TYPING.cancel,oldTypingSend=STATES.TYPING.send;
+STATES.TYPING.cancel=function(){if(!this.d.conversation)return oldTypingCancel.call(this);var q=el.ta.value.trim();if(q)holdDraft(q,'',false,q===HELD?HELD_PARAMS:null);else conversationReturn();};
+STATES.TYPING.send=function(){if(!this.d.conversation)return oldTypingSend.call(this);if(TB.composing)return;var q=el.ta.value.replace(/\s+/g,' ').trim();if(q)convSend(q,false);else this.cancel();};
+var oldOpenTyping=openTyping;
+openTyping=function(d){d=d||{};if(!d.followUpOf)d.conversation=true;oldOpenTyping(d);};
+var oldPermEnter=STATES.PRE_PERMISSION.enter;
+STATES.PRE_PERMISSION.enter=function(prev,d){this.back=d.back||CONV_RETURN||{name:prev,data:{}};oldPermEnter.call(this);el.permBtn.classList.add("quiet-primary");};
+STATES.PRE_PERMISSION.down=function(h){if(h==='perm')return tapG(function(){STATES.PRE_PERMISSION.cont();});return tapG(conversationReturn);};
+STATES.PRE_PERMISSION.cont=function(){if(this.asked)return;this.asked=true;var self=this;bcall('speech.requestPermission').then(function(m){if(ST.name!=='PRE_PERMISSION')return;if(m&&m.state)SES.mic=m;conversationReturn();hint(tt(m&&m.state==='granted'?(TALK_MODE==='tap'?'cap.tapToTalk':'cap.holdToTalk'):'hint.micOff'));},function(){conversationReturn();hint(tt('hint.micOff'));});};
+var oldRouteReply=routeReply;
+routeReply=function(r){if(r.reply.status==='error'&&r.reply.code==='bad_response'&&!r.accepted&&(r.params.confirm||r.params.companion||r.params.retry))r.reply={status:'companion_error',requestId:r.stageId||r.params.retry,code:'unavailable',retryable:true,questionSpoken:r.questionSpoken};if(r.reply.status==='confirm'&&r.reply.cost){go('READ_CONFIRM',{reply:r.reply});return;}if(r.reply.status==='cancelled'){var q=r.question;READ=null;holdDraft(q,'',!!(r.questionSpoken||r.params&&r.params.spoken||r.reply&&r.reply.questionSpoken),r.params);return;}oldRouteReply(r);};
+var oldSendingEnter=STATES.SENDING.enter;
+STATES.SENDING.enter=function(prev,d){if(d.params&&d.params.question&&!d.params.companion&&!d.params.followUpOf&&READ_CONFIRM)d.params.confirm=true;if(!d.params&&!d.token)d.params={question:d.question,confirm:READ_CONFIRM};if(d.origin==='speech'&&d.params&&!d.params.retry&&!d.params.token)d.params.spoken=true;this.waitCy=S.cy.x;this.waitR=S.r.x;oldSendingEnter.call(this,prev,d);conversationAnnounce('aria.sending');pillMode('stop');hint(tt('cap.cancel'));A.closeO.set(0);A.note.o.set(0);};
+STATES.SENDING.down=function(h){if(h==='pill')return tapG(function(){cancelRead();});return null;};
+STATES.RESOLVING.enter=function(){pillMode('stop');hint(tt('cap.cancel'));};
+STATES.RESOLVING.down=STATES.SENDING.down;
+var oldCancelRead=cancelRead;
+cancelRead=function(){var r=READ;if(!r)return;var q=r.question;r.cancelling=true;bcall('cancel').catch(noop);READ=null;holdDraft(q,'',!!(r.questionSpoken||r.params&&r.params.spoken||r.reply&&r.reply.questionSpoken),r.params);};
+var oldThinkEnter=STATES.THINK_WAIT.enter,oldThinkTick=STATES.THINK_WAIT.tick;
+STATES.THINK_WAIT.enter=function(){oldThinkEnter.call(this);pillMode('stop');hint('');};
+STATES.THINK_WAIT.tick=function(){var e=inState(),r=READ,cost=r&&r.conversationCost;hint(tt(e>=75?'hint.long':e>=20?'hint.still':cost?'cap.costCancel':'cap.cancel',cost?{cost:cost.levelLabel+' · '+cost.short}:{}));if(r&&r.reply){if(r.reply.status==='ok'){if(e>=(READS_DONE===0?4.5:1.5))go('THINK_RESOLVE');}else routeReply(r);}};
+STATES.THINK_WAIT.down=STATES.SENDING.down;
+var confirmPanel=mk('section','conversation'),confirmName=mk('p','conversation-phrase'),confirmCost=mk('p'),confirmLevel=mk('button','quiet-level'),confirmLine=mk('span'),confirmAction=mk('button','quiet-primary'),confirmExit=mk('button','quiet-link');
+confirmPanel.id='conversation-confirm';confirmAction.id='conversation-confirm-read';confirmExit.id='conversation-confirm-exit';confirmLevel.id='conversation-confirm-level';confirmCost.appendChild(confirmLevel);confirmCost.appendChild(confirmLine);[confirmName,confirmCost,confirmAction,confirmExit].forEach(function(e){confirmPanel.appendChild(e);});uiEl.appendChild(confirmPanel);confirmPanel.style.display='none';
+quietAction(confirmAction,function(){var c=STATES.READ_CONFIRM.reply;go('SENDING',{token:c.token,question:READ.question,origin:'chip'});});quietAction(confirmExit,function(){READ=null;go('RETURNING');});quietAction(confirmLevel,function(){STATES.READ_CONFIRM.levelOpen=true;openNative('levels');});
+STATES.READ_CONFIRM={enter:function(prev,d){this.reply=d.reply||this.reply;var c=this.reply;chromeUp();chipsHide();greetOut();meriOut();dissolveThink();glassHome();hint('');A.closeO.set(0);pillMode(idleMode());moveSphere(256,98);confirmPanel.style.display='block';confirmPanel.style.top='400px';confirmName.textContent=c.asset.name+' ('+c.asset.symbol+')';confirmLevel.textContent=c.cost.levelLabel+' ⌄';confirmLevel.setAttribute('aria-label',c.cost.levelLabel);confirmLine.textContent=c.cost.line;confirmAction.textContent=c.label;confirmExit.textContent=tt('risk.notNow');conversationBorn(confirmName,'sphere',32);conversationBorn(confirmAction,'pill');},exit:function(){conversationRetire(confirmName,'sphere');conversationRetire(confirmAction,'pill');confirmPanel.style.display='none';},down:function(h,p){if(h==='pill')return pillDown(p,false);if(h==='avatar')return avatarG();return null;},on:function(n,p){if(n==='app.state'&&p.state==='background')conversationReset();}};
+
+var conversationTypeEnter=STATES.TYPING.enter,conversationTypeDown=STATES.TYPING.down;
+STATES.TYPING.enter=function(prev,d){S.cy.set(180);S.r.set(48);conversationTypeEnter.call(this,prev,d);};
+STATES.TYPING.down=function(h){if(h==='close')return tapG(function(){STATES.TYPING.cancel();});return conversationTypeDown.call(this,h);};
 
 /* ---- app/80-render.js ---- */
 /* =====================================================================
@@ -6329,6 +6665,65 @@ var refineRow = D.getElementById('speakingRefine');
 ['pointerdown','pointermove','pointerup','touchstart','touchmove','touchend','click'].forEach(function(k){ refineRow.addEventListener(k, function(e){ e.stopPropagation(); }); });
 Array.prototype.forEach.call(refineRow.querySelectorAll('button'), function(b){ b.addEventListener('click', function(){ var n = Math.max(0, DIAL_VALUES.indexOf(SES.speaking.value)); dialSave(clamp(n + +b.getAttribute('data-refine'),0,2),true); }); });
 
+/* ---- app/95-conversation-render.js ---- */
+var preparingLine=mk('p','conversation conversation-status');preparingLine.id='conversation-preparing';uiEl.appendChild(preparingLine);
+/* Render corrections are iPhone-only; the shipped read choreography stays intact. */
+var conversationRender=render;
+render=function(){conversationRender();conversationChrome();};
+function conversationChrome(){
+ if(!A||!S)return;
+ var name=ST.name,scale=Math.max(.5,fitS||1),k=(SES&&SES.textScale||1)/scale,target=44/scale;
+ var statusVisible=['SENDING','RESOLVING'].indexOf(name)>=0;if(!statusVisible&&preparingLine._visible)conversationRetire(preparingLine,'sphere');preparingLine._visible=statusVisible;preparingLine.style.display=statusVisible?'block':'none';preparingLine.textContent=tt('status.preparing');if(preparingLine.style.display==='block'&&preparingLine._born!==ST.t0){preparingLine._born=ST.t0;conversationBorn(preparingLine,'sphere',27);}preparingLine.style.top='512px';preparingLine.style.fontSize=22*k+'px';preparingLine.style.lineHeight=27*k+'px';
+ var waiting=['SENDING','RESOLVING','THINK_WAIT'].indexOf(name)>=0,listening=name==='LISTENING',held=name==='HELD_DRAFT',speaking=!!(VOICE.id&&VOICE.started&&!VOICE.ended);
+ var rest=name==='IDLE'||name==='WAKE';if(rest){A.closeO.set(0);op(el.close,0);}att(el.close,'aria-hidden',rest||waiting||name==='READ_CONFIRM'?'true':'false');
+ keyboardButton.style.display=!waiting&&name!=='BOOT'&&name!=='TYPING'?'grid':'none';keyboardButton.style.width=keyboardButton.style.height=target+'px';keyboardButton.style.left=(105-target/2)+'px';keyboardButton.style.top=(770-target/2)+'px';keyboardButton.setAttribute('aria-label',tt('aria.type'));
+ fieldMic.style.display=name==='TYPING'&&TALK_MODE==='tap'?'block':'none';fieldMic.setAttribute('aria-label',tt('aria.talk'));
+ var send=TALK_MODE==='tap'&&(held||listening&&STATES.LISTENING.live);el.pill.classList.toggle('conversation-send',send);
+ if(TALK_MODE==='tap')att(el.pill,'aria-label',tt(waiting?'aria.cancelQuestion':speaking?'aria.pillStop':listening?'aria.sendSpoken':held?'type.send':'aria.talk'));
+ if(waiting){op(el.close,0);op(el.tx,0);op(el.greet,0);op(el.note,0);if(name!=='THINK_WAIT'){if(STATES.SENDING.waitR)moveSphere(STATES.SENDING.waitCy,STATES.SENDING.waitR);A.pillW.set(96);if(A.mode!=='stop')pillMode('stop');hint(tt(clk-ST.t0>=20?'cap.stillWorking':'cap.cancel'));el.dockQ.textContent=READ?READ.question:'';op(el.dockQ,1);att(el.sphereA,'aria-label',tt('aria.preparing'));}}
+ if(name==='COMPANION'){op(el.close,1);op(el.tx,0);op(el.greet,0);op(el.note,0);att(el.close,'aria-label',tt('aria.closeAnswer'));if(RM&&speaking)hint(tt('aria.speaking'));}
+ if(listening||held){op(el.dockQ,0);op(el.dockA,0);A.dockO.set(0);A.dockAO.set(0);att(el.sphereA,'aria-label',tt(listening&&STATES.LISTENING.live?'aria.listening':'aria.idle'));op(el.close,1);op(el.tx,0);op(el.greet,0);op(el.note,0);att(el.close,'aria-label',tt('aria.discardSpoken'));draftPanel.style.setProperty('--type',k);draftPhrase.style.fontSize=26*k+'px';draftPhrase.style.lineHeight=32*k+'px';draftPhrase.style.maxHeight=160*k+'px';draftPhrase.style.overflow='auto';draftPhrase.scrollTop=draftPhrase.scrollHeight;draftPhrase.classList.toggle('conversation-top-fade',draftPhrase.scrollHeight>160*k);}
+ if(name==='READ_CONFIRM'){
+  op(el.close,0);op(el.tx,0);op(el.greet,0);op(el.note,0);confirmPanel.style.setProperty('--target',target+'px');
+  confirmName.style.fontSize=26*k+'px';confirmName.style.lineHeight=32*k+'px';confirmCost.style.font=15*k+'px/'+21*k+'px var(--sans)';confirmCost.style.textAlign='center';confirmCost.style.color='#A39C91';confirmLevel.style.fontSize=15*k+'px';confirmAction.style.fontSize=16*k+'px';confirmAction.style.minHeight=Math.max(50,target)+'px';confirmExit.style.fontSize=15*k+'px';confirmExit.style.display='block';confirmExit.style.margin='8px auto 0';
+  var height=confirmPanel.offsetHeight,r=clamp((602-12-32-height)/2,44,98),spare=Math.max(0,602-12-32-height-2*r),top=110+.4*spare;moveSphere(top+r,r);confirmPanel.style.top=(top+2*r+32)+'px';
+ }
+ if(TALK_MODE==='tap'&&name!=='TYPING'&&name!=='BOOT'){
+  var mode=waiting||speaking?'stop':'mic';if(A.mode!==mode)pillMode(mode);
+  if(!send){op(el.pillMic,mode==='mic'?1:0);op(el.pillStop,mode==='stop'?1:0);op(el.pillKbd,0);op(el.pillThink,0);op(el.pillBars,0);}
+ }
+ if(name==='TYPING'){
+  op(el.wm,0);op(el.close,1);op(el.tx,0);op(el.greet,0);op(el.note,0);
+  var boxTop=parseFloat(el.typeBox.style.top),limit=fin(boxTop)?(boxTop-fitY)/scale-24:330,r=clamp((limit-112)/2,44,98);moveSphere(112+r,r);
+ }
+ if(listening||held)op(el.wm,0);
+ var b=D.getElementById('lvl');if(b){b.classList.remove('on');b.style.display='none';}
+ el.close.style.width=el.close.style.height=target+'px';el.close.style.left=(32-target/2)+'px';el.close.style.top=(76-target/2)+'px';
+ el.hint.style.fontSize=Math.max(11,11/scale)+'px';el.hint.style.bottom='103px';
+ var meta=held&&['cap.minute','cap.stopped'].indexOf(HELD_CAP)>=0;el.hint.style.color=listening&&STATES.LISTENING.live?'#5CE1FF':'#A39C91';el.hint.style.fontFamily=meta?'var(--sans)':'var(--mono)';el.hint.style.textTransform=meta?'none':'uppercase';el.hint.style.letterSpacing=meta?'0':'';el.hint.style.lineHeight=meta?18*k+'px':'';if(meta)el.hint.style.fontSize=13*k+'px';
+}
+var oldOnStage=onStage;onStage=function(p){if(READ&&p&&p.cost)READ.conversationCost=p.cost;oldOnStage(p);};
+var oldAriaState=ariaState;ariaState=function(){oldAriaState();if(['SENDING','RESOLVING'].indexOf(ST.name)>=0)att(el.sphereA,'aria-label',tt('aria.preparing'));};
+var oldLvlSync=lvlSync;lvlSync=function(){var b=D.getElementById('lvl');if(b)b.classList.remove('on');};
+var confirmationRefresh=Promise.resolve(),oldLvlApply=lvlApply;lvlApply=function(l){oldLvlApply(l);if(ST.name!=='READ_CONFIRM')return;var r=READ;confirmAction.disabled=true;confirmationRefresh=confirmationRefresh.catch(noop).then(function(){if(READ!==r||ST.name!=='READ_CONFIRM')return;return bcall('confirm.refresh',{token:STATES.READ_CONFIRM.reply.token}).then(function(reply){if(READ!==r||ST.name!=='READ_CONFIRM')return;confirmAction.disabled=false;r.reply=reply;routeReply(r);}).catch(function(){if(READ===r&&ST.name==='READ_CONFIRM')confirmAction.disabled=false;});});};
+/* The dial retains its native door. It is never a wake scene. */
+var oldWakeEnter=STATES.WAKE.enter;STATES.WAKE.enter=function(prev,d){var offer=SES&&SES.speaking&&SES.speaking.offer;if(SES&&SES.speaking)SES.speaking.offer=false;oldWakeEnter.call(this,prev,d);if(SES&&SES.speaking)SES.speaking.offer=offer;};
+var oldAskStart=askStart;askStart=function(p){if(['COMPANION','READ_CONFIRM','HELD_DRAFT'].indexOf(ST.name)>=0){GUIDE=null;HELD='';go('IDLE',{restoreGreet:true});}return oldAskStart(p);};
+
+var conversationCall=bcall;bcall=function(method,params){if(method==='speak'&&params&&typeof params.spoken!=='boolean')params.spoken=!!(READ&&(READ.reply&&READ.reply.questionSpoken||READ.params&&READ.params.spoken));return conversationCall(method,params);};
+var conversationAriaPill=ariaPill;ariaPill=function(){
+ conversationAriaPill();
+ if(!el||!el.pill)return;
+ var n=ST.name,waiting=['SENDING','RESOLVING','THINK_WAIT'].indexOf(n)>=0;
+ if(waiting)att(el.pill,'aria-label',tt('aria.cancelQuestion'));
+ else if(TALK_MODE==='tap')att(el.pill,'aria-label',tt(VOICE.id&&VOICE.started&&!VOICE.ended?'aria.pillStop':n==='LISTENING'?'aria.sendSpoken':n==='HELD_DRAFT'?'type.send':'aria.talk'));
+};
+
+var conversationTalking=isTalking;isTalking=function(){return ST.name==='COMPANION'?!!(VOICE.started&&!VOICE.ended):conversationTalking();};
+var conversationDrivers=drivers;drivers=function(h){conversationDrivers(h);if(ST.name==='LISTENING'&&TALK_MODE==='tap'&&!STATES.LISTENING.live){FLAG.listen=false;U.energy.t=.35;}if(['SENDING','RESOLVING'].indexOf(ST.name)>=0){U.nodesO.set(0);U.braid.set(0);U.swirl.set(0);U.energy.t=.35+.04*Math.sin(clk*3);}}
+
+var conversationIdleHint=idleHint;idleHint=function(){if(TALK_MODE==='tap'){hint('');if(FACES.length>1&&!HINTED.swipe)hint('',tt('hint.swipe'));}else hint(tt('cap.holdToTalk'));};
+
 /* ---- app/99-boot.js ---- */
 /* =====================================================================
    19. Boot: wire the bridge events, ask for the session, then wake.
@@ -6425,15 +6820,16 @@ function wire(){
   if (!BR) return;
   BR.on('session.changed', function(s){
     var walled = oneTapOff();
+    if(s&&NucleoLocale.language(s.language)!==LANG)conversationReset();
     applySession(s, false);
     if (ST.name === 'IDLE') pillMode(idleMode());
     /* the last read was spent, or reads came back: the idle row loses or regains its one-tap chips at once */
     if (oneTapOff() !== walled && ST.name === 'IDLE') showIdleSuggestions(); else nudgeSync();
   });
   BR.on('speaking.open', function(){ if (SES && SES.speaking && SES.riskAccepted && ['IDLE','HANDBACK','CARDS','FOLLOWUPS','THESIS_VIEW','FACES'].indexOf(ST.name) >= 0){ clearRead(); glassHome(); go('SPEAKING_DIAL'); } });
-  BR.on('account.changed', function(p){ dialBusy = false; dialGreeting = false; stage.classList.remove('speaking-greet'); accountChanged(p); });
-  BR.on('consent.withdrawn', consentWithdrawn);
-  BR.on('app.state', function(p){ if (p && p.state === 'background'){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
+  BR.on('account.changed', function(p){ conversationReset(); dialBusy = false; dialGreeting = false; stage.classList.remove('speaking-greet'); accountChanged(p); });
+  BR.on('consent.withdrawn', function(p){conversationReset();consentWithdrawn(p);});
+  BR.on('app.state', function(p){ if (p && p.state === 'background'){ conversationReset(); SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
   BR.on('companion.checkIn', companionCheckIn);
   BR.on('companion.revoked', function(){ GUIDE_EPOCH++; CHECKIN = null; GUIDE_INPUT_CHECKIN = false; GUIDE_ANSWER_ERROR = ''; if (GUIDE) { GUIDE.personalized = false; GUIDE.companionCheckIn = null; } if (ST.name === 'COMPANION') guideRender(); else { guidePanel.style.display = 'none'; if (ST.name === 'HANDBACK') readChips(); } });
@@ -6448,6 +6844,7 @@ function wire(){
   BR.on('voice.start', function(p){
     if (!p || p.id !== VOICE.id) return;
     VOICE.started = true; VOICE.engine = p.engine || null;
+    if(ST.name==='COMPANION'){K.on=false;fsmEvent('voice.start',p);return;}
     VOICE.lat = clamp(lerp(VOICE.lat, clk - VOICE.reqT, 0.6), 0.15, 5);   /* a slow voice is requested earlier, under the choreography */
     K.on = true; K.t = 0; K.mode = 'read';
     if (fin(p.durationSec) && p.durationSec > 0) kRetime(p.durationSec);

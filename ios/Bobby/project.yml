@@ -115,7 +115,7 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         LSApplicationQueriesSchemes:
           - instagram-stories
-        NSMicrophoneUsageDescription: "Bobby listens only while you hold the button, to hear your question or what you answer to Bobby."
+        NSMicrophoneUsageDescription: "Bobby listens only after you tap the microphone, and stops when you send, cancel or go quiet, to hear your question or what you answer to Bobby."
         NSPhotoLibraryAddUsageDescription: "Bobby saves your skin card to Photos only when you tap Save Image."
         NSSpeechRecognitionUsageDescription: "Bobby turns your spoken question or answer to Bobby into text: on this iPhone when the language is installed, otherwise through Apple's speech service. Bobby does not store the audio."
         # RevenueCat's PUBLIC iOS SDK key (appl_…), from the build setting below. Empty = purchases are off

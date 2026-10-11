@@ -9,7 +9,7 @@ final class CompanionPilotTests: XCTestCase {
         _ = await p.probe(); _ = await p.probe()
         XCTAssertEqual(calls, 1)
         let result = await p.turn(question: "What is investing?", requestId: UUID().uuidString, candidate: nil, speech: "plain")
-        XCTAssertNil(result); XCTAssertEqual(calls, 1)
+        XCTAssertEqual(result?["code"] as? String, "explain_off"); XCTAssertEqual(result?["retryable"] as? Bool, false); XCTAssertEqual(calls, 1)
     }
     func testRoutingKeepsSearchAndShortAssetQuestionsOut() {
         XCTAssertTrue(CompanionPilot.shouldRoute(question: "qué opinas de ethereun hoy", needsConfirmation: true, matchKind: "fuzzy"))
@@ -99,6 +99,43 @@ final class CompanionPilotTests: XCTestCase {
         let result = await p.turn(question: "What is investing?", requestId: UUID().uuidString, candidate: nil, speech: nil)
         XCTAssertEqual((result?["fact"] as? [String: String])?["text"], "Envelope card")
         XCTAssertEqual(result?["text"] as? String, "Explanation")
+    }
+
+    func testFailedProbeIsNotCachedAndAskWaitsForRateLimit() async {
+        let p=CompanionPilot(); var calls=0
+        p.transport = { _, method, _ in
+            if method == "GET" { calls += 1; return (nil,calls == 1 ? 503 : 405) }
+            return (["version":1,"kind":"explanation","reply":["text":"Learning.","gist":"Learning.","followUp":NSNull()]],200)
+        }
+        let first=await p.probe(); XCTAssertFalse(first.known)
+        let started=Date()
+        let answer=await p.turn(question:"What is investing?",requestId:UUID().uuidString,candidate:nil,speech:nil)
+        XCTAssertEqual(calls,2); XCTAssertGreaterThanOrEqual(Date().timeIntervalSince(started),4.8)
+        XCTAssertEqual(answer?["status"] as? String,"companion"); XCTAssertEqual(answer?["gist"] as? String,"Learning.")
+        _ = await p.probe(); XCTAssertEqual(calls,2)
+        p.invalidateProbe(); _ = await p.probe(); XCTAssertEqual(calls,3)
+    }
+    func testRoutingCanonicalReadsAndExplanationsInSixLanguages() {
+        let asset=NucleoAsset(symbol:"BTC",name:"Bitcoin",isEquity:false,assetClass:"crypto")
+        let reads=["en":"Analyze Bitcoin today!","es":"¡Analiza Bitcoin hoy!","fr":"Analyse Bitcoin aujourd’hui","pt":"Analisa Bitcoin hoje","it":"Analizza Bitcoin oggi","de":"Analysiere Bitcoin heute"]
+        let explanations=["en":"What is Bitcoin?","es":"¿Qué es Bitcoin?","fr":"C’est quoi Bitcoin ?","pt":"O que é Bitcoin?","it":"Che cos’è Bitcoin?","de":"Was ist Bitcoin?"]
+        for language in reads.keys {
+            XCTAssertTrue(ConversationRouting.isRead(reads[language]!,asset:asset,language:language),language)
+            XCTAssertTrue(ConversationRouting.isRead("BTC",asset:asset,language:language))
+            XCTAssertFalse(ConversationRouting.isRead(explanations[language]!,asset:asset,language:language),language)
+        }
+    }
+    func testLimitDatesDoNotInventTimeAndFollowLocalDay() {
+        let old=L.language; defer { UserDefaults.standard.set(old,forKey:L.preferenceKey) }
+        UserDefaults.standard.set("es",forKey:L.preferenceKey)
+        var calendar=Calendar(identifier:.gregorian); calendar.timeZone=TimeZone(secondsFromGMT:0)!
+        let now=calendar.date(from:DateComponents(year:2026,month:10,day:10,hour:23,minute:30))!
+        let tomorrow=now.addingTimeInterval(6300)
+        let when=ConversationCopy.when(tomorrow,now:now,calendar:calendar,locale:Locale(identifier:"es_MX"))
+        XCTAssertTrue(when.hasPrefix("mañana a la "),when)
+        XCTAssertEqual(ConversationCopy.limit(headers:[:],now:now),ConversationCopy.limitUnknown())
+        XCTAssertEqual(ConversationCopy.limit(headers:["Retry-After":"invalid"],now:now),ConversationCopy.limitUnknown())
+        XCTAssertEqual(ConversationCopy.limit(headers:["Retry-After":"6300"],now:now,calendar:calendar,locale:Locale(identifier:"es_MX")),ConversationCopy.limitKnown(when))
     }
 
 }

@@ -217,7 +217,7 @@ STATES.WAKE = {
     cue(0.55, function(){ meriIn(); });
     cue(0.70, function(){ A.pillY.to(0, 'soft'); A.pillO.tween(1, 0.3, E.fade); });
     cue(0.85, function(){ S.lean.to(4, BODY.gaze); S.lean.to(0, BODY.gaze, null, 0.26); });
-    cue(0.90, function(){ go(SES && SES.riskAccepted && SES.speaking && SES.speaking.offer ? 'SPEAKING_DIAL' : 'IDLE'); });
+    cue(0.90, function(){ go('IDLE'); });
   },
   down: function(h, p){ if (h === 'pill' || h === 'surface') return STATES.IDLE.down(h, p); return null; }
 };

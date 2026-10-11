@@ -14,7 +14,7 @@ final class NucleoStoreScreenshots: XCTestCase {
             "-avatar.voiceMuted", "YES", "-nucleo.voiceMuteReset.v1", "YES"]
         app.launch()
         XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 30))
-        let ask = app.webViews.buttons.matching(NSPredicate(format: "label == %@ OR label == %@", language == "es" ? "Escribe una pregunta" : "Type a question", language == "es" ? "Pregúntale a Bobby, mantén para hablar" : "Ask Bobby, hold to talk")).firstMatch
+        let ask = app.webViews.buttons.matching(NSPredicate(format: "label == %@ OR label == %@", language == "es" ? "Escribir" : "Type", language == "es" ? "Pregúntale a Bobby, mantén para hablar" : "Ask Bobby, hold to talk")).firstMatch
         XCTAssertTrue(ask.waitForExistence(timeout: 20))
         Thread.sleep(forTimeInterval: 3)
         shot(app, "release47-home-\(language)")
@@ -22,9 +22,13 @@ final class NucleoStoreScreenshots: XCTestCase {
         let field = app.webViews.textViews.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         field.tap()
+        let intro=app.buttons.matching(NSPredicate(format:"label == 'Continue'")).allElementsBoundByIndex.first { $0.isHittable && $0.frame.minY > app.frame.height * 0.7 }
+        if let intro { intro.tap() }
         field.typeText(language == "es" ? "Que riesgos tiene Bitcoin?" : "What risks should I review for Bitcoin?")
         app.webViews.buttons[language == "es" ? "Enviar pregunta" : "Send question"].tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        let confirm=app.webViews.buttons[language == "es" ? "Ver lectura de Bitcoin" : "See the Bitcoin read"]
+        XCTAssertTrue(confirm.waitForExistence(timeout:20)); confirm.tap()
         Thread.sleep(forTimeInterval: 1)
         shot(app, "release47-debate-\(language)")
         let wait = app.webViews.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", language == "es" ? "Esperar" : "Wait")).firstMatch

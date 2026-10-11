@@ -2,8 +2,12 @@ import XCTest
 
 final class CompanionBuild69UITests: XCTestCase {
     override func setUp() { continueAfterFailure = false }
-    func testSpanishCompanionAndMemory() { exercise("es") }
-    func testGermanCompanionAndMemory() { exercise("de") }
+    func testSpanishCompanionAndMemory() {
+        dailyMemory("es")
+    }
+    func testGermanCompanionAndMemory() {
+        dailyMemory("de")
+    }
     func testLiveSpanishMemory() { exercise("es", live: true) }
     func testLiveGermanMemory() { exercise("de", live: true) }
     func testLiveSpanishAndGermanCompanion() {
@@ -23,45 +27,103 @@ final class CompanionBuild69UITests: XCTestCase {
     func testSpanishCompanionRetryOnce() {
         let app = launch("es", scenario: "companion-error")
         ask(app, "¿Qué significa invertir?")
-        let retry = app.webViews.firstMatch.buttons["Intentar de nuevo"]
-        XCTAssertTrue(retry.waitForExistence(timeout: 20), app.debugDescription)
-        retry.tap()
-        XCTAssertTrue(app.webViews.firstMatch.buttons["Volver a Bobby"].waitForExistence(timeout: 20))
-        XCTAssertFalse(retry.exists)
-        shot(app, "build69-es-one-retry")
+        let retry = app.webViews.firstMatch.buttons["Reintentar"]
+        for _ in 0..<3 {
+            XCTAssertTrue(retry.waitForExistence(timeout: 20), app.debugDescription)
+            retry.tap()
+        }
+        XCTAssertTrue(retry.waitForExistence(timeout: 20)); XCTAssertTrue(retry.isHittable)
+        shot(app, "i1-es-repeatable-retry"); app.terminate()
     }
-    func testSpanishControlsFit() { controlsFit("es") }
-    func testGermanControlsFit() { controlsFit("de") }
-    func testTypedSpanishAnswers() { typedAnswers("es", live: false) }
-    func testTypedGermanAnswers() { typedAnswers("de", live: false) }
+    func testSpanishControlsFit() {
+        dailyControls("es")
+    }
+    func testGermanControlsFit() {
+        dailyControls("de")
+    }
+    func testTypedSpanishAnswers() {
+        dailyTyped("es")
+    }
+    func testTypedGermanAnswers() {
+        dailyTyped("de")
+    }
     func testLiveTypedSpanishAnswers() { typedAnswers("es", live: true) }
     func testSpanishAnswerErrorKeepsOptions() {
+        // T12: I-1 has no personal-answer panel; the fixture cannot bring one back.
         let app = launch("es", scenario: "companion-answer-error")
-        ask(app, "¿Qué significa invertir?")
-        XCTAssertTrue(app.buttons["companion-consent-yes"].waitForExistence(timeout: 20))
-        app.buttons["companion-consent-yes"].tap()
-        XCTAssertTrue(app.webViews.firstMatch.buttons["Cripto"].waitForExistence(timeout: 10))
-        answer(app, "Me interesa cripto", spanish: true)
-        XCTAssertTrue(app.webViews.firstMatch.staticTexts["No pude anotarlo. Puedes elegir una de las opciones."].waitForExistence(timeout: 15))
-        visible(app.webViews.firstMatch.buttons["Omitir"], app, aboveMic: true)
-        shot(app, "build69-es-tier3-answer-error-fixed")
-        app.webViews.firstMatch.buttons["Cripto"].tap()
-        XCTAssertTrue(app.webViews.firstMatch.buttons["No entiendo las palabras"].waitForExistence(timeout: 10))
-        app.terminate()
+        ask(app, "¿Qué significa invertir?"); dailyAnswer(app, es: true)
+        XCTAssertFalse(app.webViews.firstMatch.buttons["Cripto"].exists)
+        XCTAssertFalse(app.webViews.firstMatch.buttons["Omitir"].exists)
+        shot(app,"i1-es-no-personal-options"); app.terminate()
     }
     func testFactCardFixture() {
         let app = launch("es", scenario: "companion-fact")
-        ask(app, "¿Qué son los CETES?")
-        XCTAssertTrue(app.buttons["companion-consent-no"].waitForExistence(timeout: 20))
-        app.buttons["companion-consent-no"].tap()
+        ask(app, "¿Qué son los CETES?"); dailyAnswer(app, es: true)
         let card = app.webViews.firstMatch.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Fuente de ejemplo' AND label CONTAINS '2026'")).firstMatch
-        XCTAssertTrue(card.waitForExistence(timeout: 10)); XCTAssertTrue(card.isHittable)
-        visible(app.webViews.firstMatch.buttons["Volver a Bobby"], app, aboveMic: true)
-        shot(app, "build69-es-tier3-fact-fixture-fixed")
-        app.terminate()
+        XCTAssertTrue(card.waitForExistence(timeout: 10)); visible(card, app)
+        shot(app,"i1-es-fact-reading"); app.terminate()
     }
-    func testSpanishExerciseExplanation() { exerciseExplanation("es") }
-    func testGermanExerciseExplanation() { exerciseExplanation("de") }
+    func testSpanishExerciseExplanation() {
+        dailyExercise("es")
+    }
+    func testGermanExerciseExplanation() {
+        dailyExercise("de")
+    }
+    // T11–T16: the answer is first; Profile memory remains an explicit path.
+    private func dailyAnswer(_ app: XCUIApplication, es: Bool) {
+        let x=app.webViews.firstMatch.buttons[es ? "Cerrar la respuesta" : "Antwort schließen"]
+        XCTAssertTrue(x.waitForExistence(timeout:20),app.debugDescription)
+        XCTAssertFalse(app.buttons["companion-consent-yes"].exists)
+        XCTAssertFalse(app.webViews.firstMatch.buttons[es ? "Cripto" : "Krypto"].exists)
+    }
+    private func dailyMemory(_ language: String) {
+        let es=language=="es", app=launch(language,scenario:"companion-plain")
+        ask(app,es ? "¿Qué significa invertir?" : "Was bedeutet investieren?"); dailyAnswer(app,es:es)
+        let follow=app.webViews.firstMatch.buttons.matching(NSPredicate(format:"label CONTAINS %@",es ? "¿Cómo funciona una acción?" : "Wie funktioniert eine Aktie?")).firstMatch
+        XCTAssertTrue(follow.waitForExistence(timeout:10)); follow.tap(); dailyAnswer(app,es:es)
+        shot(app,"i1-\(language)-follow-up"); app.terminate()
+        dailyNotes(language)
+    }
+    private func dailyControls(_ language: String) {
+        let es=language=="es", app=launch(language,scenario:"companion")
+        ask(app,es ? "¿Qué significa invertir?" : "Was bedeutet investieren?"); dailyAnswer(app,es:es)
+        visible(app.webViews.firstMatch.buttons[es ? "Cerrar la respuesta" : "Antwort schließen"],app)
+        let profile=app.webViews.firstMatch.buttons[es ? "Momo. Cuenta y progreso" : "Momo. Konto und Fortschritt"]
+        XCTAssertTrue(profile.isHittable); profile.tap()
+        XCTAssertTrue(app.buttons["account-analysis-level"].waitForExistence(timeout:10)); for _ in 0..<4 where !app.buttons["account-analysis-level"].isHittable { app.swipeUp() }; visible(app.buttons["account-analysis-level"],app)
+        shot(app,"i1-\(language)-profile-control-roles"); app.terminate()
+    }
+    private func dailyExercise(_ language: String) {
+        let es=language=="es",app=launch(language,scenario:"companion-exercise")
+        ask(app,es ? "¿Qué significa invertir?" : "Was bedeutet investieren?"); dailyAnswer(app,es:es)
+        XCTAssertFalse(app.webViews.firstMatch.buttons[es ? "Pararía" : "Ich würde aufhören"].exists)
+        shot(app,"i1-\(language)-no-personal-exercise"); app.terminate()
+    }
+    private func dailyTyped(_ language: String) {
+        let es=language=="es",app=launch(language,scenario:"companion")
+        for question in es ? ["¿Qué significa invertir?","Me interesa cripto","No entiendo las palabras"] : ["Was bedeutet investieren?","Mich interessiert Krypto","Ich verstehe die Begriffe nicht"] {
+            ask(app,question); dailyAnswer(app,es:es)
+        }
+        shot(app,"i1-\(language)-typed-without-check-in"); app.terminate()
+    }
+    private func dailyNotes(_ language: String) {
+        let es=language=="es",app=launch(language,scenario:"companion",seedNotes:true)
+        ask(app,es ? "¿Qué significa invertir?" : "Was bedeutet investieren?"); dailyAnswer(app,es:es)
+        openNotes(app,es:es)
+        XCTAssertTrue(app.staticTexts["companion-note-interest"].waitForExistence(timeout:10))
+        app.buttons["companion-correct-interest"].tap()
+        XCTAssertTrue(app.buttons["companion-correct-option-companies"].waitForExistence(timeout:10)); app.buttons["companion-correct-option-companies"].tap()
+        let toggle=app.switches["companion-memory-toggle"]; toggle.tap()
+        let confirm=app.buttons["companion-delete-confirm"],cancel=app.buttons["companion-delete-cancel"]
+        XCTAssertTrue(confirm.waitForExistence(timeout:10)); visible(confirm,app); visible(cancel,app)
+        XCTAssertEqual(confirm.frame.width,cancel.frame.width,accuracy:1); XCTAssertEqual(confirm.frame.height,cancel.frame.height,accuracy:1)
+        cancel.tap(); XCTAssertTrue(app.staticTexts["companion-note-interest"].exists)
+        reach(app.buttons["companion-delete-interest"],app,up:true); app.buttons["companion-delete-interest"].tap()
+        XCTAssertFalse(app.staticTexts["companion-note-interest"].exists); XCTAssertFalse(confirm.exists)
+        reach(toggle,app,up:false); toggle.tap(); XCTAssertTrue(confirm.waitForExistence(timeout:10)); confirm.tap()
+        XCTAssertEqual(toggle.value as? String,"0")
+        shot(app,"i1-\(language)-profile-correct-delete-memory"); app.terminate()
+    }
     private func exerciseExplanation(_ language: String) {
         let es = language == "es", app = launch(language, scenario: "companion-exercise")
         ask(app, es ? "¿Qué significa invertir?" : "Was bedeutet investieren?")
@@ -76,22 +138,23 @@ final class CompanionBuild69UITests: XCTestCase {
         shot(app, "build69-\(language)-tier3-exercise-explanation-fixed")
         app.terminate()
     }
-    func testSpanishDesignReviewC() { designReviewC("es") }
-    func testGermanDesignReviewC() { designReviewC("de") }
+    func testSpanishDesignReviewC() {
+        dailyNotes("es")
+    }
+    func testGermanDesignReviewC() {
+        dailyNotes("de")
+    }
     func testDecliningConsentAsksNothingMore() {
-        let app = launch("es", scenario: "companion")
-        ask(app, "¿Qué significa invertir?")
-        XCTAssertTrue(app.buttons["companion-consent-no"].waitForExistence(timeout: 20)); app.buttons["companion-consent-no"].tap()
-        XCTAssertTrue(app.webViews.firstMatch.buttons["Volver a Bobby"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.webViews.firstMatch.buttons["Cripto"].exists)
-        ask(app, "¿Qué significa ahorrar?")
-        XCTAssertTrue(app.webViews.firstMatch.buttons["Volver a Bobby"].waitForExistence(timeout: 20))
-        XCTAssertFalse(app.buttons["companion-consent-yes"].exists)
-        XCTAssertFalse(app.webViews.firstMatch.buttons["Cripto"].exists)
-        app.terminate()
+        let app = launch("es",scenario:"companion")
+        ask(app,"¿Qué significa invertir?"); dailyAnswer(app,es:true)
+        openNotes(app,es:true)
+        let toggle=app.switches["companion-memory-toggle"]; XCTAssertTrue(toggle.waitForExistence(timeout:10)); toggle.tap()
+        XCTAssertTrue(app.buttons["companion-consent-no"].waitForExistence(timeout:10)); app.buttons["companion-consent-no"].tap()
+        XCTAssertEqual(toggle.value as? String,"0"); XCTAssertFalse(app.staticTexts["companion-note-interest"].exists)
+        shot(app,"i1-es-profile-memory-declined"); app.terminate()
     }
     private func openNotes(_ app: XCUIApplication, es: Bool) {
-        let close = app.webViews.firstMatch.buttons[es ? "Volver a Bobby" : "Zurück zu Bobby"]
+        let close = app.webViews.firstMatch.buttons[es ? "Cerrar la respuesta" : "Antwort schließen"]
         XCTAssertTrue(close.waitForExistence(timeout: 10)); close.tap()
         let profile = app.webViews.firstMatch.buttons[es ? "Momo. Cuenta y progreso" : "Momo. Konto und Fortschritt"]
         XCTAssertTrue(profile.waitForExistence(timeout: 10)); profile.tap()
@@ -261,7 +324,7 @@ final class CompanionBuild69UITests: XCTestCase {
         XCTAssertGreaterThanOrEqual(element.frame.height, 43)
         if aboveMic { XCTAssertLessThan(element.frame.maxY, app.frame.height * 742 / 844) }
     }
-    private func launch(_ language: String, scenario: String) -> XCUIApplication {
+    private func launch(_ language: String, scenario: String, seedNotes: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-nucleo-fixtures", scenario, "-nucleo-page", "app", "-qa-companion",
             "-AppleLanguages", "(\(language))", "-app.language", language, "-agent.riskNoticeVersion", "6",
@@ -272,17 +335,21 @@ final class CompanionBuild69UITests: XCTestCase {
             app.launchArguments.removeFirst(2)
             app.launchArguments += ["-qa-companion-live", "-qa-companion-memory-account", "companion-qa-" + UUID().uuidString]
         }
+        if seedNotes { app.launchArguments += ["-qa-redesign-notes"] }
         app.launch()
         XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 30))
         return app
     }
     private func ask(_ app: XCUIApplication, _ question: String) {
         let web = app.webViews.firstMatch
-        let known = web.buttons.matching(NSPredicate(format: "label == 'Escribe una pregunta' OR label == 'Frage eingeben' OR label == 'Type a question' OR label CONTAINS 'mantén para hablar' OR label CONTAINS 'zum Sprechen' OR label CONTAINS 'hold to talk'")).firstMatch
+        let known = web.buttons.matching(NSPredicate(format: "label == 'Escribe una pregunta' OR label == 'Frage eingeben' OR label == 'Type a question' OR label == 'Escribir una pregunta' OR label == 'Frage tippen' OR label == 'Escribir' OR label == 'Schreiben' OR label == 'Type' OR label CONTAINS 'mantén para hablar' OR label CONTAINS 'zum Sprechen' OR label CONTAINS 'hold to talk'")).firstMatch
         XCTAssertTrue(known.waitForExistence(timeout: 15), app.debugDescription); known.tap()
         let field = web.textViews.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 10), app.debugDescription)
-        field.tap(); field.typeText(question)
+        field.tap()
+        let intro=app.buttons.matching(NSPredicate(format:"label == 'Continue'")).allElementsBoundByIndex.first { $0.isHittable && $0.frame.minY > app.frame.height * 0.7 }
+        if let intro { intro.tap() }
+        field.typeText(question)
         let send = web.buttons.matching(NSPredicate(format: "label == 'Enviar pregunta' OR label == 'Frage senden' OR label == 'Send question'")).firstMatch
         XCTAssertTrue(send.waitForExistence(timeout: 10), app.debugDescription)
         send.tap()

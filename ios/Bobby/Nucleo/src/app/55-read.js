@@ -45,6 +45,7 @@ function startRead(params, question){
   var prev = READ, origin = ASK_ORIGIN || ((params.token || params.followUpOf) && prev && prev.origin) || 'person';
   var r = { id: ++READ_SEQ, params: params, question: question, stageId: null, accepted: false, asset: null, market: null, reply: null, model: null,
             requestId: null, askT: clk, save: null, cancelling: false, origin: origin };
+  r.questionSpoken=!!(params.spoken||params.token&&prev&&(prev.questionSpoken||prev.reply&&prev.reply.questionSpoken));
   READ = r;
   bcall('ask', params).then(function(res){ onAskReply(r, res); },
     function(err){ onAskReply(r, { v: 1, status: 'error', code: 'bad_response', message: null, fault: err && err.code }); });
@@ -384,17 +385,15 @@ function showIdleSuggestions(){
   if (ST.name !== 'IDLE') return;
   /* A starter chip reads as the company; its action keeps the exchange symbol the server resolves
      (src/lib/regional-stocks.ts). A symbol without an entry shows as itself. */
-  var CHIP_NAMES = { 'NVDA':'NVIDIA', 'MC.PA':'LVMH', 'OR.PA':'L’Oréal', 'EDP.LS':'EDP', 'GALP.LS':'Galp',
-    'PETR4.SA':'Petrobras', 'VALE3.SA':'Vale', 'ISP.MI':'Intesa Sanpaolo', 'ENEL.MI':'Enel', 'SAP.DE':'SAP', 'SIE.DE':'Siemens' };
   var list = [], seen = {};
   /* Bobby never invites someone into a wall: when native says the next read would be refused (`oneTap: false` in the
      session) the home offers no chip that asks by itself. The pill still takes their own question. */
   ((oneTapOff() ? [] : (SUGG && SUGG.quickAccess)) || []).forEach(function(item){
-    var sym = String(item && item.symbol || '').toUpperCase();
-    if (list.length >= 3 || seen[sym] || !/^[A-Z0-9.^=-]{1,20}$/.test(sym)) return;
+    var sym = String(item && item.symbol || '').toUpperCase(),name=String(item&&item.name||sym);
+    if (!name || list.length >= 3 || seen[sym] || !/^[A-Z0-9.^=-]{1,20}$/.test(sym)) return;
     seen[sym] = 1;
-    var question = RMOD.t(LANG, 'follow.how', { symbol:sym });
-    list.push({ label:CHIP_NAMES.hasOwnProperty(sym) ? CHIP_NAMES[sym] : sym, ariaLabel:question, action:{ question:question, symbol:sym, starter:true } });
+    var question = RMOD.t(LANG, 'follow.how', { symbol:name });
+    list.push({ label:name, ariaLabel:question, action:{ question:question, symbol:sym, starter:true } });
   });
   list = withNudge(list);
   if (list.length) chipsShow(list, nudgeEyebrow()); else chipsHide();

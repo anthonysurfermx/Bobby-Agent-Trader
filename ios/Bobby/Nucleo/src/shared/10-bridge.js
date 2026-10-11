@@ -16,7 +16,7 @@
   'use strict';
   var V = 1;
   var METHODS = [
-    'companion.presented', 'companion.answer', 'speaking.choose', 'session', 'roster', 'suggestions', 'ask', 'cancel', 'read.rendered',
+    'companion.presented', 'companion.answer', 'speaking.choose', 'session', 'roster', 'suggestions', 'ask', 'confirm.refresh', 'cancel', 'read.rendered',
     'speech.permission', 'speech.requestPermission', 'speech.start', 'speech.stop',
     'speak', 'previewVoice', 'stopSpeaking', 'setMuted', 'haptic',
     'saveThesis', 'island', 'theses', 'record',

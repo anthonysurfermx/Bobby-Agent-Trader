@@ -1,0 +1,41 @@
+/* Quiet control roles, SPEC 9. One source injected in both iPhone pages. */
+.conversation{position:absolute;left:20px;width:350px;z-index:18;color:#F2EDE4;--target:44px;--type:1;pointer-events:auto}
+.conversation button,.quiet-glyph{min-height:var(--target);min-width:var(--target);color:#F2EDE4;font-family:var(--sans);touch-action:manipulation}
+.quiet-primary{background:#F2EDE4;color:#141210!important;border:0;border-radius:999px;width:100%;padding:15px 24px;font-weight:600}
+.quiet-secondary{background:rgba(242,237,228,.06);border:1px solid rgba(242,237,228,.30);border-radius:999px}
+.quiet-chip{background:rgba(242,237,228,.04);border:1px solid rgba(242,237,228,.14);border-radius:28px;text-align:left;width:100%;padding:14px 18px;font-weight:500;white-space:normal}
+.quiet-link,.quiet-level{border:0;background:transparent;padding:8px;color:#A39C91!important}
+.quiet-glyph{position:absolute;z-index:21;left:83px;top:748px;width:44px;height:44px;display:grid;place-items:center;background:rgba(242,237,228,.04);border:1px solid rgba(242,237,228,.14);border-radius:50%;color:#A39C91}
+.conversation-phrase{font-family:var(--serif);font-weight:300;letter-spacing:-.035em;text-align:center;text-wrap:balance;margin:0;white-space:pre-wrap;color:#FFF8EC}
+.conversation-body{font-family:var(--sans);white-space:pre-wrap;margin:14px 0 0;color:#F2EDE4}
+.conversation-reading{overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-mask-image:linear-gradient(to bottom,transparent,#000 var(--fade-top,0px),#000 calc(100% - var(--fade-bottom,0px)),transparent)}
+.conversation-slot{position:absolute;left:20px;width:350px;z-index:19;pointer-events:auto}
+.conversation-slot button{min-height:var(--target);min-width:var(--target);font:500 calc(15px * var(--type))/1.333 var(--sans);color:#F2EDE4}
+.conversation-meta{font:400 calc(13px * var(--type))/1.385 var(--sans);color:#A39C91;margin:10px 0 0}
+.conversation-tail{color:#A39C91}
+#pill .send-icon{position:absolute;inset:0;display:none;place-items:center;color:#F2EDE4}
+#pill.conversation-send .send-icon{display:grid}
+#pill.conversation-send .mic,#pill.conversation-send .stop,#pill.conversation-send .bars,#pill.conversation-send .kbd{visibility:hidden!important;opacity:0!important}
+
+.conversation-status{font-family:var(--serif);font-weight:300;text-align:center;margin:0;color:#F2EDE4}
+.conversation-top-fade{-webkit-mask-image:linear-gradient(to bottom,transparent,#000 20px)}
+#conversation-field-mic{position:absolute;left:auto;top:auto;right:50px;bottom:5px;background:transparent;border:0}
+#typeBox:has(#conversation-field-mic[style*="block"]) #ta{padding-right:105px}
+
+.conversation-eyebrow{display:block;font:500 calc(11px * var(--type))/1.273 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:#A39C91;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.conversation-slot .quiet-chip{max-height:calc(110px * var(--type));overflow:hidden}
+
+.conversation-noted::before{content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:#B9ADEB;margin:0 7px 2px 0}
+
+.conversation-slot .quiet-primary{font:600 calc(16px * var(--type))/1.25 var(--sans)}
+.conversation button:disabled,.quiet-glyph:disabled{opacity:.45}
+.conversation button:focus-visible,.quiet-glyph:focus-visible{outline:2px solid #F2EDE4;outline-offset:3px}
+.conversation button:active,.quiet-glyph:active{filter:brightness(1.15)}
+
+#taSend{width:44px;height:44px;right:4px;bottom:3px}
+
+.conversation-chip-label{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.conversation-eyebrow{margin-bottom:calc(4px * var(--type))}
+
+#companion-read-all{margin:4px auto 0}
+.quiet-level{color:#F2EDE4!important}

@@ -93,15 +93,16 @@ function wire(){
   if (!BR) return;
   BR.on('session.changed', function(s){
     var walled = oneTapOff();
+    if(s&&NucleoLocale.language(s.language)!==LANG)conversationReset();
     applySession(s, false);
     if (ST.name === 'IDLE') pillMode(idleMode());
     /* the last read was spent, or reads came back: the idle row loses or regains its one-tap chips at once */
     if (oneTapOff() !== walled && ST.name === 'IDLE') showIdleSuggestions(); else nudgeSync();
   });
   BR.on('speaking.open', function(){ if (SES && SES.speaking && SES.riskAccepted && ['IDLE','HANDBACK','CARDS','FOLLOWUPS','THESIS_VIEW','FACES'].indexOf(ST.name) >= 0){ clearRead(); glassHome(); go('SPEAKING_DIAL'); } });
-  BR.on('account.changed', function(p){ dialBusy = false; dialGreeting = false; stage.classList.remove('speaking-greet'); accountChanged(p); });
-  BR.on('consent.withdrawn', consentWithdrawn);
-  BR.on('app.state', function(p){ if (p && p.state === 'background'){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
+  BR.on('account.changed', function(p){ conversationReset(); dialBusy = false; dialGreeting = false; stage.classList.remove('speaking-greet'); accountChanged(p); });
+  BR.on('consent.withdrawn', function(p){conversationReset();consentWithdrawn(p);});
+  BR.on('app.state', function(p){ if (p && p.state === 'background'){ conversationReset(); SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
   BR.on('companion.checkIn', companionCheckIn);
   BR.on('companion.revoked', function(){ GUIDE_EPOCH++; CHECKIN = null; GUIDE_INPUT_CHECKIN = false; GUIDE_ANSWER_ERROR = ''; if (GUIDE) { GUIDE.personalized = false; GUIDE.companionCheckIn = null; } if (ST.name === 'COMPANION') guideRender(); else { guidePanel.style.display = 'none'; if (ST.name === 'HANDBACK') readChips(); } });
@@ -116,6 +117,7 @@ function wire(){
   BR.on('voice.start', function(p){
     if (!p || p.id !== VOICE.id) return;
     VOICE.started = true; VOICE.engine = p.engine || null;
+    if(ST.name==='COMPANION'){K.on=false;fsmEvent('voice.start',p);return;}
     VOICE.lat = clamp(lerp(VOICE.lat, clk - VOICE.reqT, 0.6), 0.15, 5);   /* a slow voice is requested earlier, under the choreography */
     K.on = true; K.t = 0; K.mode = 'read';
     if (fin(p.durationSec) && p.durationSec > 0) kRetime(p.durationSec);

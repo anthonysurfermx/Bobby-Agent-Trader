@@ -353,6 +353,11 @@ struct AccountSheet: View {
                        action: { onOpenRoute(.reminders) }) { ProfileIcon(symbol: "bell") }
                 .accessibilityIdentifier("account-reminders")
         }
+        if let onOpenRoute {
+            ProfileRow(label: invites.level.name,
+                       action: { onOpenRoute(.levels) }) { ProfileIcon(symbol: "slider.horizontal.3") }
+                .accessibilityIdentifier("account-analysis-level")
+        }
         // Bobby Pro weekly briefing: the account's Monday schedule, its consents and its inbox.
         ProfileRow(label: L.t("Weekly briefing", "Resumen semanal"),
                    detail: BriefingCopy.summary(account.isSignedIn ? briefings.settings : nil),

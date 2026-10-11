@@ -1,6 +1,6 @@
 import XCTest
 
-/// The shipping build-69 scenes, driven exclusively through the offline fixture transport.
+/// The corresponding current scenes (build-69 evidence is retained separately), driven exclusively through the offline fixture transport.
 /// Language is injected into the test runner by redesign-shots.sh, never by a live service.
 final class RedesignShots: XCTestCase {
     private var app: XCUIApplication!
@@ -49,7 +49,7 @@ final class RedesignShots: XCTestCase {
     }
     private func type(_ text: String? = nil) {
         let web = app.webViews.firstMatch
-        ready(pill); pill.tap()
+        let keyboard=web.buttons[word("app", "aria.type")]; ready(keyboard); keyboard.tap()
         ready(web.textViews.firstMatch)
         web.textViews.firstMatch.tap()
         // Fresh simulator keyboards can cover the keys with Apple's QuickPath introduction.
@@ -73,9 +73,9 @@ final class RedesignShots: XCTestCase {
         let send = app.webViews.firstMatch.buttons[word("app", "type.send")]
         ready(send); send.tap()
     }
-    private func answered() { ready(app.webViews.firstMatch.buttons[word("companion", "close")]) }
+    private func answered() { ready(app.webViews.firstMatch.buttons[word("app", "aria.closeAnswer")]) }
     private var pill: XCUIElement {
-        app.webViews.firstMatch.buttons.matching(NSPredicate(format: "label IN %@", [word("app", "aria.pillType"), word("app", "aria.pill")])).firstMatch
+        app.webViews.firstMatch.buttons.matching(NSPredicate(format: "label IN %@", [word("app", "aria.talk"), word("app", "aria.pill")])).firstMatch
     }
     private func shot(_ name: String) {
         // Let the existing motion settle; capture current behavior without freezing the product FSM.
@@ -111,8 +111,8 @@ final class RedesignShots: XCTestCase {
     }
     func test03WaitingGeneralQuestion() {
         launch("companion-waiting"); ask()
-        ready(app.webViews.firstMatch.buttons[word("app", "aria.pillCancel")])
-        XCTAssertFalse(app.webViews.firstMatch.buttons[word("companion", "close")].exists)
+        ready(app.webViews.firstMatch.buttons[word("app", "aria.cancelQuestion")])
+        XCTAssertFalse(app.webViews.firstMatch.buttons[word("app", "aria.closeAnswer")].exists)
         shot("03-waiting-general-question")
     }
     func test04EducationalAnswer() {
@@ -120,17 +120,25 @@ final class RedesignShots: XCTestCase {
         XCTAssertFalse(app.buttons["companion-consent-yes"].exists)
         shot("04-educational-answer")
     }
+    // T11/4.9: memory consent is reached only by the person, through Profile.
+    private func openEducationalNotes() {
+        let profile=app.webViews.firstMatch.buttons[word("app", "aria.account").replacingOccurrences(of:"{name}",with:"Momo")]
+        ready(profile); profile.tap()
+        scrollTo(app.buttons["account-memory"]); app.buttons["account-memory"].tap()
+        scrollTo(app.buttons["memory-educational-notes"]); app.buttons["memory-educational-notes"].tap()
+        ready(app.switches["companion-memory-toggle"])
+    }
     func test05MemoryConsent() {
-        launch("companion"); ask(); ready(app.buttons["companion-consent-yes"])
-        ready(app.buttons["companion-consent-no"])
-        shot("05-memory-consent")
+        launch("companion"); ask(); answered(); XCTAssertFalse(app.buttons["companion-consent-yes"].exists)
+        openEducationalNotes(); app.switches["companion-memory-toggle"].tap()
+        ready(app.buttons["companion-consent-yes"]); ready(app.buttons["companion-consent-no"])
+        shot("05-explicit-memory-consent")
     }
     func test06QuestionFromBobby() {
-        launch("companion"); ask(); ready(app.buttons["companion-consent-yes"])
-        app.buttons["companion-consent-yes"].tap()
-        ready(app.webViews.firstMatch.buttons[labels["crypto"] as! String])
-        XCTAssertTrue(app.webViews.firstMatch.staticTexts[labels["interest"] as! String].exists)
-        shot("06-question-from-bobby")
+        launch("companion"); ask(); answered()
+        XCTAssertFalse(app.webViews.firstMatch.buttons[labels["crypto"] as! String].exists)
+        XCTAssertFalse(app.buttons["companion-consent-yes"].exists)
+        shot("06-answer-without-personal-question")
     }
     func test07AnswerWithNotes() {
         launch("companion", notes: true); ask(); answered()
@@ -139,7 +147,7 @@ final class RedesignShots: XCTestCase {
     }
     func test08CompanionFailureRetry() {
         launch("companion-error"); ask()
-        ready(app.webViews.firstMatch.buttons[word("companion", "retry")])
+        ready(app.webViews.firstMatch.buttons[word("app", "fail.retry")])
         shot("08-companion-failure-retry")
     }
     func test09NotesScreen() {

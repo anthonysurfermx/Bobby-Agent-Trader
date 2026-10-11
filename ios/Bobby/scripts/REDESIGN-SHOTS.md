@@ -37,3 +37,11 @@ The UI driver waits for visible Apple Intelligence notification text before atta
 | 12-first-run-consent-beat | same ready screen, tap BTC; capture before hold-to-agree |
 
 The notes seed exists only behind DEBUG and the offline-fixtures check. It cannot seed a live or Release app. Existing fixture scenarios are unchanged. Every HTTP(S) request is intercepted by NucleoFixtureProtocol; no paid model or real market server is used by RedesignShots.
+
+## Increment 1
+
+`ConversationShots` captures the daily rest, composer, speech states, neutral wait, answer layouts, single slot, failures, costs and level confirmation. `WithoutHelpUITests` runs the seven4.11 tasks and exports one or more named captures per task. Run these in Spanish on Pro at default type and SE at `--text-size +1` before theI-1a checkpoint, then repeat Spanish/German for finalI-1. `HoldConversationUITests` is selected only after `python3 ios/Bobby/scripts/talk-mode.py hold`; use the same script to restoretap before other captures. Purpose strings and primer labels move together.
+
+The native suite selector `--test BobbyTests` is supported, as is `--test BobbyTests/NucleoBridgeTests`. All runs explicitly exclude the four actual `testLive…` methods. The script refuses a live selector, refuses less than5GiB of free space, and holds one simulator lock. Signed Debug only; no archive. Every result bundle is exported then deleted. `--cleanup` deletes only phones created by that invocation.
+
+Capture directories from failed or interrupted attempts are diagnostic evidence. Review every final image against the board/SPEC0.5, keep an index with source/run provenance, and promote only images without OS banners, clipping, keyboard/sphere overlap or incomplete controls. Green automation alone does not approve a screenshot.

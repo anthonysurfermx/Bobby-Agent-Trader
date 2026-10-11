@@ -38,6 +38,7 @@ export function askStartCases(kit) {
   const state = (app) => app.context.nucleo.state();
   const emit = (app, name, payload) => app.context.nucleoBridge.emit(name, payload);
   const offer = (app, token) => emit(app, 'ask.start', { token, question: QUESTION });
+  const type = app => { const b=app.nodes.get('ui').children.find(n=>n.id==='conversation-keyboard'); if(b)b._guideAction();else tap(app,app.nodes.get('pill')); };
   const stage = (app) => app.nodes.get('stage').listeners;
   const finger = (target, x, y) => ({ isPrimary: true, button: 0, pointerId: 7, clientX: x, clientY: y, target, cancelable: false });
   // The glass itself: a place of the stage that is nothing to tap.
@@ -154,7 +155,7 @@ export function askStartCases(kit) {
     // Reduced motion: positions are set, not sprung; the states are the same.
     for (const from of ['HANDBACK', 'TYPING']) {
       const calm = await idle({ seed: (session) => { session.reducedMotion = true; } });
-      if (from === 'HANDBACK') await personRead(calm, okRead()); else tap(calm, calm.nodes.get('pill'));
+      if (from === 'HANDBACK') await personRead(calm, okRead()); else type(calm);
       assert.equal(state(calm), from);
       await taken(calm, 'tok-3', from + ' with reduced motion');
     }
@@ -203,18 +204,18 @@ export function askStartCases(kit) {
   test('the keyboard gives way: with nothing typed it closes, and words they had typed are there the next time it opens', async () => {
     // Nothing typed, from the idle home.
     const empty = await idle();
-    tap(empty, empty.nodes.get('pill'));
+    type(empty);
     assert.equal(state(empty), 'TYPING');
     await taken(empty, 'tok-1', 'TYPING, nothing typed');
     // Their own words, half written.
     const words = await idle();
-    tap(words, words.nodes.get('pill'));
+    type(words);
     words.nodes.get('ta').value = 'What about the earnings';
     await taken(words, 'tok-2', 'TYPING, words typed');
     assert.equal(asksOf(words).some((ask) => ask.question === 'What about the earnings'), false, 'their words were not sent for them');
     tap(words, words.nodes.get('close')); words.advance(2.5); await flush();
     assert.equal(state(words), 'IDLE');
-    tap(words, words.nodes.get('pill'));
+    type(words);
     assert.equal(state(words), 'TYPING');
     assert.equal(words.nodes.get('ta').value, 'What about the earnings', 'the draft is back in the box');
     // "Another question" over a finished read: the read leaves with the keyboard, and the question is not asked as
@@ -225,7 +226,7 @@ export function askStartCases(kit) {
     assert.equal(state(another), 'TYPING');
     another.nodes.get('ta').value = 'and the volume';
     await taken(another, 'tok-3', 'TYPING over a read');
-    assert.deepEqual(asksOf(another).map((ask) => Object.keys(ask).sort().join()), ['chip,question', 'token']);
+    assert.deepEqual(asksOf(another).map((ask) => Object.keys(ask).sort().join()), [kit.confirm ? 'chip,confirm,question' : 'chip,question', 'token']);
     assert.deepEqual(empty.errors.concat(words.errors, another.errors), []);
   });
 
@@ -263,10 +264,10 @@ export function askStartCases(kit) {
     const card = await idle();
     stage(card).pointerdown(finger(card.nodes.get('pill'), 220, 880));
     card.advance(0.4);
-    stage(card).pointerup(finger(card.nodes.get('pill'), 220, 880));
+    stage(card).pointerup(finger(card.nodes.get('pill'), 220, 880)); await flush();
     assert.equal(state(card), 'PRE_PERMISSION');
     await taken(card, 'tok-4', 'PRE_PERMISSION');
-    assert.deepEqual(card.calls.filter((call) => call.method.startsWith('speech.')), [], 'the card closed without asking for the microphone');
+    assert.deepEqual(card.calls.filter((call) => ['speech.start','speech.requestPermission'].includes(call.method)), [], 'the card closed without asking for the microphone');
   });
 
   test('a read that ended without a verdict gives way: its caption, and the chips that ask which asset was meant', async () => {
@@ -284,7 +285,7 @@ export function askStartCases(kit) {
   test('where a read is not started, and that the same token is taken once the page is somewhere it can be', async () => {
     // LISTENING: the mic is open (native refuses first; if an offer arrives anyway it does nothing).
     const mic = await idle({ seed: (session) => { session.mic = { state: 'granted', onDevice: true }; } });
-    stage(mic).pointerdown(finger(mic.nodes.get('pill'), 220, 880));
+    stage(mic).pointerdown(finger(mic.nodes.get('pill'), 220, 880)); if(kit.confirm) await flush();
     assert.equal(state(mic), 'LISTENING');
     refused(mic, 'tok-1', 'LISTENING');
     // A read on its way: SENDING, RESOLVING, THINK_WAIT.
@@ -345,7 +346,7 @@ export function askStartCases(kit) {
   test('a row rebuilt under a native sheet draws nothing out of place, and is right again when the sheet has gone', async () => {
     const app = await idle({ seed: (session) => { session.nudge = { id: 'harness.move.nvda', text: 'NVDA +2.3% since you asked', cta: 'See your week' }; } });
     app.advance(1); await flush();
-    assert.deepEqual(rowOf(app), ['See your week', 'NVIDIA', 'BTC', 'ETH']);
+    assert.deepEqual(rowOf(app), ['See your week', 'NVIDIA', ...(kit.confirm ? ['Bitcoin','Ethereum'] : ['BTC','ETH'])]);
     const settled = (nodes) => { const places = nodes.map(placeOf); return nodes.every(drawn) && places.every(Boolean) && new Set(places.map(String)).size === nodes.length; };
     assert.ok(settled(chipsOf(app)), 'on the home every chip is drawn in a place of its own');
     // The tap on the nudge's button: native opens its sheet, retires the nudge and sends the session again.
@@ -362,7 +363,7 @@ export function askStartCases(kit) {
     // The sheet goes: the row is the new one, each chip in its place.
     emit(app, 'native.sheet', { route: 'followUp', state: 'closed' });
     await flush(); app.advance(2.5); await flush();
-    assert.deepEqual(rowOf(app), ['NVIDIA', 'BTC', 'ETH']);
+    assert.deepEqual(rowOf(app), ['NVIDIA', ...(kit.confirm ? ['Bitcoin','Ethereum'] : ['BTC','ETH'])]);
     assert.ok(settled(chipsOf(app)), 'drawn, each in its place');
     const places = chipsOf(app).map(placeOf);
     assert.ok(places.every((at, index) => at[1] === places[0][1] && (index === 0 || at[0] > places[index - 1][0])), 'one row, left to right');

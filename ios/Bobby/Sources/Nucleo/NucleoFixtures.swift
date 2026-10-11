@@ -7,7 +7,7 @@
 import Foundation
 
 enum NucleoFixtures {
-    static let scenarios: Set<String> = ["companion-waiting", "companion", "companion-fact", "companion-answer-error", "companion-exercise", "companion-belief", "companion-plain", "companion-off", "companion-error", "companion-limit", "companion-mismatch", "companion-offer", "default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline",
+    static let scenarios: Set<String> = ["companion-probe-recovery","companion-gist-long","companion-limit-today","companion-limit-tomorrow","companion-confirm-last","companion-confirm-unknown","companion-confirm-guest","companion-confirm-deep","companion-confirm-max","companion-pro-deep","companion-confirm-long","companion-no-gist", "companion-wrong-gist", "companion-paused", "companion-retry", "companion-closing", "companion-no-followup", "companion-long", "companion-pro", "companion-waiting", "companion", "companion-fact", "companion-answer-error", "companion-exercise", "companion-belief", "companion-plain", "companion-off", "companion-error", "companion-limit", "companion-mismatch", "companion-offer", "default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline",
                                          "signin_required", "subscription_required",
                                          "levels", "upgrade_required", "level_exhausted", "budget_paused"]
     /// Analysis levels (DEBUG QA): `levels` answers a premium desk with a synthesis, a second round, scenarios,
@@ -18,6 +18,8 @@ enum NucleoFixtures {
     static let gates: Set<String> = ["signin_required", "subscription_required"]
 
     private static let lock = NSLock()
+    private static var _turnCount = 0
+    private static var _probeRecovered = false
     private static var _scenario: String?
     private static var _liveVoice = false
     private static var _timeScale = 1.0
@@ -49,7 +51,7 @@ enum NucleoFixtures {
     /// Registers the protocol (once) before any request is made.
     static func activate(scenario: String, liveVoice: Bool = false, timeScale: Double = 1) {
         lock.lock()
-        _scenario = scenarios.contains(scenario) ? scenario : "default"
+        _turnCount = 0; _probeRecovered = false; _scenario = scenarios.contains(scenario) ? scenario : "default"
         _liveVoice = liveVoice
         _timeScale = timeScale
         _log = []
@@ -61,12 +63,17 @@ enum NucleoFixtures {
         print("[NucleoFixture] active · scenario \(scenario)\(liveVoice ? " · live voice" : "")")
     }
 
+    /// Keep this fault deterministic through boot/foreground probes; a person retries after recovery.
+    static func recoverProbeForRetry() {
+        lock.lock(); if _scenario == "companion-probe-recovery" { _probeRecovered = true }; lock.unlock()
+    }
+
     static func deactivate() {
         lock.lock(); _scenario = nil; _liveVoice = false; _timeScale = 1; lock.unlock()
     }
 
     static func setScenario(_ scenario: String) {
-        lock.lock(); _scenario = scenarios.contains(scenario) ? scenario : "default"; lock.unlock()
+        lock.lock(); _turnCount = 0; _probeRecovered = false; _scenario = scenarios.contains(scenario) ? scenario : "default"; lock.unlock()
     }
 
     static func record(_ line: String) {
@@ -136,8 +143,8 @@ enum NucleoFixtures {
         case fail(URLError.Code)
     }
 
-    static func json(_ status: Int, _ object: Any) -> Reply {
-        .http(status: status, headers: ["Content-Type": "application/json; charset=utf-8"],
+    static func json(_ status: Int, _ object: Any, headers extra: [String:String] = [:]) -> Reply {
+        .http(status: status, headers: ["Content-Type": "application/json; charset=utf-8"].merging(extra, uniquingKeysWith: { _,new in new }),
               body: (try? JSONSerialization.data(withJSONObject: object)) ?? Data())
     }
 
@@ -171,6 +178,10 @@ enum NucleoFixtures {
         case "/api/companion-turn":
             guard scenario.hasPrefix("companion") && scenario != "companion-off" else { return (Self.json(404, ["error": "off"]), quick) }
             if method == "GET" {
+                if scenario == "companion-probe-recovery" {
+                    lock.lock(); let recovered = _probeRecovered; lock.unlock()
+                    if !recovered { return (Self.json(503, [:]), quick) }
+                }
                 return (Self.json(405, ["companion": ["context": !["companion-plain", "companion-waiting"].contains(scenario), "catalog": scenario == "companion-mismatch" ? 2 : 1, "notices": ["memory-1"]]]), quick)
             }
             if let answer = json["answer"] as? [String: Any], let id = answer["questionId"] as? String,
@@ -215,24 +226,38 @@ enum NucleoFixtures {
                 }
             }
             let follow: [String: String] = ["es": "¿Cómo funciona una acción?", "en": "How does a stock work?", "fr": "Comment fonctionne une action ?", "pt": "Como funciona uma ação?", "it": "Come funziona un’azione?", "de": "Wie funktioniert eine Aktie?"]
-            if scenario == "companion-error" || scenario == "companion-limit" {
-                return (Self.json(scenario == "companion-limit" ? 429 : 503,
-                    ["version": 1, "kind": "error", "error": ["code": scenario == "companion-limit" ? "orientation_limit" : "companion_unavailable",
-                        "message": CompanionCopy.text("unavailable"), "retryable": scenario != "companion-limit"]]), quick)
+            lock.lock(); _turnCount += 1; let turnCount = _turnCount; lock.unlock()
+            if scenario == "companion-paused" { return (Self.json(503, ["version": 1, "kind": "error", "error": ["code":"companion_paused", "retryable":false]]), quick) }
+            let atLimit = scenario.hasPrefix("companion-limit")
+            if scenario == "companion-error" || atLimit || (scenario == "companion-retry" && turnCount == 1) {
+                return (Self.json(atLimit ? 429 : 503,
+                    ["version": 1, "kind": "error", "error": ["code": atLimit ? "orientation_limit" : "companion_unavailable",
+                        "message": CompanionCopy.text("unavailable"), "retryable": !atLimit]], headers: scenario == "companion-limit-today" ? ["Retry-After":"1800"] : scenario == "companion-limit-tomorrow" ? ["Retry-After":"86400"] : [:]), quick)
             }
             if scenario == "companion-offer", let candidate = json["candidate"] as? [String: Any], let symbol = candidate["symbol"] as? String {
                 return (Self.json(200, ["version": 1, "kind": "desk_offer", "nextAction": ["symbol": symbol, "requiresConfirmation": true]]), quick)
             }
             let context = json["context"] as? [String: Any]
-            return (Self.json(200, ["version": 1, "kind": "explanation", "requestId": json["requestId"] ?? NSNull(),
-                "reply": ["text": text[language] ?? text["en"]!, "followUp": follow[language] ?? follow["en"]!],
-                "personalized": context != nil, "checkIn": NSNull(), "fact": NSNull(),
-                "nextAction": NSNull(), "allowance": ["kind": "orientation", "consumed": 1, "remaining": 4]]), scenario == "companion-waiting" ? 35 : quick)
+            let whole = text[language] ?? text["en"]!
+            let gist = String(whole.prefix(through: whole.firstIndex(of: ".")!))
+            let answerText = scenario == "companion-closing" ? gist : scenario == "companion-gist-long" ? whole + "\n\n" + whole : scenario == "companion-long" ? Array(repeating: whole, count: 12).joined(separator: "\n\n") : whole
+            let next: Any = ["companion-closing", "companion-no-followup"].contains(scenario) ? NSNull() : (follow[language] ?? follow["en"]!)
+            let shownGist: Any = scenario == "companion-gist-long" ? String(whole.prefix(120)) : scenario == "companion-no-gist" ? NSNull() : scenario == "companion-wrong-gist" ? (follow[language] ?? follow["en"]!) : gist
+            let reply: [String: Any] = ["version": 1, "kind": "explanation", "requestId": json["requestId"] ?? NSNull(),
+                "reply": ["text": answerText, "gist": shownGist, "followUp": next], "personalized": context != nil,
+                "checkIn": NSNull(), "fact": NSNull(), "nextAction": NSNull(), "allowance": ["kind": "orientation", "consumed": 1, "remaining": 11]]
+            return (Self.json(200, reply), scenario == "companion-waiting" ? 35 : quick)
         case "/api/bobby-asset-search":
             if scenario.hasPrefix("companion") && param("browse") != "1" {
                 if let q = json["q"] as? String, q.lowercased().contains("ethereun") {
                     return (Self.json(200, ["resolved": ["symbol": "ETH", "assetClass": "crypto", "aliases": ["Ethereum"]],
                         "resolution": ["needsConfirmation": true, "matchKind": "fuzzy"]]), quick)
+                }
+                let q = (json["q"] as? String ?? "").lowercased()
+                for (symbol, name) in [("BTC", "Bitcoin"), ("ETH", "Ethereum"), ("NVDA", "NVIDIA")] {
+                    if q.contains(symbol.lowercased()) || q.contains(name.lowercased()) {
+                        return (Self.json(200, ["resolved": ["symbol": symbol, "name": scenario == "companion-confirm-long" ? "Vanguard FTSE All-World UCITS ETF (USD) Accumulating" : name, "assetClass": symbol == "NVDA" ? "equity" : "crypto", "aliases": [name]], "resolution": ["needsConfirmation": false, "matchKind": "exact"]]), quick)
+                    }
                 }
                 return (Self.json(200, ["resolved": NSNull(), "results": [Any]()]), quick)
             }

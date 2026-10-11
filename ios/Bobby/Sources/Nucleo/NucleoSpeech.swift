@@ -103,6 +103,9 @@ final class NucleoSpeech {
     private var activeLocaleIdentifier: String?
     private var latestText = ""
     private var session = 0
+    private var silenceStop: Task<Void, Never>?
+    private var fixtureTask: Task<Void, Never>?
+    private var fixturePermissionRequested = false
     private var autoStop: Task<Void, Never>?
     private var finalTimeout: Task<Void, Never>?
     private var lastLevelAt: CFTimeInterval = 0
@@ -162,6 +165,9 @@ final class NucleoSpeech {
     /// `consent`: both OS permissions are granted, only Apple's speech service can transcribe the
     /// language, and the user has not agreed to send the audio there (`onDevice` is false).
     func permission() -> Permission {
+#if DEBUG
+        if fixtureSpeech { return Permission(state: fixturePermissionRequested ? "granted" : BobbyApp.argument(after: "-qa-speech-permission") ?? "granted", onDevice: true) }
+#endif
         let inputs: PermissionInputs
         if let permissionInputs {
             inputs = permissionInputs()
@@ -197,6 +203,9 @@ final class NucleoSpeech {
     /// speech recognition) and, when only Apple's speech service can transcribe the language, the
     /// agreement to send the audio there. Declining stores nothing: the state stays `consent`.
     func requestPermission() async -> Permission {
+#if DEBUG
+        if fixtureSpeech { fixturePermissionRequested = true; return permission() }
+#endif
         var current = permission()
         if current.state == "undetermined" {
             if AVAudioApplication.shared.recordPermission == .undetermined {
@@ -277,6 +286,9 @@ final class NucleoSpeech {
     enum StartStatus: String { case listening, needsPermission = "needs_permission", denied, unavailable, consent, busy }
 
     func start() -> StartStatus {
+#if DEBUG
+        if fixtureSpeech { return startFixture() }
+#endif
         if listening || awaitingFinal { return .busy }
         let perm = permission()
         switch perm.state {
@@ -323,13 +335,14 @@ final class NucleoSpeech {
             Task { @MainActor in self?.recognized(text: text, isFinal: isFinal, failed: failed, token: token) }
         }
         observeInterruptions()
+        armSilence(token)
         emit("speech.state", ["state": "listening"])
         let sleep = self.sleep
         autoStop = Task { [weak self] in
             try? await sleep(Self.maxListeningSeconds)
             guard !Task.isCancelled, let self, self.listening, self.session == token else { return }
             // The listening bound closes audio; it never confirms a question while the finger is held.
-            self.interrupted()
+            self.interrupted(reason: "minute")
         }
         return .listening
     }
@@ -339,6 +352,18 @@ final class NucleoSpeech {
     /// Pill released. Unless `cancel`, `speech.final` follows within 1.5 s ("" = nothing heard).
     @discardableResult
     func stop(cancel: Bool) -> StopStatus {
+        silenceStop?.cancel()
+        fixtureTask?.cancel()
+#if DEBUG
+        if fixtureSpeech {
+            let wasListening = listening
+            listening = false
+            if cancel { latestText = ""; session += 1 }
+            else if wasListening { emit("speech.final", ["text": latestText]) }
+            emit("speech.state", ["state": "stopped"])
+            return wasListening ? .stopped : .idle
+        }
+#endif
         // A released pill is no longer listening, but recognition still owns a
         // pending final. Background/cancellation must invalidate that final too.
         if cancel {
@@ -439,7 +464,10 @@ final class NucleoSpeech {
         // endAudio/cancel after a final may cause another callback. Preserve the settled text
         // and wait for the explicit release; a late callback must not erase or confirm it.
         guard !recognitionFinished else { return }
-        if let text { latestText = text }
+        if let text {
+            if ConversationRouting.normalize(text) != ConversationRouting.normalize(latestText), listening { armSilence(token) }
+            latestText = text
+        }
         if listening {
             if failed {
                 // The recognizer gave up mid-hold (e.g. it lost the audio): tell the page, close the mic.
@@ -460,8 +488,9 @@ final class NucleoSpeech {
                 closeMicrophone()
                 task?.cancel()
                 task = nil
-                // Keep the logical hold active. A stopped event would make the page treat
-                // this as a release; only stop(cancel:false) may emit the stored final.
+                // In tap mode an automatic recognizer end holds the transcript, never sends it.
+                // Hold mode retains the legacy explicit-release policy.
+                if NucleoTalkMode.tap { interrupted(reason: "recognition") }
             }
             return
         }
@@ -512,9 +541,51 @@ final class NucleoSpeech {
         observers.removeAll()
     }
 
-    private func interrupted() {
+    private func armSilence(_ token: Int) {
+        silenceStop?.cancel()
+        guard NucleoTalkMode.tap else { return }
+        let sleep = self.sleep
+        silenceStop = Task { [weak self] in
+            try? await sleep(10)
+            guard !Task.isCancelled, let self, self.listening, self.session == token else { return }
+            self.interrupted(reason: "silence")
+        }
+    }
+
+#if DEBUG
+    private var fixtureSpeech: Bool { NucleoFixtures.isActive && ProcessInfo.processInfo.arguments.contains("-qa-speech-fixture") }
+    private func startFixture() -> StartStatus {
+        guard !listening else { return .busy }
+        willStart(); listening = true; latestText = ""; session += 1
+        let token = session
+        emit("speech.state", ["state": "listening"])
+        let mode = BobbyApp.argument(after: "-qa-speech-fixture") ?? "words"
+        fixtureTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            guard !Task.isCancelled, let self, self.listening, self.session == token else { return }
+            if mode != "empty" {
+                let texts = ["en":"What is investing?", "es":"¿Qué es invertir?", "fr":"C’est quoi, investir ?", "pt":"O que é investir?", "it":"Che cos’è investire?", "de":"Was heißt investieren?"]
+                let text = texts[L.language] ?? texts["en"]!
+                self.latestText = String(text.split(separator: " ").dropLast().joined(separator: " "))
+                self.emit("speech.partial", ["text": self.latestText])
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                guard !Task.isCancelled, self.listening, self.session == token else { return }
+                self.latestText = text; self.emit("speech.partial", ["text": text])
+            }
+            if ["silence", "minute", "interruption", "route", "empty"].contains(mode) {
+                try? await Task.sleep(nanoseconds: mode == "silence" ? 10_000_000_000 : 4_000_000_000)
+                guard !Task.isCancelled, self.listening, self.session == token else { return }
+                self.interrupted(reason: mode)
+            }
+        }
+        return .listening
+    }
+#endif
+
+    private func interrupted(reason: String = "interruption") {
         guard listening else { return }
+        let text = latestText
+        emit("speech.error", ["code": "interrupted", "reason": reason, "text": text])
         stop(cancel: true)
-        emit("speech.error", ["code": "interrupted"])
     }
 }

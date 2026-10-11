@@ -14,8 +14,28 @@ const table = page => {
 const app = table('app'), onboarding = table('onboarding');
 const copy = load('Resources/Nucleo/companion-copy.json');
 const interest = load('Resources/Nucleo/companion-questions.json').questions.find(q => q.id === 'interest');
+const nativeText = file => fs.readFileSync(path.join(ios, file),'utf8');
+const copyNative = nativeText('Sources/Nucleo/ConversationCopy.swift');
+const levelNative = nativeText('Sources/Nucleo/NucleoLevels.swift');
+const pairs = {
+  read: copyNative.match(/static func readLabel[^\n]+L\.t\("([^"]+)", "([^"]+)"/).slice(1,3),
+  deep: levelNative.match(/case \.profundo: return L\.t\("([^"\n]+)", "([^"\n]+)"/).slice(1,3),
+  quick: levelNative.match(/case \.rapido: return L\.t\("([^"]+)", "([^"]+)"/).slice(1,3)
+};
+const nativeDictionaries = nativeText('Sources/NativeTranslations.swift') + '\n' + nativeText('Sources/V18/Translations/NativeTranslations18+Conversation.swift');
+function nativeLabels(lang) {
+  return Object.fromEntries(Object.entries(pairs).map(([key,[en,es]])=>{
+    if(lang==='en'||lang==='es')return [key,lang==='en'?en:es];
+    const line=nativeDictionaries.split('\n').find(line=>line.includes('result['+JSON.stringify(en)+'] = '));
+    if(!line)throw new Error('Missing native label '+key);
+    const start=line.indexOf('= [')+2;
+    const row=JSON.parse('{'+line.slice(start+1,line.lastIndexOf(']'))+'}');
+    if(!row[lang])throw new Error('Missing native '+key+' '+lang);
+    return [key,row[lang]];
+  }));
+}
 const labels = Object.fromEntries(['en','es','fr','pt','it','de'].map(lang => [lang, {
-  app: app[lang], onboarding: onboarding[lang],
+  app: app[lang], onboarding: onboarding[lang], native: nativeLabels(lang),
   companion: Object.fromEntries(Object.entries(copy.texts).map(([key, row]) => [key, row[lang]])),
   interest: interest.text[lang], crypto: interest.options.find(o => o.id === 'crypto').label[lang]
 }]));
