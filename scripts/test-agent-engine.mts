@@ -89,7 +89,21 @@ const crypto = await analysisOf(['BTC', 'ETH'], 30);
 const btc30 = BTC.slice(-30), eth30 = ETH.slice(-30);
 near(fig(crypto, 'return_BTC').value, refReturn(btc30), 'the window is the last thirty calendar days of completed bars');
 near(fig(crypto, 'drawdown_ETH').value, refDrawdown(eth30), 'the largest fall, checked by brute force');
-near(fig(crypto, 'move_BTC').value, refMove(refChanges(btc30)), 'movement over the same window');
+// Every day of the window has its own change: the first one from the close right before the window (BTC has 60 closes, the window the last 30).
+const refOwnChanges = (c: number[], n: number) => c.slice(-n).map((v, i) => 100 * (v / c[c.length - n + i - 1] - 1));
+near(fig(crypto, 'move_BTC').value, refMove(refOwnChanges(BTC, 30)), 'movement over the same window, its first day included');
+{
+  const own = refOwnChanges(BTC, 30), lowest = Math.min(...own), highest = Math.max(...own), dayAt = (i: number) => dayOf(Date.parse(`${LAST}T00:00:00Z`) - (29 - i) * DAY);
+  near(fig(crypto, 'worst_BTC').value, lowest, 'the worst day is chosen among every day of the window'); near(fig(crypto, 'best_BTC').value, highest, 'and the best day too');
+  eq([fig(crypto, 'worst_BTC').day, fig(crypto, 'best_BTC').day, fig(crypto, 'move_BTC').days, fig(crypto, 'worst_BTC').days, fig(crypto, 'return_BTC').days], [dayAt(own.indexOf(lowest)), dayAt(own.indexOf(highest)), 30, 30, 29], 'each on its own date; the daily figures rest on thirty changes, the change of the whole window on the twenty-nine between its closes');
+  ok(/first day's from the close right before the window/.test(fig(crypto, 'move_BTC').basis) && /every day of the window/.test(fig(crypto, 'best_BTC').basis), 'and the basis says which changes were counted');
+  // A window whose first day IS the best day: told as the best (sixth blind set: +3.6% on the first day, +1.7% told).
+  const jump = [...Array.from({ length: 31 }, (_, i) => 100 + i * 0.1)]; jump[1] = 104;
+  const withLead = metrics(bars(jump.slice(1)), { ...bars(jump)[0], day: '2026-08-31' })!, without = metrics(bars(jump.slice(1)))!;
+  eq(metrics(bars(jump.slice(1)), bars(jump)[0])!.led, false, 'a "close before" that is not dated before the run is not one');
+  eq([withLead.led, withLead.best!.day === bars(jump.slice(1))[0].day, Math.round(withLead.best!.pct * 10) / 10, without.led, without.changes.length, withLead.changes.length], [true, true, 4, false, 29, 30], 'with the close before the run, the first day\'s jump is the best day; without it that day has no change, as before');
+  near(withLead.totalReturn, without.totalReturn, 'the change of the whole run is the same either way: between its own closes');
+}
 ok(/average size of the daily changes/.test(fig(crypto, 'move_BTC').basis), 'and the figure says what it is');
 eq([fig(crypto, 'return_BTC').unit, fig(crypto, 'close_BTC').unit, fig(crypto, 'close_BTC').currency, fig(crypto, 'return_BTC').currency, fig(crypto, 'corr_BTC_ETH').unit], ['percent', 'price', 'USDT', null, 'ratio'], 'every figure says its unit; a price says its currency; a percent has none');
 eq([fig(crypto, 'return_BTC').from, fig(crypto, 'return_BTC').to, fig(crypto, 'return_BTC').days], ['2026-09-09', LAST, 29], 'a figure says the days it covers and how many changes it rests on');
@@ -107,7 +121,7 @@ ok(fig(mixed, 'return_BTC').days! > fig(mixed, 'return_SPY').days! && /UTC days/
 const coinAlone = await analysisOf(['BTC'], 30);
 if (fig(mixed, 'return_BTC').to === fig(coinAlone, 'return_BTC').to) eq(['return', 'move', 'drawdown', 'worst', 'best'].map((metric) => [fig(mixed, `${metric}_BTC`).value, fig(mixed, `${metric}_BTC`).day ?? null]), ['return', 'move', 'drawdown', 'worst', 'best'].map((metric) => [fig(coinAlone, `${metric}_BTC`).value, fig(coinAlone, `${metric}_BTC`).day ?? null]), 'a coin read beside a fund has the figures it has alone: a day is one day');
 else ok(false, `the two windows end on different days (${fig(mixed, 'return_BTC').to} and ${fig(coinAlone, 'return_BTC').to}): this check needs them equal`);
-eq([fig(mixed, 'corr_BTC_SPY').days, /days both traded/.test(fig(mixed, 'corr_BTC_SPY').basis)], [fig(mixed, 'return_SPY').days, true], 'how alike they moved is measured on the days both traded, and says so');
+eq([fig(mixed, 'corr_BTC_SPY').days, /days both traded/.test(fig(mixed, 'corr_BTC_SPY').basis)], [fig(mixed, 'move_SPY').days, true], 'how alike they moved is measured on the days both traded, and says so');
 // A series that cannot be trusted gives no number, and never a zero.
 world.down.add('ETH');
 const asksBefore = world.fetched.length;
@@ -1046,14 +1060,15 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   // the closes both have, the coin's Monday carried its weekend (SOL and META: +0.20 shown, +0.27 on own daily changes).
   const beside = await analysisOf(['BTC', 'SPY'], 30), coin = await analysisOf(['BTC'], 30);
   const corr = fig(beside, 'corr_BTC_SPY');
-  ok(corr.days === fig(beside, 'return_SPY').days && /each one's own daily changes/.test(corr.basis), 'the correlation of a coin and a fund rests on the fund\'s sessions, each side with its own daily change');
+  ok(corr.days === fig(beside, 'move_SPY').days && /each one's own daily changes/.test(corr.basis), 'the correlation of a coin and a fund rests on the fund\'s sessions, each side with its own daily change');
   // The reference, written another way: each side's closes by date, its own change from its previous close inside the
   // window, the dates both have a change, then Pearson by its textbook sums.
   const end = Date.parse(`${LAST}T00:00:00Z`), startDay = dayOf(end - 29 * DAY);
   const coinByDay = new Map(BTC.map((close, i) => [dayOf(end - (BTC.length - 1 - i) * DAY), close] as const));
   const sessions: string[] = []; for (let ms = end; sessions.length < SPY.length; ms -= DAY) if (![0, 6].includes(new Date(ms).getUTCDay())) sessions.unshift(dayOf(ms));
   const fundByDay = new Map(sessions.map((day, i) => [day, SPY[i]] as const));
-  const ownChanges = (byDay: Map<string, number>) => { const days = [...byDay.keys()].filter((day) => day >= startDay && day <= LAST).sort(); return new Map(days.slice(1).map((day, n) => [day, 100 * (byDay.get(day)! / byDay.get(days[n])! - 1)] as const)); };
+  // Each day's change from that instrument's own previous close, over the whole series; then the days of the window (its first day included).
+  const ownChanges = (byDay: Map<string, number>) => { const all = [...byDay.keys()].sort(); return new Map(all.slice(1).map((day, n) => [day, 100 * (byDay.get(day)! / byDay.get(all[n])! - 1)] as const).filter(([day]) => day >= startDay && day <= LAST)); };
   const coinChanges = ownChanges(coinByDay), fundChanges = ownChanges(fundByDay);
   const paired = [...fundChanges.keys()].filter((day) => coinChanges.has(day)).sort();
   const xs = paired.map((day) => coinChanges.get(day)!), ys = paired.map((day) => fundChanges.get(day)!);
@@ -1062,7 +1077,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   near(corr.value, pearson, 'the correlation is the one of own daily changes paired by date');
   eq([corr.days, fig(beside, 'best_BTC').value === fig(coin, 'best_BTC').value], [paired.length, true], 'on exactly those days; and the coin\'s own figures are the ones it has alone');
   const sameCalendar = fig(crypto, 'corr_BTC_ETH');
-  eq([sameCalendar.days, /on the 29 days both traded/.test(sameCalendar.basis)], [29, true], 'two instruments of one calendar: every day of the window is paired, as before');
+  eq([sameCalendar.days, /on the 30 days both traded/.test(sameCalendar.basis)], [30, true], 'two instruments of one calendar: every day of the window is paired, its first day too');
 
   // After a "no" the next turn forgot which assets were asked about ("ok, do it" met "which two do you mean?").
   const store = new MemoryAgentStore(6), deps = depsFor(store);
@@ -1170,8 +1185,9 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   const ptPair = composeByCode(crypto, 'pt').text, ptOne = composeByCode(alone, 'pt').text;
   ok(!/varia[cç][aã]o m[eé]dia por dia/i.test(ptPair + ptOne) && /num dia m[eé]dio/i.test(ptPair) && /para cima ou para baixo/.test(ptPair) && /para cima ou para baixo/.test(ptOne) && !/\{\{/.test(ptPair + ptOne), 'pt: the daily move is told as a typical day, up or down, not as an average change per day');
 
-  // The boundary of a window is written where the figure is: the first day's own change is not among the daily changes.
-  ok(['move_BTC', 'worst_BTC', 'best_BTC'].every((id) => /first day's own change is not/.test(fig(crypto, id).basis)), 'the basis of the daily figures says which change the window leaves out');
+  // The boundary of a window is written where the figure is. (Rewritten after the sixth set: the first day's own
+  // change is now counted, from the close right before the window; the basis says so instead of saying it is left out.)
+  ok(/first day's from the close right before the window/.test(fig(crypto, 'move_BTC').basis) && ['worst_BTC', 'best_BTC'].every((id) => /every day of the window/.test(fig(crypto, id).basis)), 'the basis of the daily figures says which changes were counted');
 
   const prompt = agentPrompt('de', 'de-DE');
   for (const [needle, why] of [['cost one read, whatever the window', 'what a read costs can be said'], ['how many reads they have left is not something you can see', 'the balance is not Bobby\'s to state'], ['do not turn it into a market question and offer no read', 'words that are not about investing stay that way'], ['Never call it the average change per day', 'the daily move is not a daily gain'], ['a read they paid for answers what they asked', 'what was asked comes first']] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);

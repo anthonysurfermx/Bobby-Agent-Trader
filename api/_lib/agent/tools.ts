@@ -87,21 +87,31 @@ function correlation(a: number[], b: number[]): number | null {
 export const MIN_CHANGES = 15;
 const dayMs = (day: string) => Date.parse(`${day}T00:00:00Z`);
 /** `move` is the average SIZE of the daily changes (the mean of their absolute values): what a person hears in "it moved about X% a day". A standard deviation is a different number and is not told. */
-export interface Metrics { first: DailyBar; last: DailyBar; changes: number[]; totalReturn: number; move: number | null; maxDrawdown: number; worst: { pct: number; day: string } | null; best: { pct: number; day: string } | null }
-/** What a run of closes did. Percent everywhere; a change is close over the previous close of the run. */
-export function metrics(bars: DailyBar[]): Metrics | null {
+export interface Metrics { first: DailyBar; last: DailyBar; changes: number[]; /** True when the first day's own change (from the close before the run) is among the changes. */ led: boolean; totalReturn: number; move: number | null; maxDrawdown: number; worst: { pct: number; day: string } | null; best: { pct: number; day: string } | null }
+/**
+ * What a run of closes did. Percent everywhere; a day's change is its close over the close before it.
+ * `before` is the instrument's own close right before the run: with it, the first day of the run has its change too,
+ * so "the best day of the window" is chosen among every day of the window (sixth blind set: a window's first day,
+ * +3.6% from its own previous close, was left out and the next best, +1.7%, was told as the best). The change of the
+ * whole run and the fall from a high are still measured between closes inside it.
+ */
+export function metrics(bars: DailyBar[], before: DailyBar | null = null): Metrics | null {
   if (bars.length < 2 || bars.some((bar) => !(bar.close > 0) || !Number.isFinite(bar.close))) return null;
+  const lead = before && before.close > 0 && Number.isFinite(before.close) && before.day < bars[0].day ? before : null;
   const changes: number[] = [];
   let peak = bars[0].close, maxDrawdown = 0, worst: Metrics['worst'] = null, best: Metrics['best'] = null;
-  for (let i = 1; i < bars.length; i++) {
-    const change = pct(bars[i].close / bars[i - 1].close - 1);
+  const count = (change: number, day: string) => {
     changes.push(change);
-    if (!worst || change < worst.pct) worst = { pct: change, day: bars[i].day };
-    if (!best || change > best.pct) best = { pct: change, day: bars[i].day };
+    if (!worst || change < worst.pct) worst = { pct: change, day };
+    if (!best || change > best.pct) best = { pct: change, day };
+  };
+  if (lead) count(pct(bars[0].close / lead.close - 1), bars[0].day);
+  for (let i = 1; i < bars.length; i++) {
+    count(pct(bars[i].close / bars[i - 1].close - 1), bars[i].day);
     peak = Math.max(peak, bars[i].close);
     maxDrawdown = Math.min(maxDrawdown, pct(bars[i].close / peak - 1));
   }
-  return { first: bars[0], last: bars.at(-1)!, changes, totalReturn: pct(bars.at(-1)!.close / bars[0].close - 1), move: changes.length >= MIN_CHANGES ? changes.reduce((sum, change) => sum + Math.abs(change), 0) / changes.length : null, maxDrawdown, worst, best };
+  return { first: bars[0], last: bars.at(-1)!, changes, led: lead !== null, totalReturn: pct(bars.at(-1)!.close / bars[0].close - 1), move: changes.length >= MIN_CHANGES ? changes.reduce((sum, change) => sum + Math.abs(change), 0) / changes.length : null, maxDrawdown, worst, best };
 }
 /** The whole window must be sound, not only the reader's last 22 bars: no missing crypto day, no equity gap over five days, no impossible jump. */
 function windowSound(bars: DailyBar[], assetClass: AssetClass): boolean {
@@ -187,27 +197,31 @@ export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<T
   const mixed = new Set(usable.map((read) => read.instrument.assetClass)).size > 1;
   if (mixed) limitations.push('mixed_calendars');
   const figures: Figure[] = [];
-  const used = new Map<string, DailyBar[]>();
+  const used = new Map<string, { bars: DailyBar[]; before: DailyBar | null }>();
   for (const read of reads) {
     const symbol = read.instrument.symbol, ev = [`ev_${symbol}`], item = evidence.find((entry) => entry.id === ev[0])!;
     // Each instrument is measured on its OWN days of the window, so a coin's day is one day whatever it is read beside.
     // Only the correlation, below, is computed on the days both traded.
     const bars = read.bars ? inWindow(read) : null;
     let quality: Quality = read.quality;
-    const m = bars ? metrics(bars) : null;
+    // The close right before the window gives the window's first day its own change. It counts only when it is the
+    // session right before (a coin: the day before; a fund: at most five days back) and the step is a sound one.
+    const prior = bars?.length ? read.bars!.filter((bar) => bar.day < bars[0].day).at(-1) ?? null : null;
+    const before = prior && windowSound([prior, bars![0]], read.instrument.assetClass) ? prior : null;
+    const m = bars ? metrics(bars, before) : null;
     if (bars && !m) { quality = 'missing'; item.quality = 'missing'; item.note = 'too few days in the window'; }
     if (!m) limitations.push(`no_series:${symbol}`);
     // The evidence is dated by the day its figures end on, which is not always the source's newest bar.
-    else { used.set(symbol, bars!); item.asOf = m.last.day; }
-    const basis = m ? `${read.instrument.assetClass === 'crypto' ? 'UTC days' : 'exchange sessions'} from ${m.first.day} to ${m.last.day} (${m.changes.length} daily changes, close to close)` : `no usable series (${item.note ?? 'too few days in the window'})`;
-    const figure = (metric: string, value: number | null, unit: Figure['unit'], extra = ''): Figure => ({ id: `${metric}_${symbol}`, metric, subject: symbol, value: m && value !== null && Number.isFinite(value) ? value : null, unit, currency: unit === 'price' ? read.series?.currency ?? null : null, basis: basis + extra, from: m?.first.day ?? null, to: m?.last.day ?? null, days: m ? m.changes.length : null, evidence: ev, quality: m && value !== null && Number.isFinite(value) ? quality : quality === 'valid' ? 'missing' : quality });
+    else { used.set(symbol, { bars: bars!, before: m.led ? before : null }); item.asOf = m.last.day; }
+    const basis = m ? `${read.instrument.assetClass === 'crypto' ? 'UTC days' : 'exchange sessions'} from ${m.first.day} to ${m.last.day} (${bars!.length - 1} daily changes, close to close)` : `no usable series (${item.note ?? 'too few days in the window'})`;
+    const figure = (metric: string, value: number | null, unit: Figure['unit'], extra = ''): Figure => ({ id: `${metric}_${symbol}`, metric, subject: symbol, value: m && value !== null && Number.isFinite(value) ? value : null, unit, currency: unit === 'price' ? read.series?.currency ?? null : null, basis: basis + extra, from: m?.first.day ?? null, to: m?.last.day ?? null, days: m ? (['move', 'worst', 'best'].includes(metric) ? m.changes.length : bars!.length - 1) : null, evidence: ev, quality: m && value !== null && Number.isFinite(value) ? quality : quality === 'valid' ? 'missing' : quality });
     figures.push(
       figure('close', m?.last.close ?? null, 'price'),
       figure('return', m?.totalReturn ?? null, 'percent', '; last close over first close of the window, minus one'),
-      figure('move', m?.move ?? null, 'percent', `; average size of the daily changes, up or down (the mean of their absolute values); a daily change is counted between two closes inside the window, so the first day's own change is not${m && m.move === null ? `; needs ${MIN_CHANGES} changes` : ''}`),
+      figure('move', m?.move ?? null, 'percent', `; average size of the daily changes, up or down (the mean of their absolute values); ${m?.led ? "each day's change is from the instrument's own previous close, the first day's from the close right before the window" : "the first day's own change is not counted: its previous close could not be used"}${m && m.move === null ? `; needs ${MIN_CHANGES} changes` : ''}`),
       figure('drawdown', m?.maxDrawdown ?? null, 'percent', '; largest fall from a previous high inside the window'),
-      { ...figure('worst', m?.worst?.pct ?? null, 'percent', m?.worst ? `; the day was ${m.worst.day}; among the daily changes between closes inside the window (the first day's own change is not one)` : ''), day: m?.worst?.day ?? null },
-      { ...figure('best', m?.best?.pct ?? null, 'percent', m?.best ? `; the day was ${m.best.day}; among the daily changes between closes inside the window (the first day's own change is not one)` : ''), day: m?.best?.day ?? null },
+      { ...figure('worst', m?.worst?.pct ?? null, 'percent', m?.worst ? `; the day was ${m.worst.day}; among the changes of ${m.led ? 'every day of the window' : "the days of the window after its first (the first day's previous close could not be used)"}` : ''), day: m?.worst?.day ?? null },
+      { ...figure('best', m?.best?.pct ?? null, 'percent', m?.best ? `; the day was ${m.best.day}; among the changes of ${m.led ? 'every day of the window' : "the days of the window after its first (the first day's previous close could not be used)"}` : ''), day: m?.best?.day ?? null },
     );
   }
   // Said only when there is something it is about: a window that gave no figure says nothing of the past either.
@@ -217,7 +231,7 @@ export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<T
     // A daily change is always ONE instrument's change from its own previous close, here as in every other figure:
     // the two are paired on the days both have one. (Changes taken between the closes both have would give a coin
     // a Monday that carries its weekend, and a number that is not what "daily changes" says.)
-    const own = (symbol: string) => { const bars = used.get(symbol)!; return new Map(bars.slice(1).map((bar, n) => [bar.day, pct(bar.close / bars[n].close - 1)] as const)); };
+    const own = (symbol: string) => { const { bars, before } = used.get(symbol)!; const changes = new Map(bars.slice(1).map((bar, n) => [bar.day, pct(bar.close / bars[n].close - 1)] as const)); if (before) changes.set(bars[0].day, pct(bars[0].close / before.close - 1)); return changes; };
     const a = own(symbols[i]), b = own(symbols[j]);
     const days = [...a.keys()].filter((day) => b.has(day)).sort();
     const r = days.length >= MIN_CHANGES ? correlation(days.map((day) => a.get(day)!), days.map((day) => b.get(day)!)) : null;
