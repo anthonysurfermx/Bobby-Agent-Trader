@@ -32,6 +32,8 @@ await pool.query('drop table if exists agent_steps, agent_reads, agent_attempts,
 for (const role of ['anon', 'authenticated', 'service_role']) await pool.query(`do $$ begin if not exists (select 1 from pg_roles where rolname = '${role}') then create role ${role} nologin; end if; end $$`);
 await pool.query('alter default privileges in schema public grant all on functions to anon, authenticated; alter default privileges in schema public grant all on tables to anon, authenticated; alter default privileges in schema public grant all on sequences to anon, authenticated');
 await pool.query(`do $$ declare f regprocedure; begin for f in select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'agent\\_%' loop execute format('drop function %s cascade', f); end loop; end $$`);
+// A database that still holds an earlier version of the file: the three-argument agent_end_cancelled must not survive beside the new one.
+await pool.query("create function agent_end_cancelled(p_id text, p_now timestamptz, p_by text) returns void language sql as 'select'");
 const sql = readFileSync(new URL('../docs/agent-engine/agent-engine.sql', import.meta.url), 'utf8');
 await pool.query(sql);
 await pool.query(sql);   // applying it twice changes nothing
@@ -53,6 +55,7 @@ try {
   const open = (await pool.query(`select count(*) filter (where has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute')) as open, count(*) filter (where has_function_privilege('service_role', p.oid, 'execute')) as service, count(*) as fns, count(*) filter (where p.proconfig is null or not p.proconfig::text like '%search_path=public, pg_temp%') as loose from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'agent\\_%'`)).rows[0];
   const tables = (await pool.query(`select count(*) as n from unnest(array['agent_tasks','agent_steps','agent_reads','agent_attempts']) t, unnest(array['anon','authenticated']) r, unnest(array['select','insert','update','delete']) p where has_table_privilege(r, t, p)`)).rows[0];
   eq([Number(open.fns), Number(open.open), Number(open.service), Number(open.loose), Number(tables.n)], [20, 0, 20, 0, 0], 'twenty functions, each with a fixed search path, callable by the service role and by neither API role; the tables are closed to both');
+  eq(Number((await pool.query("select count(*) as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'agent_end_cancelled'")).rows[0].n), 1, 'applied over an earlier version of itself, no function is left in two shapes');
   // Tried as the roles themselves, not only asked of the catalog: the service role can really run a function (it needs the
   // tables too), and the one object a table brings with it, its sequence, is closed to both API roles.
   const asRole = async (role: string, sql: string) => { const client = await pool.connect(); try { await client.query('begin'); await client.query(`set local role ${role}`); await client.query(sql); return 'ok'; } catch (error) { return /permission denied/.test(String((error as Error).message)) ? 'denied' : String((error as Error).message); } finally { await client.query('rollback'); client.release(); } };
@@ -238,6 +241,13 @@ try {
     const ended = (await s.get(owner, id))!;
     return [ended.steps.at(-1)!.kind, ended.steps.at(-1)!.data, taskUsage(ended).usd];
   }, ['cancelled', { by: 'runner', readerUsd: 0.0011 }, 0.0011], 'an answer that crosses a cancel is dropped, and what its reading cost is kept');
+  await same(async (s) => {
+    const owner = `rs${fresh()}`, id = `task_${owner}_k`;
+    await s.begin(newTask(owner, 'k'), {}, T0); const run = await s.claim(id, 'w', 60_000, T0);
+    await s.cancel(owner, id, T0 + 1);
+    const stored = await s.append(id, run!.fence, 'error', { code: 'unchecked', readerUsd: 'not a number' }, T0 + 2);
+    return [stored, (await s.get(owner, id))!.steps.at(-1)!.data];
+  }, [null, { by: 'runner' }], 'a cost that is not a number is not a cost, and never undoes the cancel');
   // The keys of a tool's input are the model's too.
   await same(async (s) => {
     const owner = `ky${fresh()}`, id = `task_${owner}_k`;

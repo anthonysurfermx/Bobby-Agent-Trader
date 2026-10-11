@@ -73,6 +73,8 @@ begin
   return jsonb_build_object('n', v_n, 'at', to_char(p_now at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'kind', p_kind, 'data', p_data);
 end $$;
 -- Writes `cancelled`. A read taken for a metered action that never ran asked no source: it goes back here.
+-- An earlier version of this file had three arguments here: left in place, every three-argument call would be ambiguous.
+drop function if exists agent_end_cancelled(text, timestamptz, text);
 create or replace function agent_end_cancelled(p_id text, p_now timestamptz, p_by text, p_reader_usd numeric default null) returns void language plpgsql set search_path = public, pg_temp as $$
 declare v_back boolean := false;
 begin
@@ -145,7 +147,8 @@ begin
   -- The result of a metered tool is one of those: the person will see nothing of it, so the read that paid for it goes back.
   if (p_kind in ('answer', 'error', 'approval_requested', 'cancelled', 'tool_started') or (p_kind = 'tool_call' and p_data->>'metered' = 'true'))
     and exists (select 1 from agent_steps where task = p_id and kind = 'cancel_requested') then
-    perform agent_end_cancelled(p_id, p_now, 'runner', (p_data->>'readerUsd')::numeric); return null;
+    -- Only a JSON number is a cost: anything else in that field is not cast (a cast that throws would undo the cancel).
+    perform agent_end_cancelled(p_id, p_now, 'runner', case when jsonb_typeof(p_data->'readerUsd') = 'number' then (p_data->>'readerUsd')::numeric end); return null;
   end if;
   -- A metered tool that brought no figure gives the read back in the write that says so.
   if p_kind = 'tool_call' and p_data->>'metered' = 'true' and p_data->>'refunded' = 'true' then delete from agent_reads where task = p_id; end if;

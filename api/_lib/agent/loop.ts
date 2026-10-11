@@ -71,7 +71,7 @@ What kind of errand it is decides what you do:
 - "previous" in the input is their last question, your answer to it and the figures behind it. A follow-up about those figures is answered from them, with no new tool call. Use a tool again only if they ask for other assets or another window.
 - The instruments you can read with evidence are: ${UNIVERSE.map((instrument) => `${instrument.name} (${instrument.symbol})`).join(', ')}. Windows: 30 or 60 days. Suggest nothing outside them.
 
-Numbers. You never write a market number. Every figure lives in a tool result (or in "previous") and has an id: to state it, write {{f:ID}} and the app writes the number with its unit, so never put a percent sign or the word for percent after it. {{days}} writes only the number of calendar days of the window: write the plain word for "days" right after it (never sessions or trading days: the window holds fewer of those). A figure that is one day's (the worst day, the best day) carries that day: {{d:ID}} writes its date. {{from:ID}} and {{to:ID}} write the first and the last day a figure covers. Never type a date or a count of days yourself. Never state a number of your own, in digits or in words. Three things are not that: the length of the window you read, or the two lengths the tool offers named together ("30 or 60 days"), followed by the word for days; a number the person wrote, said back exactly as they wrote it; a name that holds a number (S&P 500, Nasdaq 100, 24/7). Never compute, never round, never restate a figure in words, never put two placeholders side by side. A figure whose value is null does not exist: say that it could not be established.
+Numbers. You never write a market number. Every figure lives in a tool result (or in "previous") and has an id: to state it, write {{f:ID}} and the app writes the number with its unit, so never put a percent sign or the word for percent after it. {{days}} writes only the number of calendar days of the window: write the plain word for "days" right after it (never sessions or trading days: the window holds fewer of those). A figure that is one day's (the worst day, the best day) carries that day: {{d:ID}} writes its date. {{from:ID}} and {{to:ID}} write the first and the last day a figure covers. Never type a date or a count of days yourself. Never state a number of your own, in digits or in words. Three things are not that: the length of the window you read, or the two lengths the tool offers named together ("30 or 60 days"), followed by the word for days; a number the person wrote, said back exactly as they wrote it; a name that holds a number (S&P 500, Nasdaq 100, 24/7). In gist and text the window is always written with {{days}}; the other length, or the two together, may be named only in a limitation or in next. Never compute, never round, never restate a figure in words, never put two placeholders side by side. A figure whose value is null does not exist: say that it could not be established.
 A comparison answers the dimensions they asked about, says how the assets differed on each, and keeps apart what the figures show from what you make of them. A past window does not say what comes next: never predict. Never recommend or rank an asset, never say which is better or right for them, never tell them what to buy, sell or hold. Say plainly that money can be lost when that matters. Never promise safety or gains. Do not ask about their income, savings or wealth. Never end by asking them something.
 
 Write nothing outside tool calls. Finish by calling the tool "answer" exactly once:
@@ -274,7 +274,8 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
       if (asked) return;
     }
   } finally {
-    await deps.store.release(id, fence);
+    // Idempotent (the fence): tried once more before the lease is left to run out and block the person's next request.
+    await deps.store.release(id, fence).catch(() => deps.store.release(id, fence));
   }
 }
 
@@ -314,7 +315,8 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
     const reason = !parsed.success ? 'invalid_arguments' : (shown as { refusal: { code: string; detail: string } }).refusal.code;
     // For arguments the server cannot read, which field and what kind of fault: the schema's own words, never the model's.
     const detail = !parsed.success ? parsed.error.issues.slice(0, 3).map((issue) => `${issue.path.join('.')}: ${issue.code}`).join('; ') : (shown as { refusal: { code: string; detail: string } }).refusal.detail;
-    if (repairs < 1) { await write('tool_refused', { useId, tool: 'answer', reason, detail }); return false; }
+    // A write the store refused (a stale runner) ends this run, like every other write of the loop: never "go round again".
+    if (repairs < 1) return !await write('tool_refused', { useId, tool: 'answer', reason, detail });
     // Code tells the figures when there are figures. An answer that needed none says only that it could not be given:
     // it never blames data nobody asked for.
     const figures = ownAnalysis(task) ?? (draft?.kind === 'analysis' ? analysis : null);
@@ -358,7 +360,10 @@ export function companionReader(store: AgentStore, budget: Budget, now: () => nu
       // The owner turned the reader off. That is not a reader that passed: an analysis is told by code, and anything
       // else is held to the companion's deterministic lists, as the companion itself is.
       if (measured) return 'unchecked';
-      const reviewed = reviewCompanionReply(numbersFrom ?? question, { text, followUp: next ?? '' }, language);
+      // Every digit in a text that reaches here already passed present() (a name's, a window length, the person's own):
+      // the lists read the words (advice, promises, amounts in words, a market "now").
+      const words = (part: string) => part.replace(/[$€£¥]?\s?\p{N}+(?:[.,/+]\p{N}+)*/gu, ' ');
+      const reviewed = reviewCompanionReply(numbersFrom ?? question, { text: words(text), followUp: words(next ?? '') }, language);
       return 'rejected' in reviewed ? { verdict: reviewed.rejected === 'shape' ? 'advice' : reviewed.rejected, keepNext: false, by: 'lists' } : { verdict: 'pass', keepNext: reviewed.followUp !== null, by: 'lists' };
     }
     const [pIn, , pOut] = modelPrice(model, 2000);
@@ -379,7 +384,9 @@ export function companionReader(store: AgentStore, budget: Budget, now: () => nu
     // that could not be read, like one that never came, keeps the reservation.
     const unread = !verdict && !usage.some((row) => row.ok || String(row.stop).startsWith('http_'));
     const usd = usage.reduce((sum, row) => sum + (row.usd ?? 0), 0);
-    await store.settle(reserved.attemptId, unknown || unread ? 'unknown' : 'settled', usd).catch(() => undefined);
+    // Idempotent: tried once more before the attempt is left dispatched (which would block every later call of the task).
+    const settle = () => store.settle(reserved.attemptId, unknown || unread ? 'unknown' : 'settled', usd);
+    await settle().catch(settle).catch(() => undefined);
     return { verdict: !verdict ? 'unchecked' : verdict.rejected ?? 'pass', keepNext: verdict?.keepNext ?? false, usd: unknown || unread ? reserveUsd : usd };
   };
 }

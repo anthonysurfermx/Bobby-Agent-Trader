@@ -122,10 +122,10 @@ export async function reservedCall(store: AgentStore, budget: Budget, task: stri
   try { attempt = await call(request); } catch { attempt = { ok: false, outcome: 'unknown', code: 'adapter_threw', status: null, latencyMs: 0 }; }
   const failed = attempt.ok ? null : (attempt as Extract<ModelAttempt, { ok: false }>);
   const paid = !failed ? (attempt as Extract<ModelAttempt, { ok: true }>).usd : failed.outcome === 'charged' ? (failed as Extract<ModelAttempt, { outcome: 'charged' }>).usd : null;
-  try {
-    if (paid !== null) await store.settle(attemptId, 'settled', paid);
-    else await store.settle(attemptId, failed!.outcome === 'no_charge' ? 'no_charge' : 'unknown', null);
-  } catch { console.error('[agent] settle', 'storage'); }
+  // Idempotent in every store: tried once more before the attempt is left dispatched, which would hold its whole
+  // reservation and block every later call of the task (the second reader's included).
+  const settle = () => (paid !== null ? store.settle(attemptId, 'settled', paid) : store.settle(attemptId, failed!.outcome === 'no_charge' ? 'no_charge' : 'unknown', null));
+  try { await settle(); } catch { try { await settle(); } catch { console.error('[agent] settle', 'storage'); } }
   if (!failed) { const good = attempt as Extract<ModelAttempt, { ok: true }>; return { ok: true, turn: good.turn, usd: good.usd, usage: good.usage, reservedUsd: reserveUsd }; }
   return { ok: false, code: failed.outcome === 'unknown' ? 'provider_unknown' : 'provider_failed', detail: failed.code, usd: paid ?? 0, reservedUsd: reserveUsd, outcome: failed.outcome };
 }

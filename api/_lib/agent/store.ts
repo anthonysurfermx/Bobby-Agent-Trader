@@ -214,7 +214,7 @@ export class MemoryAgentStore implements AgentStore {
     const givenBack = !ran && Boolean(this.state.reads[task.id]);
     if (givenBack) delete this.state.reads[task.id];
     // What a second reader cost before the cancel discarded its result stays on the record.
-    task.steps.push({ n: task.steps.length + 1, at: new Date(now).toISOString(), kind: 'cancelled', data: { by, ...(givenBack ? { readGivenBack: true } : {}), ...(Number(readerUsd) > 0 ? { readerUsd: Number(readerUsd) } : {}) } });
+    task.steps.push({ n: task.steps.length + 1, at: new Date(now).toISOString(), kind: 'cancelled', data: { by, ...(givenBack ? { readGivenBack: true } : {}), ...(typeof readerUsd === 'number' && Number.isFinite(readerUsd) && readerUsd > 0 ? { readerUsd } : {}) } });
   }
 
   async refund(id: string): Promise<void> {
