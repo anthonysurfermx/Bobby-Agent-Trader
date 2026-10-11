@@ -17,10 +17,10 @@ import { DATE_MARK, FIGURE_MARK } from './reader.js';
 import { UNIVERSE, WINDOWS, instrumentName, resolveMention } from './tools.js';
 import type { Analysis, Figure, Presentation } from './types.js';
 
-export interface Draft { kind: Presentation['kind']; gist: string; text: string; limitations: string[]; next: string; claims: Array<{ metric: string; top: string }> }
+export interface Draft { kind: Presentation['kind']; gist: string; text: string; limitations: string[]; next: string; claims: Array<{ metric: string; top: string }>; asked?: string[] }
 /** A draft as its author wrote it, with every number and date of code's replaced by a mark. */
 export interface OwnWords { text: string; limitations: string[]; next: string | null }
-export type Refusal = { code: 'unknown_figure' | 'figure_without_value' | 'typed_number' | 'bad_placeholder' | 'claim_contradicts_figures' | 'claim_cannot_be_checked' | 'too_long' | 'empty'; detail: string };
+export type Refusal = { code: 'unknown_figure' | 'figure_without_value' | 'typed_number' | 'bad_placeholder' | 'claim_contradicts_figures' | 'claim_cannot_be_checked' | 'asked_not_answered' | 'too_long' | 'empty'; detail: string };
 
 const PLACEHOLDER = /\{\{((?:f|d|from|to):[A-Za-z0-9_~]+|days)\}\}/g;
 /** Written with its sign, so no dash before it can be read as one. */
@@ -254,7 +254,7 @@ const COMPOSED_MOVE: Record<AppLanguage, { one: string; two: (a: string, b: stri
   en: { one: ' On an average day it moved {{f:move_A}}.', two: (a, b) => ` On an average day ${a} moved {{f:move_A}} and ${b} {{f:move_B}}.`, many: (items) => `On an average day, ${items}.`, each: (name, s) => `${name} moved {{f:move_${s}}}` },
   es: { one: ' En un día promedio se movió {{f:move_A}}.', two: (a, b) => ` En un día promedio, ${a} se movió {{f:move_A}} y ${b} {{f:move_B}}.`, many: (items) => `En un día promedio, ${items}.`, each: (name, s) => `${name} se movió {{f:move_${s}}}` },
   fr: { one: ' Un jour moyen, il a bougé de {{f:move_A}}.', two: (a, b) => ` Un jour moyen, ${a} a bougé de {{f:move_A}} et ${b} de {{f:move_B}}.`, many: (items) => `Un jour moyen, ${items}.`, each: (name, s) => `${name} a bougé de {{f:move_${s}}}` },
-  pt: { one: ' A variação média por dia foi de {{f:move_A}}.', two: (a, b) => ` A variação média por dia foi de {{f:move_A}} em ${a} e de {{f:move_B}} em ${b}.`, many: (items) => `A variação média por dia foi ${items}.`, each: (name, s) => `de {{f:move_${s}}} em ${name}` },
+  pt: { one: ' Num dia médio variou {{f:move_A}}, para cima ou para baixo.', two: (a, b) => ` Num dia médio, ${a} variou {{f:move_A}} e ${b} {{f:move_B}}, para cima ou para baixo.`, many: (items) => `Num dia médio, para cima ou para baixo, ${items}.`, each: (name, s) => `${name} variou {{f:move_${s}}}` },
   it: { one: ' In un giorno medio si è mosso del {{f:move_A}}.', two: (a, b) => ` In un giorno medio ${a} si è mosso del {{f:move_A}} e ${b} del {{f:move_B}}.`, many: (items) => `In un giorno medio, ${items}.`, each: (name, s) => `${name} si è mosso del {{f:move_${s}}}` },
   de: { one: ' An einem durchschnittlichen Tag bewegte er sich um {{f:move_A}}.', two: (a, b) => ` An einem durchschnittlichen Tag bewegte sich ${a} um {{f:move_A}} und ${b} um {{f:move_B}}.`, many: (items) => `An einem durchschnittlichen Tag: ${items}.`, each: (name, s) => `${name} {{f:move_${s}}}` },
 };
@@ -373,6 +373,13 @@ export function present(draft: Draft, analysis: Analysis | null, question: strin
     const top = resolveMention(claim.top)?.symbol ?? claim.top;
     if (!analysis?.subjects.includes(top) || [...figures.values()].filter((figure) => figure.metric === claim.metric && figure.value !== null).length < 2) return { ok: false, refusal: { code: 'claim_cannot_be_checked', detail: `${claim.metric}:${claim.top}` } };
     if (!claimHolds({ metric: claim.metric, top }, figures)) return { ok: false, refusal: { code: 'claim_contradicts_figures', detail: `${claim.metric}:${claim.top}` } };
+  }
+  // What a person spent a read on is what they hear: each dimension the model says they asked about is told with at
+  // least one of its figures (fourth blind set: three correlations asked and none told; a worst day asked and not told).
+  if (draft.kind === 'analysis' && draft.asked?.length) {
+    const told = new Set([...[text, ...draft.limitations].join(' ').matchAll(PLACEHOLDER)].filter((match) => match[1] !== 'days').map((match) => match[1].split(':')[1]));
+    const missing = [...new Set(draft.asked)].filter((metric) => { const have = [...figures.values()].filter((figure) => figure.metric === metric && figure.value !== null); return have.length > 0 && !have.some((figure) => told.has(figure.id)); });
+    if (missing.length) return { ok: false, refusal: { code: 'asked_not_answered', detail: missing.join(',') } };
   }
   const written = write(text, figures, days, language, locale), front = write(gist, figures, days, language, locale);
   if (front.length > 200 || written.length > 1100) return { ok: false, refusal: { code: 'too_long', detail: `${front.length}/${written.length}` } };

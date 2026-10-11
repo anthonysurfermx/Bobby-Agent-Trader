@@ -1144,4 +1144,37 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   for (const [needle, why] of [['An average says nothing about each day', 'an average is not every day'], ['it is not how often they moved the same way', 'a correlation is not a frequency'], ['it was not run, so there are no figures', 'a declined query is not answered from memory'], ['is not yet an asset', 'a lone everyday word is asked about, not assumed'], ['means that asset: do not ask which one', 'one asset on the table is "it"']] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);
 }
 
+// ---------- 7i. what the fourth independent evaluation found (2026-10-11, 127 turns, no critical turn) ----------
+{
+  // A read the person paid for left out what they asked (three correlations; a worst day). The model now says what
+  // was asked, and code checks that each of those dimensions is told with at least one of its figures.
+  const told = (asked: string[], text: string) => { const r = present({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text, limitations: [], next: '', claims: [], asked }, crypto, '¿Cómo se movieron juntos Bitcoin y Ethereum?', 'es'); return r.ok ? 'shown' : `${r.refusal.code}:${r.refusal.detail}`; };
+  eq([told(['correlation'], 'Bitcoin cambió {{f:return_BTC}}. Ethereum cambió {{f:return_ETH}}.'), told(['correlation'], 'Bitcoin cambió {{f:return_BTC}}. Su correlación con Ethereum fue de {{f:corr_BTC_ETH}}.'), told(['worst', 'correlation'], 'Bitcoin cambió {{f:return_BTC}}. Su correlación con Ethereum fue de {{f:corr_BTC_ETH}}.'), told([], 'Bitcoin cambió {{f:return_BTC}}.')],
+    ['asked_not_answered:correlation', 'shown', 'asked_not_answered:worst', 'shown'], 'what was asked is told: a dimension the model names as asked and does not give is sent back, by name');
+  const single = present({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}}.', limitations: [], next: '', claims: [], asked: ['correlation'] }, alone, '¿Y su correlación?', 'es');
+  ok(single.ok, 'a dimension with no figure at all (the correlation of one asset) is not something to send back: there is nothing to give');
+
+  // In the loop: sent back once with the reason, then the corrected answer is served.
+  const store = new MemoryAgentStore(6), deps = depsFor(store);
+  script = [() => turn([use('read_assets', { assets: ['Bitcoin', 'Ethereum'], windowDays: 30 })]),
+    () => answer({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}.', asked: ['worst'] }),
+    () => answer({ kind: 'analysis', gist: 'El peor día de Bitcoin fue de {{f:worst_BTC}}.', text: 'El peor día de Bitcoin fue de {{f:worst_BTC}} y el de Ethereum de {{f:worst_ETH}}.', asked: ['worst'] })];
+  const offered = await ask(deps, 'rosa', '¿Cuál fue el peor día de Bitcoin y de Ethereum?', 'r1');
+  await store.approve('rosa', offered.id, waitingApproval(offered)!.digest, clock);
+  await runTask(deps, 'rosa', offered.id);
+  const done = (await store.get('rosa', offered.id))!, shown = taskResult(done)!.presentation;
+  eq([done.steps.filter((s) => s.kind === 'tool_refused').map((s) => [s.data.tool, s.data.reason, s.data.detail]), shown.composedByCode, shown.figures.includes('worst_BTC') && shown.figures.includes('worst_ETH')], [[['answer', 'asked_not_answered', 'worst']], false, true], 'the worst day they asked for and did not get: asked once more with the reason, then served with it');
+  ok(WIRE_TOOLS.find((tool) => tool.name === 'answer')!.input_schema.required.includes('asked'), 'the answer tool asks the model for what was asked');
+
+  // The daily move in Portuguese read as a daily gain ("variação média por dia"). Code's own sentence says a typical day, up or down.
+  const ptPair = composeByCode(crypto, 'pt').text, ptOne = composeByCode(alone, 'pt').text;
+  ok(!/varia[cç][aã]o m[eé]dia por dia/i.test(ptPair + ptOne) && /num dia m[eé]dio/i.test(ptPair) && /para cima ou para baixo/.test(ptPair) && /para cima ou para baixo/.test(ptOne) && !/\{\{/.test(ptPair + ptOne), 'pt: the daily move is told as a typical day, up or down, not as an average change per day');
+
+  // The boundary of a window is written where the figure is: the first day's own change is not among the daily changes.
+  ok(['move_BTC', 'worst_BTC', 'best_BTC'].every((id) => /first day's own change is not/.test(fig(crypto, id).basis)), 'the basis of the daily figures says which change the window leaves out');
+
+  const prompt = agentPrompt('de', 'de-DE');
+  for (const [needle, why] of [['cost one read, whatever the window', 'what a read costs can be said'], ['how many reads they have left is not something you can see', 'the balance is not Bobby\'s to state'], ['do not turn it into a market question and offer no read', 'words that are not about investing stay that way'], ['Never call it the average change per day', 'the daily move is not a daily gain'], ['a read they paid for answers what they asked', 'what was asked comes first']] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);
+}
+
 console.log(`agent-engine: ${checks} checks passed`);

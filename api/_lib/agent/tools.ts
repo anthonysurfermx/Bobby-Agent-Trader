@@ -204,10 +204,10 @@ export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<T
     figures.push(
       figure('close', m?.last.close ?? null, 'price'),
       figure('return', m?.totalReturn ?? null, 'percent', '; last close over first close of the window, minus one'),
-      figure('move', m?.move ?? null, 'percent', `; average size of the daily changes, up or down (the mean of their absolute values)${m && m.move === null ? `; needs ${MIN_CHANGES} changes` : ''}`),
+      figure('move', m?.move ?? null, 'percent', `; average size of the daily changes, up or down (the mean of their absolute values); a daily change is counted between two closes inside the window, so the first day's own change is not${m && m.move === null ? `; needs ${MIN_CHANGES} changes` : ''}`),
       figure('drawdown', m?.maxDrawdown ?? null, 'percent', '; largest fall from a previous high inside the window'),
-      { ...figure('worst', m?.worst?.pct ?? null, 'percent', m?.worst ? `; the day was ${m.worst.day}` : ''), day: m?.worst?.day ?? null },
-      { ...figure('best', m?.best?.pct ?? null, 'percent', m?.best ? `; the day was ${m.best.day}` : ''), day: m?.best?.day ?? null },
+      { ...figure('worst', m?.worst?.pct ?? null, 'percent', m?.worst ? `; the day was ${m.worst.day}; among the daily changes between closes inside the window (the first day's own change is not one)` : ''), day: m?.worst?.day ?? null },
+      { ...figure('best', m?.best?.pct ?? null, 'percent', m?.best ? `; the day was ${m.best.day}; among the daily changes between closes inside the window (the first day's own change is not one)` : ''), day: m?.best?.day ?? null },
     );
   }
   // Said only when there is something it is about: a window that gave no figure says nothing of the past either.
