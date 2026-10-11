@@ -34,10 +34,27 @@ class ConversationFixtureCase: XCTestCase {
         app.launch(); ready(button("aria.type"))
     }
     func ready(_ element: XCUIElement, timeout: Double = 25) {
-        if element.exists && element.isHittable { return }
-        XCTAssertTrue(element.waitForExistence(timeout: timeout), app.debugDescription)
+        if element.exists && element.elementType != .staticText && element.isHittable { return }
+        XCTAssertTrue(element.waitForExistence(timeout:timeout),app.debugDescription)
+        if element.elementType == .staticText {
+            // Read-only WebKit text has no activation point during its entrance animation.
+            let visible=XCTNSPredicateExpectation(predicate:NSPredicate { _,_ in
+                let frame=element.frame
+                return element.exists && frame.width > 0 && frame.height > 0 && frame.midX.isFinite && frame.midY.isFinite && frame.intersects(self.app.windows.firstMatch.frame)
+            },object:nil)
+            XCTAssertEqual(XCTWaiter.wait(for:[visible],timeout:timeout),.completed,app.debugDescription)
+            return
+        }
         let e = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: element)
         XCTAssertEqual(XCTWaiter.wait(for: [e], timeout: timeout), .completed, app.debugDescription)
+    }
+    func openProfileFromGlass() {
+        let avatar=web.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Momo.'")).firstMatch
+        ready(avatar)
+        // WAKE and RETURNING expose the header before accepting its gesture; the longest
+        // return is 1.7 seconds. Drive the settled scene, as the captured reviewer sees it.
+        Thread.sleep(forTimeInterval:2)
+        avatar.tap();ready(app.buttons["account-close"])
     }
     func type(_ question: String? = nil) {
         ready(button("aria.type")); button("aria.type").tap(); ready(web.textViews.firstMatch)
@@ -209,8 +226,7 @@ final class ConversationShots: ConversationFixtureCase {
     func test16Correcting() { launch("companion-offer"); ask("Ethereun"); ready(button("risk.notNow")); type(); XCTAssertEqual(web.textViews.firstMatch.value as? String,"Ethereun"); shot("16-correcting") }
     func test17LongReading() { launch("companion-long"); ask(); answered(); web.swipeUp(); shot("17-long-reading") }
     func test18ProfileLevel() {
-        launch(); let profile=web.buttons.matching(NSPredicate(format:"label CONTAINS 'Momo.'")).firstMatch
-        ready(profile);profile.tap();ready(app.buttons["account-close"])
+        launch();openProfileFromGlass()
         let row = app.buttons["account-analysis-level"]
         for _ in 0..<7 where !row.isHittable { app.scrollViews.firstMatch.swipeUp() }
         ready(row); shot("18-profile-level")
@@ -643,8 +659,7 @@ final class MemoryNotesShots: ConversationFixtureCase {
     func copy(_ key:String)->String { (labels["companion"] as! [String:String])[key]! }
     func notes(_ seeded:Bool = true, scenario:String = "companion", ownerReset:Bool = false) {
         launch(scenario,notes:seeded, memory:ownerReset ? "owner-reset" : nil)
-        let profile=web.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Momo.'")).firstMatch
-        ready(profile);profile.tap();let memory=app.buttons["account-memory"];for _ in 0..<6 where !memory.isHittable { app.scrollViews.firstMatch.swipeUp() };ready(memory);memory.tap()
+        openProfileFromGlass();let memory=app.buttons["account-memory"];for _ in 0..<6 where !memory.isHittable { app.scrollViews.firstMatch.swipeUp() };ready(memory);memory.tap()
         let door=app.buttons["memory-educational-notes"];ready(door);door.tap();ready(app.staticTexts["companion-notes-title"])
     }
     func row(_ field:String)->XCUIElement { app.buttons["companion-note-row-"+field] }
@@ -713,10 +728,9 @@ final class StoreScreenShots: ConversationFixtureCase {
         app.terminate();launch("companion",memory:"barrier");ask();answered()
         let words=labels["companion"] as! [String:String]
         let chip=web.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",words["bobbyAsks"]!.components(separatedBy:"{question}")[0])).firstMatch
-        ready(chip);chip.tap();ready(web.buttons[words["notNow"]!]);assertPillGlyphVisible(web.buttons[words["speakAnswer"]!]);shot("04-personal-question")
+        ready(chip);chip.tap();ready(web.buttons[words["notNow"]!]);Thread.sleep(forTimeInterval:1);assertPillGlyphVisible(web.buttons[words["speakAnswer"]!]);shot("04-personal-question")
         app.terminate();launch("companion",notes:true)
-        let profile=web.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Momo.'")).firstMatch
-        ready(profile);profile.tap()
+        openProfileFromGlass()
         let memory=app.buttons["account-memory"]
         for _ in 0..<6 where !memory.isHittable { app.scrollViews.firstMatch.swipeUp() }
         ready(memory);memory.tap();ready(app.buttons["memory-educational-notes"]);app.buttons["memory-educational-notes"].tap()
@@ -757,8 +771,7 @@ final class StoreReviewerWalk: ConversationFixtureCase {
     }
     func profile() {
         if app.buttons["account-close"].exists { return }
-        let avatar=web.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Momo.'")).firstMatch
-        ready(avatar);avatar.tap();ready(app.buttons["account-close"])
+        openProfileFromGlass()
     }
     func notes() {
         profile();let memory=app.buttons["account-memory"];reach(memory);memory.tap()
@@ -887,8 +900,7 @@ final class StoreAdditionalWalk: ConversationFixtureCase {
         ready(element)
     }
     func profile() {
-        let avatar=web.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Momo.'")).firstMatch
-        ready(avatar);avatar.tap();ready(app.buttons["account-close"])
+        openProfileFromGlass()
     }
     func testServerDisallowsMemoryWithoutBlockingExistingNotesDeletion() {
         launch("companion-plain",notes:true);ask();answered()
@@ -921,6 +933,6 @@ final class StoreAdditionalWalk: ConversationFixtureCase {
         ask("What is an ETF?")
         ready(web.buttons["I agree to the risk notice and AI processing"]);shot("45-review-withdrawn-question-needs-consent")
         let profileAfter=web.buttons.matching(NSPredicate(format:"label == 'Profile' OR label BEGINSWITH 'Momo.'")).firstMatch
-        ready(profileAfter);profileAfter.tap();ready(app.buttons["account-close"]);shot("46-review-profile-after-withdrawal")
+        ready(profileAfter);Thread.sleep(forTimeInterval:2);profileAfter.tap();ready(app.buttons["account-close"]);shot("46-review-profile-after-withdrawal")
     }
 }
