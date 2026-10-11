@@ -74,6 +74,8 @@ protocol NucleoEmitting: AnyObject {
 
 @MainActor
 final class NucleoSession: ObservableObject {
+    // Owner deadline: the unverified I-2b dial has no user-facing entry.
+    private static let invitationDialEnabled = false
     static let hintsKey = "nucleo.hints"
     static let hintPattern = #"^[a-z][A-Za-z0-9_.-]{0,31}$"#
     static let suggestionsCacheSeconds: TimeInterval = 300
@@ -1405,7 +1407,7 @@ final class NucleoSession: ObservableObject {
         } else if companionContext.accepted, let question = companionContext.next(preferred: reply["checkIn"] as? String), companionPacing.permits(question) {
             companionQuestionId = question.id; companionSceneStarted = false
             decorated["invitation"] = question.json
-        } else if companionPacing.dialDue(decided: companionContext.decided) {
+        } else if Self.invitationDialEnabled && companionPacing.dialDue(decided: companionContext.decided) {
             decorated["invitation"] = ["kind": "dial", "text": CompanionCopy.text("dialTitle")]
         }
         return decorated

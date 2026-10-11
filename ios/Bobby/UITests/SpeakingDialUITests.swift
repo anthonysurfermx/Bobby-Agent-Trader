@@ -15,7 +15,7 @@ final class SpeakingDialUITests: ConversationFixtureCase {
         ready(save);ready(leave);physicalControls([save,leave],abovePill:false);shot("57-dial-from-chip")
         leave.tap();ready(button("aria.closeAnswer"));XCTAssertFalse(web.sliders.firstMatch.exists);shot("58-dial-left-same-answer")
         app.terminate();launch("companion",memory:"dial");ask();answered();ready(chip);chip.tap();ready(save)
-        let value=dialOption();ready(web.buttons[value]);web.buttons[value].tap();shot("59-dial-preview")
+        let value=dialOption();let range=web.sliders.firstMatch;ready(range);range.adjust(toNormalizedSliderPosition:1);XCTAssertEqual(range.value as? String,value);shot("59-dial-preview")
         save.tap();ready(button("aria.closeAnswer"));XCTAssertFalse(web.sliders.firstMatch.exists);shot("60-dial-saved-same-answer")
         app.terminate();launch("companion");XCTAssertFalse(web.sliders.firstMatch.exists);shot("61-dial-no-wake-after-save")
     }
