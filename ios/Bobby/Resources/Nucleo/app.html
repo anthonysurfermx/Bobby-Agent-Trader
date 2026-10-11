@@ -300,7 +300,8 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 .conversation-status{font-family:var(--serif);font-weight:300;text-align:center;margin:0;color:#F2EDE4}
 .conversation-top-fade{-webkit-mask-image:linear-gradient(to bottom,transparent,#000 20px)}
 #conversation-field-mic{position:absolute;left:auto;top:auto;right:50px;bottom:5px;background:transparent;border:0}
-#typeBox #ta{padding-right:105px}
+#typeBox{padding:14px 0}
+#typeBox #ta{min-height:0;padding:0 105px 0 18px}
 
 .conversation-eyebrow{display:block;font:500 calc(11px * var(--type))/1.273 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:#A39C91;white-space:nowrap;overflow:hidden;text-overflow:clip}
 .conversation-slot .quiet-chip{max-height:calc(110px * var(--type));overflow:hidden}
@@ -5452,11 +5453,11 @@ function showTypeBox(on){
 function focusTa(){ try { el.typeBox.style.visibility = 'visible'; el.ta.focus({ preventScroll: true }); } catch (e) { try { el.ta.focus(); } catch (x) {} } }
 function taAutosize(){
   el.ta.style.height = 'auto';
-  var line = parseFloat(el.ta.style.lineHeight) || 22, padding = 28, max = padding + 4 * line;
+  var line = parseFloat(el.ta.style.lineHeight) || 22, max = 4 * line;
   el.ta.style.maxHeight = max + 'px';
-  var lines = Math.max(1, Math.ceil(((el.ta.scrollHeight || 50) - padding) / line));
-  var h = padding + Math.min(4, lines) * line;
-  el.ta.style.height = h + 'px'; TB.h = h;
+  var lines = Math.max(1, Math.ceil((el.ta.scrollHeight || line) / line));
+  var h = Math.min(4, lines) * line;
+  el.ta.style.height = h + 'px'; TB.h = h + 28;
   el.taSend.disabled = TB.composing || !el.ta.value.trim();
 }
 function placeTypeBox(){
@@ -5508,6 +5509,9 @@ function conversationSuspend(){
  var listening=ST.name==='LISTENING',tap=typeof TALK_MODE!=='undefined'&&TALK_MODE==='tap',q=(CONV_BASE+' '+CONV_PARTIAL).trim();
  if(listening&&tap){STATES.LISTENING.startSeq++;STATES.LISTENING.released=true;STATES.LISTENING.finalWait=0;STATES.LISTENING.live=false;}
  cancelInput();bcall('speech.stop',{cancel:true}).catch(noop);
+ // Do not let iOS restore a focused keyboard with a scrolled visual viewport.
+ // Blur keeps the field, its words and the TYPING state required by the pin.
+ if(ST.name==='TYPING')el.ta.blur();
  if(listening&&tap){if(q)holdDraft(q,'cap.stopped',true);else{conversationReturn();hint(tt('cap.empty'));}}
  else if(listening&&ST.name==='LISTENING')STATES.LISTENING.interrupt();
  // The frozen HOLD pin drops an inactive dictation recovery, never a typed field.
@@ -5884,7 +5888,11 @@ function renderPill(){
     tfx(el.micGlow, 0, y, lerp(0.42, 1, clamp((w - 96) / 140, 0, 1)) * (0.92 + 0.2 * lv), 0.9 + 0.35 * lv, 0);
     tfx(el.micGlowI, 0, 0, 1, 1, P.conic);
   }
-  op(el.pillMic, A.modeO.mic.x); op(el.pillKbd, A.modeO.kbd.x); op(el.pillBars, A.modeO.bars.x); op(el.pillThink, A.modeO.think.x); op(el.pillStop, A.modeO.stop.x);
+  // The tap conversation owns these glyphs in conversationChrome. Two opacity
+  // writers in one frame let WebKit snapshots capture an empty control.
+  if (TALK_MODE !== 'tap'){
+    op(el.pillMic, A.modeO.mic.x); op(el.pillKbd, A.modeO.kbd.x); op(el.pillBars, A.modeO.bars.x); op(el.pillThink, A.modeO.think.x); op(el.pillStop, A.modeO.stop.x);
+  }
   op(el.pillGoo, 0.34 * A.goo.x);
   if (A.modeO.bars.x > 0.01){
     for (var b = 0; b < 22; b++){

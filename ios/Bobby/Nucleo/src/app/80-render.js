@@ -255,7 +255,11 @@ function renderPill(){
     tfx(el.micGlow, 0, y, lerp(0.42, 1, clamp((w - 96) / 140, 0, 1)) * (0.92 + 0.2 * lv), 0.9 + 0.35 * lv, 0);
     tfx(el.micGlowI, 0, 0, 1, 1, P.conic);
   }
-  op(el.pillMic, A.modeO.mic.x); op(el.pillKbd, A.modeO.kbd.x); op(el.pillBars, A.modeO.bars.x); op(el.pillThink, A.modeO.think.x); op(el.pillStop, A.modeO.stop.x);
+  // The tap conversation owns these glyphs in conversationChrome. Two opacity
+  // writers in one frame let WebKit snapshots capture an empty control.
+  if (TALK_MODE !== 'tap'){
+    op(el.pillMic, A.modeO.mic.x); op(el.pillKbd, A.modeO.kbd.x); op(el.pillBars, A.modeO.bars.x); op(el.pillThink, A.modeO.think.x); op(el.pillStop, A.modeO.stop.x);
+  }
   op(el.pillGoo, 0.34 * A.goo.x);
   if (A.modeO.bars.x > 0.01){
     for (var b = 0; b < 22; b++){

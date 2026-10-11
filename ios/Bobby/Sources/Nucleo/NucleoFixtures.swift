@@ -249,6 +249,9 @@ enum NucleoFixtures {
             return (Self.json(200, reply), scenario == "companion-waiting" ? 35 : quick)
         case "/api/bobby-asset-search":
             if scenario.hasPrefix("companion") && param("browse") != "1" {
+                if scenario == "companion-confirm-long" {
+                    return (Self.json(200, ["resolved": ["symbol": "VWRP", "assetClass": "etf", "aliases": ["Vanguard FTSE All-World UCITS ETF (USD) Accumulating"]], "resolution": ["needsConfirmation": false, "matchKind": "exact"]]), quick)
+                }
                 if let q = json["q"] as? String, q.lowercased().contains("ethereun") {
                     return (Self.json(200, ["resolved": ["symbol": "ETH", "assetClass": "crypto", "aliases": ["Ethereum"]],
                         "resolution": ["needsConfirmation": true, "matchKind": "fuzzy"]]), quick)
@@ -256,7 +259,7 @@ enum NucleoFixtures {
                 let q = (json["q"] as? String ?? "").lowercased()
                 for (symbol, name) in [("BTC", "Bitcoin"), ("ETH", "Ethereum"), ("NVDA", "NVIDIA")] {
                     if q.contains(symbol.lowercased()) || q.contains(name.lowercased()) {
-                        return (Self.json(200, ["resolved": ["symbol": symbol, "name": scenario == "companion-confirm-long" ? "Vanguard FTSE All-World UCITS ETF (USD) Accumulating" : name, "assetClass": symbol == "NVDA" ? "equity" : "crypto", "aliases": [name]], "resolution": ["needsConfirmation": false, "matchKind": "exact"]]), quick)
+                        return (Self.json(200, ["resolved": ["symbol": symbol, "name": name, "assetClass": symbol == "NVDA" ? "equity" : "crypto", "aliases": [name]], "resolution": ["needsConfirmation": false, "matchKind": "exact"]]), quick)
                     }
                 }
                 return (Self.json(200, ["resolved": NSNull(), "results": [Any]()]), quick)

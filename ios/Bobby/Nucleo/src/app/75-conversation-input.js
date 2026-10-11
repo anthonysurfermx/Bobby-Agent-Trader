@@ -18,6 +18,9 @@ function conversationSuspend(){
  var listening=ST.name==='LISTENING',tap=typeof TALK_MODE!=='undefined'&&TALK_MODE==='tap',q=(CONV_BASE+' '+CONV_PARTIAL).trim();
  if(listening&&tap){STATES.LISTENING.startSeq++;STATES.LISTENING.released=true;STATES.LISTENING.finalWait=0;STATES.LISTENING.live=false;}
  cancelInput();bcall('speech.stop',{cancel:true}).catch(noop);
+ // Do not let iOS restore a focused keyboard with a scrolled visual viewport.
+ // Blur keeps the field, its words and the TYPING state required by the pin.
+ if(ST.name==='TYPING')el.ta.blur();
  if(listening&&tap){if(q)holdDraft(q,'cap.stopped',true);else{conversationReturn();hint(tt('cap.empty'));}}
  else if(listening&&ST.name==='LISTENING')STATES.LISTENING.interrupt();
  // The frozen HOLD pin drops an inactive dictation recovery, never a typed field.

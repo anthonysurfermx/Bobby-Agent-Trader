@@ -113,11 +113,11 @@ function showTypeBox(on){
 function focusTa(){ try { el.typeBox.style.visibility = 'visible'; el.ta.focus({ preventScroll: true }); } catch (e) { try { el.ta.focus(); } catch (x) {} } }
 function taAutosize(){
   el.ta.style.height = 'auto';
-  var line = parseFloat(el.ta.style.lineHeight) || 22, padding = 28, max = padding + 4 * line;
+  var line = parseFloat(el.ta.style.lineHeight) || 22, max = 4 * line;
   el.ta.style.maxHeight = max + 'px';
-  var lines = Math.max(1, Math.ceil(((el.ta.scrollHeight || 50) - padding) / line));
-  var h = padding + Math.min(4, lines) * line;
-  el.ta.style.height = h + 'px'; TB.h = h;
+  var lines = Math.max(1, Math.ceil((el.ta.scrollHeight || line) / line));
+  var h = Math.min(4, lines) * line;
+  el.ta.style.height = h + 'px'; TB.h = h + 28;
   el.taSend.disabled = TB.composing || !el.ta.value.trim();
 }
 function placeTypeBox(){
