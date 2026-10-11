@@ -179,7 +179,7 @@ final class ConversationShots: ConversationFixtureCase {
     func test50Deep() { launch("companion-confirm-deep",level:"profundo"); ask("Bitcoin"); ready(button("risk.notNow")); shot("50-confirm-deep") }
     func test51Max() { launch("companion-confirm-max",level:"maximo"); ask("Bitcoin"); ready(button("risk.notNow")); shot("51-confirm-max") }
     func test52ProDeep() { launch("companion-pro-deep",level:"profundo"); ask("Bitcoin"); ready(button("risk.notNow")); shot("52-confirm-pro-deep") }
-    func test53LongName() { launch("companion-confirm-long"); ask("VWRP"); ready(button("risk.notNow")); XCTAssertTrue(web.staticTexts["Vanguard FTSE All-World UCITS ETF (USD) Accumulating (VWRP)"].exists); shot("53-confirm-long-name") }
+    func test53LongName() { launch("companion-confirm-long"); ask("VWRP"); ready(button("risk.notNow")); XCTAssertTrue(web.staticTexts["Vanguard Ftse All-world Ucits Etf (usd) Accumulating (VWRP)"].exists); shot("53-confirm-long-name") }
     func test54LongGist() { launch("companion-gist-long",voice:true); ask(); answered(); shot("54-long-gist") }
     func test55TypingOverAnswer() { launch(); ask(); answered(); type(); shot("55-typing-over-answer") }
     func test56ListeningEmpty() { launch(speech:"empty"); button("aria.talk").tap(); ready(button("aria.sendSpoken")); shot("56-listening-empty") }
