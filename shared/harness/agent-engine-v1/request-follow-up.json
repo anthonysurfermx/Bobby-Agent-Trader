@@ -1,0 +1,10 @@
+{
+  "op": "ask",
+  "version": 1,
+  "requestId": "44444444-4444-4444-8444-444444444404",
+  "sessionId": "session-0001",
+  "question": "¿Y cuál cayó más?",
+  "language": "es",
+  "locale": "es-MX",
+  "follow": true
+}

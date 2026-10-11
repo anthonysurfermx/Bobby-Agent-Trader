@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "taskId": "task_9e3e33f8ddd14e6ca54f25906182e93e",
+  "requestId": "44444444-4444-4444-8444-444444444402",
+  "state": "waiting_approval",
+  "events": [
+    {
+      "type": "received"
+    },
+    {
+      "type": "approval_pending",
+      "scope": {
+        "action": "read_assets",
+        "assets": [
+          "BTC",
+          "ETH"
+        ],
+        "windowDays": 30,
+        "depth": "standard",
+        "consumption": {
+          "reads": 1
+        },
+        "digest": "adb183bffbe9e72cb43846655d685c9afb3f63856aa98cd346621b3f690fd8f0"
+      }
+    }
+  ],
+  "approval": {
+    "action": "read_assets",
+    "assets": [
+      "BTC",
+      "ETH"
+    ],
+    "windowDays": 30,
+    "depth": "standard",
+    "consumption": {
+      "reads": 1
+    },
+    "digest": "adb183bffbe9e72cb43846655d685c9afb3f63856aa98cd346621b3f690fd8f0"
+  },
+  "result": null,
+  "error": null,
+  "allowance": {
+    "kind": "reads",
+    "remaining": 6
+  },
+  "engine": {
+    "model": "claude-sonnet-5-5",
+    "prompt": "agent-2026-10-10.5",
+    "tools": "tools-2026-10-10.2"
+  }
+}

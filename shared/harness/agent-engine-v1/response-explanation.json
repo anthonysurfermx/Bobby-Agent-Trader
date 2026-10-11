@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "taskId": "task_f4a4555e8d304e40a43c4e01ec9d2485",
+  "requestId": "44444444-4444-4444-8444-444444444401",
+  "state": "completed",
+  "events": [
+    {
+      "type": "received"
+    },
+    {
+      "type": "answer"
+    }
+  ],
+  "approval": null,
+  "result": {
+    "kind": "explanation",
+    "gist": "Un ETF es un fondo que cotiza en bolsa y agrupa muchos activos en uno.",
+    "text": "Un ETF es un fondo que cotiza en bolsa y agrupa muchos activos en uno. Al comprar una parte, tienes una porción de toda esa canasta, por ejemplo las acciones de un índice. Se compra y se vende durante el día, como una acción. Su valor sube y baja con lo que contiene, así que puedes perder dinero.",
+    "figures": [],
+    "references": [],
+    "limitations": [],
+    "next": null,
+    "composedByCode": false,
+    "analysis": null
+  },
+  "error": null,
+  "allowance": {
+    "kind": "reads",
+    "remaining": 6
+  },
+  "engine": {
+    "model": "claude-sonnet-5-5",
+    "prompt": "agent-2026-10-10.5",
+    "tools": "tools-2026-10-10.2"
+  }
+}

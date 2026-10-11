@@ -49,6 +49,7 @@ jobs:
       # The web desk: a question Bobby wrote is never offered beside a swap card, a wallet pill or a swap sheet.
       - run: npm run test:desk-suggestions
       - run: npm run test:user-memory
+      - run: npm run test:harness-brain
       - run: npm run test:stock-ticker-routing
       - run: npm run test:remediation-r2
       - run: npm run test:rpc-redaction
