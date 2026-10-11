@@ -3359,6 +3359,9 @@ function fillCards(m){
   if (typeof SES !== 'undefined' && SES && SES.reportContentLabel){
     var report = mk('button', 'report-answer', SES.reportContentLabel);
     report.type = 'button';
+    report.id = 'reportAnswer';
+    // Keep this native button out of the stage's captured card-drag gesture so a real tap clicks it.
+    report.onpointerdown = report.ontouchstart = function(e){ e.stopPropagation(); };
     report.onclick = function(e){ e.stopPropagation(); bcall('openNative', { route:'reportContent' }).catch(noop); };
     el.card0.inn.appendChild(report);
   }
@@ -4839,7 +4842,8 @@ function taAutosize(){
 function placeTypeBox(){
   if (!el.typeBox) return;
   var s = fitS || 1, vv = W.visualViewport, bottom = vv ? vv.offsetTop + vv.height : W.innerHeight;
-  var w = 350 * s, left = fitX + 20 * s, fs = Math.max(16, 17 * s);
+  // The IME shrinks the scene's fit scale, but typing needs readable text and send targets.
+  var w = Math.min(W.innerWidth - 32, Math.max(280, 350 * s)), left = (W.innerWidth - w) / 2, fs = Math.max(16, 17 * s);
   var pillTop = fitY + 742 * s, rest = Math.min(pillTop + 56 * s - TB.h, bottom - TB.h - 12);
   var p = A ? clamp(A.type.p.x, 0, 1.2) : 1, y = lerp(pillTop + 8 * s, rest, p);
   st(el.typeBox, 'width', Math.round(w) + 'px'); st(el.typeBox, 'left', Math.round(left) + 'px'); st(el.typeBox, 'top', Math.round(y) + 'px');

@@ -3,7 +3,6 @@ package xyz.bobbyprotocol.android
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.SystemClock
-import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import androidx.compose.ui.test.assertIsDisplayed
@@ -137,7 +136,13 @@ class ReleaseLocaleSmokeInstrumentedTest {
         assertTrue(typingBounds.toString(), typingBounds.getDouble("height") >= 48)
         assertTrue(typingBounds.toString(), typingBounds.getDouble("top") >= 0)
         assertTrue("Composer is above the keyboard: $typingBounds", typingBounds.getDouble("bottom") <= typingBounds.getDouble("viewport") + 2)
-        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_ESCAPE)
+        // The Android IME consumes Escape to hide itself, retaining textarea focus.
+        // Exercise the phone's Back dismissal and the actual empty-composer surface tap.
+        device.pressBack()
+        compose.mainClock.advanceTimeBy(1000)
+        waitFor { var visible = false; onMain { visible = ViewCompat.getRootWindowInsets(web.view)?.isVisible(WindowInsetsCompat.Type.ime()) == true }; !visible }
+        assertFalse(activity.isFinishing || activity.isDestroyed)
+        device.click(device.displayWidth/2, device.displayHeight/2)
         waitFor { js("window.nucleo.state()==='IDLE'") == true }
         // A real page chip reaches the actual session/asset resolver/desk parser and returns a read.
         waitFor { js("!!document.querySelector('#chipRow [data-hit=chip]')") == true }
