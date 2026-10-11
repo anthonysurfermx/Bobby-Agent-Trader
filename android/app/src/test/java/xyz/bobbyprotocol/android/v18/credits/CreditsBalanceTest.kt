@@ -462,7 +462,7 @@ class CreditsBalanceTest {
 
     // Six languages
 
-    @Test fun everyCreditsLineHasFourTranslationsThatKeepTheirPlaceholders() {
+    @Test fun everyCreditsLineHasFourTranslationsAndOnlyAndroidSignInCopy() {
         val said = listOf(
             "Credits", "Quick", "Deep", "Max", "Quick reads", "Deep reads", "Max reads", "Gifted Quick reads", "Gifted Deep reads", "Gifted Max reads",
             "Unlimited", "Unlimited · fair use", "With Bobby Pro, within fair use.", "{0} of {1} left this week", "{0} of {1} left",
@@ -475,7 +475,7 @@ class CreditsBalanceTest {
             "Invite", "Code", "Checking…", "1 credit = 1 read", "Share Bobby with someone you know.",
             "You get {0} days of Bobby Pro for each friend who joins with your link, up to {1} friends.",
             "{0} days of Bobby Pro for each friend who joins", "Bobby Pro for each friend who joins", "Restore purchases", "Manage subscription",
-            "Try again", "Risk notice", "Details", "Continue with Google", "Continue with Apple",
+            "Try again", "Risk notice", "Details", "Continue with Google", "Provider instructions",
             "Use this if you paid for Bobby Pro with your Google Play account on another phone or after reinstalling. Codes and gifts never need restoring.")
         for (key in said) {
             val translations = V18Catalog.row(key)
@@ -483,7 +483,7 @@ class CreditsBalanceTest {
             for ((language, text) in translations) {
                 assertEquals("$key [$language]", V18Catalog.placeholders(key), V18Catalog.placeholders(text))
                 assertFalse("no exclamation marks: $key [$language]", text.contains("!"))
-                assertFalse("Android never names an iPhone or its store here: $key [$language]", Regex("iPhone|App Store|Apple Account").containsMatchIn(text))
+                assertFalse("Android never names an iPhone or its store here: $key [$language]", Regex("iPhone|App Store|Apple").containsMatchIn(text))
             }
         }
     }

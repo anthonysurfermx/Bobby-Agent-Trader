@@ -20,12 +20,13 @@ function kotlinFiles(directory) {
   });
 }
 
-test('every literal native UI string has all four additional translations', () => {
+test('every literal native UI string has four additional translations and Android wording', () => {
   const literal = /\b(?:t|text)\(\s*"((?:[^"\\]|\\.)*)"\s*,\s*"((?:[^"\\]|\\.)*)"/g;
   let count = 0;
   for (const file of kotlinFiles(path.join(main, 'java'))) {
     for (const match of fs.readFileSync(file, 'utf8').matchAll(literal)) {
       const key = JSON.parse(`"${match[1]}"`);
+      assert.ok(!/iPhone|iPad|App Store|Apple/.test(key), `Native Android wording required: ${key} (${file})`);
       // Runtime interpolation needs its own format contract rather than a literal catalog key.
       assert.ok(!key.includes('$'), `Use a catalog template for interpolation in ${file}: ${key}`);
       for (const language of addedLanguages) {

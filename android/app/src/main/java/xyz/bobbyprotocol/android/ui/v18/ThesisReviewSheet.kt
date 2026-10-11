@@ -344,9 +344,8 @@ private fun Refused(host: V18Host, copy: ThesisCopy, said: ThesisRefusalCopy, re
 private fun RefusalButton(host: V18Host, copy: ThesisCopy, action: ThesisRefusalCopy.Action, prominent: Boolean, reviewer: ThesisReviewer) {
     when (action) {
         ThesisRefusalCopy.Action.SIGN_IN -> {
-            // The same two doors as the profile. The sheet closes when the account arrives.
+            // Android offers the same Google sign-in as Profile; the sheet closes when the account arrives.
             Choice(host.text("Continue with Google", "Continuar con Google"), prominent, "thesis-review-signin-google") { host.signIn("google") }
-            Choice(host.text("Continue with Apple", "Continuar con Apple"), false, "thesis-review-signin-apple") { host.signIn("apple") }
         }
         ThesisRefusalCopy.Action.PRO -> Choice(host.text("See Bobby Pro", "Ver Bobby Pro"), prominent, "thesis-review-pro") { host.switchSheet("paywall") }
         ThesisRefusalCopy.Action.QUICK -> Choice(host.text("Review with {0}", "Revisar con {0}", copy.levelName(ThesisReviewer.QUICK)), prominent, "thesis-review-quick") {
