@@ -37,7 +37,7 @@ absence of the native level sheet. Neither previous diagnostic set is promoted.
 
 Current fast gates: page **311/311**, input **1512/1512**, language **13/13**,
 localization **1384 keys / 1444 rows**, untouched production web build passed.
-Signed full native/UI rerun and the frozen Spanish Pro / SE +1 matrices are pending;
+Corrected signed native suite passed **1167/1167** (including legal guards and A10 UUID/deadline tests). Fixture UI and the frozen Spanish Pro / SE +1 matrices are pending;
 **I-1a is not READY** until those results and every image are reviewed.
 
 Evidence is under `a10-*` at the shared harness root. The initial `a10-focused`
