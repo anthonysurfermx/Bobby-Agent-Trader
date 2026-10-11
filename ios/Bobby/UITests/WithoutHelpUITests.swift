@@ -209,10 +209,10 @@ final class ConversationShots: ConversationFixtureCase {
     func test16Correcting() { launch("companion-offer"); ask("Ethereun"); ready(button("risk.notNow")); type(); XCTAssertEqual(web.textViews.firstMatch.value as? String,"Ethereun"); shot("16-correcting") }
     func test17LongReading() { launch("companion-long"); ask(); answered(); web.swipeUp(); shot("17-long-reading") }
     func test18ProfileLevel() {
-        launch(); web.buttons.matching(NSPredicate(format:"label CONTAINS 'Momo.'")).firstMatch.tap()
+        launch(); let profile=web.buttons.matching(NSPredicate(format:"label CONTAINS 'Momo.'")).firstMatch
+        ready(profile);profile.tap();ready(app.buttons["account-close"])
         let row = app.buttons["account-analysis-level"]
-        XCTAssertTrue(row.waitForExistence(timeout: 10))
-        for _ in 0..<5 where !row.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        for _ in 0..<7 where !row.isHittable { app.scrollViews.firstMatch.swipeUp() }
         ready(row); shot("18-profile-level")
         row.tap(); ready(app.buttons["nucleo.level.rapido"])
     }
