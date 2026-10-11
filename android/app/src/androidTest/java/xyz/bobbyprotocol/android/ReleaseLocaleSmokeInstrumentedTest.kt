@@ -3,6 +3,7 @@ package xyz.bobbyprotocol.android
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.SystemClock
+import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
 import androidx.compose.ui.test.assertIsDisplayed
@@ -325,11 +326,13 @@ class ReleaseLocaleSmokeInstrumentedTest {
         // Queue both real touchscreen events without waiting for the overloaded WebView
         // to acknowledge DOWN: synchronous acknowledgement can turn a 30ms tap into a hold.
         MotionEvent.obtain(down,down,MotionEvent.ACTION_DOWN,x,y,0).also {
+            it.source = InputDevice.SOURCE_TOUCHSCREEN
             check(instrumentation.uiAutomation.injectInputEvent(it, false)) { "Touch DOWN was refused" }
             it.recycle()
         }
         SystemClock.sleep(30)
         MotionEvent.obtain(down,down+30,MotionEvent.ACTION_UP,x,y,0).also {
+            it.source = InputDevice.SOURCE_TOUCHSCREEN
             check(instrumentation.uiAutomation.injectInputEvent(it, false)) { "Touch UP was refused" }
             it.recycle()
         }
