@@ -231,6 +231,7 @@ final class NucleoSession: ObservableObject {
         }
         desk.speakingLevel = { [weak self] in guard let self else { return nil }; return SpeakingDial(defaults: self.defaults).value(self.fixtures ? nil : self.desk.userID()) }
         if fixtures {
+#if DEBUG
             if NucleoFixtures.scenario?.hasPrefix("companion") == true {
                 desk.readAccess = {
                     let scenario=NucleoFixtures.scenario ?? "", pro=scenario.hasPrefix("companion-pro")
@@ -242,6 +243,7 @@ final class NucleoSession: ObservableObject {
                     desk.readMeter = { level in NucleoLevelMeter(json:["used":0,"limit":5,"remaining": level == .maximo ? 2 : 5,"windowDays":7]) }
                 }
             }
+#endif
             // Fixture mode is always the signed-out path: no ProgressSync, no island, no Apple, no bearer.
             desk.isSignedIn = { false }
             desk.userID = { nil }
