@@ -488,12 +488,11 @@ class CreditsBalanceTest {
         }
     }
 
-    @Test fun theInviteLineSpeaksToThePersonInformallyInEveryLanguage() {
-        // Bobby says tu, never vous. This row once came from the older catalog, where it was formal in
-        // French and Portuguese; it is the line every Android account reads today under Credits › Details.
+    @Test fun theInviteLineUsesInformalLocalizedCopyIncludingBrazilianPortuguese() {
+        // French uses tu; Brazil uses the everyday voce form. Credits must use the regional catalog row.
         val row = V18Catalog.row("Share Bobby with someone you know.")
         assertEquals("Partage Bobby avec une personne que tu connais.", row["fr"])
-        assertEquals("Partilha o Bobby com alguém que conheces.", row["pt"])
+        assertEquals("Compartilhe o Bobby com alguém que você conhece.", row["pt"])
         assertEquals("Condividi Bobby con qualcuno che conosci.", row["it"])
         assertEquals("Teile Bobby mit jemandem, den du kennst.", row["de"])
         assertFalse(Regex("\\b(vous|votre|vos)\\b", RegexOption.IGNORE_CASE).containsMatchIn(row["fr"] ?: "vous"))

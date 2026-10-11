@@ -27,6 +27,12 @@
 # Keep its public entrypoint/companion for that independently compiled assertion, not initialization.
 -keep class com.revenuecat.purchases.Purchases** { *; }
 
+# The independent acceptance APK calls the target app's public/protected API (NucleoStateStore
+# disappeared during app-only shrinking). Retain that callable surface, but explicitly permit
+# optimization and obfuscation; private implementation/resources still shrink. The same rule
+# ships in the unsigned bundle, so tests never exercise a separately relaxed application build.
+-keep,allowoptimization,allowobfuscation class xyz.bobbyprotocol.android.** { public *; protected *; }
+
 # The device acceptance tests install a fixture transport by field name; production owns this client too.
 -keepclassmembers class xyz.bobbyprotocol.android.data.BobbyRepository { okhttp3.OkHttpClient client; }
 # Device acceptance inspects the actual activity session and repository, without shipping any fixture hook.
