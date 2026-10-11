@@ -84,7 +84,8 @@ const decimalOf = (n: string) => (/^\p{N}+[.,](?:\p{N}{1,2}|\p{N}{4,})$/u.test(n
  *     question ("Nasdaq 100") lends no number at all.
  */
 function refuse(text: string, figures: Map<string, Figure>, question: string, days: number | null): Refusal | null {
-  if (new RegExp(`[${MARKS}]`).test(text)) return { code: 'bad_placeholder', detail: 'a character only the app writes' };
+  // The marks code puts in place of a number (here, and for the second reader) are code's: a draft that types one is refused.
+  if (new RegExp(`[${MARKS}\u27E6\u27E7]`).test(text)) return { code: 'bad_placeholder', detail: 'a character only the app writes' };
   for (const match of text.matchAll(PLACEHOLDER)) {
     if (match[1] === 'days') { if (days === null) return { code: 'bad_placeholder', detail: '{{days}} with no window read' }; continue; }
     const [kind, id] = match[1].split(':'), figure = figures.get(id);
