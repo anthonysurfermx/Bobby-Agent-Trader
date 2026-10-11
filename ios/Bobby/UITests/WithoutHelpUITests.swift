@@ -115,9 +115,16 @@ final class ConversationShots: ConversationFixtureCase {
     func test13Limit() { launch("companion-limit"); ask(); answered(); XCTAssertFalse(button("fail.retry").exists); shot("13-limit") }
     func test14ExplanationsOff() { launch("companion-off"); ask(); answered(); XCTAssertTrue(web.staticTexts[word("fail.cantExplain")].exists); shot("14-explanations-off") }
     func test15Confirmation() { launch(); ask("Bitcoin"); ready(button("risk.notNow")); physicalControls([confirmRead,button("risk.notNow"),confirmLevel]); shot("15-confirmation") }
-    func test16Correcting() { launch(); ask("Ethereun"); ready(button("risk.notNow")); type(); XCTAssertEqual(web.textViews.firstMatch.value as? String,"Ethereun"); shot("16-correcting") }
+    func test16Correcting() { launch("companion-offer"); ask("Ethereun"); ready(button("risk.notNow")); type(); XCTAssertEqual(web.textViews.firstMatch.value as? String,"Ethereun"); shot("16-correcting") }
     func test17LongReading() { launch("companion-long"); ask(); answered(); web.swipeUp(); shot("17-long-reading") }
-    func test18ProfileLevel() { launch(); web.buttons.matching(NSPredicate(format:"label CONTAINS 'Momo.'")).firstMatch.tap(); ready(app.buttons["account-analysis-level"]); shot("18-profile-level") }
+    func test18ProfileLevel() {
+        launch(); web.buttons.matching(NSPredicate(format:"label CONTAINS 'Momo.'")).firstMatch.tap()
+        let row = app.buttons["account-analysis-level"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        for _ in 0..<5 where !row.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        ready(row); shot("18-profile-level")
+        row.tap(); ready(app.buttons["nucleo.level.rapido"])
+    }
     func test31Primer() { launch(permission:"undetermined"); button("aria.talk").tap(); ready(button("perm.cta")); shot("31-microphone-primer"); button("perm.cta").tap(); ready(button("aria.talk")); XCTAssertFalse(button("aria.sendSpoken").exists) }
     func test32Denied() { launch(permission:"denied"); button("aria.talk").tap(); ready(button("aria.type")); XCTAssertFalse(button("aria.sendSpoken").exists); shot("32-microphone-denied") }
     func test33Empty() { launch(speech:"empty"); listening(); ready(button("aria.talk")); XCTAssertTrue(web.staticTexts[word("cap.empty")].exists); shot("33-empty-capture") }

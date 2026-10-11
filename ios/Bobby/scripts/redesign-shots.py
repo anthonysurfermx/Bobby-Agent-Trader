@@ -139,7 +139,8 @@ def main():
                             if target.exists(): raise RuntimeError(f'Duplicate screenshot name: {target.name}')
                             shutil.copyfile(Path(raw) / filename, target)
                             named.append((target.name, test['testIdentifier']))
-                    if not named: raise RuntimeError('No screenshot attachments exported')
+                    if not named and any(not t.startswith('BobbyTests') for t in tests):
+                        raise RuntimeError('No screenshot attachments exported')
                     (folder / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
                 index = [f'# {DEVICES[key][0]} · {args.language} · {args.text_size}', '',
                          f'Captured: {datetime.datetime.now(datetime.timezone.utc).isoformat()}',
