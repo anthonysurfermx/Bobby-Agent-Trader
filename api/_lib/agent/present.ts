@@ -332,8 +332,8 @@ export function everyDayClaim(text: string, language: AppLanguage): boolean {
   return text.split(/(?<=[.!?…])\s+|\n+/).some((sentence) => EVERY_DAY[language].test(sentence) && !AN_AVERAGE[language].test(sentence));
 }
 
-/** A plain reading of the analysis written by code: what is served when the model's text cannot be shown. */
-export function composeByCode(analysis: Analysis | null, language: AppLanguage, locale?: string | null): Presentation {
+/** Code's plain reading: change, average daily move and largest fall (and the two days, for one instrument). */
+function composeBase(analysis: Analysis | null, language: AppLanguage, locale?: string | null): Presentation {
   const figures = new Map((analysis?.figures ?? []).map((figure) => [figure.id, figure]));
   const ready = (analysis?.subjects ?? []).filter((symbol) => figures.get(`return_${symbol}`)?.value != null && figures.get(`drawdown_${symbol}`)?.value != null);
   // Whatever could be read is told: two against each other, or the one that came back, with the other named as a limit.
@@ -352,6 +352,47 @@ export function composeByCode(analysis: Analysis | null, language: AppLanguage, 
   const text = write(draft, figures, analysis.windowDays, language, locale);
   const used = b ? [`return_${a}`, `return_${b}`, `drawdown_${a}`, `drawdown_${b}`, ...(moved ? [`move_${a}`, `move_${b}`] : [])] : [`return_${a}`, `drawdown_${a}`, ...(moved ? [`move_${a}`] : []), ...(days ? [`worst_${a}`, `best_${a}`] : [])];
   return { kind: 'analysis', gist: text.slice(0, text.indexOf('. ') + 1) || text, text, figures: used, references: references(analysis, used), limitations: limitationsInWords(analysis, language), next: null, composedByCode: true };
+}
+
+/** What code adds to its own text when the model said what the person asked about: told by code, a paid read still answers the question. */
+const ASKED: Record<AppLanguage, { correlation: (pairs: string) => string; pair: (a: string, b: string, id: string) => string; worst: (items: string) => string; best: (items: string) => string; day: (name: string, id: string) => string }> = {
+  en: { correlation: (pairs) => `The correlation of their daily changes was ${pairs}.`, pair: (a, b, id) => `{{f:${id}}} for ${a} and ${b}`, worst: (items) => `Worst day: ${items}.`, best: (items) => `Best day: ${items}.`, day: (name, id) => `${name} {{f:${id}}} on {{d:${id}}}` },
+  es: { correlation: (pairs) => `La correlación de sus cambios diarios fue de ${pairs}.`, pair: (a, b, id) => `{{f:${id}}} entre ${a} y ${b}`, worst: (items) => `Peor día: ${items}.`, best: (items) => `Mejor día: ${items}.`, day: (name, id) => `${name} {{f:${id}}} el {{d:${id}}}` },
+  fr: { correlation: (pairs) => `La corrélation de leurs variations quotidiennes a été de ${pairs}.`, pair: (a, b, id) => `{{f:${id}}} entre ${a} et ${b}`, worst: (items) => `Pire jour : ${items}.`, best: (items) => `Meilleur jour : ${items}.`, day: (name, id) => `${name} {{f:${id}}} le {{d:${id}}}` },
+  pt: { correlation: (pairs) => `A correlação das variações diárias foi de ${pairs}.`, pair: (a, b, id) => `{{f:${id}}} entre ${a} e ${b}`, worst: (items) => `Pior dia: ${items}.`, best: (items) => `Melhor dia: ${items}.`, day: (name, id) => `${name} {{f:${id}}} em {{d:${id}}}` },
+  it: { correlation: (pairs) => `La correlazione delle loro variazioni giornaliere è stata di ${pairs}.`, pair: (a, b, id) => `{{f:${id}}} tra ${a} e ${b}`, worst: (items) => `Giorno peggiore: ${items}.`, best: (items) => `Giorno migliore: ${items}.`, day: (name, id) => `${name} {{f:${id}}} il {{d:${id}}}` },
+  de: { correlation: (pairs) => `Die Korrelation ihrer täglichen Veränderungen betrug ${pairs}.`, pair: (a, b, id) => `{{f:${id}}} zwischen ${a} und ${b}`, worst: (items) => `Schwächster Tag: ${items}.`, best: (items) => `Stärkster Tag: ${items}.`, day: (name, id) => `${name} {{f:${id}}} am {{d:${id}}}` },
+};
+const several = (parts: string[], language: AppLanguage) => (parts.length > 1 ? listed(parts, language) : parts[0]);
+
+/**
+ * A plain reading of the analysis written by code: what is served when the model's text cannot be shown. `asked` is
+ * what the model said the person asked about (metric names): code adds those figures when its plain reading does not
+ * already carry them, so a read someone spent on "how do they move together" is not answered with something else
+ * (fourth and fifth blind sets: correlations and worst days asked, a safe summary told).
+ */
+export function composeByCode(analysis: Analysis | null, language: AppLanguage, locale?: string | null, asked: string[] = []): Presentation {
+  const base = composeBase(analysis, language, locale);
+  if (!analysis || base.kind !== 'analysis' || !asked.length) return base;
+  const figures = new Map(analysis.figures.map((figure) => [figure.id, figure]));
+  const ready = analysis.subjects.filter((symbol) => figures.get(`return_${symbol}`)?.value != null && figures.get(`drawdown_${symbol}`)?.value != null);
+  const words = ASKED[language], sentences: string[] = [], used: string[] = [];
+  if (asked.includes('correlation') && ready.length > 1) {
+    const pairs: string[] = [];
+    for (let i = 0; i < ready.length; i++) for (let j = i + 1; j < ready.length; j++) {
+      const id = [`corr_${ready[i]}_${ready[j]}`, `corr_${ready[j]}_${ready[i]}`].find((key) => figures.get(key)?.value != null);
+      if (id) { pairs.push(words.pair(instrumentName(ready[i]), instrumentName(ready[j]), id)); used.push(id); }
+    }
+    if (pairs.length) sentences.push(words.correlation(several(pairs, language)));
+  }
+  for (const metric of ['worst', 'best'] as const) {
+    if (!asked.includes(metric)) continue;
+    const ids = ready.map((symbol) => `${metric}_${symbol}`).filter((id) => !base.figures.includes(id) && figures.get(id)?.value != null && Boolean(figures.get(id)?.day));
+    if (ids.length) { sentences.push(words[metric](several(ids.map((id) => words.day(instrumentName(id.slice(metric.length + 1)), id)), language))); used.push(...ids); }
+  }
+  if (!used.length) return base;
+  const all = [...base.figures, ...used];
+  return { ...base, text: `${base.text} ${write(sentences.join(' '), figures, analysis.windowDays, language, locale)}`, figures: all, references: references(analysis, all) };
 }
 
 /**

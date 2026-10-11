@@ -1177,4 +1177,34 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   for (const [needle, why] of [['cost one read, whatever the window', 'what a read costs can be said'], ['how many reads they have left is not something you can see', 'the balance is not Bobby\'s to state'], ['do not turn it into a market question and offer no read', 'words that are not about investing stay that way'], ['Never call it the average change per day', 'the daily move is not a daily gain'], ['a read they paid for answers what they asked', 'what was asked comes first']] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);
 }
 
+// ---------- 7j. what the fifth independent evaluation found (2026-10-11, 100 turns, no critical turn) ----------
+{
+  // When the model's words could not be shown, code's plain reading answered something else: correlations and worst
+  // days that were asked for were left out. Told by code, a paid read still carries what was asked.
+  const three = await analysisOf(['BTC', 'ETH', 'SPY'], 30);
+  for (const language of ['en', 'es', 'fr', 'pt', 'it', 'de'] as const) {
+    const plain = composeByCode(crypto, language), withCorr = composeByCode(crypto, language, null, ['correlation']), withDays = composeByCode(crypto, language, null, ['worst', 'best']);
+    const corr = formatFigure(fig(crypto, 'corr_BTC_ETH'), language);
+    ok(!plain.figures.includes('corr_BTC_ETH') && withCorr.text.startsWith(plain.text) && withCorr.text.includes(corr) && withCorr.figures.includes('corr_BTC_ETH') && !/\{\{/.test(withCorr.text), `${language}: asked how they moved together, told by code: the correlation is in the text and in its figures`);
+    ok(['worst_BTC', 'worst_ETH', 'best_BTC', 'best_ETH'].every((id) => withDays.figures.includes(id) && withDays.text.includes(formatFigure(fig(crypto, id), language)) && withDays.text.includes(formatDay(fig(crypto, id).day!, language))) && !/\{\{/.test(withDays.text), `${language}: asked for the worst and best day of each: each one with its date`);
+    const trio = composeByCode(three, language, null, ['correlation']);
+    ok(['corr_BTC_ETH', 'corr_BTC_SPY', 'corr_ETH_SPY'].filter((id) => fig(three, id).value !== null).every((id) => trio.figures.includes(id)) && !/\{\{|undefined/.test(trio.text), `${language}: three assets, three pairs: every correlation that exists is told`);
+  }
+  eq([composeByCode(alone, 'es', null, ['correlation']).text === composeByCode(alone, 'es').text, composeByCode(alone, 'es', null, ['worst']).figures.filter((id) => id === 'worst_BTC').length, composeByCode(null, 'es', null, ['worst']).kind], [true, 1, 'unavailable'], 'nothing is added that does not exist (the correlation of one asset), nothing twice (one asset already carries its days), nothing to an unavailable reading');
+
+  // In the loop: the reader turns the model's words down, and what the person asked for is still what they get.
+  const store = new MemoryAgentStore(6), deps = depsFor(store);
+  script = [() => turn([use('read_assets', { assets: ['Bitcoin', 'Ethereum'], windowDays: 30 })]),
+    () => answer({ kind: 'analysis', gist: 'Su correlación fue de {{f:corr_BTC_ETH}}.', text: 'Su correlación fue de {{f:corr_BTC_ETH}}. Yo elegiría Bitcoin.', asked: ['correlation'] })];
+  const offered = await ask(deps, 'sara', '¿Qué tan juntos se movieron Bitcoin y Ethereum?', 's1');
+  await store.approve('sara', offered.id, waitingApproval(offered)!.digest, clock);
+  verdicts.push('advice');
+  await runTask(deps, 'sara', offered.id);
+  const shown = taskResult((await store.get('sara', offered.id))!)!.presentation;
+  eq([shown.composedByCode, shown.figures.includes('corr_BTC_ETH'), shown.text.includes(formatFigure(fig(crypto, 'corr_BTC_ETH'), 'es')), /elegir/i.test(shown.text)], [true, true, true, false], 'the model\'s advice is not shown, and the correlation they asked for is: code tells it');
+
+  const prompt = agentPrompt('en', 'en-US');
+  for (const [needle, why] of [['an asset they leave out', 'an excluded asset is not counted among the three'], ['SPY and QQQ are funds, never call them indices', 'a fund is not called an index']] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);
+}
+
 console.log(`agent-engine: ${checks} checks passed`);
