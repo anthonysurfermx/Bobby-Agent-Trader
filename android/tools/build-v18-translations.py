@@ -11,6 +11,8 @@ This script reads every iOS row and merges it into that JSON:
   - a row that names an iPhone, an Apple Account or the App Store is replaced by its Android wording
     from v18-android-wording.json (key = the iOS English string; `en` there is the Android key,
     `es` is the Spanish to pass to `text(en, es)`);
+  - an explicit Android wording row may keep its English key for regional copy (Portuguese Brazil);
+    record all six fields there and update the existing catalog row, which remains authoritative;
   - the file is written sorted by key, so running it again changes nothing and two branches that
     each add rows merge without a fight (when they do conflict: take either side, run this again).
 

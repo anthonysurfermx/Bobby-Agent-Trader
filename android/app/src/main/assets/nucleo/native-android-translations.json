@@ -307,7 +307,7 @@
   },
   "Audio is unavailable. Your report is ready to read.": {
     "fr": "L'audio est indisponible. Tu peux lire ton rapport.",
-    "pt": "O áudio não está disponível. Podes ler o relatório.",
+    "pt": "O áudio não está disponível. Você pode ler o relatório.",
     "it": "L'audio non è disponibile. Puoi leggere il rapporto.",
     "de": "Audio ist nicht verfügbar. Dein Bericht ist zum Lesen bereit."
   },
@@ -383,7 +383,7 @@
   },
   "Blocking hides this creator on this device, even if the island is renamed. You can unblock them here.": {
     "fr": "Le blocage masque ce créateur sur cet appareil, même si l'île change de nom. Tu peux le débloquer ici.",
-    "pt": "Bloquear oculta este criador neste dispositivo, mesmo que o nome da ilha mude. Podes desbloqueá-lo aqui.",
+    "pt": "Bloquear oculta este criador neste dispositivo, mesmo que o nome da ilha mude. Você pode desbloqueá-lo aqui.",
     "it": "Il blocco nasconde questo creatore su questo dispositivo, anche se l'isola cambia nome. Puoi sbloccarlo qui.",
     "de": "Blockieren blendet diesen Ersteller auf diesem Gerät aus, auch wenn die Insel umbenannt wird. Du kannst die Blockierung hier aufheben."
   },
@@ -807,7 +807,7 @@
   },
   "Delete your Bobby account and synced personal data? Public blockchain records and your store subscription may remain. Manage your subscription separately.": {
     "fr": "Supprimer ton compte Bobby et les données personnelles synchronisées ? Les données publiques de la blockchain et ton abonnement peuvent subsister. Gère ton abonnement séparément.",
-    "pt": "Eliminar a tua conta Bobby e os dados pessoais sincronizados? Os registos públicos na blockchain e a subscrição da loja podem permanecer. Gere a subscrição separadamente.",
+    "pt": "Excluir sua conta Bobby e os dados pessoais sincronizados? Os registros públicos na blockchain e a assinatura da loja podem permanecer. Gerencie sua assinatura separadamente.",
     "it": "Eliminare il tuo account Bobby e i dati personali sincronizzati? I dati pubblici sulla blockchain e l'abbonamento dello store possono rimanere. Gestisci l'abbonamento separatamente.",
     "de": "Dein Bobby-Konto und synchronisierte persönliche Daten löschen? Öffentliche Blockchain-Einträge und dein Store-Abonnement können bestehen bleiben. Verwalte dein Abonnement separat."
   },
@@ -1127,7 +1127,7 @@
   },
   "Google Play subscriptions are not available yet.": {
     "fr": "Les abonnements Google Play ne sont pas encore disponibles.",
-    "pt": "As subscrições do Google Play ainda não estão disponíveis.",
+    "pt": "As assinaturas do Google Play ainda não estão disponíveis.",
     "it": "Gli abbonamenti Google Play non sono ancora disponibili.",
     "de": "Google Play-Abonnements sind noch nicht verfügbar."
   },
@@ -1157,7 +1157,7 @@
   },
   "Have a code?": {
     "fr": "Tu as un code ?",
-    "pt": "Tens um código?",
+    "pt": "Tem um código?",
     "it": "Hai un codice?",
     "de": "Hast du einen Code?"
   },
@@ -1468,6 +1468,12 @@
     "pt": "Gerir",
     "it": "Gestisci",
     "de": "Verwalten"
+  },
+  "Manage subscription": {
+    "fr": "Gérer l’abonnement",
+    "pt": "Gerenciar assinatura",
+    "it": "Gestisci abbonamento",
+    "de": "Abonnement verwalten"
   },
   "Managed on the web.": {
     "fr": "Géré sur le web.",
@@ -1899,7 +1905,7 @@
   },
   "Publishing shares your island name and layout. Your account identity is not included in the public island.": {
     "fr": "La publication partage le nom et la disposition de ton île. Ton identité de compte n'est pas incluse dans l'île publique.",
-    "pt": "Publicar partilha o nome e a disposição da tua ilha. A ilha pública não inclui a identidade da tua conta.",
+    "pt": "Publicar compartilha o nome e o layout da sua ilha. A ilha pública não inclui a identidade da sua conta.",
     "it": "La pubblicazione condivide il nome e la disposizione della tua isola. L'isola pubblica non include l'identità del tuo account.",
     "de": "Die Veröffentlichung teilt den Namen und die Anordnung deiner Insel. Deine Kontoidentität ist nicht Teil der öffentlichen Insel."
   },
@@ -2317,7 +2323,7 @@
     "en": "Share",
     "es": "Compartir",
     "fr": "Partager",
-    "pt": "Partilhar",
+    "pt": "Compartilhar",
     "it": "Condividi",
     "de": "Teilen"
   },
@@ -2325,13 +2331,13 @@
     "en": "Share Bobby with someone you know",
     "es": "Comparte Bobby con alguien que conoces",
     "fr": "Partage Bobby avec quelqu’un que tu connais",
-    "pt": "Partilha o Bobby com alguém que conheces",
+    "pt": "Compartilhe o Bobby com alguém que você conhece",
     "it": "Condividi Bobby con qualcuno che conosci",
     "de": "Teile Bobby mit jemandem, den du kennst"
   },
   "Share Bobby with someone you know.": {
     "fr": "Partage Bobby avec une personne que tu connais.",
-    "pt": "Partilha o Bobby com alguém que conheces.",
+    "pt": "Compartilhe o Bobby com alguém que você conhece.",
     "it": "Condividi Bobby con qualcuno che conosci.",
     "de": "Teile Bobby mit jemandem, den du kennst."
   },
@@ -2339,13 +2345,13 @@
     "en": "Share a text summary of your companion, level and earned gear",
     "es": "Comparte un resumen de texto de tu compañero, nivel y equipo ganado",
     "fr": "Partage un résumé texte de ton compagnon, de ton niveau et de ton équipement gagné",
-    "pt": "Partilha um resumo em texto do teu companheiro, nível e equipamento ganho",
+    "pt": "Compartilhe um resumo em texto do seu companheiro, nível e equipamento conquistado",
     "it": "Condividi un riepilogo testuale del tuo compagno, del livello e dell’equipaggiamento guadagnato",
     "de": "Teile eine Textübersicht deines Begleiters, deiner Stufe und deiner verdienten Ausrüstung"
   },
   "Share invite": {
     "fr": "Partager l'invitation",
-    "pt": "Partilhar convite",
+    "pt": "Compartilhar convite",
     "it": "Condividi invito",
     "de": "Einladung teilen"
   },
@@ -2353,13 +2359,13 @@
     "en": "Share my avatar",
     "es": "Compartir mi avatar",
     "fr": "Partager mon avatar",
-    "pt": "Partilhar o meu avatar",
+    "pt": "Compartilhar meu avatar",
     "it": "Condividi il mio avatar",
     "de": "Meinen Avatar teilen"
   },
   "Share this name and layout with visitors? You can make it private again here.": {
     "fr": "Partager ce nom et cette disposition avec les visiteurs ? Tu peux la rendre privée ici à tout moment.",
-    "pt": "Partilhar este nome e disposição com visitantes? Podes torná-la privada novamente aqui.",
+    "pt": "Compartilhar este nome e layout com visitantes? Você pode tornar a ilha privada novamente aqui.",
     "it": "Condividere questo nome e questa disposizione con i visitatori? Puoi renderla nuovamente privata qui.",
     "de": "Diesen Namen und diese Anordnung mit Besuchern teilen? Du kannst die Insel hier wieder privat machen."
   },
@@ -2367,13 +2373,13 @@
     "en": "Share your companion, level and earned gear",
     "es": "Comparte tu compañero, nivel y equipo ganado",
     "fr": "Partage ton compagnon, ton niveau et ton équipement gagné",
-    "pt": "Partilha o teu companheiro, nível e equipamento ganho",
+    "pt": "Compartilhe seu companheiro, nível e equipamento conquistado",
     "it": "Condividi il tuo compagno, il livello e l’equipaggiamento guadagnato",
     "de": "Teile deinen Begleiter, deine Stufe und deine verdiente Ausrüstung"
   },
   "Shared island": {
     "fr": "Île partagée",
-    "pt": "Ilha partilhada",
+    "pt": "Ilha compartilhada",
     "it": "Isola condivisa",
     "de": "Geteilte Insel"
   },
@@ -2381,7 +2387,7 @@
     "en": "Sharing is unavailable. Try again.",
     "es": "No se pudo compartir. Intenta de nuevo.",
     "fr": "Le partage est indisponible. Réessaie.",
-    "pt": "Não foi possível partilhar. Tenta novamente.",
+    "pt": "Não foi possível compartilhar. Tente novamente.",
     "it": "La condivisione non è disponibile. Riprova.",
     "de": "Das Teilen ist nicht verfügbar. Versuche es erneut."
   },
@@ -2611,7 +2617,7 @@
   },
   "Subscriptions renew automatically unless cancelled through your store. Access is confirmed by Bobby after purchase.": {
     "fr": "Les abonnements se renouvellent automatiquement sauf annulation dans ta boutique. Bobby confirme l'accès après l'achat.",
-    "pt": "As subscrições renovam-se automaticamente, salvo cancelamento na tua loja. O Bobby confirma o acesso após a compra.",
+    "pt": "As assinaturas são renovadas automaticamente, salvo cancelamento na sua loja. O Bobby confirma o acesso após a compra.",
     "it": "Gli abbonamenti si rinnovano automaticamente salvo annullamento nel tuo store. Bobby conferma l'accesso dopo l'acquisto.",
     "de": "Abonnements verlängern sich automatisch, sofern du sie nicht über deinen Store kündigst. Bobby bestätigt den Zugang nach dem Kauf."
   },
@@ -2645,7 +2651,7 @@
   },
   "Tap one to ask Bobby.": {
     "fr": "Touche-en un pour demander à Bobby.",
-    "pt": "Toca num para perguntar ao Bobby.",
+    "pt": "Toque em um para perguntar ao Bobby.",
     "it": "Toccane uno per chiedere a Bobby.",
     "de": "Tippe auf eins, um Bobby zu fragen."
   },
@@ -3083,7 +3089,7 @@
   },
   "What you have and how to get more": {
     "fr": "Ce que tu as et comment en obtenir plus",
-    "pt": "O que tens e como obter mais",
+    "pt": "O que você tem e como obter mais",
     "it": "Cosa hai e come averne di più",
     "de": "Was du hast und wie du mehr bekommst"
   },
@@ -3143,19 +3149,19 @@
   },
   "You already have a thesis for {0}.": {
     "fr": "Tu as déjà une thèse sur {0}.",
-    "pt": "Já tens uma tese sobre {0}.",
+    "pt": "Você já tem uma tese sobre {0}.",
     "it": "Hai già una tesi su {0}.",
     "de": "Du hast schon eine These zu {0}."
   },
   "You already have a thesis on {0}.": {
     "fr": "Tu as déjà une thèse sur {0}.",
-    "pt": "Já tens uma tese sobre {0}.",
+    "pt": "Você já tem uma tese sobre {0}.",
     "it": "Hai già una tesi su {0}.",
     "de": "Du hast schon eine These zu {0}."
   },
   "You already have an active subscription.": {
     "fr": "Tu as déjà un abonnement actif.",
-    "pt": "Já tens uma subscrição ativa.",
+    "pt": "Você já tem uma assinatura ativa.",
     "it": "Hai già un abbonamento attivo.",
     "de": "Du hast bereits ein aktives Abonnement."
   },

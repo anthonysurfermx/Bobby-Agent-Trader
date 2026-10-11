@@ -17,6 +17,16 @@
 # library code size; Bobby's own composables/domain and other dependencies still undergo R8.
 -keep class androidx.** { *; }
 
+# The external device fixture transport uses interceptor/response-builder APIs absent from app-only
+# reachability (observed OkHttp Builder.addInterceptor). Preserve the shared HTTP library ABI.
+-keep class okhttp3.** { *; }
+# Fixture responses also use the HTTP runtime's shared buffer/source APIs from Okio.
+-keep class okio.** { *; }
+
+# The release journey verifies the SDK's actual unconfigured state through Purchases.isConfigured.
+# Keep its public entrypoint/companion for that independently compiled assertion, not initialization.
+-keep class com.revenuecat.purchases.Purchases** { *; }
+
 # The device acceptance tests install a fixture transport by field name; production owns this client too.
 -keepclassmembers class xyz.bobbyprotocol.android.data.BobbyRepository { okhttp3.OkHttpClient client; }
 # Device acceptance inspects the actual activity session and repository, without shipping any fixture hook.

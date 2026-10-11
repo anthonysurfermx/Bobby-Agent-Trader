@@ -53,9 +53,9 @@ test('new Android entries preserve template placeholders and all translated fiel
   }
 });
 
-test('every iOS 1.8 translation row is in the Android catalog, in Android words', () => {
+test('every iOS 1.8 row preserves its translations or explicit Android and Brazilian wording', () => {
   // android/tools/build-v18-translations.py writes them; this is the check that it ran and that
-  // nobody retyped a translation iOS already has.
+  // inherited translations stay intact except explicitly recorded Android/Brazilian wording.
   const root = path.resolve(main, '../../../..');
   const tables = path.join(root, 'ios/Bobby/Sources/V18/Translations');
   const wording = JSON.parse(fs.readFileSync(path.join(root, 'android/tools/v18-android-wording.json'), 'utf8'));
@@ -83,7 +83,8 @@ test('every iOS 1.8 translation row is in the Android catalog, in Android words'
         assert.ok(!apple.test(entry[language]), `${language} names Apple hardware or a store: ${key}`);
       }
       if (reworded) {
-        assert.equal(android[iosKey], undefined, `The iOS wording must not ship on Android: ${iosKey}`);
+        if (key !== iosKey) assert.equal(android[iosKey], undefined, `The replaced iOS wording must not ship on Android: ${iosKey}`);
+        else assert.equal(entry.pt, reworded.pt, `The same-key Brazilian wording must ship: ${key}`);
         for (const language of languages) assert.ok(reworded[language]?.trim() && !apple.test(reworded[language]), `${language}: ${iosKey}`);
         assert.deepEqual(placeholders(reworded.es), placeholders(reworded.en), `es: ${key}`);
         assert.deepEqual(placeholders(reworded.en), placeholders(iosKey), `en: ${key}`);
