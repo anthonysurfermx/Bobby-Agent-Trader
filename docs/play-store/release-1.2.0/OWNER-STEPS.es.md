@@ -1,6 +1,6 @@
 # Play Console — pasos del propietario
 
-Entrega técnica: draft PR #185; versión **1.2.0**, código **10**, paquete **xyz.bobbyprotocol.bobby**. Claude firma el AAB y, para una prueba de teléfono fuera de Play, el APK universal. Codex no accede a la clave de subida. No subir un AAB sin firmar. Los hashes y el comando exacto de descarga quedarán en `release-evidence.md` tras CI verde del commit final.
+Entrega técnica: draft PR #185; versión **1.2.0**, código **10**, paquete **xyz.bobbyprotocol.bobby**. Claude firma el AAB y, para una prueba de teléfono fuera de Play, el APK universal. Codex no accede a la clave de subida. No subir un AAB sin firmar. La evidencia versionada identifica el checkpoint de aplicación verificado. Tras CI verde del commit final, Claude recibe el comando exacto, hashes y tamaños definitivos en `codex-android-status.md` y en el PR; el artifact contiene también `evidence.json` con `sourceCommit`. Comprueba ese SHA antes de firmar, porque el último commit puede completar solo documentación.
 
 ## 1. Cerrar las dependencias de publicación
 
@@ -31,7 +31,7 @@ Entrega técnica: draft PR #185; versión **1.2.0**, código **10**, paquete **x
 
 Contacto de desarrollador/email, entidad y domicilio: usa los datos reales de la cuenta Console. Son datos del propietario, no inventados en este dossier. Completa también declaraciones nuevas que Console muestre; no ocultes una función para eludir revisión.
 
-Capturas de teléfono: usar las capturas aprobadas de cada idioma descritas en `screenshots-review.md` (1080×1920). No usar la captura de consentimiento/borrado como promesa de un backend real probado. Icono: `app-icon-512.png`, mismos píxeles del icono Android, en PNG de 32 bits (512×512). Feature graphic: `feature-graphic-1024x500.png` (1024×500, PNG de 24 bits sin alpha), mismos píxeles RGB del arte de marca existente en inglés, revisado visualmente; no contiene una pantalla de otro producto ni menciona tiendas/cadenas retiradas. Usa ese recurso común o el arte localizado que el propietario ya haya aprobado; no estires el icono.
+Capturas de teléfono: usar las capturas aprobadas de cada idioma descritas en `screenshots-review.md` (720×1280 nativos, 9:16; cumplen los mínimos de teléfono, pero quedan por debajo de los 1080px recomendados por Play). Las capturas de diagnóstico de la suite (720×1600) superan la relación máxima 2:1; no subirlas tal cual. No usar la captura de consentimiento/borrado como promesa de un backend real probado. Icono: `app-icon-512.png`, mismos píxeles del icono Android, en PNG de 32 bits (512×512). Feature graphic: `feature-graphic-1024x500.png` (1024×500, PNG de 24 bits sin alpha), mismos píxeles RGB del arte de marca existente en inglés, revisado visualmente; no contiene una pantalla de otro producto ni menciona tiendas/cadenas retiradas. Usa ese recurso común o el arte localizado que el propietario ya haya aprobado; no estires el icono.
 
 ## 3. Prueba interna primero
 

@@ -18,6 +18,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -126,12 +127,14 @@ class ReleaseLocaleSmokeInstrumentedTest {
         // A physical tap opens the real IME on API 35, even on the shipped software fallback.
         tapDom("pill")
         waitFor { js("window.nucleo.state()==='TYPING' && document.activeElement.id==='ta'") == true }
-        waitFor { var visible = false; onMain { visible = ViewCompat.getRootWindowInsets(web.view)?.isVisible(WindowInsetsCompat.Type.ime()) == true }; visible }
+        val imePackage = V18Shots.shell("settings get secure default_input_method").trim().substringBefore('/')
+        waitFor { imeVisible() && device.hasObject(By.pkg(imePackage)) }
         // IME visibility precedes Compose's inset layout. Advance the native clock before
         // measuring the shipping DOM, without requiring the continuously animated page to idle.
         compose.mainClock.advanceTimeBy(1000)
         Thread.sleep(1000)
         shot("03b-keyboard")
+        assertTrue("Real IME window remains on the captured display", imeVisible() && device.hasObject(By.pkg(imePackage)))
         val typingBounds = JSONObject(js("JSON.stringify((function(){var r=document.getElementById('typeBox').getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:r.height,viewport:window.visualViewport?window.visualViewport.height:innerHeight};})())") as String)
         assertTrue(typingBounds.toString(), typingBounds.getDouble("height") >= 48)
         assertTrue(typingBounds.toString(), typingBounds.getDouble("top") >= 0)
@@ -203,6 +206,9 @@ class ReleaseLocaleSmokeInstrumentedTest {
         compose.mainClock.advanceTimeBy(1000)
         compose.waitForIdle()
         compose.onNodeWithTag("account-delete").performScrollTo().assertIsDisplayed()
+        // Accessibility scroll completion can precede the displayed scroll offset.
+        // Finish with real finger swipes so the image contains the account controls.
+        scrollSheet()
         shot("07-profile-account-controls")
         compose.onNodeWithTag("account-delete").assertIsDisplayed()
         close()
@@ -345,6 +351,11 @@ class ReleaseLocaleSmokeInstrumentedTest {
         runCatching { shot("99-failed") }; fail("Release locale $language did not reach the expected state")
     }
     private fun onMain(block: () -> Unit) = instrumentation.runOnMainSync(block)
+    private fun imeVisible(): Boolean {
+        var visible = false
+        onMain { visible = ViewCompat.getRootWindowInsets(web.view)?.isVisible(WindowInsetsCompat.Type.ime()) == true }
+        return visible
+    }
     private inline fun <reified T> field(value: Any, name: String): T = value.javaClass.getDeclaredField(name).apply { isAccessible=true }.get(value) as T
     private fun SharedPreferences.Editor.restoreValue(key: String, value: Any?) {
         when(value) { is String -> putString(key,value); is Int -> putInt(key,value); is Long -> putLong(key,value); is Float -> putFloat(key,value); is Boolean -> putBoolean(key,value); is Set<*> -> putStringSet(key,value.filterIsInstance<String>().toSet()) }

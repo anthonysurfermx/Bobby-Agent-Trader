@@ -5,7 +5,7 @@ Requested declaration: **“My app doesn’t provide any financial features.”*
 | Listed feature family | Android finding |
 |---|---|
 | Banking, loans, credit, payday lending | None. No balance/income/credit collection or lending endpoint. |
-| Payments, wallet, transfer | None. No wallet SDK, custody, send/receive funds, exchange checkout or swap route. Android external actions are OAuth, public privacy/support, explicit shares and (when configured) Google subscription management. |
+| Payments, wallet, transfer | None. No wallet SDK, custody, send/receive funds, exchange checkout or swap route. Android external actions are OAuth, public privacy/support, explicit shares, legacy identity-provider revocation help and (when configured) Google subscription management. |
 | Crypto/NFT/stock trading or portfolio management | None executable. Asset lookup/candles/debate/thesis review contain market information. No holdings amounts, broker links, trade tickets, signatures or wallet actions. Naming an asset is not an executed transaction. |
 | Rewards/incentives of financial value | None. Reads/XP/companions/islands are non-redeemable service/game progression; invitations can grant service reads, not money or tokens. |
 | Financial advisory services | Not offered as a regulated or personalized service. Risk acceptance precedes processing; claims are educational, evidence/time-qualified, with no guaranteed result. Do not market this app as individualized investment guidance. |
