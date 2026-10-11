@@ -14,12 +14,18 @@ import type { Step, StepKind, Task } from './types.js';
 
 export type AgentRpc = (name: string, args: Record<string, unknown>) => Promise<unknown>;
 const at = (ms: number) => new Date(ms).toISOString();
+const UNWRITABLE = /\u0000|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
+/**
+ * jsonb refuses U+0000 and half a surrogate pair. A question or a model's reply that holds one must not make an
+ * errand unwritable (a paid call whose step cannot be stored would be paid again): each is written as U+FFFD.
+ */
+const writable = <T>(value: T): T => JSON.parse(JSON.stringify(value, (_key, part) => (typeof part === 'string' ? part.replace(UNWRITABLE, '\ufffd') : part))) as T;
 
 export class PgAgentStore implements AgentStore {
   constructor(private readonly rpc: AgentRpc, private readonly readsPerDay: number | null = 6, private readonly tasksPerAddress = 120) {}
 
   async begin(task: Omit<Task, 'steps' | 'lease' | 'fence'>, received: Record<string, unknown>, now: number): Promise<Begin> {
-    return await this.rpc('agent_begin', { p_task: task, p_received: received, p_now: at(now), p_tasks_per_address: this.tasksPerAddress }) as Begin;
+    return await this.rpc('agent_begin', { p_task: writable(task), p_received: writable(received), p_now: at(now), p_tasks_per_address: this.tasksPerAddress }) as Begin;
   }
   async get(owner: string, id: string): Promise<Task | null> { return (await this.rpc('agent_get', { p_owner: owner, p_id: id }) as Task | null) ?? null; }
   async latestCompleted(owner: string, session: string): Promise<Task | null> { return (await this.rpc('agent_latest_completed', { p_owner: owner, p_session: session }) as Task | null) ?? null; }
@@ -27,7 +33,7 @@ export class PgAgentStore implements AgentStore {
     return (await this.rpc('agent_claim', { p_id: id, p_worker: worker, p_lease_ms: Math.round(leaseMs), p_now: at(now) }) as { fence: number; task: Task } | null) ?? null;
   }
   async append(id: string, fence: number, kind: StepKind, data: Record<string, unknown>, now: number): Promise<Step | null> {
-    return (await this.rpc('agent_append', { p_id: id, p_fence: fence, p_kind: kind, p_data: data, p_now: at(now) }) as Step | null) ?? null;
+    return (await this.rpc('agent_append', { p_id: id, p_fence: fence, p_kind: kind, p_data: writable(data), p_now: at(now) }) as Step | null) ?? null;
   }
   async release(id: string, fence: number): Promise<void> { await this.rpc('agent_release', { p_id: id, p_fence: fence }); }
   async approve(owner: string, id: string, digest: string, now: number): Promise<Approve> {

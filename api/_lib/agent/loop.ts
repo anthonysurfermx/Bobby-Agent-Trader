@@ -24,7 +24,7 @@ import { appLocale, languageName, type AppLanguage } from '../../../src/lib/app-
 import { companionFallback } from '../companion.js';
 import { judgeCompanionReply, companionJudgeModel } from '../companion-judge.js';
 import { modelPrice, type LlmUsage } from '../llm.js';
-import { composeByCode, limitationsInWords, present, type Draft } from './present.js';
+import { composeByCode, limitationsInWords, present, unanswered, type Draft } from './present.js';
 import { agentModel, callAnthropicOnce, reservedCall, type Block, type CallModel, type Message, type WireTool } from './provider.js';
 import { taskError, taskEvents, taskResult, taskState } from './state.js';
 import { isFinal, waitingApproval, type AgentStore, type Begin, type Budget } from './store.js';
@@ -61,13 +61,13 @@ What kind of errand it is decides what you do:
 - "previous" in the input is their last question, your answer to it and the figures behind it. A follow-up about those figures is answered from them, with no new tool call. Use a tool again only if they ask for other assets or another window.
 - The instruments you can read with evidence are: ${UNIVERSE.map((instrument) => `${instrument.name} (${instrument.symbol})`).join(', ')}. Windows: 30 or 60 days. Suggest nothing outside them.
 
-Numbers. You never write a market number. Every figure lives in a tool result (or in "previous") and has an id: to state it, write {{f:ID}} and the app writes the number with its unit. {{days}} writes only the number of days of the window (you write the word for "days"). A figure that is one day's (the worst day, the best day) carries that day: {{d:ID}} writes its date; never type a date yourself. Never type a digit of your own (the one exception: the lengths of the windows the tool offers, 30 and 60), never compute, never round, never restate a figure in words. A figure whose value is null does not exist: say that it could not be established.
+Numbers. You never write a market number. Every figure lives in a tool result (or in "previous") and has an id: to state it, write {{f:ID}} and the app writes the number with its unit, so never put a percent sign or the word for percent after it. {{days}} writes only the number of days of the window: write the word for "days" right after it. A figure that is one day's (the worst day, the best day) carries that day: {{d:ID}} writes its date. {{from:ID}} and {{to:ID}} write the first and the last day a figure covers. Never type a date or a count of days yourself. Never state a number of your own, in digits or in words. Three things are not that: a window length the tool offers (30 or 60) followed by the word for days; a number the person wrote, said back exactly as they wrote it; a name that holds a number (S&P 500, Nasdaq 100, 24/7). Never compute, never round, never restate a figure in words, never put two placeholders side by side. A figure whose value is null does not exist: say that it could not be established.
 A comparison answers the dimensions they asked about, says how the assets differed on each, and keeps apart what the figures show from what you make of them. A past window does not say what comes next: never predict. Never recommend or rank an asset, never say which is better or right for them, never tell them what to buy, sell or hold. Say plainly that money can be lost when that matters. Never promise safety or gains. Do not ask about their income, savings or wealth. Never end by asking them something.
 
 Write nothing outside tool calls. Finish by calling the tool "answer" exactly once:
 - gist: one sentence of at most 14 words that carries the whole idea and stands on its own (it may hold placeholders).
 - text: the whole answer, starting with that same sentence; at most 90 words for an analysis, 60 for an explanation, 25 for a clarification; one short paragraph, the way you would say it aloud: no list, no heading, no emoji.
-- claims: for an analysis, every ordering your text states, as {metric, top}: metric is the figure's metric (return, volatility, drawdown, worst, best) and top is the symbol your text says had the larger change, moved more, fell further, had the worse worst day or the better best day. Empty when your text states none.
+- claims: for an analysis, every ordering your text states, as {metric, top}: metric is the figure's metric and top is the ONE symbol that stands above every other asset read. return: the higher number (it rose more, or fell less: when your text says one fell more over the window, top is the other one). volatility: moved more from day to day. drawdown: fell further from a high. worst: had the worse worst day. best: had the better best day. When three were read and your text orders only two of them, list no claim for that sentence. Empty when your text states no ordering.
 - limitations: short sentences for what you could not establish and that matters to the errand; empty when there is none. Do not put there that a past window says nothing about the future, nor anything the tool already lists under its own limitations (different calendars, a series that could not be read): the app adds those sentences itself.
 - next: one question this person would most naturally ask you next, in their own voice, at most 12 words, never about what to buy or sell; an empty string when the answer is complete.`;
 }
@@ -180,11 +180,14 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
       const approved = approvedNotRun(task);
       if (approved) {
         const tool = TOOLS[approved.tool];
+        // That metered work starts is a fact the store decides, like an answer: a cancel accepted before this step
+        // stops the tool before any source is asked, and the person's read goes back with it.
+        if (!await write('tool_started', { useId: approved.useId, tool: approved.tool })) return;
         let out: Awaited<ReturnType<typeof tool.run>> | null = null;
         try { out = await tool.run(approved.args, deps.tools); } catch { out = null; }
-        // The person's read is for figures. When the server knows none came back with a value, the read is theirs again.
+        // The person's read is for figures. When the server knows none came back with a value, the read is theirs again:
+        // the store gives it back in the same write as the step that says so (`refunded`), never before it.
         const useful = Boolean(out?.analysis?.figures.some((figure) => figure.value !== null));
-        if (!useful) await deps.store.refund(id);
         if (!await write('tool_call', { useId: approved.useId, tool: approved.tool, args: approved.args, evidence: out?.evidence ?? [], data: out?.data ?? { error: 'the tool failed' }, ...(out?.analysis ? { analysis: out.analysis } : {}), metered: true, refunded: !useful })) return;
         continue;
       }
@@ -258,7 +261,7 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   const theirs = parent ? `${parent.question} ${task.question}` : task.question;
   // What a text IS is decided by code: it is an analysis when it cites a figure, or when this task ran a comparison
   // itself (then its sources and limits are shown even if nothing could be cited); otherwise an explanation, read in full.
-  const cites = parsed.success && (/\{\{[fd]:/.test(`${parsed.data.gist} ${parsed.data.text}`) || ownAnalysis(task) !== null);
+  const cites = parsed.success && (/\{\{(?:f|d|from|to):/.test(`${parsed.data.gist} ${parsed.data.text}`) || ownAnalysis(task) !== null);
   const draft: Draft | null = parsed.success ? { ...parsed.data, kind: parsed.data.kind === 'clarification' ? 'clarification' : cites ? 'analysis' : 'explanation' } as Draft : null;
   const shown = draft ? present(draft, draft.kind === 'clarification' ? null : analysis, theirs, task.language, task.locale) : null;
   let presentation: Presentation | null = shown && 'presentation' in shown ? shown.presentation : null;
@@ -266,7 +269,10 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
     const reason = !parsed.success ? 'invalid_arguments' : (shown as { refusal: { code: string; detail: string } }).refusal.code;
     const detail = !parsed.success ? '' : (shown as { refusal: { code: string; detail: string } }).refusal.detail;
     if (repairs < 1) { await write('tool_refused', { useId, tool: 'answer', reason, detail }); return false; }
-    presentation = composeByCode(ownAnalysis(task) ?? (draft?.kind === 'analysis' ? analysis : null), task.language, task.locale);
+    // Code tells the figures when there are figures. An answer that needed none says only that it could not be given:
+    // it never blames data nobody asked for.
+    const figures = ownAnalysis(task) ?? (draft?.kind === 'analysis' ? analysis : null);
+    presentation = figures ? composeByCode(figures, task.language, task.locale) : unanswered(task.language);
   }
   // Everything of the model's that a person is about to get is read: the text, the limitations it wrote and the next
   // question. Only a text code wrote itself is not (there is nothing of the model's in it), and the record says so.
@@ -321,7 +327,8 @@ export function engineDeps(store: AgentStore, over: Partial<Deps> = {}): Deps {
   const now = over.now ?? (() => Date.now());
   // The ceiling is a day's: the partition carries the UTC day, so yesterday's attempts (settled, unknown or never
   // settled) do not hold today's money. The no-blind-retry rule is per task and does not depend on it.
-  const budget = over.budget ?? { partition: `agent:${new Date(now()).toISOString().slice(0, 10)}`, capUsd: Number(process.env.BOBBY_AGENT_DAILY_USD) > 0 ? Number(process.env.BOBBY_AGENT_DAILY_USD) : 5 };
+  const set = Number(process.env.BOBBY_AGENT_DAILY_USD);
+  const budget = over.budget ?? { partition: `agent:${new Date(now()).toISOString().slice(0, 10)}`, capUsd: Number.isFinite(set) && set > 0 ? set : 5 };
   const limits = over.limits ?? DEFAULT_LIMITS;
   return {
     store, now, budget, limits, worker: over.worker ?? `w_${randomUUID().slice(0, 8)}`,

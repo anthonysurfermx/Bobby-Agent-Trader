@@ -16,13 +16,14 @@ create table if not exists agent_tasks (
   model text not null, prompt_version text not null, toolset_version text not null,
   fence integer not null default 0, lease_worker text, lease_until timestamptz,
   created_at timestamptz not null,
+  seq bigint generated always as identity,   -- the order errands were begun: what breaks a tie between two answers of one instant
   unique (owner, request_id)
 );
 create index if not exists agent_tasks_address_day on agent_tasks (address, created_at);
 create table if not exists agent_steps (
   task text not null references agent_tasks(id) on delete cascade,
   n integer not null, at timestamptz not null,
-  kind text not null check (kind in ('received','model_call','tool_call','tool_refused','approval_requested','approval_granted','approval_denied','answer','error','cancel_requested','cancelled')),
+  kind text not null check (kind in ('received','model_call','tool_started','tool_call','tool_refused','approval_requested','approval_granted','approval_denied','answer','error','cancel_requested','cancelled')),
   data jsonb not null,
   primary key (task, n)                      -- written once, numbered without gaps
 );
@@ -33,9 +34,9 @@ create table if not exists agent_reads (
 create index if not exists agent_reads_owner_day on agent_reads (owner, day);
 create table if not exists agent_attempts (
   id text primary key, task text not null, partition text not null, model text not null,
-  reserve_usd numeric(14,6) not null check (reserve_usd > 0),
+  reserve_usd numeric not null check (reserve_usd > 0),          -- no scale: what is checked against a cap is what is stored
   state text not null default 'reserved' check (state in ('reserved','dispatched','settled','no_charge','unknown')),
-  actual_usd numeric(14,6), at timestamptz not null
+  actual_usd numeric, at timestamptz not null
 );
 create index if not exists agent_attempts_partition on agent_attempts (partition);
 create index if not exists agent_attempts_task on agent_attempts (task);
@@ -88,7 +89,7 @@ create or replace function agent_get(p_owner text, p_id text) returns jsonb lang
 $$;
 create or replace function agent_latest_completed(p_owner text, p_session text) returns jsonb language sql stable as $$
   select agent_task_json(t.id) from agent_tasks t join agent_steps s on s.task = t.id and s.kind = 'answer'
-  where t.owner = p_owner and t.session = p_session order by s.at desc, t.id desc limit 1
+  where t.owner = p_owner and t.session = p_session order by s.at desc, t.seq desc limit 1
 $$;
 
 -- ---------- a task's life ----------
@@ -110,7 +111,10 @@ begin
     end if;
   end if;
   insert into agent_tasks (id, owner, address, session, request_id, body_digest, language, locale, question, parent, model, prompt_version, toolset_version, created_at)
-  values (p_task->>'id', p_task->>'owner', v_address, p_task->>'session', p_task->>'requestId', p_task->>'bodyDigest', p_task->>'language', p_task->>'locale', p_task->>'question', p_task->>'parent', p_task->>'model', p_task->>'promptVersion', p_task->>'toolsetVersion', p_now);
+  values (p_task->>'id', p_task->>'owner', v_address, p_task->>'session', p_task->>'requestId', p_task->>'bodyDigest', p_task->>'language', p_task->>'locale', p_task->>'question', p_task->>'parent', p_task->>'model', p_task->>'promptVersion', p_task->>'toolsetVersion', p_now)
+  on conflict (id) do nothing;
+  -- The same task id arriving at once under another owner: one of them is new, the other is told mismatch.
+  if not found then return jsonb_build_object('state', 'mismatch'); end if;
   perform agent_push(p_task->>'id', 'received', p_received, p_now);
   return jsonb_build_object('state', 'new', 'task', agent_task_json(p_task->>'id'));
 end $$;
@@ -133,11 +137,15 @@ declare v agent_tasks%rowtype;
 begin
   select * into v from agent_tasks where id = p_id for update;
   -- A runner that lost its lease, or a task that already ended, writes nothing.
-  if not found or v.lease_worker is null or v.fence <> p_fence or agent_is_final(p_id) then return null; end if;
-  -- A result that crosses an accepted cancel is not stored: decided here, in the same transaction as the write.
-  if p_kind in ('answer', 'approval_requested', 'cancelled') and exists (select 1 from agent_steps where task = p_id and kind = 'cancel_requested') then
+  -- `is distinct from`: a missing fence is no fence (with <> a NULL would pass).
+  if not found or v.lease_worker is null or v.fence is distinct from p_fence or agent_is_final(p_id) then return null; end if;
+  -- What would end or advance the task (an answer, an error, a request for approval, the start of metered work) and
+  -- crosses an accepted cancel is not stored: decided here, in the same transaction as the write.
+  if p_kind in ('answer', 'error', 'approval_requested', 'cancelled', 'tool_started') and exists (select 1 from agent_steps where task = p_id and kind = 'cancel_requested') then
     perform agent_end_cancelled(p_id, p_now, 'runner'); return null;
   end if;
+  -- A metered tool that brought no figure gives the read back in the write that says so.
+  if p_kind = 'tool_call' and p_data->>'metered' = 'true' and p_data->>'refunded' = 'true' then delete from agent_reads where task = p_id; end if;
   return agent_push(p_id, p_kind, p_data, p_now);
 end $$;
 
@@ -145,10 +153,10 @@ create or replace function agent_release(p_id text, p_fence integer) returns voi
 declare v agent_tasks%rowtype; v_at timestamptz;
 begin
   select * into v from agent_tasks where id = p_id for update;
-  if not found or v.lease_worker is null or v.fence <> p_fence then return; end if;
+  if not found or v.lease_worker is null or v.fence is distinct from p_fence then return; end if;
   update agent_tasks set lease_worker = null, lease_until = null where id = p_id;
   if not agent_is_final(p_id) and exists (select 1 from agent_steps where task = p_id and kind = 'cancel_requested') then
-    select max(at) into v_at from agent_steps where task = p_id;
+    select at into v_at from agent_steps where task = p_id order by n desc limit 1;   -- the last step's own time, as in the memory store
     perform agent_end_cancelled(p_id, v_at, 'store');
   end if;
 end $$;
@@ -164,11 +172,12 @@ begin
   select * into v from agent_tasks where id = p_id and owner = p_owner for update;
   if not found then return jsonb_build_object('state', 'not_found'); end if;
   v_scope := agent_waiting_scope(p_id);
-  if v_scope is null and exists (select 1 from agent_steps where task = p_id and kind = 'approval_granted' and data->>'digest' = p_digest) then
+  -- "Already" is said of the LAST yes only: an older approval of the same task is not this one.
+  if v_scope is null and (select data->>'digest' from agent_steps where task = p_id and kind = 'approval_granted' order by n desc limit 1) = p_digest then
     return jsonb_build_object('state', 'already', 'remaining', agent_remaining(p_owner, p_now, p_reads_per_day));
   end if;
   if v_scope is null or agent_is_final(p_id) or exists (select 1 from agent_steps where task = p_id and kind = 'cancel_requested') then return jsonb_build_object('state', 'not_waiting'); end if;
-  if v_scope->>'digest' <> p_digest then return jsonb_build_object('state', 'mismatch'); end if;
+  if v_scope->>'digest' is distinct from p_digest then return jsonb_build_object('state', 'mismatch'); end if;
   v_units := (v_scope->'consumption'->>'reads')::integer;
   if not exists (select 1 from agent_reads where task = p_id) then
     if p_reads_per_day is not null then
@@ -220,6 +229,9 @@ create or replace function agent_reserve(p_partition text, p_cap numeric, p_task
 declare v_id text; v_task numeric;
 begin
   if p_cap is null or p_task_cap is null or p_reserve is null or not (p_cap > 0) or not (p_task_cap > 0) or not (p_reserve > 0) then return jsonb_build_object('ok', false, 'code', 'not_configured'); end if;
+  -- Two locks, always in this order. The task's own: its cap and its unresolved work belong to the task across every
+  -- partition (a task whose runs straddle midnight has two). Then the partition's.
+  perform pg_advisory_xact_lock(hashtext('agent_task_money:' || p_task));
   perform pg_advisory_xact_lock(hashtext('agent_budget:' || p_partition));
   if exists (select 1 from agent_attempts where task = p_task and state in ('dispatched', 'unknown')) then return jsonb_build_object('ok', false, 'code', 'work_unresolved'); end if;
   select coalesce(sum(case state when 'settled' then coalesce(actual_usd, reserve_usd) when 'no_charge' then 0 else reserve_usd end), 0) into v_task from agent_attempts where task = p_task;

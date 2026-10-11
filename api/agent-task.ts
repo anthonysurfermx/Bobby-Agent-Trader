@@ -30,7 +30,7 @@ import { deviceHash } from './_lib/access.js';
 import { requestOriginHost } from './_lib/origins.js';
 import { getClientQuotaKeys } from './_lib/rate-limit.js';
 import { createTask, engineDeps, runTask, taskView } from './_lib/agent/loop.js';
-import { FileAgentStore, MemoryAgentStore, type AgentStore } from './_lib/agent/store.js';
+import { FileAgentStore, MemoryAgentStore, isFinal, type AgentStore } from './_lib/agent/store.js';
 import { ENGINE_VERSION } from './_lib/agent/types.js';
 
 export const config = { maxDuration: 60 };
@@ -69,7 +69,10 @@ async function door(req: VercelRequest, res: VercelResponse) {
   if (!store) return refuse(503, 'engine_storage_unavailable');
   const deps = engineDeps(store, testDeps ?? {});
   const view = async (id: string, status = 200) => {
-    const task = await store.get(owner!, id);
+    let task = await store.get(owner!, id);
+    // A cancel that was accepted while a runner held the task, and whose runner never came back, is completed by
+    // whoever looks next: a person who cancelled never reads "cancelling" for ever, and a read no tool used goes back.
+    if (task && !isFinal(task) && task.steps.some((step) => step.kind === 'cancel_requested') && !(task.lease && task.lease.until > deps.now()) && await store.cancel(owner!, id, deps.now())) task = await store.get(owner!, id);
     return task ? res.status(status).json(taskView(task, deps.now(), await store.remaining(owner!, deps.now()))) : refuse(404, 'not_found');
   };
 

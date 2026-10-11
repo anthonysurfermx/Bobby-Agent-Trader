@@ -132,7 +132,7 @@ try {
   script = [() => turn([{ type: 'tool_use', id: 'u_ans', name: 'answer', input: { kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}} en {{days}} días.', claims: [], limitations: [], next: '' } }])];
   await runTask(deps, 'lia', begun.task.id);
   const done = (await big.get('lia', begun.task.id))!, result = taskResult(done)!;
-  eq([taskState(done, T0), result.presentation.kind, result.presentation.figures, result.analysis!.evidence.map((e) => [e.id, e.quality, e.asOf]), done.steps.map((s) => s.kind), taskUsage(done)], ['completed', 'analysis', ['return_BTC', 'return_ETH'], [['ev_BTC', 'valid', '2026-10-08'], ['ev_ETH', 'valid', '2026-10-08']], ['received', 'model_call', 'approval_requested', 'approval_granted', 'tool_call', 'model_call', 'answer'], { modelCalls: 2, toolCalls: 1, usd: 0.008, unknownUsd: 0, reads: 1 }], 'after the yes: evidence, figures written by code, and every step kept as it happened, through the database');
+  eq([taskState(done, T0), result.presentation.kind, result.presentation.figures, result.analysis!.evidence.map((e) => [e.id, e.quality, e.asOf]), done.steps.map((s) => s.kind), taskUsage(done)], ['completed', 'analysis', ['return_BTC', 'return_ETH'], [['ev_BTC', 'valid', '2026-10-08'], ['ev_ETH', 'valid', '2026-10-08']], ['received', 'model_call', 'approval_requested', 'approval_granted', 'tool_started', 'tool_call', 'model_call', 'answer'], { modelCalls: 2, toolCalls: 1, usd: 0.008, unknownUsd: 0, reads: 1 }], 'after the yes: evidence, figures written by code, and every step kept as it happened, through the database');
   ok(/\d/.test(result.presentation.text) && !/\{\{/.test(result.presentation.text) && result.presentation.text.includes('30 días'), 'the stored answer is the one a person reads');
   const callsBefore = calls.length;
   const again = await createTask(deps, { owner: 'lia', address: 'addr-lia', session: 'sess', requestId: 'e1', question: 'Compara Bitcoin y Ethereum', language: 'es', model: 'claude-test' });
@@ -143,6 +143,78 @@ try {
   await runTask(deps, 'lia', follow.task.id);
   const followed = (await big.get('lia', follow.task.id))!;
   eq([followed.parent, taskState(followed, T0), taskResult(followed)!.presentation.figures, taskUsage(followed).reads, await count('agent_reads', "owner = 'lia'")], [begun.task.id, 'completed', ['volatility_ETH', 'volatility_BTC'], 0, 1], 'a follow-up reads the result on the table from the database: no tool, no second read');
+
+  // 8. What the second review found (2026-10-11): where the database answered differently from the memory store.
+  const { MemoryAgentStore } = await import('../api/_lib/agent/store.ts');
+  const { taskError } = await import('../api/_lib/agent/state.ts');
+  const both = <T>(run: (s: InstanceType<typeof PgAgentStore> | InstanceType<typeof MemoryAgentStore>) => Promise<T>) => Promise.all([run(new PgAgentStore(rpc, 6, 120)), run(new MemoryAgentStore(6, 120))]);
+  const same = async <T>(run: Parameters<typeof both<T>>[0], expected: T, what: string) => { const [onPg, inMemory] = await both(run); eq(onPg, expected, `${what} (Postgres)`); eq(inMemory, expected, `${what} (memory)`); };
+  let n8 = 0; const fresh = () => `z${++n8}`;
+  // Text jsonb cannot hold must not make an errand, or a paid step, unwritable.
+  await same(async (s) => {
+    const key = fresh(), b = await s.begin(newTask('nul', key, { question: 'a\u0000b \ud83d' }), { question: 'a\u0000b \ud83d' }, T0);
+    const c = await s.claim(`task_nul_${key}`, 'w', 1000, T0);
+    const step = await s.append(`task_nul_${key}`, c!.fence, 'model_call', { blocks: [{ type: 'text', text: 'a\u0000b \udc00 😀' }] }, T0);
+    return [b.state, step?.n, (step?.data.blocks as any)?.[0].text.includes('😀')];
+  }, ['new', 2, true], 'text the database cannot hold stops neither an errand nor a step, and intact text stays intact');
+  // The task's cap holds across partitions (a task whose runs straddle midnight has two).
+  eq((await Promise.all(Array.from({ length: 30 }, (_, n) => store.reserve({ partition: `d${n}`, capUsd: 5, taskCapUsd: 0.25 }, 'one-task', 'm', 0.2, T0)))).filter((r) => r.ok).length, 1, 'thirty reservations for one task in thirty partitions at once: one');
+  // Answers of the same instant: the one begun last, as in memory.
+  await same(async (s) => {
+    const owner = `eq${fresh()}`;
+    for (const key of ['z', 'm', 'a']) { await s.begin(newTask(owner, key, { session: 'tie' }), {}, T0); const c = await s.claim(`task_${owner}_${key}`, 'w', 1000, T0); await s.append(`task_${owner}_${key}`, c!.fence, 'answer', { result: {} }, T0); await s.release(`task_${owner}_${key}`, c!.fence); }
+    return (await s.latestCompleted(owner, 'tie'))?.id.endsWith('_a');
+  }, true, 'answers of one instant: the errand begun last is the latest');
+  // A missing fence or digest is refused.
+  await same(async (s) => {
+    const owner = `nf${fresh()}`, d = await waiting(s as InstanceType<typeof PgAgentStore>, owner, 'k');
+    const yes = (await s.approve(owner, `task_${owner}_k`, null as never, T0)).state;
+    await s.approve(owner, `task_${owner}_k`, d as string, T0);
+    const c = await s.claim(`task_${owner}_k`, 'w', 60_000, T0);
+    const written = await s.append(`task_${owner}_k`, null as never, 'answer', { result: {} }, T0);
+    await s.release(`task_${owner}_k`, null as never);
+    return [yes, written, (await s.get(owner, `task_${owner}_k`))!.lease?.fence === c!.fence];
+  }, ['mismatch', null, true], 'a missing digest approves nothing; a missing fence writes nothing and frees no lease');
+  // "Already" is said of the last yes only.
+  await same(async (s) => {
+    const owner = `ay${fresh()}`, id = `task_${owner}_k`, d1 = await waiting(s as InstanceType<typeof PgAgentStore>, owner, 'k') as string;
+    await s.approve(owner, id, d1, T0);
+    const c = await s.claim(id, 'w', 1000, T0), d2 = scopeDigest(owner, id, { ...scope, windowDays: 60 });
+    await s.append(id, c!.fence, 'approval_requested', { scope: { ...scope, windowDays: 60, digest: d2 } }, T0); await s.release(id, c!.fence);
+    await s.approve(owner, id, d2, T0);
+    return [(await s.approve(owner, id, d1, T0)).state, (await s.approve(owner, id, d2, T0)).state];
+  }, ['not_waiting', 'already'], 'an older yes of the same task is not "already": only the last one is');
+  // A cancel beats an error and the start of metered work; a refunded tool gives the read back in its own write.
+  await same(async (s) => {
+    const owner = `cb${fresh()}`;
+    await s.begin(newTask(owner, 'e'), {}, T0); const live = await s.claim(`task_${owner}_e`, 'w', 60_000, T0 + 5000);
+    await s.append(`task_${owner}_e`, live!.fence, 'model_call', { outcome: 'unknown' }, T0 + 5000);
+    await s.cancel(owner, `task_${owner}_e`, T0 + 1);   // another instance, its clock behind
+    const crossed = await s.append(`task_${owner}_e`, live!.fence, 'error', { code: 'provider_unknown' }, T0 + 5001);
+    const ended = (await s.get(owner, `task_${owner}_e`))!;
+    const d = await waiting(s as InstanceType<typeof PgAgentStore>, owner, 't') as string; await s.approve(owner, `task_${owner}_t`, d, T0);
+    const run = await s.claim(`task_${owner}_t`, 'w', 60_000, T0); await s.cancel(owner, `task_${owner}_t`, T0 + 1);
+    const started = await s.append(`task_${owner}_t`, run!.fence, 'tool_started', { tool: 'read_assets' }, T0 + 2);
+    const d2 = await waiting(s as InstanceType<typeof PgAgentStore>, owner, 'r') as string; await s.approve(owner, `task_${owner}_r`, d2, T0);
+    const run2 = await s.claim(`task_${owner}_r`, 'w', 60_000, T0), left = await s.remaining(owner, T0);
+    await s.append(`task_${owner}_r`, run2!.fence, 'tool_call', { metered: true, refunded: true }, T0 + 2);
+    return [crossed, taskState(ended, T0 + 5002), taskError(ended), started, (await s.get(owner, `task_${owner}_t`))!.steps.at(-1)!.data, left, await s.remaining(owner, T0)];
+  }, [null, 'cancelled', null, null, { by: 'runner', readGivenBack: true }, 5, 6], 'an accepted cancel beats an error and the start of metered work; a tool that brought no figure gives the read back in its own write');
+  await same(async (s) => {
+    const owner = `rl${fresh()}`; await s.begin(newTask(owner, 'k'), {}, T0); const c = await s.claim(`task_${owner}_k`, 'w', 60_000, T0 + 5000);
+    await s.append(`task_${owner}_k`, c!.fence, 'model_call', {}, T0 + 5000); await s.cancel(owner, `task_${owner}_k`, T0 + 1); await s.release(`task_${owner}_k`, c!.fence);
+    return (await s.get(owner, `task_${owner}_k`))!.steps.at(-1)!.at;
+  }, new Date(T0 + 1).toISOString(), 'a cancel completed by release is dated by the last step, whichever clock wrote it');
+  // Money to the last decimal; one id under twelve owners at once; a cost that is not a number.
+  const tiny = { partition: 'tiny', capUsd: 0.00001, taskCapUsd: 1 }, fits: boolean[] = [];
+  for (let n = 0; n < 9; n++) fits.push((await store.reserve(tiny, `tiny${n}`, 'm', 0.0000014, T0)).ok);
+  eq([fits.filter(Boolean).length, (await store.reserve({ ...tiny, partition: 'tiny2' }, 'tiny-x', 'm', 0.0000004, T0)).ok, Number((await store.committed('tiny')).toFixed(7))], [7, true, 0.0000098], 'a cap is kept to the last decimal: what is checked is what is stored');
+  eq((await Promise.all(Array.from({ length: 12 }, (_, n) => store.begin(newTask(`tw${n}`, `k${n}`, { id: 'task_one_id' }), {}, T0)))).map((r) => r.state).sort().join(), [...Array(11).fill('mismatch'), 'new'].join(), 'one task id under twelve owners at once: one new, eleven mismatch, none thrown');
+  await same(async (s) => {
+    const b = { partition: `nan${fresh()}`, capUsd: 1, taskCapUsd: 1 }, a = await s.reserve(b, `${b.partition}-t`, 'm', 0.3, T0) as { ok: true; attemptId: string };
+    await s.dispatch(a.attemptId); await s.settle(a.attemptId, 'settled', NaN);
+    return [await s.committed(b.partition), (await s.reserve(b, `${b.partition}-u`, 'm', 0.9, T0)).ok, await s.reserve({ ...b, capUsd: Infinity }, `${b.partition}-v`, 'm', 0.1, T0)];
+  }, [0.3, false, { ok: false, code: 'not_configured' }], 'a cost that is not a number keeps the reservation; a cap that is not a number is no cap');
   console.log(`agent-engine-pg: ${checks} checks passed`);
 } finally {
   await pool.end();

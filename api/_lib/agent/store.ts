@@ -10,7 +10,7 @@
 // docs/agent-engine/agent-engine.sql; it is NOT a migration and nothing applies it.
 //
 // Invariants (each has a test in scripts/test-agent-engine.mts):
-//   1. begin() is idempotent per (owner, idemKey): the same key with the same body returns the same task;
+//   1. begin() is idempotent per (owner, requestId): the same key with the same body returns the same task;
 //      the same key with another body is `mismatch`; two owners never see each other's keys.
 //   2. get() is owner-scoped: a task read by another owner is null.
 //   3. One runner at a time: claim() gives a fence that grows; append() with an older fence is refused.
@@ -19,8 +19,10 @@
 //      in the same critical section. The same approval twice takes one read.
 //   6. Provider money: reserve() never lets reserved + settled + unknown exceed a cap; an attempt that was
 //      dispatched and never settled, or settled `unknown`, keeps its reservation.
-//   7. A read is taken once per task, and given back only by refund() when the server knows no metered
-//      work ran.
+//   7. A read is taken once per task, and given back only in the same critical section as the fact that
+//      justifies it: a metered tool_call that brought no figure (`refunded`), or a cancel that ends the task
+//      before any metered tool_call. An accepted cancel beats whatever the runner writes next that would end
+//      or advance the task (an answer, an error, a request for approval, the start of metered work).
 // ============================================================
 import { readFileSync, writeFileSync, renameSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -59,6 +61,8 @@ const DAY_MS = 86_400_000;
 /** Steps after which a task takes no more steps from a runner. */
 const FINAL: readonly StepKind[] = ['answer', 'error', 'cancelled', 'approval_denied'];
 export const isFinal = (task: Pick<Task, 'steps'>) => task.steps.some((step) => FINAL.includes(step.kind));
+/** What a runner may not write once the person's cancel was accepted: the cancel ends the task instead. */
+const CANCEL_BEATS: readonly StepKind[] = ['answer', 'error', 'approval_requested', 'cancelled', 'tool_started'];
 /** The approval a task is waiting on: requested, and neither granted nor denied since. */
 export function waitingApproval(task: Pick<Task, 'steps'>): ApprovalScope | null {
   let scope: ApprovalScope | null = null;
@@ -84,7 +88,8 @@ export class MemoryAgentStore implements AgentStore {
 
   async begin(input: Omit<Task, 'steps' | 'lease' | 'fence'>, received: Record<string, unknown>, now: number): Promise<Begin> {
     this.load();
-    const key = `${input.owner}\n${input.idemKey}`;
+    // One key and one clock, as in the database: the request's id, and the store's own `now` for the errand's day.
+    const key = `${input.owner}\n${input.requestId}`;
     const known = this.state.keys[key];
     if (known) {
       const task = this.state.tasks[known];
@@ -93,7 +98,7 @@ export class MemoryAgentStore implements AgentStore {
     if (this.state.tasks[input.id]) return { state: 'mismatch' };
     const today = new Date(now).toISOString().slice(0, 10);
     if (input.address && Object.values(this.state.tasks).filter((task) => task.address === input.address && task.createdAt.slice(0, 10) === today).length >= this.tasksPerAddress) return { state: 'crowded' };
-    const task: Task = { ...clone(input), steps: [{ n: 1, at: new Date(now).toISOString(), kind: 'received', data: clone(received) }], lease: null, fence: 0 };
+    const task: Task = { ...clone(input), createdAt: new Date(now).toISOString(), steps: [{ n: 1, at: new Date(now).toISOString(), kind: 'received', data: clone(received) }], lease: null, fence: 0 };
     this.state.tasks[task.id] = task;
     this.state.keys[key] = task.id;
     this.changed();
@@ -134,7 +139,9 @@ export class MemoryAgentStore implements AgentStore {
     if (!task || !task.lease || task.lease.fence !== fence || isFinal(task)) return null;
     // The person's cancel and a runner's result can cross: the runner looked, the cancel was accepted, the result
     // arrives here. Decided in this critical section, not by the runner's earlier look: the cancel wins.
-    if ((kind === 'answer' || kind === 'approval_requested' || kind === 'cancelled') && task.steps.some((step) => step.kind === 'cancel_requested')) { this.endCancelled(task, now, 'runner'); this.changed(); return null; }
+    if (CANCEL_BEATS.includes(kind) && task.steps.some((step) => step.kind === 'cancel_requested')) { this.endCancelled(task, now, 'runner'); this.changed(); return null; }
+    // A metered tool that brought no figure gives the read back in the write that says so.
+    if (kind === 'tool_call' && data.metered === true && data.refunded === true) delete this.state.reads[id];
     const step: Step = { n: task.steps.length + 1, at: new Date(now).toISOString(), kind, data: clone(data) };
     task.steps.push(step);
     this.changed();
@@ -216,7 +223,8 @@ export class MemoryAgentStore implements AgentStore {
 
   async reserve(budget: Budget, task: string, model: string, reserveUsd: number, now: number): Promise<Reserve> {
     this.load();
-    if (!(budget.capUsd > 0) || !(budget.taskCapUsd > 0) || !(reserveUsd > 0) || !Number.isFinite(reserveUsd)) return { ok: false, code: 'not_configured' };
+    // A cap that is not a number (NaN, Infinity) is no cap anybody set: refused, as the database refuses it.
+    if (![budget.capUsd, budget.taskCapUsd, reserveUsd].every(Number.isFinite) || !(budget.capUsd > 0) || !(budget.taskCapUsd > 0) || !(reserveUsd > 0)) return { ok: false, code: 'not_configured' };
     const mine = Object.values(this.state.attempts).filter((attempt) => attempt.task === task);
     // An attempt that left and never came back may have been billed: no blind second attempt for the same task.
     if (mine.some((attempt) => attempt.state === 'dispatched' || attempt.state === 'unknown')) return { ok: false, code: 'work_unresolved' };
@@ -244,7 +252,8 @@ export class MemoryAgentStore implements AgentStore {
     // Settled once. A second settle of the same attempt changes nothing: the first word stands.
     if (attempt.state !== 'reserved' && attempt.state !== 'dispatched') return;
     attempt.state = outcome;
-    attempt.actualUsd = outcome === 'settled' ? Math.max(0, actualUsd ?? attempt.reserveUsd) : outcome === 'no_charge' ? 0 : null;
+    // A cost that is not a number is not known: the reservation stands for it, never NaN (which no cap can refuse).
+    attempt.actualUsd = outcome === 'settled' ? Math.max(0, actualUsd !== null && Number.isFinite(actualUsd) ? actualUsd : attempt.reserveUsd) : outcome === 'no_charge' ? 0 : null;
     this.changed();
   }
 

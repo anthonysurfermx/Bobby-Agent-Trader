@@ -372,7 +372,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   const t5 = await begin('Compara', 'c5'); await runTask(deps, 'ana', t5.id);
   await store.approve('ana', t5.id, waitingApproval((await store.get('ana', t5.id))!)!.digest, clock); await runTask(deps, 'ana', t5.id);
   const r5 = (await store.get('ana', t5.id))!;
-  eq([r5.steps.filter((s) => s.kind === 'tool_refused').map((s) => [s.data.tool, s.data.reason, s.data.detail]), taskResult(r5)!.presentation.composedByCode, /12\s?%/.test(taskResult(r5)!.presentation.text)], [[['answer', 'typed_number', '%']], false, false], 'a typed number is sent back once with the reason, and the corrected answer is served');
+  eq([r5.steps.filter((s) => s.kind === 'tool_refused').map((s) => [s.data.tool, s.data.reason, s.data.detail]), taskResult(r5)!.presentation.composedByCode, /12\s?%/.test(taskResult(r5)!.presentation.text)], [[['answer', 'typed_number', '12%']], false, false], 'a typed number is sent back once with the reason, and the corrected answer is served');
   ok(JSON.stringify(calls.at(-1)!.messages.at(-1)).includes('typed_number'), '…the model was told why');
   script = [cmp, () => answer({ kind: 'analysis', gist: 'Bitcoin subió 12%.', text: 'Bitcoin subió 12%.' }), () => answer({ kind: 'analysis', gist: 'Bitcoin subió 15%.', text: 'Bitcoin subió 15%.' })];
   const t6 = await begin('Compara', 'c6'); await runTask(deps, 'ana', t6.id);
@@ -506,7 +506,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   // A number of the model's own cannot ride on what is allowed.
   const no = (over: Record<string, unknown>, question = 'Compara Bitcoin y Ethereum') => { const r = present(draft(over), crypto, question, 'es', 'es-MX'); return 'refusal' in r ? `${r.refusal.code}:${r.refusal.detail}` : 'shown'; };
   eq([no({ text: 'Bitcoin subió 60% en el periodo.' }), no({ text: 'Pasó en el {{days}}% de los días.' }), no({ text: 'Se movió 60{{f:volatility_BTC}}.' }), no({ text: 'Bitcoin{{f:return_BTC}} cambió.' })],
-    ['typed_number:%', 'bad_placeholder:glued: {{…}}%', 'bad_placeholder:glued: 0{{…}}', 'bad_placeholder:glued: n{{…}}'], 'a window length is not a percentage, and nothing may be glued to a placeholder');
+    ['typed_number:60%', 'bad_placeholder:glued: {{…}}%', 'bad_placeholder:glued: 0{{…}}', 'bad_placeholder:glued: n{{…}}'], 'a window length is not a percentage, and nothing may be glued to a placeholder');
   eq([no({ text: 'Bitcoin rindió 10.00 puntos.' }, 'Tengo 1000 pesos. Compara Bitcoin y Ethereum'), no({ text: 'Con tus 1,000 pesos habría cambiado {{f:return_BTC}}.' }, 'Tengo 1000 pesos. Compara Bitcoin y Ethereum'), no({ text: 'Subió 20.25 en el año.' }, '¿Y en 2025? Compara Bitcoin y Ethereum')],
     ['typed_number:10.00', 'shown', 'typed_number:20.25'], 'the person\'s 1000 lets 1,000 through and never 10.00; their 2025 never lets 20.25 through');
   {
@@ -516,7 +516,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
     eq([no({ text: 'Su peor día fue el 15 de septiembre.' }), no({ text: 'Cambió el {{d:return_BTC}}.' }), no({ text: 'Fue el {{d:worst_DOGE}}.' })], ['typed_number:15', 'figure_without_value:return_BTC', 'unknown_figure:worst_DOGE'], 'a date the model types is a number of its own; a figure with no day has no date to write');
   }
   eq([no({ text: 'Bitcoin subió doce por ciento.' }), no({ text: 'Bitcoin subió １２ puntos.' }), no({ text: 'Subió x² en el periodo.' }), no({ limitations: ['Rindió 7 puntos más.'] }), no({ next: '¿Y si sube 15 más?' })],
-    ['typed_number:por ciento', 'typed_number:12', 'typed_number:2', 'typed_number:7', 'typed_number:15'], '"percent" in words, look-alike digits, and numbers in the limitations or the next question are the model\'s own too');
+    ['typed_number:doce por ciento', 'typed_number:12', 'typed_number:2', 'typed_number:7', 'typed_number:15'], '"percent" in words, look-alike digits, and numbers in the limitations or the next question are the model\'s own too');
   // An ordering that cannot be checked is not a checked ordering.
   eq([no({ claims: [{ metric: 'drawdown', top: 'ethereum' }] }) === (fell === 'ETH' ? 'shown' : 'claim_contradicts_figures:drawdown:ethereum'), no({ claims: [{ metric: 'drawdown', top: 'Dogecoin' }] }), (() => { const r = present(draft({ gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}}.', claims: [{ metric: 'return', top: 'BTC' }] }), alone, 'q', 'es'); return 'refusal' in r ? r.refusal.code : 'shown'; })()],
     [true, 'claim_cannot_be_checked:drawdown:Dogecoin', 'claim_cannot_be_checked'], 'a claim may name its subject; one about something that was not read, or about a single instrument, cannot be checked and refuses the draft');
@@ -622,6 +622,94 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   } finally { globalThis.fetch = realFetch; delete process.env.ANTHROPIC_API_KEY; }
 }
 
+// ---------- 7c. what the second review found (2026-10-11), each with the check that would have caught it ----------
+{
+  type L = 'es' | 'en' | 'de';
+  const no = (over: Record<string, unknown>, question = 'Compara Bitcoin y Ethereum', language: L = 'es') => { const r = present(draft(over), crypto, question, language); return 'refusal' in r ? `${r.refusal.code}:${r.refusal.detail}` : 'shown'; };
+  const expl = (text: string, question: string, language: L = 'es') => { const r = present({ kind: 'explanation', gist: text, text, limitations: [], next: '', claims: [] }, null, question, language); return 'refusal' in r ? `${r.refusal.code}:${r.refusal.detail}` : 'shown'; };
+  const code = (said: string) => said.split(':')[0];
+
+  // The person's numbers are theirs as whole numbers. A piece of one, or a number inside a name they wrote, is nobody's.
+  eq([no({ text: 'Con tus 1000 pesos habrías ganado 100.' }, 'Tengo 1000 pesos. Compara Bitcoin y Ethereum'), no({ text: 'En el año el S&P 500 subió un 10 y el Nasdaq 100 un 50.' }, 'Compara el S&P 500 y el Nasdaq 100'), no({ text: 'Subió 15 puntos.' }, 'Tengo 1.5 bitcoins. Compara Bitcoin y Ethereum'), no({ text: 'Se mueve 2 veces más.' }, 'Compara estos dos: Bitcoin y Ethereum'), no({ text: 'En 2025 subió 25 puntos.' }, '¿Y en 2025? Compara Bitcoin y Ethereum'), no({ text: 'It is up 11 points more.' }, 'Once more: compare Bitcoin and Ethereum', 'en')],
+    ['typed_number:100', 'typed_number:10', 'typed_number:15', 'typed_number:2', 'typed_number:25', 'typed_number:11'], 'a number of the model rides on no part of what the person wrote: not a piece of their number, not a name, not a number word');
+  eq([no({ text: 'Con tus 1.000 pesos habría cambiado {{f:return_BTC}}.' }, 'Tengo 1000 pesos. Compara Bitcoin y Ethereum'), no({ text: 'De 2025 no sé; aquí cambió {{f:return_BTC}}.' }, '¿Y en 2025? Compara Bitcoin y Ethereum'), no({ text: 'Con una comisión de 0,5 al año, Bitcoin cambió {{f:return_BTC}}.' }, 'Mi fondo cobra 0.5 al año. Compara Bitcoin y Ethereum')],
+    ['shown', 'shown', 'shown'], '…and their own number, whole, is still theirs to hear back, however its separators are written');
+  // A window length counts days and nothing else; placeholders do not join into one number.
+  eq([no({ text: 'Bitcoin ronda los 60 mil dólares.' }), no({ text: 'It trades near 60k.' }, 'Compare', 'en'), no({ text: 'Subió un 60 por cien.' }), no({ text: 'Ganó 30 puntos porcentuales.' }), no({ text: 'Ein 60-prozentiger Anstieg.' }, 'Vergleiche', 'de'), no({ text: 'Subió 30 ٪ este año.' }), no({ text: 'Vale {{days}}{{days}} dólares.' }), no({ text: 'Subió 60.{{days}} puntos.' }), no({ text: 'Subió {{days}} puntos.' }), no({ text: 'Cerró en {{days}}{{f:close_BTC}}.' }), no({ text: 'Fue {{f:return_BTC}},{{f:return_ETH}}.' }), no({ next: '¿Y si Bitcoin llega a 60 mil?' })].map(code),
+    ['typed_number', 'typed_number', 'typed_number', 'typed_number', 'typed_number', 'typed_number', 'bad_placeholder', 'bad_placeholder', 'bad_placeholder', 'bad_placeholder', 'bad_placeholder', 'typed_number'], 'a window length (typed, or written by {{days}}) is no price, no change and no percentage; two placeholders never write one number');
+  eq([no({ next: '¿Y en una ventana de 60 días?' }), no({ next: '¿Quieres ver 30 días o 60?' }), no({ limitations: ['Aquí solo puedo leer 30 o 60 días.'] }), no({ text: 'Sur les {{days}} derniers jours, Bitcoin a varié de {{f:return_BTC}}.' }), no({ text: 'Im 30-Tage-Fenster: Bitcoin {{f:return_BTC}}.' }, 'Vergleiche', 'de')],
+    ['shown', 'shown', 'shown', 'shown', 'shown'], '…and where it counts days it is still written, in any of the ways a language says it');
+  // A percentage is code's to write; the person's own, and the bare word, are not a number of the model.
+  eq([expl('Invertir el 10% de lo que ganas es una costumbre común.', '¿Tiene sentido invertir el 10% de mi sueldo?'), expl('Invertir el 10 por ciento de lo que ganas es una costumbre común.', '¿Tiene sentido invertir el 10% de mi sueldo?'), expl('Es un porcentaje de lo que tienes invertido, cada año.', '¿Qué es una comisión de gestión?'), expl('Both are measured in percent.', 'How are they measured?', 'en'), expl('Wenn Bitcoin um 20 % fällt, verlierst du ein Fünftel davon.', 'Was, wenn Bitcoin um 20 % fällt?', 'de')],
+    ['shown', 'shown', 'shown', 'shown', 'shown'], 'their own percentage may be said back, as a sign or in words, and the plain word may be used');
+  eq([expl('Invertir el 15% de lo que ganas es lo normal.', '¿Tiene sentido invertir el 10% de mi sueldo?'), expl('Bitcoin subió doce por ciento.', '¿Qué es Bitcoin?'), expl('Suele rendir un 10 al año.', '¿Tiene sentido invertir el 10% de mi sueldo?'), no({ text: 'Bitcoin cambió {{f:return_BTC}} por ciento.' })].map(code),
+    ['typed_number', 'typed_number', 'typed_number', 'typed_number'], '…a percentage of the model\'s own may not; their percentage lends no bare number; a figure already carries its unit');
+  // A name is a name.
+  eq([expl('Bitcoin se negocia las 24 horas, todos los días.', '¿Por qué se mueve el fin de semana?'), expl('Bitcoin trades 24/7 and a fund only on exchange days.', 'Why does it move on weekends?', 'en'), expl('Un índice es una lista de empresas, como el IBEX 35.', '¿Qué es un índice?'), no({ text: 'Der S&P-500-ETF ist etwas anderes; Bitcoin: {{f:return_BTC}}.' }, 'Vergleiche', 'de'), no({ text: 'El Nasdaq‑100 es otra cosa; Bitcoin cambió {{f:return_BTC}}.' }), no({ text: 'El S&P\n500 es otra cosa; Bitcoin cambió {{f:return_BTC}}.' })],
+    ['shown', 'shown', 'shown', 'shown', 'shown', 'shown'], 'a name that holds a number is a name: an index, 24/7, an instrument in any spelling of its spaces');
+  eq([code(no({ text: 'Bitcoin subió 24 puntos.' })), code(no({ text: 'Bitcoin￼ cambió.' })), code(expl('En {{days}} días pasa de todo.', '¿Qué es Bitcoin?'))], ['typed_number', 'bad_placeholder', 'bad_placeholder'], '…a number is still a number; the app\'s own marks cannot be typed; {{days}} means nothing when no window was read');
+  // The window's own days are written by code.
+  const dayEs = (day: string) => new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${day}T00:00:00Z`));
+  const span = present(draft({ gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}}. Va del {{from:return_BTC}} al {{to:return_BTC}}.' }), crypto, 'q', 'es', 'es-MX') as any;
+  ok(span.presentation.text.endsWith(`Va del ${dayEs(fig(crypto, 'return_BTC').from!)} al ${dayEs(LAST)}.`) && span.presentation.figures.join() === 'return_BTC', 'the first and the last day a figure covers are written by code, in the person\'s language');
+  eq([code(no({ text: 'Fue del 9 de septiembre al 8 de octubre.' })), code(no({ text: 'Va del {{from:return_DOGE}} al final.' }))], ['typed_number', 'unknown_figure'], '…a date the model types stays a number of its own');
+  // Three read, three told.
+  const three = await analysisOf(['BTC', 'ETH', 'SOL'], 30);
+  for (const language of ['en', 'es', 'fr', 'pt', 'it', 'de'] as const) {
+    const told = composeByCode(three, language);
+    ok(told.kind === 'analysis' && ['Bitcoin', 'Ethereum', 'Solana'].every((name) => told.text.split(name).length === 3) && told.figures.join() === 'return_BTC,return_ETH,return_SOL,drawdown_BTC,drawdown_ETH,drawdown_SOL' && told.references.length === 3 && !/\{\{/.test(told.text) && told.text.startsWith(told.gist) && told.gist.length < told.text.length, `three read, three told by code (${language})`);
+  }
+  // The sentence in front.
+  const dated = present(draft({ gist: 'Bitcoins schlechtester Tag brachte {{f:worst_BTC}}.', text: 'Der schlechteste Tag von Bitcoin war der {{d:worst_BTC}} mit {{f:worst_BTC}}; Ethereum hatte seinen am {{d:worst_ETH}}. Mehr sagt das Fenster nicht.' }), crypto, 'Was war der schlechteste Tag?', 'de') as any;
+  ok(/\d\. \p{L}/u.test(dated.presentation.gist) && dated.presentation.gist.endsWith(`${new Intl.DateTimeFormat('de-DE', { month: 'long', timeZone: 'UTC' }).format(new Date(`${fig(crypto, 'worst_ETH').day}T00:00:00Z`))}.`) && dated.presentation.text.startsWith(dated.presentation.gist), 'the sentence in front does not stop at the full stop of a German date');
+  const us = present({ kind: 'explanation', gist: 'Stocks trade on weekdays.', text: 'Stocks in the U.S. trade Monday to Friday, during the day in New York. Bitcoin trades every day.', limitations: [], next: '', claims: [] }, null, 'q', 'en') as any;
+  eq(us.presentation.gist, 'Stocks in the U.S. trade Monday to Friday, during the day in New York.', '…nor at an abbreviation');
+
+  // The loop and the store.
+  const store = new MemoryAgentStore(6), deps = depsFor(store);
+  const begin = async (question: string, key: string) => (await createTask(deps, { owner: 'ana', session: 'v', requestId: key, question, language: 'es', model: 'claude-test' }) as any).task as import('../api/_lib/agent/types.ts').Task;
+  script = [() => answer({ kind: 'explanation', gist: 'Suele rendir un 7 al año.', text: 'Suele rendir un 7 al año.' }), () => answer({ kind: 'explanation', gist: 'Suele rendir un 8 al año.', text: 'Suele rendir un 8 al año.' })];
+  const twice = await ask(deps, 'ana', '¿Qué es un fondo indexado?', 'u1');
+  eq([taskState(twice, clock), taskResult(twice)!.presentation.kind, taskResult(twice)!.presentation.text, taskResult(twice)!.presentation.composedByCode, twice.question], ['completed', 'unavailable', 'Esta vez no logré responder eso con el cuidado que pide. Tu pregunta sigue aquí.', true, '¿Qué es un fondo indexado?'], 'an explanation that could not be shown twice says so and blames no data: none was asked for');
+  // A cancel the store accepts after the yes and before the tool starts stops the tool: no source asked, the read back.
+  script = [() => turn([use('read_assets', { assets: ['BTC', 'ETH'], windowDays: 30 }, 'u_cmp')])];
+  const t = await begin('Compara', 'k1'); await runTask(deps, 'ana', t.id);
+  await store.approve('ana', t.id, waitingApproval((await store.get('ana', t.id))!)!.digest, clock);
+  const realGet = store.get.bind(store); let looks = 0;
+  // The cancel arrives right after the runner's own look for one: its second read of the task.
+  store.get = async (owner: string, id: string) => { const task = await realGet(owner, id); if (id === t.id && ++looks === 2) await store.cancel('ana', t.id, clock); return task; };
+  const fetchedBefore = world.fetched.length, hadReads = store.readsTaken();
+  await runTask(deps, 'ana', t.id); store.get = realGet;
+  const stoppedTask = (await store.get('ana', t.id))!;
+  eq([hadReads, world.fetched.length - fetchedBefore, store.readsTaken(), taskState(stoppedTask, clock), stoppedTask.steps.at(-1)!.data, stoppedTask.steps.some((s) => s.kind === 'tool_call' || s.kind === 'tool_started'), taskUsage(stoppedTask).reads, stoppedTask.lease], [1, 0, 0, 'cancelled', { by: 'runner', readGivenBack: true }, false, 0, null], 'a cancel accepted before the tool starts stops it: no source is asked and the read goes back');
+  // Without a cancel, the start of metered work is a step of its own, before the tool's result.
+  script = [() => turn([use('read_assets', { assets: ['BTC', 'ETH'], windowDays: 30 }, 'u_cmp')]), () => answer({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}}.' })];
+  const t2 = await begin('Compara', 'k2'); await runTask(deps, 'ana', t2.id);
+  await store.approve('ana', t2.id, waitingApproval((await store.get('ana', t2.id))!)!.digest, clock); await runTask(deps, 'ana', t2.id);
+  eq((await store.get('ana', t2.id))!.steps.map((s) => s.kind), ['received', 'model_call', 'approval_requested', 'approval_granted', 'tool_started', 'tool_call', 'model_call', 'answer'], 'the steps of a read, in the order they happened');
+
+  const scope = { action: 'read_assets' as const, assets: ['BTC', 'ETH'], windowDays: 30, depth: 'standard' as const, consumption: { reads: 1 } };
+  const st = new MemoryAgentStore(6, 1);
+  // The read goes back in the write that says no figure came, and only when that write is stored.
+  const b1 = await st.begin(newTask('ana', 'f1'), {}, T0) as any, c1 = await st.claim(b1.task.id, 'w', 1000, T0), d1 = scopeDigest('ana', b1.task.id, scope);
+  await st.append(b1.task.id, c1!.fence, 'approval_requested', { scope: { ...scope, digest: d1 } }, T0); await st.release(b1.task.id, c1!.fence); await st.approve('ana', b1.task.id, d1, T0);
+  const c2 = await st.claim(b1.task.id, 'w', 1000, T0);
+  eq([await st.append(b1.task.id, c2!.fence - 1, 'tool_call', { metered: true, refunded: true }, T0), st.readsTaken(), (await st.append(b1.task.id, c2!.fence, 'tool_call', { metered: true, refunded: true }, T0))?.kind, st.readsTaken()], [null, 1, 'tool_call', 0], 'a read goes back in the write that says no figure came, and only if that write is stored');
+  // An error that crosses an accepted cancel is not stored either.
+  const b2 = await st.begin(newTask('ben', 'e1'), {}, T0) as any, live = await st.claim(b2.task.id, 'w', 60_000, T0);
+  eq([await st.cancel('ben', b2.task.id, T0 + 1), await st.append(b2.task.id, live!.fence, 'model_call', { outcome: 'unknown' }, T0 + 2) !== null, await st.append(b2.task.id, live!.fence, 'error', { code: 'provider_unknown' }, T0 + 3), taskState((await st.get('ben', b2.task.id))!, T0 + 4), taskError((await st.get('ben', b2.task.id))!)], [true, true, null, 'cancelled', null], 'an error that crosses an accepted cancel is not stored: what the call cost is recorded, and the errand ends cancelled, as the person was told');
+  // Money: a cost or a cap that is not a number.
+  const budget = { partition: 'nan', capUsd: 1, taskCapUsd: 1 };
+  const attempt = await st.reserve(budget, 'tn', 'm', 0.3, T0) as { ok: true; attemptId: string }; await st.dispatch(attempt.attemptId); await st.settle(attempt.attemptId, 'settled', NaN);
+  eq([await st.committed('nan'), (await st.reserve(budget, 'tn2', 'm', 0.9, T0)).ok, await st.reserve({ ...budget, capUsd: Infinity }, 'tn3', 'm', 0.1, T0)], [0.3, false, { ok: false, code: 'not_configured' }], 'a cost that is not a number keeps the reservation; a cap that is not a number is no cap');
+  // One key and one clock, as in the database.
+  eq([(await st.begin({ ...newTask('cy', 'same'), idemKey: 'a' }, {}, T0)).state, (await st.begin({ ...newTask('cy', 'same'), idemKey: 'b' }, {}, T0)).state, (await st.begin({ ...newTask('o2', 'k'), address: 'addr', createdAt: new Date(T0 - 5 * DAY).toISOString() }, {}, T0)).state, (await st.begin({ ...newTask('o3', 'k'), address: 'addr' }, {}, T0)).state],
+    ['new', 'replay', 'new', 'crowded'], 'the request id decides a replay and the store\'s own clock decides an address\'s day');
+  process.env.BOBBY_AGENT_DAILY_USD = 'Infinity';
+  eq(engineDeps(new MemoryAgentStore()).budget.capUsd, 5, 'a ceiling that is not a number is no ceiling anybody set: the default stands');
+  delete process.env.BOBBY_AGENT_DAILY_USD;
+}
+
 // ---------- 8. the door ----------
 {
   const { default: handler, __setAgentTestDeps } = await import('../api/agent-task.ts');
@@ -654,6 +742,16 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
     const replay = await send('POST', askBody()), back = await send('GET', null, undefined, { id });
     eq([replay.body.taskId, replay.body.result.text === approved.body.result.text, back.body.result.text === approved.body.result.text, calls.length - before, back.body.allowance.remaining, (await send('POST', { op: 'cancel', taskId: id })).statusCode], [id, true, true, 0, 5, 409], 'coming back, by id or by sending the request again, returns the stored answer with no call and no read; a finished errand cannot be cancelled');
     eq([(await send('POST', { op: 'ask' })).statusCode, (await send('GET', null, undefined, { id: '../../etc/passwd' })).statusCode, (await send('POST', askBody({ requestId: 'not-a-uuid' }))).statusCode], [400, 400, 400], 'anything outside the contract is refused');
+    // A cancel accepted while a runner held the task, whose runner never came back: completed by whoever looks next.
+    const { agentStore } = await import('../api/agent-task.ts');
+    script = [() => turn([use('read_assets', { assets: ['BTC', 'ETH'], windowDays: 30 }, 'u_dead')])];
+    const lost = await send('POST', askBody({ requestId: '5a5a5a5a-0000-4000-8000-000000000003' }), 'device-agent-0000000003');
+    const lostId = lost.body.taskId as string, mem = agentStore()! as any, lostOwner = mem.state.tasks[lostId].owner as string;
+    await mem.approve(lostOwner, lostId, lost.body.approval.digest, clock); await mem.claim(lostId, 'a-runner-that-dies', 60_000, clock);
+    const cancelling = await send('POST', { op: 'cancel', taskId: lostId }, 'device-agent-0000000003');
+    clock += 120_000;
+    const looked = await send('GET', null, 'device-agent-0000000003', { id: lostId });
+    eq([cancelling.body.state, cancelling.body.allowance.remaining, looked.body.state, looked.body.allowance.remaining, looked.body.result], ['cancel_requested', 5, 'cancelled', 6, null], 'a cancel whose runner never came back is completed by the next look, and the read no tool used goes back');
     // Storage that stops answering in the middle of anything: 503, never a guess and never a 500 with a stack.
     process.env.BOBBY_AGENT_STORE = '/dev/null/not-a-directory/store.json';
     const broken = await send('POST', askBody({ requestId: '5a5a5a5a-0000-4000-8000-000000000009' }));

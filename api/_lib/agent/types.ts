@@ -21,7 +21,7 @@ import type { AppLanguage } from '../../../src/lib/app-language.js';
 
 export const ENGINE_VERSION = 1;
 /** Bumped with any change to the instructions or to a tool's meaning: every run records the pair it ran with. */
-export const PROMPT_VERSION = 'agent-2026-10-11.1';
+export const PROMPT_VERSION = 'agent-2026-10-11.2';
 export const TOOLSET_VERSION = 'tools-2026-10-11.1';
 
 export type TaskState = 'created' | 'running' | 'waiting_approval' | 'completed' | 'failed' | 'cancel_requested' | 'cancelled';
@@ -92,6 +92,7 @@ export interface ApprovalScope {
 export type StepKind =
   | 'received'            // the errand, as the person sent it
   | 'model_call'          // one provider attempt: its outcome, usage and cost, and what it asked for
+  | 'tool_started'        // an approved metered action is about to ask its sources: a cancel accepted before this stops it
   | 'tool_call'           // one tool run by the server: validated arguments, evidence, data
   | 'tool_refused'        // a tool the model asked for that the server did not run, and why
   | 'approval_requested'  // a metered action waits for the person
