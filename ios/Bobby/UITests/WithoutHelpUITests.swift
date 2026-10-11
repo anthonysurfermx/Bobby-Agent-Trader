@@ -65,6 +65,19 @@ class ConversationFixtureCase: XCTestCase {
 }
 
 final class WithoutHelpUITests: ConversationFixtureCase {
+    func testOutsideTapClosesKeyboardWithoutSendingOrLosingDraft() {
+        launch(); let question = word("ex.1"); type(question)
+        let field = web.textViews.firstMatch
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        shot("66-keyboard-editing")
+        web.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+        let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch)
+        XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 5), .completed)
+        XCTAssertEqual(field.value as? String, question)
+        XCTAssertFalse(button("aria.closeAnswer").exists)
+        shot("67-keyboard-outside-draft-kept")
+        ready(button("type.send")); button("type.send").tap(); answered()
+    }
     func backgroundAndReturn() {
         XCUIDevice.shared.press(.home)
         Thread.sleep(forTimeInterval:1)
