@@ -545,6 +545,7 @@ final class NucleoSession: ObservableObject {
 #if DEBUG
         if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-home-fresh") { json["hasDeliveredRead"] = false }
         if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-home-reads") { json["hasDeliveredRead"] = true }
+        if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-home-wall") { json["oneTap"] = false }
         if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-home-nudge") {
             json["nudge"] = ["id":"fixture.home", "text": ConversationCopy.ready(), "cta": ConversationCopy.readFallback()]
         }

@@ -146,3 +146,14 @@ el.ta.addEventListener('pointerup',function(){
  if(closed&&D.activeElement===el.ta)el.ta.blur();
  focusTa();try{el.ta.setSelectionRange(start,end);}catch(_){}
 });
+
+// Measure the empty hint with the field's actual width; restore emptiness before any event.
+var wholeTaAutosize=typeof taAutosize==='function'?taAutosize:null;
+if(wholeTaAutosize){
+taAutosize=function(){
+ if(el.ta.value)return wholeTaAutosize();
+ el.ta.value=el.ta.placeholder||'';
+ try{wholeTaAutosize();}finally{el.ta.value='';el.taSend.disabled=true;}
+};
+el.ta.addEventListener('input',taAutosize);
+}

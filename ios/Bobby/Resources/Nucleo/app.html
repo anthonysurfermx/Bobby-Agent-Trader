@@ -345,6 +345,13 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 /* The first-run composer extends the same Quiet primary role at a physical 44pt. */
 #typeBox #typeSend.quiet-primary{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border-radius:22px}
 
+/* Empty composers keep the complete C4 placeholder on whole lines. */
+#typeBox #ta::placeholder,#typeBox #typeIn::placeholder{white-space:normal;overflow:visible;text-overflow:clip}
+#typeBox:has(#typeIn){padding:8px 8px 8px 16px}
+
+#first-run-field-mic.quiet-glyph{position:static;flex:none;width:44px;height:44px;min-width:44px;min-height:44px;background:transparent;border:0}
+#stage header #close.quiet-glyph{left:8px;top:0;background:transparent;border:0}
+
 </style>
 </head>
 <body data-page="app">
@@ -5661,6 +5668,17 @@ el.ta.addEventListener('pointerup',function(){
  if(closed&&D.activeElement===el.ta)el.ta.blur();
  focusTa();try{el.ta.setSelectionRange(start,end);}catch(_){}
 });
+
+// Measure the empty hint with the field's actual width; restore emptiness before any event.
+var wholeTaAutosize=typeof taAutosize==='function'?taAutosize:null;
+if(wholeTaAutosize){
+taAutosize=function(){
+ if(el.ta.value)return wholeTaAutosize();
+ el.ta.value=el.ta.placeholder||'';
+ try{wholeTaAutosize();}finally{el.ta.value='';el.taSend.disabled=true;}
+};
+el.ta.addEventListener('input',taAutosize);
+}
 
 /* ---- app/76-examples.js ---- */
 /* The first-run example row lives beside the unchanged Android-pinned chip and nudge blocks. */

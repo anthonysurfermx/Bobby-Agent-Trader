@@ -18,15 +18,16 @@ function firstRunTitle(){
   tb('title');
 }
 ENTER.ASK_TEACH=function(a){
-  firstRunAskEnter(a);
+  var tap=typeof TALK_MODE!=='undefined'&&TALK_MODE==='tap',args=Object.assign({},a);if(tap&&a.granted){args.granted=false;args.quiet=true;}firstRunAskEnter(args);
   W.agMode='plain';W.duel=null;W.conv=null;W.nodeOn=[false,false,false];
   setPill('mic','',96);W.pillModeT=T-1;W.micBreath=true;tb('pillIn',T-1);
   if(a.hello&&!RM){
     FIRST_HELLO_UNTIL=T+2.5;W.title=[Ls('hello').replace(/\|/g,' '),''];tb('title');
     titleEl.style.fontSize='22px';titleEl.style.lineHeight='27px';
-    at(2.5,firstRunTitle);
+    at(2.5,function(){if(W.state==='ASK_TEACH'&&FIRST_HELLO_UNTIL)firstRunTitle();});
   }else firstRunTitle();
   setChips(firstRunExamples());tb('chips',T-1);
+  if(tap&&a.granted){setHint(Ls('cap.tapToTalk'));at(4,function(){if(W.state==='ASK_TEACH'&&W.hint===Ls('cap.tapToTalk'))setHint('');});}
   loadSugg().then(function(){if(W.state==='ASK_TEACH'){setChips(firstRunExamples());tb('chips',T-1);}});
   if(!firstRunKeyboard){
     firstRunKeyboard=document.createElement('button');firstRunKeyboard.className='quiet-glyph';
@@ -57,6 +58,7 @@ var firstRunRenderTexts=renderTexts;
 renderTexts=function(){
   firstRunRenderTexts();
   stage.style.setProperty('--first-fit',String(FIT||1));
+  if(W.state==='ASK_TEACH'&&FIRST_HELLO_UNTIL){titleEl.style.fontSize='22px';titleEl.style.lineHeight='27px';}
   if(W.state==='ASK_TEACH'&&FIRST_HELLO_UNTIL&&T>=FIRST_HELLO_UNTIL)firstRunTitle();
   if(W.state==='ASK_TEACH'&&!FIRST_HELLO_UNTIL){
     if(titleEl.scrollHeight>72||titleEl.scrollWidth>350){titleEl.style.fontSize='28px';titleEl.style.lineHeight='32px';}
