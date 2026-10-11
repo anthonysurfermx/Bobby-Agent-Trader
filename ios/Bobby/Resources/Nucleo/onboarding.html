@@ -6057,6 +6057,7 @@ function firstRunUnavailable(){
 var firstRunControlHint=renderHint;
 renderHint=function(){
   firstRunControlHint();
+  $('hint').style.visibility=W.state==='TYPING'?'hidden':'';
   var meta=TALK_MODE==='tap'&&W.state==='HELD_DRAFT'&&(W.heldCaption==='cap.minute'||W.heldCaption==='cap.stopped');
   $('hint').classList.toggle('first-run-meta-caption',meta);
   $('hint').classList.toggle('first-run-live-caption',TALK_MODE==='tap'&&W.state==='LISTENING');

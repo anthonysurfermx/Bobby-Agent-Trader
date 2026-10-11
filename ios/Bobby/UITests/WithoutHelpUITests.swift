@@ -389,6 +389,7 @@ final class FirstRunShots: FirstRunFixtureCase {
         fresh();web.buttons[firstWords["aria.type"]!].tap();ready(web.textViews.firstMatch)
         web.textViews.firstMatch.typeText(firstWords["ex.1"]!);backgroundAndReturn();ready(web.textViews.firstMatch)
         XCTAssertEqual(web.textViews.firstMatch.value as? String,firstWords["ex.1"]!)
+        XCTAssertFalse(web.staticTexts.matching(NSPredicate(format:"label ==[c] %@",firstWords["hint.type"]!)).firstMatch.isHittable)
         XCTAssertFalse(web.buttons[firstWords["risk.notNow"]!].isHittable);shot("99-first-run-typed-background")
     }
     func testHandoverPreparingThenFirstAnswerRecording() {
@@ -397,7 +398,6 @@ final class FirstRunShots: FirstRunFixtureCase {
         agree.press(forDuration:1.3)
         XCTAssertTrue(web.staticTexts[word("status.preparing")].waitForExistence(timeout:1))
         // Rendering latency is measured in the recording, not XCTest query overhead.
-        // Native also logs fixture handover→ask seconds without logging the question.
         XCTAssertTrue(web.staticTexts[firstWords["ex.1"]!].exists);shot("84-handover-preparing-no-idle")
         ready(button("aria.closeAnswer"),timeout:45);shot("85-handover-first-daily-answer")
     }
