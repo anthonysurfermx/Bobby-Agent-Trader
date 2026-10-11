@@ -13,10 +13,13 @@
 // ============================================================
 import { appLocale, type AppLanguage } from '../../../src/lib/app-language.js';
 import { NAMED_NUMBER, NUMBER_WORD, fold } from '../companion-review.js';
+import { DATE_MARK, FIGURE_MARK } from './reader.js';
 import { UNIVERSE, WINDOWS, instrumentName, resolveMention } from './tools.js';
 import type { Analysis, Figure, Presentation } from './types.js';
 
 export interface Draft { kind: Presentation['kind']; gist: string; text: string; limitations: string[]; next: string; claims: Array<{ metric: string; top: string }> }
+/** A draft as its author wrote it, with every number and date of code's replaced by a mark. */
+export interface OwnWords { text: string; limitations: string[]; next: string | null }
 export type Refusal = { code: 'unknown_figure' | 'figure_without_value' | 'typed_number' | 'bad_placeholder' | 'claim_contradicts_figures' | 'claim_cannot_be_checked' | 'too_long' | 'empty'; detail: string };
 
 const PLACEHOLDER = /\{\{((?:f|d|from|to):[A-Za-z0-9_~]+|days)\}\}/g;
@@ -229,7 +232,7 @@ export function composeByCode(analysis: Analysis | null, language: AppLanguage, 
  * The model's draft, checked and written out. A refusal says what to repair; the caller may ask the model once
  * more and then falls back to composeByCode.
  */
-export function present(draft: Draft, analysis: Analysis | null, question: string, language: AppLanguage, locale?: string | null): { ok: true; presentation: Presentation } | { ok: false; refusal: Refusal } {
+export function present(draft: Draft, analysis: Analysis | null, question: string, language: AppLanguage, locale?: string | null): { ok: true; presentation: Presentation; own: OwnWords } | { ok: false; refusal: Refusal } {
   const figures = new Map((analysis?.figures ?? []).map((figure) => [figure.id, figure]));
   const gist = draft.gist.trim(), text = draft.text.trim(), next = draft.next.trim();
   if (!gist || !text) return { ok: false, refusal: { code: 'empty', detail: '' } };
@@ -251,5 +254,8 @@ export function present(draft: Draft, analysis: Analysis | null, question: strin
   // gist is not how its text begins, the text's own first sentence stands in front: nothing is said twice.
   // A full stop after a digit ("16. September") or after a single letter ("U.S.") does not end a sentence.
   const opening = written.startsWith(front) ? front : (/^.{12,200}?(?<!\p{N}|(?<!\p{L})\p{L})[.!?…](?=\s|$)/su.exec(written)?.[0] ?? written.slice(0, 200));
-  return { ok: true, presentation: { kind: draft.kind, gist: opening, text: written, figures: used, references: draft.kind === 'analysis' ? references(analysis, used) : [], limitations, next: next ? write(next, figures, days, language, locale) : null, composedByCode: false } };
+  // The model's own words, for the second reader of an analysis: what code wrote is a mark, so any quantity left is the model's.
+  const marked = (part: string) => part.replace(PLACEHOLDER, (_, key: string) => (key === 'days' ? String(days ?? '') : key.startsWith('f:') ? FIGURE_MARK : DATE_MARK)).replace(/[ \t\r\n]+/g, ' ').trim();
+  const own: OwnWords = { text: marked(text), limitations: draft.limitations.map(marked).filter(Boolean), next: next ? marked(next) : null };
+  return { ok: true, own, presentation: { kind: draft.kind, gist: opening, text: written, figures: used, references: draft.kind === 'analysis' ? references(analysis, used) : [], limitations, next: next ? write(next, figures, days, language, locale) : null, composedByCode: false } };
 }

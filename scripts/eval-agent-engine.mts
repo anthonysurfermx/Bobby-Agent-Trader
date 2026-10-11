@@ -13,7 +13,7 @@ if (!process.env.ANTHROPIC_API_KEY) { console.error('ANTHROPIC_API_KEY is not se
 const { MemoryAgentStore, waitingApproval } = await import('../api/_lib/agent/store.ts');
 const { createTask, runTask, engineDeps, taskView, agentPrompt } = await import('../api/_lib/agent/loop.ts');
 const { taskUsage, taskState } = await import('../api/_lib/agent/state.ts');
-const { formatFigure } = await import('../api/_lib/agent/present.ts');
+const { formatFigure, formatDay } = await import('../api/_lib/agent/present.ts');
 const { UNIVERSE, WINDOWS } = await import('../api/_lib/agent/tools.ts');
 const { theirNumbers } = await import('../api/_lib/companion-review.ts');
 type Task = import('../api/_lib/agent/types.ts').Task;
@@ -69,6 +69,8 @@ const CASES: Case[] = [
 function strayNumbers(text: string, task: Task, analysis: { figures: any[]; windowDays: number } | null): string[] {
   let bare = text;
   for (const figure of analysis?.figures ?? []) { const shown = figure.value === null ? '' : formatFigure(figure, task.language, task.locale); if (shown) bare = bare.split(shown).join(' '); }
+  // Dates are code's too: the day of a one-day figure, and the first and last day a figure covers.
+  for (const day of new Set((analysis?.figures ?? []).flatMap((figure) => [figure.day, figure.from, figure.to]).filter(Boolean) as string[])) bare = bare.split(formatDay(day, task.language, task.locale)).join(' ');
   for (const name of UNIVERSE.flatMap((instrument) => [instrument.name, ...instrument.aliases]).filter((n) => /\d/.test(n)).sort((a, b) => b.length - a.length)) bare = bare.replace(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), ' ');
   const theirs = theirNumbers(task.question);
   return (bare.match(/\d[\d.,]*/g) ?? []).filter((n) => !theirs.has(n.replace(/[.,]/g, '')) && !WINDOWS.some((days) => String(days) === n.replace(/[.,]$/, '')));

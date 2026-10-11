@@ -297,12 +297,13 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   eq([taskResult(conc)!.presentation.kind, taskResult(conc)!.presentation.limitations, taskResult(conc)!.presentation.figures, taskUsage(conc).toolCalls, store.readsTaken()], ['explanation', ['No hay datos de composición ni de concentración.'], [], 0, 1], 'what no tool can establish is said as a limit, with no figure and no read');
   eq([taskResult(conc)!.analysis?.subjects, taskView(conc, clock, 5).result?.analysis], [['BTC', 'ETH'], null], 'the analysis on the table stays with the thread for the next follow-up, and is not handed to a client with an answer that did not use it');
 
-  // An honest "I cannot establish that" that still cites one figure it does have is an analysis: the reader calling
-  // that number a figure does not throw the answer away (found on the first real run, 2026-10-10).
-  verdicts = ['figure'];
+  // An honest "I cannot establish that" that still cites one figure it does have is an analysis (found on the first
+  // real run, 2026-10-10). It is read as the model's own words: the number code writes reaches the reader as a mark.
+  readerSaw.length = 0;
   script = [() => answer({ kind: 'explanation', gist: 'No puedo establecer aquí la concentración.', text: 'No puedo establecer aquí la concentración. Lo que sí muestran las cifras es que sus cambios diarios se parecieron: {{f:corr_BTC_ETH}} en estos {{days}} días.', limitations: ['No tengo datos de composición.'] })];
   const honest = await ask(deps, 'ana', '¿Y cuál está más concentrado?', 'r4b', true);
   eq([taskResult(honest)!.presentation.kind, taskResult(honest)!.presentation.composedByCode, taskResult(honest)!.presentation.figures, taskResult(honest)!.presentation.limitations.at(-1), taskResult(honest)!.presentation.references.length], ['analysis', false, ['corr_BTC_ETH'], 'No tengo datos de composición.', 2], 'a text that cites a figure is an analysis whatever the model called it, and is served with its evidence');
+  eq(readerSaw, ['No puedo establecer aquí la concentración. Lo que sí muestran las cifras es que sus cambios diarios se parecieron: ⟦figure⟧ en estos 30 días. No tengo datos de composición.'], 'the second reader of an analysis reads the model\'s own words: every number of code\'s is a mark, so a quantity it finds is the model\'s');
 
   // 4.4 Coming back: the result is read, nobody is called, nothing is used.
   const callsBefore = calls.length, readsBefore = store.readsTaken(), committed = await store.committed('agent');
@@ -390,7 +391,8 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   script = [cmp, () => answer({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}.' })];
   const t8 = await begin('Compara', 'c8'); await runTask(deps, 'ana', t8.id);
   await store.approve('ana', t8.id, waitingApproval((await store.get('ana', t8.id))!)!.digest, clock); await runTask(deps, 'ana', t8.id);
-  eq(taskResult((await store.get('ana', t8.id))!)!.presentation.composedByCode, false, 'the reader calling an evidenced number a figure does not refuse an analysis: those numbers are the point');
+  const r8 = taskResult((await store.get('ana', t8.id))!)!.presentation;
+  ok(r8.composedByCode && r8.kind === 'analysis' && r8.text.includes(pctEs(refReturn(btc30))) && (await store.get('ana', t8.id))!.steps.at(-1)!.data.reader === 'figure', 'a quantity the reader finds in an analysis\'s own words is the model\'s (code\'s numbers were marks): the figures are told by code');
   verdicts = ['figure'];
   script = [() => answer({ kind: 'explanation', gist: 'El mercado suele doblar tu dinero cada siete años.', text: 'El mercado suele doblar tu dinero cada siete años, así que conviene empezar pronto.' })];
   const t9 = await begin('¿Cuánto da el mercado?', 'c9'); await runTask(deps, 'ana', t9.id);

@@ -24,7 +24,8 @@ import { appLocale, languageName, type AppLanguage } from '../../../src/lib/app-
 import { companionFallback } from '../companion.js';
 import { judgeCompanionReply, companionJudgeModel } from '../companion-judge.js';
 import { modelPrice, type LlmUsage } from '../llm.js';
-import { composeByCode, limitationsInWords, present, unanswered, type Draft } from './present.js';
+import { composeByCode, limitationsInWords, present, unanswered, type Draft, type OwnWords } from './present.js';
+import { judgeAnalysis } from './reader.js';
 import { agentModel, callAnthropicOnce, reservedCall, type Block, type CallModel, type Message, type WireTool } from './provider.js';
 import { taskError, taskEvents, taskResult, taskState } from './state.js';
 import { isFinal, waitingApproval, type AgentStore, type Begin, type Budget } from './store.js';
@@ -34,10 +35,18 @@ import { DEFAULT_LIMITS, ENGINE_VERSION, PROMPT_VERSION, TOOLSET_VERSION, type A
 export type Verdict = 'pass' | 'advice' | 'guarantee' | 'figure' | 'unchecked';
 /**
  * The second reader: reads everything of the model's a person is about to get (the text, its own limitations and
- * the next question). Its own call is reserved like any other. `keepNext` false drops the next question; `usd` is
+ * the next question). An explanation is read as written, by the companion's reader. An analysis is read as the
+ * model's own words, with code's numbers replaced by marks, by the engine's reader: there, "figure" means a quantity
+ * the model stated itself, and the answer is then told by code. Its own call is reserved like any other. `keepNext` false drops the next question; `usd` is
  * what the reading cost, for the task's own record.
  */
-export type Reader = (p: { task: string; question: string; text: string; next: string | null; language: AppLanguage; locale: string | null }) => Promise<Verdict | { verdict: Verdict; keepNext: boolean; usd?: number }>;
+export type Reader = (p: {
+  task: string; question: string; text: string; next: string | null; language: AppLanguage; locale: string | null;
+  /** True for an analysis: `text` and `next` are the model's own words, every number of code's replaced by a mark (reader.ts). */
+  measured?: boolean;
+  /** Where the person's own numbers are read from, when it is more than the question (a follow-up: the exchange on screen). */
+  numbersFrom?: string;
+}) => Promise<Verdict | { verdict: Verdict; keepNext: boolean; usd?: number }>;
 export interface Deps { store: AgentStore; call: CallModel; tools: ToolContext; read: Reader; now: () => number; budget: { partition: string; capUsd: number }; limits: Limits; worker: string }
 
 const ADDRESS: Record<AppLanguage, string> = { en: '', es: ' Address them as "tú".', fr: ' Address them as "tu", never "vous".', it: ' Address them as "tu", never "Lei".', de: ' Address them as "du", never "Sie".', pt: ' Address them informally.' };
@@ -67,7 +76,7 @@ A comparison answers the dimensions they asked about, says how the assets differ
 Write nothing outside tool calls. Finish by calling the tool "answer" exactly once:
 - gist: one sentence of at most 14 words that carries the whole idea and stands on its own (it may hold placeholders).
 - text: the whole answer, starting with that same sentence; at most 90 words for an analysis, 60 for an explanation, 25 for a clarification; one short paragraph, the way you would say it aloud: no list, no heading, no emoji.
-- claims: for an analysis, every ordering your text states, as {metric, top}: metric is the figure's metric and top is the ONE symbol that stands above every other asset read. return: the higher number (it rose more, or fell less: when your text says one fell more over the window, top is the other one). volatility: moved more from day to day. drawdown: fell further from a high. worst: had the worse worst day. best: had the better best day. When three were read and your text orders only two of them, list no claim for that sentence. Empty when your text states no ordering.
+- claims: for an analysis, every ordering your text states, as {metric, top}: metric is the figure's metric (return, volatility, drawdown, worst, best) and top is the symbol your text says rose more (return: the higher number, so when both fell it is the one that fell less), moved more from day to day (volatility), fell further from a high (drawdown), had the worse worst day (worst) or the better best day (best). With three assets, list a claim only when your text puts one of them beyond both others. Empty when your text states none.
 - limitations: short sentences for what you could not establish and that matters to the errand; empty when there is none. Do not put there that a past window says nothing about the future, nor anything the tool already lists under its own limitations (different calendars, a series that could not be read): the app adds those sentences itself.
 - next: one question this person would most naturally ask you next, in their own voice, at most 12 words, never about what to buy or sell; an empty string when the answer is complete.`;
 }
@@ -265,9 +274,11 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   const draft: Draft | null = parsed.success ? { ...parsed.data, kind: parsed.data.kind === 'clarification' ? 'clarification' : cites ? 'analysis' : 'explanation' } as Draft : null;
   const shown = draft ? present(draft, draft.kind === 'clarification' ? null : analysis, theirs, task.language, task.locale) : null;
   let presentation: Presentation | null = shown && 'presentation' in shown ? shown.presentation : null;
+  const ownWords: OwnWords | null = shown && 'own' in shown ? shown.own : null;
   if (!presentation) {
     const reason = !parsed.success ? 'invalid_arguments' : (shown as { refusal: { code: string; detail: string } }).refusal.code;
-    const detail = !parsed.success ? '' : (shown as { refusal: { code: string; detail: string } }).refusal.detail;
+    // For arguments the server cannot read, which field and what kind of fault: the schema's own words, never the model's.
+    const detail = !parsed.success ? parsed.error.issues.slice(0, 3).map((issue) => `${issue.path.join('.')}: ${issue.code}`).join('; ') : (shown as { refusal: { code: string; detail: string } }).refusal.detail;
     if (repairs < 1) { await write('tool_refused', { useId, tool: 'answer', reason, detail }); return false; }
     // Code tells the figures when there are figures. An answer that needed none says only that it could not be given:
     // it never blames data nobody asked for.
@@ -280,15 +291,18 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   if (!presentation.composedByCode) {
     // A clarification is one short question. Anything longer, or with no question in it, is not one: it is read as an explanation.
     if (presentation.kind === 'clarification' && (presentation.text.length > 220 || !/[?？]/.test(presentation.text))) presentation.kind = 'explanation';
+    const measured = presentation.kind === 'analysis' && ownWords !== null;
     const own = presentation.limitations.filter((line) => !limitationsInWords(analysis, task.language).includes(line));
-    const read = await deps.read({ task: task.id, question: task.question, text: [presentation.text, ...own].join(' '), next: presentation.next, language: task.language, locale: task.locale });
+    const read = await deps.read(measured
+      ? { task: task.id, question: task.question, text: [ownWords!.text, ...ownWords!.limitations].join(' '), next: ownWords!.next, language: task.language, locale: task.locale, measured: true, numbersFrom: theirs }
+      : { task: task.id, question: task.question, text: [presentation.text, ...own].join(' '), next: presentation.next, language: task.language, locale: task.locale, numbersFrom: theirs });
     if (await stopped()) return true;
     const said = typeof read === 'string' ? { verdict: read, keepNext: true, usd: 0 } : read;
     verdict = said.verdict; readerUsd = said.usd ?? 0;
     if (!said.keepNext) presentation.next = null;
-    // An evidenced number is the point of an analysis. A text that cites none has no such excuse.
-    const figuresAreEvidence = presentation.kind === 'analysis' && presentation.figures.length > 0 && verdict === 'figure';
-    if (verdict !== 'pass' && !figuresAreEvidence) {
+    // An analysis was read as the model's own words (code's numbers were marks), so "figure" there is a quantity the
+    // model stated itself, in digits or in words: like any other verdict but "pass", its words are not shown.
+    if (verdict !== 'pass') {
       if (verdict === 'unchecked' && presentation.kind !== 'analysis') { await write('error', { code: 'unchecked', readerUsd }); return true; }
       // The model's words cannot be shown: an analysis is told by code from its figures, anything else by the fixed sentence.
       presentation = presentation.kind === 'analysis' ? composeByCode(analysis, task.language, task.locale)
@@ -302,7 +316,7 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
 
 /** The second reader of the companion, with its own reservation: up to three attempts of a small model. */
 export function companionReader(store: AgentStore, budget: Budget, now: () => number): Reader {
-  return async ({ task, question, text, next, language, locale }) => {
+  return async ({ task, question, text, next, language, locale, measured, numbersFrom }) => {
     const model = companionJudgeModel();
     if (!model) return 'pass';
     const [pIn, , pOut] = modelPrice(model, 2000);
@@ -311,7 +325,11 @@ export function companionReader(store: AgentStore, budget: Budget, now: () => nu
     if (!reserved || !reserved.ok) return 'unchecked';
     const usage: LlmUsage[] = [];
     let verdict: Awaited<ReturnType<typeof judgeCompanionReply>> = null;
-    try { await store.dispatch(reserved.attemptId); verdict = await judgeCompanionReply(question, { text, followUp: next }, language, { model, locale: locale ?? undefined, usage }); } catch { verdict = null; }
+    try {
+      await store.dispatch(reserved.attemptId);
+      verdict = measured ? await judgeAnalysis(question, { text, followUp: next }, language, { model, locale: locale ?? undefined, usage, numbersFrom })
+        : await judgeCompanionReply(question, { text, followUp: next }, language, { model, locale: locale ?? undefined, usage, numbersFrom });
+    } catch { verdict = null; }
     const unknown = usage.some((row) => row.stop === 'timeout' || row.stop === 'network' || row.stop === 'deadline');
     // Its cost is known only when every attempt either was refused by the provider or reported its own usage; a reply
     // that could not be read, like one that never came, keeps the reservation.
