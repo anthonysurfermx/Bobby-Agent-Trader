@@ -41,7 +41,7 @@ class ConversationFixtureCase: XCTestCase {
             let visible=XCTNSPredicateExpectation(predicate:NSPredicate { _,_ in
                 let frame=element.frame
                 return element.exists && frame.width > 0 && frame.height > 0 && frame.midX.isFinite && frame.midY.isFinite && frame.intersects(self.app.windows.firstMatch.frame)
-            },object:nil)
+            },object:element)
             XCTAssertEqual(XCTWaiter.wait(for:[visible],timeout:timeout),.completed,app.debugDescription)
             return
         }
@@ -931,7 +931,10 @@ final class StoreAdditionalWalk: ConversationFixtureCase {
         withdraw.tap();ready(app.buttons["Withdraw consent"]);shot("43-review-withdraw-ai-confirm")
         app.buttons["Withdraw consent"].tap();ready(button("aria.type"));shot("44-review-ai-withdrawn")
         ask("What is an ETF?")
-        ready(web.buttons["I agree to the risk notice and AI processing"]);shot("45-review-withdrawn-question-needs-consent")
+        let openRisk=web.buttons["Open the risk notice"];ready(openRisk)
+        XCTAssertTrue(web.staticTexts["Bobby reads nothing until you agree to it. Your question was not sent."].exists)
+        shot("45-review-withdrawn-question-needs-consent");openRisk.tap()
+        ready(web.buttons["I agree to the risk notice and AI processing"]);shot("49-review-withdrawn-full-notice")
         let profileAfter=web.buttons.matching(NSPredicate(format:"label == 'Profile' OR label BEGINSWITH 'Momo.'")).firstMatch
         ready(profileAfter);Thread.sleep(forTimeInterval:2);profileAfter.tap();ready(app.buttons["account-close"]);shot("46-review-profile-after-withdrawal")
     }

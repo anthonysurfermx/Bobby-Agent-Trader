@@ -75,3 +75,11 @@ test('saved reading keeps old captions hidden after animation updates visibility
   for(const key of ['chipRow','eyebrow','hint']) assert.equal(el[key].style.visibility,'hidden',key);
   assert.equal(el.readNextNote.textContent,'Saved on this phone.');
 });
+
+test('saved panel removes the animated chip row and restores it on returning to rest', () => {
+  const {c,el,r,draw}=setup('FOLLOWUPS','en');r.save={status:'saved'};draw();
+  assert.equal(el.chipRow.hidden,true);assert.equal(el.chipRow.style.display,'none');
+  // A descendant setting visibility:visible cannot escape an ancestor display:none.
+  c.ST.name='IDLE';draw();
+  assert.equal(el.chipRow.hidden,false);assert.equal(el.chipRow.style.display,'block');
+});

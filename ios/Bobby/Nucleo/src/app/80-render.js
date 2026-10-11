@@ -614,6 +614,8 @@ function renderReadActions(){
   }
   /* The contextual next question is rendered in the primary action after saving; the idle row keeps its own layout. */
   // op() writes visibility during animation; enforce panel ownership every frame.
+  // Child chips animate their own visibility; an absent row cannot be overridden by them.
+  readControlShown(el.chipRow, !panel, 'block');
   el.chipRow.style.visibility = panel ? 'hidden' : 'visible'; el.eyebrow.style.visibility = panel ? 'hidden' : 'visible';
   el.hint.style.visibility = panel || handback || voice ? 'hidden' : 'visible';
 }
