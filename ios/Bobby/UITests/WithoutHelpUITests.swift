@@ -861,6 +861,7 @@ final class StoreOSPermissionWalk: ConversationFixtureCase {
             XCTAssertTrue(deny.waitForExistence(timeout:12),system.debugDescription);deny.tap()
         }
         let settings=app.buttons["Open Settings"];ready(settings)
+        XCTAssertTrue(app.staticTexts[word("hint.micOff")].exists)
         shot(state == "microphone-denied" ? "34-review-os-microphone-denied" : "35-review-os-speech-denied")
         settings.tap()
         let preferences=XCUIApplication(bundleIdentifier:"com.apple.Preferences")
@@ -870,7 +871,11 @@ final class StoreOSPermissionWalk: ConversationFixtureCase {
         XCTAssertTrue(preferences.navigationBars.firstMatch.waitForExistence(timeout:12),preferences.debugDescription)
         let route=XCTAttachment(screenshot:XCUIScreen.main.screenshot());route.name="redesign-47-review-os-settings-route";route.lifetime = .keepAlways;add(route)
         app.activate();ready(button("aria.type"));XCTAssertFalse(button("aria.sendSpoken").exists)
-        XCTAssertTrue(web.staticTexts[word("hint.micOff")].exists,app.debugDescription)
+        // Returning clears a transient page hint. A fresh explicit voice tap still explains
+        // the real denial; declining Settings leaves the keyboard route available.
+        button("aria.talk").tap();ready(app.buttons["Open Settings"])
+        XCTAssertTrue(app.staticTexts[word("hint.micOff")].exists)
+        app.buttons["Cancel"].tap();ready(button("aria.type"))
         ask("What is an ETF?");answered();shot("36-review-os-denied-typing-works")
     }
 }
