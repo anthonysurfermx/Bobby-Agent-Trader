@@ -400,3 +400,21 @@ New separate UI classes cover early C1 touch/timer ownership and uninterrupted c
 I-1b final pointer/caption correction (SPEC4.1.5c, A9.7, 8.3): first-run keyboard routes through the existing `data-hit=type` pointer/VoiceOver action owner because actual WKWebView pointer-up reached the SVG without delivering a DOM click. No shared handler changed. `FirstRunShots/testFirstRunListeningKeyboardKeepsHeardWords`, `testFirstRunHoldAppendsToHeldDraft`, `FirstRunFieldMicGuarantees` and `WholePlaceholderGuarantees` pass this real route. `FirstRunShots/testFirstRunAutomaticStopsNeverSend` and `FirstRunDiscardGuarantees` retain exact content/no-send/discard assertions; automatic-stop sentences now use meta13/18, sentence case, bottom741, two lines, at least11ptphysical. The listening caption uses tint5CE1FF. The new `first-run-intro` case "the folding C1 copy keeps its real title geometry after losing the title id" pins the computed geometry preserved by the echo; existing birth/timer/touch tests remain.
 
 I-1b typing-caption correction (SPEC4.1.10/8/A10): `FirstRunShots/testFirstRunBackgroundKeepsTypedDraft` additionally asserts the legacy typing hint is not hittable behind the retained composer. Only first-run TYPING hides its caption; all other states restore visibility. Exact draft, shared typed-background and original HOLD safety assertions remain. Ten targeted UI cases per es/de phone replace the seven affected onboarding typing captures; the complete 86-case matrices and non-TYPING movies retain named base-product provenance.
+
+I-1b final compatibility privacy fixtures (T3/T18, SPEC4.7.4/4.7.8):
+`NucleoPrivacyUITests.testOlderNoticeRequiresCompleteReadableDisclosureAndExplicitAgreement`
+and `testWithdrawingConsentKeepsProfileAvailableAndPersistsAfterRelaunch` now explicitly
+launch `app.language=en`; the earlier AppleLanguages-only launch inherited Spanish from
+preceding fixtures. Their starter is the approved educational example, and acceptance
+reaches the daily `fail.retry` action using the offline `companion-error` URLProtocol.
+All full-disclosure bytes, viewport/scroll bounds, short-tap refusal, agreement persistence,
+withdrawal confirmation/cancellation, retained identity and Profile access assertions remain.
+The earlier 1188/2 run is diagnostic. Both privacy cases passed in the signed five-case
+regression alongside two native companion fixture cases and first-run asset confirmation.
+
+Release compile guard: the inner companion fixture block in `NucleoSession.init` is now
+inside DEBUG, matching the lifetime of `NucleoFixtures`. Removing just those two directives
+recovers the exact previous source; generic signed-out fixture safety remains. The I-1b
+READY gate additionally requires a successful generic iOS Release compile. Signing is
+disabled only for that device compile, never for simulator builds; no archive or install.
+The command/result/source hash are saved in H/i1b-release-compile.json.

@@ -18,12 +18,12 @@ final class NucleoPrivacyUITests: XCTestCase {
         super.tearDown()
     }
 
-    /// Never pass -agent.onboarded: it launches the classic UI. A local starter skips the
-    /// birth/picker animation without pretending that the full onboarding was completed.
+    /// Never pass -agent.onboarded: it launches the classic UI. Explicit app language
+    /// isolates the English legal checks from earlier Spanish/German fixture launches.
     private func launch(page: String, riskVersion: Int? = nil, reset: Bool = false) {
         app.launchArguments = [
-            "-nucleo-fixtures", "offline", "-nucleo-page", page,
-            "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+            "-nucleo-fixtures", "companion-error", "-nucleo-page", page,
+            "-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-app.language", "en",
             "-companion.id", "momo", "-companion.selected.v2.local", "momo",
             "-avatar.voiceMuted", "YES", "-nucleo.voiceMuteReset.v1", "YES"
         ]
@@ -44,9 +44,9 @@ final class NucleoPrivacyUITests: XCTestCase {
     private var disclosure: XCUIElement {
         app.webViews.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", disclosureStart)).firstMatch
     }
-    // Animated captions are intentionally aria-hidden; the failure state's actionable chip
-    // is exposed to AX. The screenshot records the accompanying offline explanation.
-    private var failureRetry: XCUIElement { app.webViews.buttons["Try another question"] }
+    // Acceptance hands the educational question to the daily conversation. The offline
+    // failure exposes its explicit retry action there; no timer submits another question.
+    private var failureRetry: XCUIElement { app.webViews.buttons["Try again"] }
 
     private func waitUntilHittable(_ element: XCUIElement, timeout: TimeInterval = 20,
                                    file: StaticString = #filePath, line: UInt = #line) {
@@ -57,9 +57,7 @@ final class NucleoPrivacyUITests: XCTestCase {
     }
 
     private func tapLocalQuestion() {
-        let question = app.webViews.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@ AND label ENDSWITH %@", "How is ", " looking?")
-        ).firstMatch
+        let question = app.webViews.buttons["What is investing?"]
         waitUntilHittable(question)
         question.tap()
     }
