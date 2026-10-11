@@ -94,6 +94,20 @@ class ConversationFixtureCase: XCTestCase {
         }
         XCTAssertGreaterThan(ink,20,"The pill must display its next-action glyph")
     }
+    func assertNoCaptionBeside(_ control: XCUIElement) {
+        // The rolling hint is aria-hidden, so its overlap cannot be caught in the AX tree.
+        // This otherwise empty band beside the centered next-question control detects it.
+        let image=app.screenshot().image.cgImage!,data=image.dataProvider!.data!,bytes=CFDataGetBytePtr(data)!
+        let factor=CGFloat(image.width)/app.windows.firstMatch.frame.width,frame=control.frame
+        let left=Int(max(12,frame.minX-85)*factor),right=Int((frame.minX-6)*factor)
+        let top=Int(frame.minY*factor),bottom=Int(frame.maxY*factor)
+        XCTAssertGreaterThan(right,left);var ink=0
+        for y in stride(from:top,to:bottom,by:2) { for x in stride(from:left,to:right,by:2) {
+            let i=y*image.bytesPerRow+x*4
+            if min(bytes[i],min(bytes[i+1],bytes[i+2]))>90 { ink += 1 }
+        } }
+        XCTAssertLessThan(ink,15,"A saved-read caption must not cross the next-question footer")
+    }
     func backgroundAndReturn() {
         XCUIDevice.shared.press(.home)
         Thread.sleep(forTimeInterval:1)
@@ -819,7 +833,8 @@ final class StoreReviewerWalk: ConversationFixtureCase {
         let home=button("read.home");ready(home)
         XCTAssertFalse(web.staticTexts["YOU MIGHT WANT TO ASK"].exists)
         XCTAssertFalse(web.staticTexts.matching(NSPredicate(format:"label BEGINSWITH[c] 'Unlocked ·'")).firstMatch.exists)
-        shot("23-review-bitcoin-saved")
+        let nextQuestion=button("read.new");ready(nextQuestion);Thread.sleep(forTimeInterval:1)
+        assertNoCaptionBeside(nextQuestion);shot("23-review-bitcoin-saved",delay:0)
         home.tap();ready(button("aria.type"))
     }
     func testSignedOutProfileCreditsRestoreAndProExit() {

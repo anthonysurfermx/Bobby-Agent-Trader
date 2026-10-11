@@ -617,6 +617,8 @@ function renderReadActions(){
   // Child chips animate their own visibility; an absent row cannot be overridden by them.
   readControlShown(el.chipRow, !panel, 'block');
   el.chipRow.style.visibility = panel ? 'hidden' : 'visible'; el.eyebrow.style.visibility = panel ? 'hidden' : 'visible';
+  // The rolling hint's spans own visibility too; keep their container out of the panel.
+  readControlShown(el.hint, !(panel || handback || voice), 'block');
   el.hint.style.visibility = panel || handback || voice ? 'hidden' : 'visible';
 }
 
