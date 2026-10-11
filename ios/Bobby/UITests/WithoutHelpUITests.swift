@@ -843,3 +843,36 @@ final class StoreOSPermissionWalk: ConversationFixtureCase {
         ask("What is an ETF?");answered();shot("36-review-os-denied-typing-works")
     }
 }
+
+final class StoreAdditionalWalk: ConversationFixtureCase {
+    func reach(_ element:XCUIElement) {
+        for _ in 0..<7 where !element.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        ready(element)
+    }
+    func profile() {
+        let avatar=web.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Momo.'")).firstMatch
+        ready(avatar);avatar.tap();ready(app.buttons["account-close"])
+    }
+    func testServerDisallowsMemoryWithoutBlockingExistingNotesDeletion() {
+        launch("companion-plain",notes:true);ask();answered()
+        let copy=labels["companion"] as! [String:String]
+        XCTAssertFalse(web.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",copy["bobbyAsks"]!.components(separatedBy:"{question}")[0])).firstMatch.exists)
+        button("aria.closeAnswer").tap();profile()
+        let memory=app.buttons["account-memory"];reach(memory);memory.tap()
+        let door=app.buttons["memory-educational-notes"];reach(door);door.tap();ready(app.staticTexts["companion-notes-title"])
+        XCTAssertFalse(app.buttons["companion-correct-interest"].exists)
+        let deletion=app.buttons["companion-delete-interest"];reach(deletion);shot("37-review-server-memory-off")
+        deletion.tap();XCTAssertFalse(app.staticTexts["companion-note-interest"].exists);shot("38-review-server-off-delete-works")
+    }
+    func testKnownGuestCreditsProDoorAndSignedInLegalRestoreExit() {
+        launch("subscription_required");profile()
+        let credits=app.buttons["account-credits"];reach(credits);credits.tap();ready(app.buttons["credits-close"])
+        let pro=app.buttons["credits-pro"];reach(pro);shot("39-review-known-credits-pro-door");pro.tap();ready(app.buttons["paywall-close"])
+        XCTAssertTrue(app.buttons["paywall-terms"].exists);XCTAssertTrue(app.buttons["paywall-privacy"].exists)
+        shot("40-review-pro-from-credits");app.buttons["paywall-close"].tap()
+        app.terminate();app.launchArguments += ["-qa-nucleo-signed-in","-nucleo-paywall"];app.launch();ready(app.buttons["paywall-close"])
+        let restore=app.buttons["paywall-restore"];reach(restore);restore.tap()
+        shot("41-review-pro-signed-in-restore-fixture")
+        app.buttons["paywall-close"].tap();ready(button("aria.type"))
+    }
+}
