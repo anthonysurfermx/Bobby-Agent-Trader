@@ -90,6 +90,12 @@ function world(surface, page, language, { consent = true, mic = 'denied', deferP
     run(['bcall','startRead','onAskReply','onStage','txWordNew','txKill','txReset','txText','txSet'].map(name=>fn(reads,name)).join('\n'));
     run(source(base+'app/60-fsm.js'));
     run(source(base+'app/70-input.js'));
+    if (surface === 'native' && !ref) {
+      run(source(base+'app/75-conversation-input.js').split('\n')[1]); // Shipping RAM declarations.
+      c.draftPanel = $('conversation-draft');
+      c.conversationClearReturns = () => {}; // Render-only animation ghosts.
+      run(fn(source(base+'app/75-conversation-input.js'), 'conversationReset'));
+    }
     const boot=source(base+'app/99-boot.js');
     run(['applySession','wire','refreshCollections',...(surface==='native'?['resetVisibleRead','accountChanged','consentWithdrawn']:[])].map(name=>fn(boot,name)).join('\n'));
     // Animation helpers have no authority over input normalization, state guards or the ask payload.
@@ -180,7 +186,10 @@ for(const surface of ['native','web']) for(const page of ['app','onboarding']) f
   const draft=world(surface,page,language);draft.type();draft.write(text);draft.ta.blur();draft.advance(200);
   check(`${label}: losing focus retains nonempty draft without sending`,()=>{assert.equal(draft.ta.value,text);assert.equal(draft.asks().length,0);});
   const typedBackground=world(surface,page,language);typedBackground.type();typedBackground.write(text);typedBackground.emit('app.state',{state:'background'});typedBackground.emit('app.state',{state:'active'});typedBackground.advance(2500);
-  check(`${label}: background/foreground events do not submit or discard a typed draft`,()=>{assert.equal(typedBackground.ta.value,text);assert.equal(typedBackground.asks().length,0);assert.equal(typedBackground.state(),'TYPING');});
+  // iPhone 1.8 intentionally wipes RAM drafts on background (DECISIONS A6).
+  // The frozen web/onboarding hold surfaces retain their existing draft pin.
+  const resetsConversation=surface==='native'&&page==='app'&&!ref;
+  check(`${label}: background/foreground preserves the surface draft policy without submitting`,()=>{assert.equal(typedBackground.ta.value,resetsConversation?'':text);assert.equal(typedBackground.asks().length,0);assert.equal(typedBackground.state(),resetsConversation?'IDLE':'TYPING');});
   const cancel=world(surface,page,language);cancel.type();cancel.write(text);cancel.ta.emit('keydown',{key:'Escape'});cancel.advance(250);cancel.type();cancel.write(text+' NVDA');cancel.send.emit('click');cancel.advance(2200);
   check(`${label}: Escape then explicit retry sends only the new draft`,()=>{assert.equal(cancel.asks().length,1);assert.equal(cancel.asks()[0].params.question,text+' NVDA');assert.deepEqual(cancel.errors,[]);});
   const changed=world(surface,page,language);changed.type();changed.write(text);const other=language==='de'?'it':'de';changed.c.applySession({language:other,locale:other==='de'?'de-DE':'it-IT',companion:null,mic:{state:'denied'},riskAccepted:true},false);

@@ -18,7 +18,7 @@ function conversationChrome(){
  if(name==='READ_CONFIRM'){
   op(el.close,0);op(el.tx,0);op(el.greet,0);op(el.note,0);confirmPanel.style.setProperty('--target',target+'px');
   confirmName.style.fontSize=26*k+'px';confirmName.style.lineHeight=32*k+'px';confirmCost.style.font=15*k+'px/'+21*k+'px var(--sans)';confirmCost.style.textAlign='center';confirmCost.style.color='#A39C91';confirmLevel.style.fontSize=15*k+'px';confirmAction.style.fontSize=16*k+'px';confirmAction.style.minHeight=Math.max(50,target)+'px';confirmExit.style.fontSize=15*k+'px';confirmExit.style.display='block';confirmExit.style.margin='8px auto 0';
-  var height=confirmPanel.offsetHeight,r=clamp((602-12-32-height)/2,44,98),spare=Math.max(0,602-12-32-height-2*r),top=110+.4*spare;moveSphere(top+r,r);confirmPanel.style.top=(top+2*r+32)+'px';
+  var height=confirmPanel.offsetHeight,r=clamp((602-12-32-height)/2,Math.max(44,44/scale),98),spare=Math.max(0,602-12-32-height-2*r),top=110+.4*spare;moveSphere(top+r,r);confirmPanel.style.top=(top+2*r+32)+'px';
  }
  if(TALK_MODE==='tap'&&name!=='TYPING'&&name!=='BOOT'){
   var mode=waiting||speaking?'stop':'mic';if(A.mode!==mode)pillMode(mode);
@@ -26,7 +26,7 @@ function conversationChrome(){
  }
  if(name==='TYPING'){
   op(el.wm,0);op(el.close,1);op(el.tx,0);op(el.greet,0);op(el.note,0);
-  var boxTop=parseFloat(el.typeBox.style.top),limit=fin(boxTop)?(boxTop-fitY)/scale-24:330,r=clamp((limit-112)/2,44,98);moveSphere(112+r,r);
+  var boxTop=parseFloat(el.typeBox.style.top),limit=fin(boxTop)?(boxTop-fitY)/scale-24:330,r=clamp((limit-112)/2,Math.max(44,44/scale),98);moveSphere(112+r,r);
  }
  if(listening||held)op(el.wm,0);
  var b=D.getElementById('lvl');if(b){b.classList.remove('on');b.style.display='none';}

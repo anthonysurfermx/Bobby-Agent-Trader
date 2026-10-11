@@ -11,7 +11,7 @@ function conversationReturn(){
  else if(back&&back.name==='READ_CONFIRM')go('READ_CONFIRM',back.data);
  else go('IDLE',{restoreGreet:true});
 }
-function conversationReset(){conversationClearReturns();HELD='';HELD_CAP='';HELD_SPOKEN=false;HELD_PARAMS=null;CONV_BASE='';CONV_PARTIAL='';CONV_RETURN=null;GUIDE=null;READ=null;el.ta.value='';draftPanel.style.display='none';bcall('stopSpeaking').catch(noop);bcall('cancel').catch(noop);go('IDLE',{restoreGreet:true});conversationClearReturns();}
+function conversationReset(){CONV_LISTEN_SEQ++;cancelInput();bcall('speech.stop',{cancel:true}).catch(noop);conversationClearReturns();HELD='';HELD_CAP='';HELD_SPOKEN=false;HELD_PARAMS=null;CONV_BASE='';CONV_PARTIAL='';CONV_RETURN=null;GUIDE=null;READ=null;el.ta.value='';draftPanel.style.display='none';bcall('stopSpeaking').catch(noop);bcall('cancel').catch(noop);go('IDLE',{restoreGreet:true});conversationClearReturns();}
 function holdDraft(text,caption,spoken,params){HELD_PARAMS=params||null;HELD_SPOKEN=!!spoken;HELD=String(text||'').trim();HELD_CAP=caption||'';SPEECH.draft=HELD;go('HELD_DRAFT');}
 function convSend(text,spoken){
  var params=HELD_PARAMS&&text.trim()===HELD?Object.assign({},HELD_PARAMS):{question:text};if(!params.retry){if(READ_CONFIRM&&!params.companion)params.confirm=true;if(spoken)params.spoken=true;else delete params.spoken;if(GUIDE&&GUIDE.requestId&&!params.after)params.after=GUIDE.requestId;}

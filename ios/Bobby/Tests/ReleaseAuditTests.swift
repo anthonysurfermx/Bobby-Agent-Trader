@@ -144,7 +144,7 @@ final class ReleaseAuditTests: XCTestCase {
         let copy = try JSONSerialization.jsonObject(with: Data(contentsOf: root.appendingPathComponent("Nucleo/talk-copy.json"))) as! [String: [String: [String: String]]]
         let mode = try XCTUnwrap(config["TALK_MODE"] as? String)
         XCTAssertEqual(NucleoTalkMode.tap, mode == "tap")
-        XCTAssertEqual(Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") as? String, copy["purpose"]?["en"]?[mode])
+        XCTAssertEqual(Bundle.main.infoDictionary?["NSMicrophoneUsageDescription"] as? String, copy["purpose"]?["en"]?[mode])
         for language in ["en", "es", "fr", "pt", "it", "de"] {
             let purpose = try String(contentsOf: root.appendingPathComponent("Sources/\(language).lproj/InfoPlist.strings"), encoding: .utf8)
             XCTAssertTrue(purpose.contains(try XCTUnwrap(copy["purpose"]?[language]?[mode])), language)

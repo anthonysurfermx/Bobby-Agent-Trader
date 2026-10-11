@@ -73,11 +73,11 @@ function guideLayout(){
  guideDisclosure.style.fontSize=15*k+'px';guideDisclosure.style.minHeight=target+'px';
  guideNarrative.classList.toggle('conversation-reading',!!GUIDE.reading);guideNarrative.setAttribute('role','region');guideNarrative.setAttribute('aria-label',tt('aria.answer'));
  guideReply.style.textAlign=GUIDE.reading?'left':'center';guideReply.style.display=guideReply.textContent?'block':'none';
- if(GUIDE.reading){guidePanel.style.top='240px';guideNarrative.style.height=(Math.floor((700-slot-16-240)/(25*k))*25*k)+'px';moveSphere(160,48);}
+ if(GUIDE.reading){guidePanel.style.top='240px';guideNarrative.style.height=(Math.floor((700-slot-16-240)/(25*k))*25*k)+'px';moveSphere(160,Math.max(48,44/scale));}
  else{
   guideNarrative.style.height='auto';
   if(guideReply.offsetHeight>96*k&&!error){guideReply.style.fontSize=22*k+'px';guideReply.style.lineHeight=27*k+'px';}
-  var p=guideReply.offsetHeight,d=guideDisclosure.style.display==='none'?0:target,r=clamp((602-12-32-p-4-d-16-slot)/2,44,98);
+  var p=guideReply.offsetHeight,d=guideDisclosure.style.display==='none'?0:target,r=clamp((602-12-32-p-4-d-16-slot)/2,Math.max(44,44/scale),98);
   var spare=602-(12+2*r+32+p+4+d+16+slot),top=110+.4*Math.max(0,spare);
   if(!error&&spare<0){GUIDE.reading=true;guideRender();return;}
   moveSphere(top+r,r);guidePanel.style.top=(top+2*r+32)+'px';
