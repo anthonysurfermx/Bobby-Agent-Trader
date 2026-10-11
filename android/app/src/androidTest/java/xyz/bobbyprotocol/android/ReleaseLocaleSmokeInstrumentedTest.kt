@@ -292,12 +292,16 @@ class ReleaseLocaleSmokeInstrumentedTest {
         MotionEvent.obtain(down,down+30,MotionEvent.ACTION_UP,x,y,0).also { instrumentation.sendPointerSync(it); it.recycle() }
     }
     private fun domVisible(id: String): Boolean = js("(function(){var e=document.getElementById(${JSONObject.quote(id)}),r=e.getBoundingClientRect(),s=getComputedStyle(e),h=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.width>0 && r.height>0 && s.visibility==='visible' && s.pointerEvents!=='none' && h && (h===e || e.contains(h));})()") == true
-    private fun close() { device.pressBack(); Thread.sleep(800) }
-    private fun scrollSheet() { repeat(3) { device.swipe(device.displayWidth/2, device.displayHeight*4/5, device.displayWidth/2, device.displayHeight/5, 18); Thread.sleep(350) } }
-    // The shipping WebView keeps scheduling display frames even on its software fallback.
-    // Espresso idleness is not a readiness condition for that live page; each journey step above
-    // waits for its actual bridge/DOM/native state, then captures the real display without changing it.
-    private fun shot(name: String) { Thread.sleep(700); V18Shots.saveListing("locale-$language-$name") }
+    private fun close() { device.pressBack(); compose.mainClock.advanceTimeBy(1000); Thread.sleep(800); assertFalse("Back must close the sheet, not finish Bobby", activity.isFinishing || activity.isDestroyed) }
+    private fun scrollSheet() { repeat(3) { device.swipe(device.displayWidth/2, device.displayHeight*4/5, device.displayWidth/2, device.displayHeight/5, 18); compose.mainClock.advanceTimeBy(500); Thread.sleep(350) } }
+    // Native modal animations use the Compose test clock and must reach their displayed state.
+    // The live page itself never satisfies Espresso idleness on a software GPU; its DOM/bridge
+    // readiness is asserted above. Do not freeze or alter the shipping WebView animation.
+    private fun shot(name: String) {
+        compose.mainClock.advanceTimeBy(1000)
+        if (name !in setOf("03-home", "03b-keyboard", "04-read", "16-account-deleted", "99-failed")) compose.waitForIdle()
+        Thread.sleep(700); V18Shots.saveListing("locale-$language-$name")
+    }
     private fun bridge(method: String, params: JSONObject = JSONObject()): JSONObject {
         js("window.releaseSmoke=null;window.nucleoBridge.call(${JSONObject.quote(method)},$params).then(function(r){window.releaseSmoke=JSON.stringify(r);},function(e){window.releaseSmoke=JSON.stringify({fault:e.code});});true")
         waitFor { js("typeof window.releaseSmoke === 'string'") == true }

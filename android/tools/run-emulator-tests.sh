@@ -88,8 +88,11 @@ if [ "${BOBBY_TEST_LOCALE:-suite}" != suite ]; then
   python3 tools/check-locale-captures.py || status=1
 else
   part screens "$argument.class=$screens" "$@"
+  if [ "$status" -ne 0 ]; then exit "$status"; fi # Preserve the first failure before running dependent stages.
   part device "$argument.class=$device" "$@"
+  if [ "$status" -ne 0 ]; then exit "$status"; fi
   part others "$argument.notClass=$screens,$device,$page" "$@"
+  if [ "$status" -ne 0 ]; then exit "$status"; fi
   part page "$argument.class=$page" "$@"
 fi
 
