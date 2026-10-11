@@ -1110,7 +1110,9 @@ final class NucleoSession: ObservableObject {
         alert.addAction(UIAlertAction(title: L.t("Cancel", "Cancelar"), style: .cancel))
         alert.addAction(UIAlertAction(title: L.t("Open Settings", "Abrir Configuración"), style: .default) { _ in
             guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-            UIApplication.shared.open(url)
+            // Finish the alert transition before leaving the app. Backgrounding during
+            // automatic dismissal can leave a stale presenter when the person returns.
+            host.dismiss(animated: true) { UIApplication.shared.open(url) }
         })
         host.present(alert, animated: true)
     }

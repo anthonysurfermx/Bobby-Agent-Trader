@@ -871,6 +871,7 @@ final class StoreOSPermissionWalk: ConversationFixtureCase {
         XCTAssertTrue(preferences.navigationBars.firstMatch.waitForExistence(timeout:12),preferences.debugDescription)
         let route=XCTAttachment(screenshot:XCUIScreen.main.screenshot());route.name="redesign-47-review-os-settings-route";route.lifetime = .keepAlways;add(route)
         app.activate();ready(button("aria.type"));XCTAssertFalse(button("aria.sendSpoken").exists)
+        shot("48-review-return-from-settings")
         // Returning clears a transient page hint. A fresh explicit voice tap still explains
         // the real denial; declining Settings leaves the keyboard route available.
         button("aria.talk").tap();ready(app.buttons["Open Settings"])
