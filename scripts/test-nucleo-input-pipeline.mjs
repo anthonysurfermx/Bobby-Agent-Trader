@@ -186,7 +186,7 @@ for(const surface of ['native','web']) for(const page of ['app','onboarding']) f
   const draft=world(surface,page,language);draft.type();draft.write(text);draft.ta.blur();draft.advance(200);
   check(`${label}: losing focus retains nonempty draft without sending`,()=>{assert.equal(draft.ta.value,text);assert.equal(draft.asks().length,0);});
   const typedBackground=world(surface,page,language);typedBackground.type();typedBackground.write(text);typedBackground.emit('app.state',{state:'background'});typedBackground.emit('app.state',{state:'active'});typedBackground.advance(2500);
-  // iPhone 1.8 intentionally wipes RAM drafts on background (DECISIONS A6).
+  // iPhone 1.8 intentionally wipes RAM drafts on background (DECISIONS A2).
   // The frozen web/onboarding hold surfaces retain their existing draft pin.
   const resetsConversation=surface==='native'&&page==='app'&&!ref;
   check(`${label}: background/foreground preserves the surface draft policy without submitting`,()=>{assert.equal(typedBackground.ta.value,resetsConversation?'':text);assert.equal(typedBackground.asks().length,0);assert.equal(typedBackground.state(),resetsConversation?'IDLE':'TYPING');});
