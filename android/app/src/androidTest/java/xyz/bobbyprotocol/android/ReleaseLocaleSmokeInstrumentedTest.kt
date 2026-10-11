@@ -47,7 +47,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
 /** Real release Activity/session/bridge and native screens. Only network/account data are staged.
- * CI's software WebView uses the shipped no-WebGL fallback; native screenshots are listing-sized.
+ * CI's software WebView uses the shipped no-WebGL fallback; screenshots are native 720x1280.
  * Never run this on a user's phone. No real credentials, mutations or outgoing requests are used.
  */
 @RunWith(AndroidJUnit4::class)
@@ -237,6 +237,9 @@ class ReleaseLocaleSmokeInstrumentedTest {
         compose.onNode(hasText(session.text("Confirm", "Confirmar")) and hasClickAction()).performClick()
         waitFor { repository.session.value == null }
         assertTrue(network.calls.any { it.method == "DELETE" && it.path == "/api/account" })
+        // Session publication precedes the deletion listeners' local cleanup.
+        // Require the cleanup to finish rather than racing the null-session event.
+        waitFor { !context.getSharedPreferences("bobby.nucleo", 0).contains("profile.$OWNER.riskVersion") }
         assertFalse(context.getSharedPreferences("bobby.nucleo", 0).contains("profile.$OWNER.riskVersion"))
         shot("16-account-deleted")
         assertFalse("RevenueCat was never initialized", com.revenuecat.purchases.Purchases.isConfigured)

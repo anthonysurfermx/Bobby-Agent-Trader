@@ -84,6 +84,9 @@ jobs:
       - name: Build the app and its instrumented tests
         working-directory: android
         run: ./gradlew :app:assemble${{ matrix.build-type }} :app:assemble${{ matrix.build-type }}AndroidTest -PbobbyTestBuildType=${{ matrix.build-type == 'Release' && 'release' || 'debug' }} --no-daemon
+      - name: Check both startup manifests
+        working-directory: android
+        run: python3 tools/check-test-startup.py ${{ matrix.build-type }}
       - name: Run the instrumented tests on an emulator
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -96,9 +99,10 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           working-directory: android
-          # A hosted runner has no GPU: the page's WebGL scene is drawn in software, and its cost grows
-          # with every pixel. 720x1600 at 320 dpi is a 360x800 dp phone, the most common Android size.
-          pre-emulator-launch-script: bash tools/emulator-screen.sh ${{ matrix.locale == 'suite' && '720 1600 320' || '1080 1920 480' }}
+          # Native 720x1280 @320dpi keeps the locale journey's 360x640dp layout while reducing
+          # software WebView tile pressure. Valid phone screenshots, below Play's 1080px recommendation.
+          # The broader suite retains its existing 360x800dp diagnostic display.
+          pre-emulator-launch-script: bash tools/emulator-screen.sh ${{ matrix.locale == 'suite' && '720 1600 320' || '720 1280 320' }}
           # What the tests are told about this emulator: it exists for this run only (a test that changes a
           # system setting may use it), and it has no GPU (the suite that drives the WebGL page by script is skipped).
           script: bash tools/run-emulator-tests.sh -PbobbyTestBuildType=${{ matrix.build-type == 'Release' && 'release' || 'debug' }} -Pandroid.testInstrumentationRunnerArguments.bobbyOwnedEmulator=ci-throwaway -Pandroid.testInstrumentationRunnerArguments.bobbySoftwareGpu=true
