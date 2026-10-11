@@ -97,7 +97,9 @@ jobs:
           cores: 4
           ram-size: 4096M
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          # Current software backend: swiftshader_indirect was deprecated in emulator36.4.9.
+          # Hosted37.2.12 RenderThread crashes are infrastructure failures, never device coverage.
+          emulator-options: -no-window -gpu software -no-snapshot -noaudio -no-boot-anim -camera-back none
           working-directory: android
           # Native 720x1280 @320dpi keeps the locale journey's 360x640dp layout while reducing
           # software WebView tile pressure. Valid phone screenshots, below Play's 1080px recommendation.

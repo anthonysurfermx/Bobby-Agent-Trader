@@ -169,7 +169,9 @@ class ReleaseLocaleSmokeInstrumentedTest {
                 val x = (xy[0] + bounds.getDouble(0)*scale).toInt()
                 val top = (xy[1] + bounds.getDouble(1)*scale).toInt()
                 val bottom = (xy[1] + bounds.getDouble(2)*scale).toInt()
-                device.swipe(x, bottom-20, x, top+20, 20)
+                // The report button consumes pointer-down so taps do not drag the
+                // card. Start inside the prose, not on a partly revealed button.
+                device.swipe(x, top + (bottom-top)*3/5, x, top+20, 20)
                 Thread.sleep(600)
             }
         }

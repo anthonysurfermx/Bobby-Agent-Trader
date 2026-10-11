@@ -29,6 +29,8 @@ for path, manifest, kind in selected:
     assert 'androidx.emoji2.text.EmojiCompatInitializer' not in names, f'Downloadable emoji startup in {path}'
     if kind == 'app':
         assert 'androidx.work.WorkManagerInitializer' in names, f'Missing reminder startup in {path}'
+    else:
+        assert not any(node.get(android + 'name') == 'androidx.startup.InitializationProvider' for node in manifest.iter('provider')), f'Shared startup class must not be a test-APK provider: {path}'
     destination = inventory / kind
     destination.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(path, destination / 'AndroidManifest.xml')
