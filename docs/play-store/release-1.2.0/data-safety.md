@@ -9,7 +9,7 @@ Audited 2026-10-11. Scope: FCM-off release with no Google RevenueCat key. Source
 | Does the app collect user data? | **Yes.** Questions, installation identifier and service requests leave the device. Collection includes failed or ephemeral requests; the current rejected Android progress POST does not make its submitted contents device-only. |
 | Encrypted in transit? | **Yes for app-controlled transport.** HTTPS-only endpoints, no cleartext, no cross-host redirects. Server-to-processor transport must be confirmed by the service owner. |
 | Account creation | **OAuth** (Google via Supabase Auth). Guest use is also available. No in-app password account creation. |
-| Request account deletion | **Yes, in the app:** Profile → Delete account → confirmation. Outside-app deletion URL: `https://bobbyprotocol.xyz/support?platform=android#contact`, **pending Claude's explicit deletion instructions/functional public form verification**. Do not submit it as verified until that page is live. |
+| Request account deletion | **Yes, in the app:** Profile → Delete account → confirmation. Outside-app deletion URL: `https://bobbyprotocol.xyz/support?platform=android#delete-account`, **pending Claude's explicit deletion instructions/functional public form verification**. Do not submit it as verified until that page is live. |
 | Request deletion without deleting the account | **Yes, some data:** Memory offers forget-one and erase-account-memory, and locally stored notes can be erased separately. Do not claim a universal server-data deletion form. |
 
 ## Types to declare

@@ -7,7 +7,7 @@ Entrega técnica: draft PR #185; versión **1.2.0**, código **10**, paquete **x
 ## 1. Cerrar las dependencias de publicación
 
 - Aprueba con Claude la migración aditiva y el servidor de PR #186; verifica después el guardado/restauración real de perfil Android. Hasta entonces POST `/api/progress` devuelve 400; no está resuelto por esta app.
-- Claude debe publicar el párrafo Android de privacidad y un camino explícito de solicitud de borrado fuera de la app. Comprueba en navegador incógnito `https://bobbyprotocol.xyz/privacy?platform=android` y `https://bobbyprotocol.xyz/support?platform=android#contact`: nombre de Bobby, qué se borra/conserva, cómo identificar la cuenta y formulario funcional. El soporte debe explicar Android/Google, no instrucciones de iPhone.
+- Claude debe publicar el párrafo Android de privacidad y un camino explícito de solicitud de borrado fuera de la app. Comprueba en navegador incógnito `https://bobbyprotocol.xyz/privacy?platform=android` y `https://bobbyprotocol.xyz/support?platform=android#delete-account`: nombre de Bobby, qué se borra/conserva, cómo identificar la cuenta y formulario funcional. El soporte debe explicar Android/Google, no instrucciones de iPhone.
 - Proporciona acceso de revisión a funciones de cuenta si Google lo solicita; no guardes credenciales en el repositorio. Prueba Google OAuth/deep link y borrado en un teléfono real con una cuenta prescindible.
 - Obtén de Claude los archivos firmados **del mismo commit** y el hash del AAB firmado. Conserva el SHA del unsigned para trazabilidad. No regeneres ni rotes la clave existente. No actives Google billing ni FCM como parte de esta entrega.
 
@@ -22,7 +22,7 @@ Entrega técnica: draft PR #185; versión **1.2.0**, código **10**, paquete **x
 | Traducciones | **Español es**, **Francés fr-FR**, **Portugués (Brasil) pt-BR**, **Italiano it-IT**, **Alemán de-DE**; pegar cada archivo correspondiente |
 | Descripción breve / completa | Secciones exactas de `listing.<lang>.md`; límites comprobados en `metadata-lengths.json` |
 | Política de privacidad | `https://bobbyprotocol.xyz/privacy?platform=android` — verificar publicación primero |
-| URL para eliminar cuenta | `https://bobbyprotocol.xyz/support?platform=android#contact` — verificar instrucciones y envío primero |
+| URL para eliminar cuenta | `https://bobbyprotocol.xyz/support?platform=android#delete-account` — verificar instrucciones y envío primero |
 | Anuncios | **No**; `ads.md` |
 | Público objetivo | **18 años o más**; no dirigida a niños |
 | Acceso a la app | **Todas o algunas funciones están restringidas**; pegar instrucciones de `app-access.md` y el acceso privado que solicite Google |
