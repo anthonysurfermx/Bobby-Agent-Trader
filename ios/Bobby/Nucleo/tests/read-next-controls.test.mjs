@@ -12,7 +12,7 @@ function setup(state = 'CARDS', lang = 'es') {
   const el = Object.fromEntries(keys.map(k => [k,{style:{},attributes:{},textContent:''}]));
   const r = { model:{}, save:null };
   const c = vm.createContext({el,READ:r,ST:{name:state},A:{cardIdx:0},SUGG:{},LANG:lang,
-    st:(n,k,v) => n.style[k]=v,att:(n,k,v) => n.attributes[k]=v,
+    st:(n,k,v) => { const cache=n._c || (n._c={}); if(cache[k]!==v){cache[k]=v;n.style[k]=v;} },att:(n,k,v) => n.attributes[k]=v,
     readResultReady:()=>['THINK_RESOLVE','TALK_EVIDENCE','TALK_CHART','VERDICT','HANDBACK'].includes(state),
     RMOD:{followUps:()=>[]} });
   vm.runInContext('var STR='+table+'; function tt(k,p){var s=STR[LANG][k]; Object.keys(p||{}).forEach(function(x){s=s.replace("{"+x+"}",p[x]);}); return s;}\n'+slice,c);
@@ -66,4 +66,12 @@ test('a real server next question keeps its action and finite tap origin', () =>
 test('a stored reading can only return home, never save again', () => {
   const {c,el,draw}=setup('THESIS_VIEW');c.READ=null;draw();
   assert.equal(el.readNextPrimary.attributes['data-hit'],'read-home');assert.equal(el.readHome.hidden,true);
+});
+
+test('saved reading keeps old captions hidden after animation updates visibility again', () => {
+  const {el,r,draw}=setup('FOLLOWUPS','en');r.save={status:'saved'};draw();
+  for(const key of ['chipRow','eyebrow','hint']) el[key].style.visibility='visible';
+  draw();
+  for(const key of ['chipRow','eyebrow','hint']) assert.equal(el[key].style.visibility,'hidden',key);
+  assert.equal(el.readNextNote.textContent,'Saved on this phone.');
 });

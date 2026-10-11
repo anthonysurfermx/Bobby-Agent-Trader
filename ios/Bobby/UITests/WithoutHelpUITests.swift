@@ -794,7 +794,10 @@ final class StoreReviewerWalk: ConversationFixtureCase {
         launch();ask("Analyze Bitcoin");ready(button("risk.notNow"));physicalControls([confirmRead,button("risk.notNow")])
         shot("21-review-bitcoin-cost");confirmRead.tap();ready(button("read.result"),timeout:45);button("read.result").tap()
         shot("22-review-bitcoin-read");let save=web.buttons.matching(NSPredicate(format:"label == %@",word("read.save"))).allElementsBoundByIndex.first { $0.isHittable }
-        XCTAssertNotNil(save);save!.tap();shot("23-review-bitcoin-saved")
+        XCTAssertNotNil(save);save!.tap();ready(web.staticTexts[word("read.savedLocal")]);
+        XCTAssertFalse(web.staticTexts["YOU MIGHT WANT TO ASK"].exists)
+        XCTAssertFalse(web.staticTexts.matching(NSPredicate(format:"label BEGINSWITH[c] 'Unlocked ·'")).firstMatch.exists)
+        shot("23-review-bitcoin-saved")
     }
     func testSignedOutProfileCreditsRestoreAndProExit() {
         launch();profile();shot("24-review-profile-signed-out")

@@ -613,8 +613,9 @@ function renderReadActions(){
     readControlShown(el.readSummary, !stored && A.cardIdx !== 0, 'block');
   }
   /* The contextual next question is rendered in the primary action after saving; the idle row keeps its own layout. */
-  st(el.chipRow, 'visibility', panel ? 'hidden' : 'visible'); st(el.eyebrow, 'visibility', panel ? 'hidden' : 'visible');
-  st(el.hint, 'visibility', panel || handback || voice ? 'hidden' : 'visible');
+  // op() writes visibility during animation; enforce panel ownership every frame.
+  el.chipRow.style.visibility = panel ? 'hidden' : 'visible'; el.eyebrow.style.visibility = panel ? 'hidden' : 'visible';
+  el.hint.style.visibility = panel || handback || voice ? 'hidden' : 'visible';
 }
 
 /* ---------- chips born from the pill ---------- */
