@@ -2,6 +2,10 @@
 # WebMessageListener, which does not require JavaScriptInterface reflection.
 -keepattributes Signature,InnerClasses,EnclosingMethod
 
+# AndroidX instrumentation shares the app's Kotlin runtime. Its null checks are external
+# calls that app-only shrinking cannot see; preserve this one runtime class across both APKs.
+-keep class kotlin.jvm.internal.Intrinsics { *; }
+
 # The device acceptance tests install a fixture transport by field name; production owns this client too.
 -keepclassmembers class xyz.bobbyprotocol.android.data.BobbyRepository { okhttp3.OkHttpClient client; }
 # Device acceptance inspects the actual activity session and repository, without shipping any fixture hook.

@@ -33,12 +33,20 @@ adb logcat -c || true
 adb logcat -v threadtime > "$out/logcat.txt" 2>&1 &
 logcat=$!
 
+# Even cancellation or a dead instrumentation runner leaves its crash log and native captures.
+collect() {
+  adb pull "$device_shots/." "$out/shots" > /dev/null 2>&1 || true
+  kill "$logcat" 2>/dev/null || true
+}
+trap collect EXIT
+
 status=0
 part() {
   name=$1
   shift
   echo "==== Instrumented tests: $name ===="
-  ./gradlew :app:connected${build_type}AndroidTest --no-daemon "$@" || status=1
+  # A runner that crashes before JUnit starts can otherwise wait until the whole 90-minute job ends.
+  timeout --signal=TERM --kill-after=30s 15m ./gradlew :app:connected${build_type}AndroidTest --no-daemon "$@" || status=1
   mkdir -p "$out/$name"
   cp -R app/build/reports/androidTests/connected "$out/$name/report" 2>/dev/null || true
   cp -R app/build/outputs/androidTest-results/connected "$out/$name/results" 2>/dev/null || true
