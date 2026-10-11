@@ -60,6 +60,27 @@ final class NucleoBridgeTests: XCTestCase {
         return (session, NucleoBridge(session: session), recorder)
     }
 
+    func testDeniedOSPermissionOffersSettingsOnlyForTheExplicitVoiceAttempt() async throws {
+        let (session, bridge, _) = make(); defer { session.teardown() }
+        var presented: [String] = []
+        session.speechDenialPresenter = { presented.append($0) }
+        session.speechPermissionProvider = { .init(state: "denied", onDevice: true) }
+        _ = await result(bridge, "speech.permission")
+        XCTAssertTrue(presented.isEmpty, "Session checks do not open help by themselves")
+        let response = await result(bridge, "speech.permission", ["denialHint":"Voice input isn’t available right now · tap to type"])
+        XCTAssertEqual(response["state"] as? String, "denied")
+        XCTAssertEqual(presented, ["Voice input isn’t available right now · tap to type"])
+        session.speechPermissionProvider = { .init(state: "granted", onDevice: true) }
+        _ = await result(bridge, "speech.permission", ["denialHint":"A bundled caption"])
+        XCTAssertEqual(presented.count, 1)
+    }
+    func testDeniedPermissionHelpRejectsMalformedCaptionWithoutShowingIt() throws {
+        let (session, _, _) = make(); defer { session.teardown() }
+        var presentations = 0; session.speechDenialPresenter = { _ in presentations += 1 }
+        XCTAssertThrowsError(try session.speechPermissionReply(.init(state:"denied",onDevice:true), params:.init(["denialHint":42])))
+        XCTAssertEqual(presentations,0)
+    }
+
     // MARK: - Helpers
 
     func testWithdrawingConsentClosesTheSheetOnceAndKeepsProfileAccessible() {

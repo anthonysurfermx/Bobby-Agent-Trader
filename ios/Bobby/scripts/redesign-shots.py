@@ -119,9 +119,9 @@ def main():
                 run(['xcrun', 'simctl', 'status_bar', udid, 'override', '--time', '9:41', '--dataNetwork', 'wifi', '--wifiMode', 'active', '--wifiBars', '3', '--batteryState', 'charged', '--batteryLevel', '100'])
                 if args.permission_state != 'default':
                     run(['xcrun','simctl','install',udid,product / 'Debug-iphonesimulator/Bobby.app'])
-                    for service in ['microphone','speech-recognition']:
-                        denied = (service == 'microphone') == (args.permission_state == 'microphone-denied')
-                        run(['xcrun','simctl','privacy',udid,'revoke' if denied else 'grant',service,'xyz.bobbyprotocol.bobby'])
+                    # Speech recognition is denied through its real iOS prompt in the UI test.
+                    # This Xcode's simctl privacy does not expose that service.
+                    run(['xcrun','simctl','privacy',udid,'revoke' if args.permission_state == 'microphone-denied' else 'grant','microphone','xyz.bobbyprotocol.bobby'])
                 if args.settle_system: time.sleep(args.settle_system)
                 result = folder / 'result.xcresult'
                 command = ['xcodebuild', '-xctestrun', plan, '-destination', f'platform=iOS Simulator,id={udid}',

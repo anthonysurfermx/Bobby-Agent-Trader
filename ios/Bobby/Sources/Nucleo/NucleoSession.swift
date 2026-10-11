@@ -117,6 +117,8 @@ final class NucleoSession: ObservableObject {
     var briefingGate: BriefingTapGate!
     /// Pause between a sheet going away and the next one presenting (SwiftUI dismissal animation).
     var briefingSheetDelay: TimeInterval = 0.4
+    var speechPermissionProvider: (() -> NucleoSpeech.Permission)?
+    var speechDenialPresenter: ((String) -> Void)?
     /// How the session waits for the two things it times itself: the wake of a page (`pageAwake`)
     /// and a question offered again (`offerRead`). Tests put a clock of their own here.
     var after: (_ delay: TimeInterval, _ work: @escaping () -> Void) -> Void = { delay, work in
@@ -450,11 +452,11 @@ final class NucleoSession: ObservableObject {
         case "read.rendered":
             return try desk.readRendered(p)
         case "speech.permission":
-            return speech.permission().json
+            return try speechPermissionReply(speechPermissionProvider?() ?? speech.permission(), params: p)
         case "speech.requestPermission":
-            let result = await speech.requestPermission().json
+            let result = await speech.requestPermission()
             sessionChanged()
-            return result
+            return try speechPermissionReply(result, params: p)
         case "speech.start":
             if !profile.acceptedRiskNotice && !speech.permission().onDevice { return ["status": "unavailable"] }
             return ["status": speech.start().rawValue]
@@ -1090,6 +1092,29 @@ final class NucleoSession: ObservableObject {
     /// Only Apple's speech service can transcribe the app language on this phone. Asked before any
     /// audio is captured, in a native alert so nothing on the page can answer for the user: allow
     /// (NucleoSpeech stores it), or type instead (nothing is stored; a later hold asks again).
+    /// A denied OS permission offers its Settings route only after the person's voice tap.
+    /// The caption comes from the bundled page's frozen six-language voice-unavailable row.
+    func speechPermissionReply(_ permission: NucleoSpeech.Permission, params: NucleoParams) throws -> [String: Any] {
+        let hint = try params.string("denialHint", required: false, maxLength: 512)
+        if permission.state == "denied", let hint, !hint.isEmpty {
+            if let speechDenialPresenter { speechDenialPresenter(hint) }
+            else { presentSpeechSettingsHelp(hint) }
+        }
+        return permission.json
+    }
+    private func presentSpeechSettingsHelp(_ hint: String) {
+        guard !tornDown, !speechPromptOpen, sheet == nil, openSheet == nil,
+              let host = Self.topViewController(), host.viewIfLoaded?.window != nil,
+              !(host is UIAlertController), !host.isBeingPresented, !host.isBeingDismissed else { return }
+        let alert = UIAlertController(title: hint, message: nil, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: L.t("Cancel", "Cancelar"), style: .cancel))
+        alert.addAction(UIAlertAction(title: L.t("Open Settings", "Abrir Configuración"), style: .default) { _ in
+            guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+            UIApplication.shared.open(url)
+        })
+        host.present(alert, animated: true)
+    }
+
     private func confirmAppleSpeechService() async -> Bool {
         // Only when the alert can really appear: otherwise nothing is stored and the page offers typing.
         guard !tornDown, !speechPromptOpen, sheet == nil, openSheet == nil,

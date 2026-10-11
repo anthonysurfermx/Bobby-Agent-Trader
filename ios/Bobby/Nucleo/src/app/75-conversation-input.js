@@ -51,12 +51,12 @@ function convListen(held,append){
  var back=CONV_RETURN||{name:ST.name,data:ST.data},seq=++CONV_LISTEN_SEQ;
  CONV_BASE=append?(HELD||SPEECH.draft||CONV_BASE):'';CONV_PARTIAL='';CONV_HOLD=held;
  if(VOICE.id&&!VOICE.ended){bcall('stopSpeaking').catch(noop);VOICE.ended=true;}
- bcall('speech.permission').then(function(m){
+ bcall('speech.permission',{denialHint:tt('hint.micOff')}).then(function(m){
   if(seq!==CONV_LISTEN_SEQ)return;if(m&&m.state)SES.mic=m;
   var state=m&&m.state||'unavailable';CONV_RETURN=back;
   if(state==='granted')go('LISTENING',{conversation:true,back:back});
   else if(state==='undetermined')go('PRE_PERMISSION',{conversation:true,back:back});
-  else if(state==='consent')bcall('speech.requestPermission').then(function(m){if(seq===CONV_LISTEN_SEQ){if(m&&m.state)SES.mic=m;hint(tt(m&&m.state==='granted'?'cap.tapToTalk':'hint.micOff'));}}).catch(noop);
+  else if(state==='consent')bcall('speech.requestPermission',{denialHint:tt('hint.micOff')}).then(function(m){if(seq===CONV_LISTEN_SEQ){if(m&&m.state)SES.mic=m;hint(tt(m&&m.state==='granted'?'cap.tapToTalk':'hint.micOff'));}}).catch(noop);
   else {hint(tt('hint.micOff'));keyboardButton.animate([{transform:'scale(1)'},{transform:'scale(1.1)'},{transform:'scale(1)'}],{duration:320});}
  }).catch(function(){if(seq===CONV_LISTEN_SEQ)hint(tt('hint.micOff'));});
 }
@@ -116,7 +116,7 @@ openTyping=function(d){d=d||{};if(!d.followUpOf)d.conversation=true;oldOpenTypin
 var oldPermEnter=STATES.PRE_PERMISSION.enter;
 STATES.PRE_PERMISSION.enter=function(prev,d){this.back=d.back||CONV_RETURN||{name:prev,data:{}};oldPermEnter.call(this);el.permBtn.classList.add("quiet-primary");};
 STATES.PRE_PERMISSION.down=function(h){if(h==='perm')return tapG(function(){STATES.PRE_PERMISSION.cont();});return tapG(conversationReturn);};
-STATES.PRE_PERMISSION.cont=function(){if(this.asked)return;this.asked=true;var self=this,seq=++CONV_LISTEN_SEQ;bcall('speech.requestPermission').then(function(m){if(seq!==CONV_LISTEN_SEQ||ST.name!=='PRE_PERMISSION')return;if(m&&m.state)SES.mic=m;conversationReturn();hint(tt(m&&m.state==='granted'?(TALK_MODE==='tap'?'cap.tapToTalk':'cap.holdToTalk'):'hint.micOff'));},function(){if(seq===CONV_LISTEN_SEQ){conversationReturn();hint(tt('hint.micOff'));}});};
+STATES.PRE_PERMISSION.cont=function(){if(this.asked)return;this.asked=true;var self=this,seq=++CONV_LISTEN_SEQ;bcall('speech.requestPermission',{denialHint:tt('hint.micOff')}).then(function(m){if(seq!==CONV_LISTEN_SEQ||ST.name!=='PRE_PERMISSION')return;if(m&&m.state)SES.mic=m;conversationReturn();hint(tt(m&&m.state==='granted'?(TALK_MODE==='tap'?'cap.tapToTalk':'cap.holdToTalk'):'hint.micOff'));},function(){if(seq===CONV_LISTEN_SEQ){conversationReturn();hint(tt('hint.micOff'));}});};
 var oldRouteReply=routeReply;
 routeReply=function(r){if(r.reply.status==='error'&&r.reply.code==='bad_response'&&!r.accepted&&(r.params.confirm||r.params.companion||r.params.retry))r.reply={status:'companion_error',requestId:r.stageId||r.params.retry,code:'unavailable',retryable:true,questionSpoken:r.questionSpoken};if(r.reply.status==='confirm'&&r.reply.cost){go('READ_CONFIRM',{reply:r.reply});return;}if(r.reply.status==='cancelled'){var q=r.question;READ=null;holdDraft(q,'',!!(r.questionSpoken||r.params&&r.params.spoken||r.reply&&r.reply.questionSpoken),r.params);return;}oldRouteReply(r);};
 var CONV_HANDOVER_UNTIL=0;

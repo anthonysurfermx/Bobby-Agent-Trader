@@ -311,7 +311,7 @@ function pillDown(p, fromRead){
 }
 /* speech.permission, now: the session's mic state is replaced by native's answer (a failed call keeps the cache) */
 function micFresh(then){
-  bcall('speech.permission').then(function(m){
+  bcall('speech.permission',{denialHint:tt('hint.micOff')}).then(function(m){
     if (m && m.state && SES){ SES.mic = m; if (ST.name === 'IDLE') pillMode(idleMode()); }
     then();
   }, function(){ then(); });
@@ -323,7 +323,7 @@ function askAppleSpeech(fromRead){
   if (askAppleSpeech.busy) return;
   askAppleSpeech.busy = true;
   var g = GEN;
-  bcall('speech.requestPermission').then(function(m){
+  bcall('speech.requestPermission',{denialHint:tt('hint.micOff')}).then(function(m){
     askAppleSpeech.busy = false;
     if (m && m.state && SES) SES.mic = m;
     /* The prompt takes longer to read than ERROR (6 s) or RETURNING last. The answer is followed where the hold
@@ -355,7 +355,7 @@ STATES.PRE_PERMISSION = {
     if (this.asked) return; this.asked = true; tick('light');
     var self = this, seq = this.permissionSeq;
     A.perm.g = clk; A.perm.p.to(0, 'ret');
-    bcall('speech.requestPermission').then(function(m){
+    bcall('speech.requestPermission',{denialHint:tt('hint.micOff')}).then(function(m){
       if (seq !== self.permissionSeq || ST.name !== 'PRE_PERMISSION') return;
       if (m && m.state) SES.mic = m;
       if (m && m.state === 'granted') go('IDLE', { hint: 'hint.hold', restoreGreet: true });

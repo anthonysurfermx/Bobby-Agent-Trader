@@ -34,6 +34,7 @@ class ConversationFixtureCase: XCTestCase {
         app.launch(); ready(button("aria.type"))
     }
     func ready(_ element: XCUIElement, timeout: Double = 25) {
+        if element.exists && element.isHittable { return }
         XCTAssertTrue(element.waitForExistence(timeout: timeout), app.debugDescription)
         let e = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: element)
         XCTAssertEqual(XCTWaiter.wait(for: [e], timeout: timeout), .completed, app.debugDescription)
@@ -216,7 +217,7 @@ final class ConversationShots: ConversationFixtureCase {
         row.tap(); ready(app.buttons["nucleo.level.rapido"])
     }
     func test31Primer() { launch(permission:"undetermined"); button("aria.talk").tap(); ready(button("perm.cta")); shot("31-microphone-primer"); button("perm.cta").tap(); ready(button("aria.talk")); XCTAssertFalse(button("aria.sendSpoken").exists) }
-    func test32Denied() { launch(permission:"denied"); button("aria.talk").tap(); ready(button("aria.type")); XCTAssertFalse(button("aria.sendSpoken").exists); shot("32-microphone-denied") }
+    func test32Denied() { launch(permission:"denied"); button("aria.talk").tap(); ready(app.alerts.buttons.firstMatch); app.alerts.buttons.firstMatch.tap(); ready(button("aria.type")); XCTAssertFalse(button("aria.sendSpoken").exists); shot("32-microphone-denied") }
     func test33Empty() { launch(speech:"empty"); listening(); ready(button("aria.talk")); XCTAssertTrue(web.staticTexts[word("cap.empty")].exists); shot("33-empty-capture") }
     func test34VoiceStopped() { launch(voice:true); ask(); answered(); ready(button("aria.pillStop")); button("aria.pillStop").tap(); ready(button("aria.talk")); XCTAssertTrue(button("answer.readAll").exists); shot("34-voice-stopped-answer-kept") }
     func test35VoiceFailed() { launch(voice:true,voiceFails:true); ask(); answered(); XCTAssertFalse(button("answer.readAll").exists); shot("35-voice-unavailable-reading") }
@@ -853,9 +854,21 @@ final class StoreOSPermissionWalk: ConversationFixtureCase {
         if let index=app.launchArguments.firstIndex(of:"-qa-speech-fixture") { app.launchArguments.removeSubrange(index...index+1) }
         if let index=app.launchArguments.firstIndex(of:"-qa-speech-permission") { app.launchArguments.removeSubrange(index...index+1) }
         app.launch();ready(button("aria.type"));button("aria.talk").tap()
-        ready(button("aria.type"));XCTAssertFalse(button("aria.sendSpoken").exists)
-        XCTAssertTrue(web.staticTexts[word("hint.micOff")].waitForExistence(timeout:8),app.debugDescription)
+        if state == "speech-denied" {
+            let primer=button("perm.cta");ready(primer);primer.tap()
+            let system=XCUIApplication(bundleIdentifier:"com.apple.springboard")
+            let deny=system.buttons.matching(NSPredicate(format:"label IN %@",["Don’t Allow","Don't Allow"])).firstMatch
+            XCTAssertTrue(deny.waitForExistence(timeout:12),system.debugDescription);deny.tap()
+        }
+        let settings=app.buttons["Open Settings"];ready(settings)
         shot(state == "microphone-denied" ? "34-review-os-microphone-denied" : "35-review-os-speech-denied")
+        settings.tap()
+        let preferences=XCUIApplication(bundleIdentifier:"com.apple.Preferences")
+        XCTAssertTrue(preferences.wait(for:.runningForeground,timeout:12),preferences.debugDescription)
+        XCTAssertTrue(preferences.navigationBars["Bobby"].waitForExistence(timeout:12),preferences.debugDescription)
+        let route=XCTAttachment(screenshot:XCUIScreen.main.screenshot());route.name="redesign-47-review-os-settings-route";route.lifetime = .keepAlways;add(route)
+        app.activate();ready(button("aria.type"));XCTAssertFalse(button("aria.sendSpoken").exists)
+        XCTAssertTrue(web.staticTexts[word("hint.micOff")].exists,app.debugDescription)
         ask("What is an ETF?");answered();shot("36-review-os-denied-typing-works")
     }
 }
