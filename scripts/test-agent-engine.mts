@@ -775,6 +775,15 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   eq([ev([['received', {}], ['tool_started', { tool: 'read_assets' }]]), ev([['tool_started', { tool: 'read_assets' }], ['tool_started', { tool: 'read_assets' }], ['tool_call', { tool: 'read_assets', metered: true }]]), ev([['tool_call', { tool: 'resolve_assets', metered: false }]]), ev([['tool_call', { tool: 'read_assets', metered: true }]])],
     [['received', 'tool_started(read_assets)'], ['tool_started(read_assets)', 'tool_finished(read_assets)'], ['tool_started(resolve_assets)', 'tool_finished(resolve_assets)'], ['tool_started(read_assets)', 'tool_finished(read_assets)']], 'while the sources are asked a person is told the tool started; a run repeated after it died tells it once');
 
+  // Two slips of form the real model makes are read as what they mean; a malformed list that is not empty is still sent back.
+  {
+    const st = new MemoryAgentStore(6), d = depsFor(st);
+    script = [() => turn([use('answer', { args: { kind: 'explanation', gist: 'Un ETF es un fondo.', text: 'Un ETF es un fondo.', claims: '', limitations: [], next: '' } })])];
+    const wrapped = await ask(d, 'ana', '¿Qué es un ETF?', 'slip1');
+    script = [() => turn([use('answer', { kind: 'explanation', gist: 'Un ETF es un fondo.', text: 'Un ETF es un fondo.', claims: 'ETH cayó más', limitations: [], next: '' })]), () => answer({ kind: 'explanation', gist: 'Un ETF es un fondo.', text: 'Un ETF es un fondo.' })];
+    const malformed = await ask(d, 'ana', '¿Qué es un ETF?', 'slip2');
+    eq([taskResult(wrapped)!.presentation.text, wrapped.steps.filter((s) => s.kind === 'model_call').length, malformed.steps.filter((s) => s.kind === 'tool_refused').map((s) => [s.data.reason, s.data.detail]), malformed.steps.filter((s) => s.kind === 'model_call').length], ['Un ETF es un fondo.', 1, [['invalid_arguments', 'claims: invalid_type']], 2], 'arguments wrapped once more, and "no orderings" written as an empty string, cost no second call; a list that is malformed and not empty is still sent back, with the field named');
+  }
   // A reply already paid for and stored is used, not bought again.
   for (const lost of ['answer', 'approval_requested'] as const) {
     const st = new MemoryAgentStore(6), d = depsFor(st);

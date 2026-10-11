@@ -278,11 +278,27 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
   }
 }
 
+/**
+ * Two slips of form the real model makes (seen on 2026-10-11, two of two follow-ups: each cost a whole extra call): the
+ * arguments wrapped once more ({"args": {…}}), and "no orderings" written as "" or null instead of []. Neither says
+ * anything a check should weigh, so both are read as what they mean. A list that is malformed and NOT empty is still sent back.
+ */
+function answerArguments(input: unknown): unknown {
+  let args = input;
+  if (args && typeof args === 'object' && !Array.isArray(args)) {
+    const keys = Object.keys(args), inner = keys.length === 1 ? (args as Record<string, unknown>)[keys[0]] : null;
+    if (inner && typeof inner === 'object' && !Array.isArray(inner) && 'text' in inner && ['args', 'arguments', 'input', 'answer'].includes(keys[0])) args = inner;
+    const claims = (args as Record<string, unknown>).claims;
+    if (claims === '' || claims === null || claims === undefined) args = { ...(args as Record<string, unknown>), claims: [] };
+  }
+  return args;
+}
+
 /** Checks the draft, has it read, stores the result. False when the model was asked to correct it (the loop goes on). */
 async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, unknown>) => Promise<unknown>, stopped: (readerUsd?: number) => Promise<boolean>, task: Task, parent: Parameters<typeof rebuild>[1], useId: string | null, input: unknown): Promise<boolean> {
   const analysis = ownAnalysis(task) ?? parent?.analysis ?? null;
   const repairs = task.steps.filter((step) => step.kind === 'tool_refused' && step.data.tool === 'answer').length;
-  const parsed = Answer.safeParse(input);
+  const parsed = Answer.safeParse(answerArguments(input));
   const theirs = parent ? `${parent.question} ${task.question}` : task.question;
   // What a text IS is decided by code: it is an analysis when it cites a figure anywhere a person will read it (the text,
   // a limitation, the next question), or when this task ran a comparison itself (then its sources and limits are shown
