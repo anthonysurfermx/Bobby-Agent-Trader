@@ -382,3 +382,5 @@ pin now retains UUID/question/language/previous after background. Existing HOLD
 background/final-transcript pins stand unchanged. New bridge-boot tests exercise
 actual tap/typing/failure/answer lifecycle and native limit refresh. WithoutHelp
 adds real app background/foreground tests and multiline field growth/scroll checks.
+
+I-1a second-resume checkpoint: A10 original shared typed-background assertion restored; original HOLD pins retained. Permission-button padding correction changes no pin or wording. QA-I1-RESUME.md records full TAP311 and actual HOLD25native+2UI, with the separate tap-only diagnostic run explained.

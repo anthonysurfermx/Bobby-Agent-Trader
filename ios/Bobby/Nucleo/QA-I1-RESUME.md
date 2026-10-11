@@ -53,3 +53,30 @@ Final Spanish SE3 at +1 from `bd0e14be`: **60/60 UI passed**, 65 numbered
 PNGs exported under `i1a-final-se/iphone-se3-es-plus1`. Every-image visual
 review is in progress. Pro full native/UI, compatibility and actual HOLD
 verification remain pending; this is still **not I-1a READY**.
+
+
+## I-1a checkpoint — second resume complete
+
+Product milestone `591aaa0b`; A10 is applied and the original shared typed-background
+assertion restored exactly. The two reported capture findings are corrected. A
+further inspected permission-button padding defect is corrected without copy changes.
+
+- Signed full native: **1167/1167**; Spanish Pro daily UI **60/60** (combined1227), SE3/+1 **60/60**.
+- Compatibility: **18/18** offline UI; four current live methods excluded, not run: address limit.
+- Actual HOLD build: **25/25** native speech plus **2/2** UI; both captures inspected. Explicit two-mode gesture JS **11/11**, language **13/13**.
+- Restored TAP: page **311/311**, language **13/13** including input **1512/1512**, final legal/build guards **8/8**, permission UI **1/1**.
+- Localization **1384 keys /1444 rows**; lint passed; unchanged web build passed; Android inverse **36/36**, offline server contract **716/716**.
+- Frozen matrices: **130 PNGs**, each inspected; `shots-i1a/iphone-se3-es/` (+1) and `shots-i1a/iphone-17-pro-es/` (default), with indices, provenance and SHA256. Only31 replaced by the scoped padding correction; base runs retained separately.
+- Immutable signed simulator app: `../_harness/ios/i1a/Bobby.app`; current signed app remains `../_harness/ios/dd/Build/Products/Debug-iphonesimulator/Bobby.app`. Version1.8/build70, TAP; bundled HTML matches generated source, strict signature verifies.
+- Owned result bundles/phones removed; zero booted phones, no simulator lock.
+
+Diagnostic distinction: a broad page run with HOLD306/311 failed five newly added
+iPhone tap scenarios because their short tap correctly opens the HOLD keyboard.
+Every assertion stays unchanged; no frozen cross-tree assertion failed. The brief's
+full page gate is in shipping TAP,311/311; actual HOLD pins, native pipeline and both
+HOLD UI flows pass. Compatibility screenshots include transition diagnostics and
+are not promoted into the frozen matrix. Physical11.6 checks remain unverified.
+
+I-1b has not changed product code at this checkpoint. SPEC4.7.6 requires six
+reviewed consent previews and Claude approval before wiring that new composition;
+independent first-run, handover, telemetry and keyboard work proceeds next.
