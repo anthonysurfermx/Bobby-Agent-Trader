@@ -26,6 +26,8 @@ assert manifest.attrib[android + 'versionName'] == '1.2.0'
 assert manifest.attrib[android + 'versionCode'] == '10'
 assert manifest.find('uses-sdk').attrib[android + 'targetSdkVersion'] == '36'
 app = manifest.find('application')
+assert not any(node.attrib.get(android + 'name') == 'androidx.emoji2.text.EmojiCompatInitializer' for node in app.iter()), 'Optional downloadable emoji fonts must not initialize automatically'
+assert any(node.attrib.get(android + 'name') == 'androidx.work.WorkManagerInitializer' for node in app.iter()), 'Local reminders still need WorkManager initialization'
 permissions = sorted(node.attrib[android + 'name'] for node in manifest.findall('uses-permission'))
 for forbidden in ('ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION', 'CAMERA', 'READ_CONTACTS', 'READ_MEDIA_AUDIO', 'READ_MEDIA_IMAGES', 'READ_MEDIA_VIDEO'):
     assert 'android.permission.' + forbidden not in permissions, forbidden
@@ -69,6 +71,7 @@ result = {'file': bundle.name, 'sourceCommit': subprocess.check_output(['git', '
           'package': manifest.attrib['package'], 'minSdk': int(manifest.find('uses-sdk').attrib[android + 'minSdkVersion']),
           'unsigned': True, 'debuggable': False, 'cleartext': False, 'allowBackup': False,
           'permissions': permissions, 'firebaseComponents': False, 'languageSplits': False,
+          'emojiFontAutoInitialization': False,
           'bundleNativeAlignment': native_config.get('alignment'), 'apkUncompressedLibrariesZipAligned16K': True,
           'nativeLibraries': libraries,
           'universalApk': {'file': apk.name, 'bytes': apk.stat().st_size, 'sha256': hashlib.sha256(apk.read_bytes()).hexdigest()}}

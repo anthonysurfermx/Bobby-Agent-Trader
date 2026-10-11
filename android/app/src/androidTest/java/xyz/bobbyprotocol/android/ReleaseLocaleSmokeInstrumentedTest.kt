@@ -128,11 +128,15 @@ class ReleaseLocaleSmokeInstrumentedTest {
         tapDom("pill")
         waitFor { js("window.nucleo.state()==='TYPING' && document.activeElement.id==='ta'") == true }
         waitFor { var visible = false; onMain { visible = ViewCompat.getRootWindowInsets(web.view)?.isVisible(WindowInsetsCompat.Type.ime()) == true }; visible }
+        // IME visibility precedes Compose's inset layout. Advance the native clock before
+        // measuring the shipping DOM, without requiring the continuously animated page to idle.
+        compose.mainClock.advanceTimeBy(1000)
+        Thread.sleep(1000)
+        shot("03b-keyboard")
         val typingBounds = JSONObject(js("JSON.stringify((function(){var r=document.getElementById('typeBox').getBoundingClientRect();return {top:r.top,bottom:r.bottom,height:r.height,viewport:window.visualViewport?window.visualViewport.height:innerHeight};})())") as String)
         assertTrue(typingBounds.toString(), typingBounds.getDouble("height") >= 48)
         assertTrue(typingBounds.toString(), typingBounds.getDouble("top") >= 0)
-        assertTrue("Composer is above the keyboard", typingBounds.getDouble("bottom") <= typingBounds.getDouble("viewport") + 2)
-        shot("03b-keyboard")
+        assertTrue("Composer is above the keyboard: $typingBounds", typingBounds.getDouble("bottom") <= typingBounds.getDouble("viewport") + 2)
         instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_ESCAPE)
         waitFor { js("window.nucleo.state()==='IDLE'") == true }
         // A real page chip reaches the actual session/asset resolver/desk parser and returns a read.

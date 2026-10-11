@@ -26,3 +26,7 @@ Packaging verification checks both native ELF LOAD alignment and Play BundleConf
 Listing captures use the actual 1080×1920 emulator display, directly encoded as 24-bit RGB PNG without alpha. Their CI gate checks size, aspect ratio and PNG type. The approved icon/feature artwork is re-encoded only to the required 32-bit/24-bit PNG container respectively; RGB pixels are verified identical. [Google preview asset specifications](https://support.google.com/googleplay/android-developer/answer/9866151).
 
 The callable-surface rule deliberately retains some app API that only instrumentation uses; it is a stability/size tradeoff, not maximal shrinking. It applies to the shipping bundle too. [Android keep modifiers](https://developer.android.com/topic/performance/app-optimization/add-keep-rules). `CreditsBalanceTest.theInviteLineUsesInformalLocalizedCopyIncludingBrazilianPortuguese` replaces the previous exact Portuguese wording expectation while preserving the other-language/informal checks.
+
+## Startup font dependency
+
+API34 logcat showed Google Play services font-provider death killing its stable client Bobby. Removed only EmojiCompat automatic downloadable-font initialization from the shipping merged manifest; system fonts remain and WorkManager initialization remains. The bundle gate checks both facts. This avoids an optional font-provider network/startup dependency; newer emoji coverage follows the installed system font. Final emulator evidence is recorded separately.
