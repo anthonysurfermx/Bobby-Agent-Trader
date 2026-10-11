@@ -101,8 +101,8 @@ export default function PrivacyPage() {
         <p className="mb-6 font-mono text-xs text-white/40">{tr('Effective', 'Vigente desde el')} {EFFECTIVE_DATE[language]}</p>
         <p className="mb-12 text-[15px] leading-7 text-white/60">
           {tr(
-            'This policy covers the Bobby app for iPhone and the website bobbyprotocol.xyz. Features that exist only on the website, or only in earlier iPhone versions, are labelled that way.',
-            'Este aviso cubre la app Bobby para iPhone y el sitio bobbyprotocol.xyz. Las funciones que solo existen en el sitio web, o solo en versiones anteriores de la app para iPhone, están marcadas como tales.',
+            'This policy covers the Bobby apps for iPhone and Android and the website bobbyprotocol.xyz. Features that exist only on the website, only in one of the apps, or only in earlier iPhone versions, are labelled that way.',
+            'Este aviso cubre las apps de Bobby para iPhone y Android y el sitio bobbyprotocol.xyz. Las funciones que solo existen en el sitio web, solo en una de las apps, o solo en versiones anteriores de la app para iPhone, están marcadas como tales.',
           )}
         </p>
 
