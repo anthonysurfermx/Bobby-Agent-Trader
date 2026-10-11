@@ -12,7 +12,7 @@ process.env.RATE_LIMIT_SALT = 'test-salt-test-salt-test-salt';
 const { MemoryAgentStore, FileAgentStore, waitingApproval } = await import('../api/_lib/agent/store.ts');
 const { taskState, taskResult, taskEvents, taskUsage, taskError } = await import('../api/_lib/agent/state.ts');
 const { metrics, readAssets, resolveMention, TOOLS, MIN_CHANGES } = await import('../api/_lib/agent/tools.ts');
-const { present, composeByCode, formatFigure, formatDay, limitationsInWords } = await import('../api/_lib/agent/present.ts');
+const { present, composeByCode, formatFigure, formatDay, limitationsInWords, everyDayClaim } = await import('../api/_lib/agent/present.ts');
 const { createTask, runTask, rebuild, agentPrompt, scopeDigest, taskView, engineDeps, companionReader, WIRE_TOOLS } = await import('../api/_lib/agent/loop.ts');
 const { worstCaseUsd, reservedCall, callAnthropicOnce } = await import('../api/_lib/agent/provider.ts');
 type ModelAttempt = import('../api/_lib/agent/provider.ts').ModelAttempt;
@@ -1093,6 +1093,55 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   const third = await ask(deps2, 'olga', '¿Y cuál cayó más?', 'o3', true);
   const sent3 = JSON.parse(calls[0].messages[0].content as string);
   ok(sent3.declined?.offered.windowDays === 60 && Array.isArray(sent3.previous?.figures) && sent3.previous.figures.length > 5 && sent3.previous.windowDays === 30 && third.parent === longer.id, 'after an answer and then a declined card, the next turn has both: the figures of the answer and what was declined');
+}
+
+// ---------- 7h. what the third independent evaluation found (2026-10-11, 112 turns) ----------
+{
+  // Both critical turns were one fault: an average told as a statement about every day, in the sentence read first.
+  // The rule is code's: in an analysis the model's own words may say "every day" only where they also say "average".
+  type Lang = 'en' | 'es' | 'fr' | 'pt' | 'it' | 'de';
+  const claims: Array<[Lang, string]> = [
+    ['it', 'COIN si è mossa di più ogni giorno. In un giorno medio si è mossa ⟦figure⟧.'],
+    ['de', 'ETH bewegte sich täglich am stärksten, SPY am wenigsten.'],
+    ['en', 'Bitcoin moved more every day of the window.'],
+    ['es', 'Bitcoin se movió más cada día que Ethereum.'],
+    ['fr', 'Bitcoin a bougé davantage chaque jour.'],
+    ['pt', 'Bitcoin se moveu mais todos os dias.'],
+  ];
+  for (const [language, text] of claims) ok(everyDayClaim(text, language), `${language}: "every day" with no average in the sentence is a claim no figure holds`);
+  const honest: Array<[Lang, string]> = [
+    ['it', 'In un giorno medio COIN si è mossa ⟦figure⟧, più di AMZN. Ogni giorno, in media, più di SOL.'],
+    ['de', 'An einem durchschnittlichen Tag bewegte sich ETH um ⟦figure⟧. Die tägliche Veränderung war im Schnitt größer als bei SPY.'],
+    ['de', 'Im Schnitt bewegte sich ETH täglich um ⟦figure⟧.'],
+    ['en', 'On an average day Bitcoin moved ⟦figure⟧. Its daily changes were larger on average than Ethereum\'s.'],
+    ['es', 'En un día promedio Bitcoin se movió ⟦figure⟧. Su peor día fue el ⟦date⟧.'],
+    ['fr', 'En moyenne, Bitcoin a bougé de ⟦figure⟧ chaque jour.'],
+    ['pt', 'Em um dia médio o Bitcoin se moveu ⟦figure⟧.'],
+  ];
+  for (const [language, text] of honest) ok(!everyDayClaim(text, language), `${language}: an average said as an average passes (${text.slice(0, 28)}…)`);
+
+  // In the loop: such an analysis is told by code from its figures, the record says which rule, and the reader is not asked.
+  const store = new MemoryAgentStore(6), deps = depsFor(store);
+  script = [() => turn([use('read_assets', { assets: ['Bitcoin', 'Ethereum'], windowDays: 30 })]),
+    () => answer({ kind: 'analysis', gist: 'Los dos se movieron cada día, y no igual.', text: 'Los dos se movieron cada día, y no igual. Bitcoin {{f:move_BTC}} y Ethereum {{f:move_ETH}}.' })];
+  const offered = await ask(deps, 'pia', '¿Cuál se movió más, Bitcoin o Ethereum?', 'p1');
+  await store.approve('pia', offered.id, waitingApproval(offered)!.digest, clock);
+  const before = readerSaw.length;
+  await runTask(deps, 'pia', offered.id);
+  const done = (await store.get('pia', offered.id))!, shown = taskResult(done)!.presentation, step = done.steps.find((s) => s.kind === 'answer')!;
+  eq([shown.composedByCode, /cada d[ií]a/i.test(shown.text), step.data.rule, step.data.reader, readerSaw.length - before], [true, false, 'every_day', 'not_read', 0], 'an average told as "every day": code tells the figures, the step names the rule, the reader is not asked');
+  ok([fig(crypto, 'move_BTC'), fig(crypto, 'move_ETH')].every((figure) => shown.text.includes(formatFigure(figure, 'es'))), '…and code\'s text still answers the question: how much each moved on an average day');
+
+  // The same words in an explanation are nobody's figure: prices do change every day.
+  const store2 = new MemoryAgentStore(6), deps2 = depsFor(store2);
+  script = [() => answer({ kind: 'explanation', gist: 'Los precios cambian cada día.', text: 'Los precios cambian cada día porque compradores y vendedores no dejan de ponerse de acuerdo.' })];
+  const plain = await ask(deps2, 'quim', '¿Por qué cambia el precio?', 'q1');
+  const plainDone = (await store2.get('quim', plain.id))!;
+  eq([taskResult(plainDone)!.presentation.composedByCode, plainDone.steps.find((s) => s.kind === 'answer')!.data.rule ?? null], [false, null], 'an explanation may say "every day": the rule is about measured windows only');
+
+  // The instructions carry what the grader found beside the criticals (each is prevention; none is a promise).
+  const prompt = agentPrompt('es', 'es-MX');
+  for (const [needle, why] of [['An average says nothing about each day', 'an average is not every day'], ['it is not how often they moved the same way', 'a correlation is not a frequency'], ['it was not run, so there are no figures', 'a declined query is not answered from memory'], ['is not yet an asset', 'a lone everyday word is asked about, not assumed'], ['means that asset: do not ask which one', 'one asset on the table is "it"']] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);
 }
 
 console.log(`agent-engine: ${checks} checks passed`);

@@ -306,6 +306,32 @@ function references(analysis: Analysis | null, used: string[]): Presentation['re
   return analysis.evidence.filter((item) => cited.has(item.id) || item.quality !== 'valid').map((item) => ({ evidence: item.id, source: item.source, url: item.url, instrument: item.instrument, asOf: item.asOf, quality: item.quality }));
 }
 
+// A figure of a window says nothing about each of its days. "It moved more every day" beside an average is a claim no
+// figure holds (third blind set: «COIN si è mossa di più ogni giorno», «ETH bewegte sich täglich am stärksten», while on
+// single days the order was another). So in an analysis the model's own words may say "every day" only in a sentence
+// that also says it is an average. Whole words; German's inflected adjective ("die tägliche Veränderung") names the
+// figure and is not the claim.
+const EVERY_DAY: Record<AppLanguage, RegExp> = {
+  en: /\b(?:every\s+(?:single\s+)?day|each\s+(?:and\s+every\s+)?day|day\s+after\s+day|day\s+in,?\s+day\s+out)\b/i,
+  es: /\b(?:cada\s+d[ií]a|todos\s+los\s+d[ií]as|d[ií]a\s+tras\s+d[ií]a|a\s+diario|diariamente)(?![a-záéíóúñ])/i,
+  fr: /\b(?:chaque\s+jour|tous\s+les\s+jours|jour\s+apr[eè]s\s+jour|quotidiennement)\b/i,
+  pt: /\b(?:todo\s+(?:santo\s+)?dia|todos\s+os\s+dias|cada\s+dia|dia\s+ap[oó]s\s+dia|diariamente)\b/i,
+  it: /\b(?:ogni\s+(?:singolo\s+)?giorno|tutti\s+i\s+giorni|giorno\s+dopo\s+giorno|quotidianamente|giornalmente)\b/i,
+  de: /\b(?:jeden\s+(?:einzelnen\s+)?Tag|an\s+jedem\s+(?:einzelnen\s+)?Tag|t[aä]glich|Tag\s+f[uü]r\s+Tag)(?![a-zäöüß])/i,
+};
+const AN_AVERAGE: Record<AppLanguage, RegExp> = {
+  en: /\b(?:average|mean|typical(?:ly)?)\b/i,
+  es: /\b(?:promedio|media|medio|t[ií]pic[oa]s?)(?![a-záéíóúñ])/i,
+  fr: /\b(?:moyenne|moyen|typique(?:ment)?)\b/i,
+  pt: /(?<![a-zà-ú])(?:m[eé]dia|m[eé]dio|t[ií]pic[oa]s?)(?![a-zà-ú])/i,
+  it: /\b(?:media|medio|mediamente|tipic[oa])\b/i,
+  de: /\b(?:Durchschnitt|durchschnittlich(?:e[nmrs]?)?|im\s+Schnitt|im\s+Mittel|typisch(?:e[nmrs]?)?|mittler(?:e[nmrs]?))(?![a-zäöüß])/i,
+};
+/** True when the model's own words claim something about every day of the window without saying it is an average. */
+export function everyDayClaim(text: string, language: AppLanguage): boolean {
+  return text.split(/(?<=[.!?…])\s+|\n+/).some((sentence) => EVERY_DAY[language].test(sentence) && !AN_AVERAGE[language].test(sentence));
+}
+
 /** A plain reading of the analysis written by code: what is served when the model's text cannot be shown. */
 export function composeByCode(analysis: Analysis | null, language: AppLanguage, locale?: string | null): Presentation {
   const figures = new Map((analysis?.figures ?? []).map((figure) => [figure.id, figure]));

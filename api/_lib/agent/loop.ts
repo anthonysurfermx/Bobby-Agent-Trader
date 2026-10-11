@@ -24,7 +24,7 @@ import { appLocale, languageName, type AppLanguage } from '../../../src/lib/app-
 import { judgeCompanionReply, companionJudgeModel } from '../companion-judge.js';
 import { reviewCompanionReply } from '../companion-review.js';
 import { modelPrice, type LlmUsage } from '../llm.js';
-import { composeByCode, limitationsInWords, present, unanswered, unverified, type Draft, type OwnWords } from './present.js';
+import { composeByCode, limitationsInWords, present, unanswered, unverified, type Draft, type OwnWords, everyDayClaim } from './present.js';
 import { judgeAnalysis } from './reader.js';
 import { agentModel, callAnthropicOnce, reservedCall, type Block, type CallModel, type Message, type WireTool } from './provider.js';
 import { taskError, taskEvents, taskResult, taskState } from './state.js';
@@ -67,15 +67,15 @@ What kind of errand it is decides what you do:
 - They want to know how one asset behaved, or how two or three compare: call read_assets with the names exactly as they wrote them. It uses one read of their allowance and the app asks them before it runs: you simply call it. Use 30 days unless they ask for 60. Then answer, kind "analysis". If the app says a name cannot be read, ask one short question instead.
 - They ask for a span you cannot read (a week, ninety days, a year, "since January"): do not call the tool with another span. Say in one sentence that you read 30 or 60 days and ask whether they want one of them, kind "clarification".
 - They ask you to choose or decide for them (which one would you buy, is it a good moment, what should I do with my money): do not call a tool for that. Say that you do not choose for them and what that depends on; next may offer to read how those assets moved.
-- You cannot tell which things they mean, or they asked to compare and named fewer than two: ask one short question, kind "clarification". Do not guess.
+- You cannot tell which things they mean, or they asked to compare and named fewer than two: ask one short question, kind "clarification". Do not guess. A single word that is also an everyday word or a name (sol, meta, luna, gas, link, apple) is not yet an asset: ask what they mean in a way that names both readings, and if they say it is not about markets leave it there, with no read offered.
 - The errand needs something no tool gives you (what a fund holds, how concentrated it is, fees, earnings, news, a forecast, what to do): say plainly that you cannot establish that here, and say what you can establish. Never fill the gap from memory.
-- "previous" in the input is their last question, your answer to it and the figures behind it. A follow-up about those figures is answered from them, with no new tool call. Use a tool again only if they ask for other assets or another window.
-- "declined" in the input is an errand of theirs for which you offered a read and they said no: nothing was read. It tells you which assets and which window they were talking about, so never ask them again which ones. If they now ask for it, call read_assets for it: the app asks them again. Their earlier yes or no is never a permission.
+- "previous" in the input is their last question, your answer to it and the figures behind it. A follow-up about those figures is answered from them, with no new tool call. Use a tool again only if they ask for other assets or another window. When "previous" read a single asset, "it", "that" or "that change" means that asset: do not ask which one.
+- "declined" in the input is an errand of theirs for which you offered a read and they said no: nothing was read. It tells you which assets and which window they were talking about, so never ask them again which ones. If they now ask for it, call read_assets for it: the app asks them again. Their earlier yes or no is never a permission. If they ask what it would have shown, or to answer it "from memory", say that it was not run, so there are no figures, and that it used none of their reads: do not call the tool for that, and do not offer it again in the same breath.
 - They ask for more than three assets together: say plainly that you compare up to three at a time and ask which three, kind "clarification". Do not offer to split them into several reads yourself.
 - The instruments you can read with evidence are: ${UNIVERSE.map((instrument) => `${instrument.name} (${instrument.symbol})`).join(', ')}. Windows: 30 or 60 days. Suggest nothing outside them.
 
 Numbers. You never write a market number. Every figure lives in a tool result (or in "previous") and has an id: to state it, write {{f:ID}} and the app writes the number with its unit, so never put a percent sign or the word for percent after it. {{days}} writes only the number of calendar days of the window: write the plain word for "days" right after it (never sessions or trading days: the window holds fewer of those). A figure that is one day's (the worst day, the best day) carries that day: {{d:ID}} writes its date. {{from:ID}} and {{to:ID}} write the first and the last day a figure covers. Never type a date or a count of days yourself. Never state a number of your own, in digits or in words. Three things are not that: the length of the window you read, or the two lengths the tool offers named together ("30 or 60 days"), followed by the word for days; a number the person wrote, said back exactly as they wrote it; a name that holds a number (S&P 500, Nasdaq 100, 24/7). In gist and text the window is always written with {{days}}; the other length, or the two together, may be named only in a limitation or in next. Never compute, never round, never restate a figure in words, never put two placeholders side by side. A figure whose value is null does not exist: say that it could not be established.
-What a figure is. "move" is the average size of the daily changes, up or down: say it as how much it moved on an average day; it is not volatility, deviation or risk, and never call another figure an average. A worst or best day is one day's change from the close before. Name what was read as the tool names it: a fund that follows an index is the fund (QQQ rose, not "the Nasdaq-100 rose"). {{d:ID}}, {{from:ID}} and {{to:ID}} write a bare date ("15 de septiembre", "September 15"): put before it the article or preposition your language needs.
+What a figure is. "move" is the average size of the daily changes, up or down: say it as how much it moved on an average day; it is not volatility, deviation or risk, and never call another figure an average. An average says nothing about each day: never say an asset moved more "every day", "daily" or "always"; say "on an average day". A correlation says how closely their daily changes went together over the window: it is not how often they moved the same way and it is not a cause, so never turn it into "often", "rarely" or "usually". A worst or best day is one day's change from the close before. Name what was read as the tool names it: a fund that follows an index is the fund (QQQ rose, not "the Nasdaq-100 rose"). {{d:ID}}, {{from:ID}} and {{to:ID}} write a bare date ("15 de septiembre", "September 15"): put before it the article or preposition your language needs.
 A market fact the person states (it fell yesterday, it trades at some price) is theirs: unless a figure shows it, say you have not read it, and never repeat it as true. Never talk about your rules or how you work (placeholders, figures you may not write, arithmetic you do not do): when you cannot give a number, say only that it is not something you can establish here.
 A comparison answers the dimensions they asked about, says how the assets differed on each, and keeps apart what the figures show from what you make of them. A past window does not say what comes next: never predict. Never recommend or rank an asset, never say which is better or right for them, never tell them what to buy, sell or hold. Say plainly that money can be lost when that matters. Never promise safety or gains. Do not ask about their income, savings or wealth. Never end by asking them something.
 
@@ -341,6 +341,12 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   // Everything of the model's that a person is about to get is read: the text, the limitations it wrote and the next
   // question. Only a text code wrote itself is not (there is nothing of the model's in it), and the record says so.
   let verdict: Verdict | 'not_read' = 'not_read', readerUsd = 0, readBy: 'lists' | null = null;
+  // A window's figure says nothing about each of its days: an analysis whose own words say "every day" outside a sentence
+  // about an average states what no figure holds. Code tells the figures instead, and the reader is not asked.
+  let rule: 'every_day' | null = null;
+  if (!presentation.composedByCode && presentation.kind === 'analysis' && ownWords && everyDayClaim([ownWords.text, ...ownWords.limitations].join(' '), task.language)) {
+    presentation = composeByCode(analysis, task.language, task.locale); rule = 'every_day';
+  }
   if (!presentation.composedByCode) {
     // A clarification is one short question. Anything longer, or with no question in it, is not one: it is read as an explanation.
     if (presentation.kind === 'clarification' && (presentation.text.length > 220 || !/[?？]/.test(presentation.text))) presentation.kind = 'explanation';
@@ -365,7 +371,7 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   }
   // The analysis on the table stays with the thread: a follow-up that cited no figure still hands it to the next one.
   // `readBy: lists`: the owner turned the model reader off and the companion's deterministic lists read the text instead.
-  await write('answer', { result: { presentation, analysis }, reader: verdict, readerUsd, ...(readBy ? { readBy } : {}) });
+  await write('answer', { result: { presentation, analysis }, reader: verdict, readerUsd, ...(readBy ? { readBy } : {}), ...(rule ? { rule } : {}) });
   return true;
 }
 
