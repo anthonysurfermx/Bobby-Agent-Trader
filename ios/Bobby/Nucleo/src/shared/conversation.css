@@ -61,3 +61,6 @@
 
 #stage:not(.consent-preview) #hint{top:calc(741px - 28px / var(--first-fit,1));height:calc(28px / var(--first-fit,1));}
 #stage #hint .roll,#stage #hint .roll>span{height:calc(28px / var(--first-fit,1));line-height:calc(14px / var(--first-fit,1));}
+
+/* The first-run composer extends the same Quiet primary role at a physical 44pt. */
+#typeBox #typeSend.quiet-primary{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border-radius:22px}

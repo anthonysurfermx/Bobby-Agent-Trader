@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 IOS = Path(__file__).resolve().parents[1]
 ROOT = IOS.parents[1]
@@ -36,6 +37,7 @@ def main():
     parser.add_argument('--text-size', choices=['default', '+1'], default='default')
     parser.add_argument('--test', '--tests', dest='tests', action='append', help='UI test class or Class/method; repeat or comma-separate (default RedesignShots)')
     parser.add_argument('--record', action='store_true', help='Record the full selected UI run (offline simulator)')
+    parser.add_argument('--settle-system', type=int, choices=range(0,61), default=0, help='Wait up to 60s after boot for transient system notifications before a final matrix')
     parser.add_argument('--cleanup', action='store_true', help='Delete only simulators created by this invocation')
     parser.add_argument('--derived-data', type=Path, default=HARNESS / 'ios/dd')
     parser.add_argument('--package-cache', type=Path, default=Path.home() / 'Library/Developer/Xcode/DerivedData/Bobby-ebrmosnbrttmoldliysreeksjobv/SourcePackages')
@@ -111,6 +113,7 @@ def main():
                 run(['xcrun', 'simctl', 'bootstatus', udid, '-b'])
                 run(['xcrun', 'simctl', 'ui', udid, 'content_size', 'extra-large' if args.text_size == '+1' else 'large'])
                 run(['xcrun', 'simctl', 'status_bar', udid, 'override', '--time', '9:41', '--dataNetwork', 'wifi', '--wifiMode', 'active', '--wifiBars', '3', '--batteryState', 'charged', '--batteryLevel', '100'])
+                if args.settle_system: time.sleep(args.settle_system)
                 result = folder / 'result.xcresult'
                 command = ['xcodebuild', '-xctestrun', plan, '-destination', f'platform=iOS Simulator,id={udid}',
                            '-derivedDataPath', args.derived_data, '-clonedSourcePackagesDirPath', args.package_cache,

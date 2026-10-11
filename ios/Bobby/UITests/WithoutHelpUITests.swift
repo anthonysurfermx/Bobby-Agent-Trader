@@ -343,7 +343,16 @@ final class FirstRunShots: ConversationFixtureCase {
         ready(web.buttons[firstWords["risk.notNow"]!]);web.buttons[firstWords["risk.notNow"]!].tap()
         ready(web.buttons[firstWords["aria.type"]!]);web.buttons[firstWords["aria.type"]!].tap();ready(web.textViews.firstMatch)
         XCTAssertEqual(web.textViews.firstMatch.value as? String,q+" "+q)
+        XCTAssertGreaterThanOrEqual(web.textViews.firstMatch.frame.height,43.5)
+        physicalControls([web.buttons[firstWords["type.send"]!]],abovePill:false)
         XCTAssertFalse(button("aria.closeAnswer").exists);shot("99-first-run-held-appended-words")
+    }
+    func testFirstRunOutsideKeyboardKeepsTypedDraft() {
+        fresh();web.buttons[firstWords["aria.type"]!].tap();ready(web.textViews.firstMatch)
+        web.textViews.firstMatch.typeText(firstWords["ex.1"]!)
+        web.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.3)).tap()
+        ready(web.buttons[firstWords["aria.sendSpoken"]!]);XCTAssertTrue(web.staticTexts[firstWords["ex.1"]!].exists)
+        XCTAssertFalse(web.buttons[firstWords["risk.notNow"]!].isHittable);shot("99-first-run-outside-keyboard-held")
     }
     func testFirstRunAutomaticStopsNeverSend() {
         for (speech,caption) in [("minute","cap.minute"),("interruption","cap.stopped"),("silence","cap.stopped")] {
@@ -360,7 +369,7 @@ final class FirstRunShots: ConversationFixtureCase {
         XCTAssertFalse(web.buttons[firstWords["risk.notNow"]!].isHittable);shot("99-first-run-empty-capture")
     }
     func testFirstRunKeyboardCancelsPermissionPrimer() {
-        fresh(permission:"undetermined");web.buttons[firstWords["aria.talk"]!].tap();ready(web.buttons[firstWords["perm.cta"]!])
+        fresh(permission:"undetermined");web.buttons[firstWords["aria.talk"]!].tap();ready(web.buttons[firstWords["perm.go"]!])
         web.buttons[firstWords["aria.type"]!].tap();ready(web.textViews.firstMatch)
         web.textViews.firstMatch.typeText(firstWords["ex.1"]!)
         XCTAssertFalse(web.buttons[firstWords["aria.sendSpoken"]!].isHittable)

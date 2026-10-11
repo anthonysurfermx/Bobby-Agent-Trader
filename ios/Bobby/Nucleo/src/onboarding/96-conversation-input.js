@@ -1,6 +1,7 @@
 /* iPhone first-run ownership. Original HOLD input functions remain as the compatibility path. */
 var firstRunInputSeq=0,firstRunBase='',firstRunWordAt=0,firstRunSendPending=false;
 function firstRunHold(text,caption){
+  if(String(text||'').trim()!==W.question)W.qCompanion=false;
   W.speechDraft=String(text||'').trim();W.question=W.speechDraft;W.heldCaption=caption||'';
   go('HELD_DRAFT');
 }
@@ -9,7 +10,7 @@ ENTER.HELD_DRAFT=function(){
   moveSphere(300,98);W.qFinal=true;tb('words',T-1);updateWords(W.speechDraft);setPill('listen','',96);W.pillModeT=T-1;setHint(W.heldCaption?Ls(W.heldCaption):'');
 };
 function firstRunCancelCapture(){
-  firstRunInputSeq++;W.listenSeq++;firstRunSendPending=false;
+  firstRunInputSeq++;W.listenSeq++;firstRunSendPending=false;W.firstPress=null;
   if(W.press)W.press.cancelled=true;W.press=null;
   fire('speech.stop',{cancel:true});endListenVisual();
 }
@@ -36,7 +37,7 @@ function firstRunAutoStop(caption){
   if(q)firstRunHold(q,caption);else{go('ASK_TEACH',{quiet:true});setHint(Ls('cap.empty'));}
 }
 var firstRunTypingEnter=ENTER.TYPING;
-ENTER.TYPING=function(a){firstRunTypingEnter(a);moveSphere(260,88);};
+ENTER.TYPING=function(a){firstRunTypingEnter(a);typeAutosize();moveSphere(260,88);};
 var firstRunListenEnter=ENTER.LISTENING;
 ENTER.LISTENING=function(a){firstRunListenEnter(a);if(TALK_MODE==='tap'){setPill('listen','',96);W.pillModeT=T-1;setHint(Ls(W.firstHeld?'hint.release':'cap.listening'));moveSphere(300,98);}};
 var firstRunOnFinal=onSpeechFinal;
@@ -66,6 +67,8 @@ pillUp=function(cancelled){
     firstRunSendPending=true;stopListening();
   }
 };
+var firstRunAskRelease=askRelease;
+askRelease=function(cancelled){if(TALK_MODE==='tap'&&cancelled&&W.state==='LISTENING')return firstRunAutoStop('cap.stopped');return firstRunAskRelease(cancelled);};
 var firstRunWire=wireEvents;
 wireEvents=function(){
   firstRunWire();if(!BR)return;
@@ -73,6 +76,7 @@ wireEvents=function(){
   BR.on('speech.state',function(p){if(TALK_MODE==='tap'&&W.state==='LISTENING'&&p&&p.state==='stopped'&&!firstRunSendPending)firstRunAutoStop(p.reason==='minute'?'cap.minute':'cap.stopped');});
   BR.on('app.state',function(p){
     if(!p||p.state!=='background')return;
+    W.firstPress=null;cancelInput();
     if(W.state==='TYPING'){try{typeIn.blur();window.scrollTo(0,0);}catch(_){}}
     if(TALK_MODE==='tap'&&W.state==='LISTENING')firstRunAutoStop('cap.stopped');else{firstRunInputSeq++;if(W.state==='PRE_PERMISSION')go('ASK_TEACH',{quiet:true});}
   });
@@ -83,10 +87,10 @@ var firstRunSim=sim;
 sim=function(h){if(TALK_MODE==='tap'&&W.state==='LISTENING'&&firstRunSendPending&&W.awaitFinal&&T>W.awaitFinal)onSpeechFinal(W.speechText);firstRunSim(h);if(TALK_MODE==='tap'&&W.state==='LISTENING'&&!firstRunSendPending&&T-firstRunWordAt>=10)firstRunAutoStop('cap.stopped');};
 var firstRunRenderPill=renderPill;
 renderPill=function(){
-  firstRunRenderPill();var send=TALK_MODE==='tap'&&(W.state==='LISTENING'||W.state==='HELD_DRAFT');
+  firstRunRenderPill();var send=W.state==='HELD_DRAFT'||TALK_MODE==='tap'&&W.state==='LISTENING';
   if(!pill.querySelector('.send-icon')){var icon=document.createElement('span');icon.className='send-icon';icon.textContent='↑';pill.appendChild(icon);}
   pill.classList.toggle('conversation-send',send);
-  if(TALK_MODE==='tap'&&['ASK_TEACH','LISTENING','HELD_DRAFT'].indexOf(W.state)>=0){var label=Ls(send?'aria.sendSpoken':'aria.talk');if(pill.getAttribute('aria-label')!==label)pill.setAttribute('aria-label',label);}
+  if(W.state==='HELD_DRAFT'||TALK_MODE==='tap'&&['ASK_TEACH','LISTENING'].indexOf(W.state)>=0){var label=Ls(send?'aria.sendSpoken':'aria.talk');if(pill.getAttribute('aria-label')!==label)pill.setAttribute('aria-label',label);}
 };
 
 var firstRunDraft=document.createElement('section'),firstRunDraftText=document.createElement('p');
@@ -111,4 +115,28 @@ var firstRunApplySession=applySession;
 applySession=function(s){
   var locale=LOCALE;firstRunApplySession(s);
   if(locale!==LOCALE){firstRunInputSeq++;firstRunBase='';W.question='';W.speechDraft='';W.qCompanion=false;typeIn.value='';typeAutosize();}
+};
+
+// Populate and edit the same whole-line field, including a silently restored heard draft.
+typeAutosize=function(){
+  var k=Math.max(1,+(SESSION&&SESSION.textScale)||1),lh=22*k;
+  typeSend.disabled=typeComposing||!String(typeIn.value||'').trim();
+  typeIn.style.fontSize=17*k+'px';typeIn.style.lineHeight=lh+'px';
+  typeIn.style.padding='0';typeIn.style.minHeight=lh+'px';typeIn.style.maxHeight=4*lh+'px';typeIn.style.height='auto';
+  var lines=Math.max(1,Math.ceil((typeIn.scrollHeight-.5)/lh));
+  typeIn.style.height=Math.min(4,lines)*lh+'px';typeIn.style.overflowY=lines>4?'auto':'hidden';
+};
+typeIn.addEventListener('input',typeAutosize);
+var firstRunTypingRender=renderTyping,firstRunTypeWidth=0;
+renderTyping=function(){
+  firstRunTypingRender();if(W.state!=='TYPING'||!typeBox.classList.contains('on'))return;
+  if(firstRunTypeWidth!==typeIn.clientWidth){firstRunTypeWidth=typeIn.clientWidth;typeAutosize();firstRunTypingRender();}
+  var top=(parseFloat(typeBox.style.top)-FIT_Y)/(FIT||1),r=Math.min(88,Math.max(44/(FIT||1),(top-110)/2));
+  moveSphere(Math.min(260,top-r-16/(FIT||1)),r);
+};
+
+// Closing the keyboard retains a composed first question as the same held draft.
+typeCancel=function(){
+  if(W.state!=='TYPING')return;var q=String(typeIn.value||'').trim();showTypeBox(false);
+  if(q)firstRunHold(q,'');else go('ASK_TEACH',{quiet:true});
 };
