@@ -81,6 +81,8 @@ function world(models: Captured['models'], tier: 'free' | 'pro') {
     const url = String(input), method = init?.method ?? 'GET';
     const headers = Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>).map(([k, v]) => [k.toLowerCase(), v]));
     const body = init?.body ? JSON.parse(String(init.body)) : null;
+    // The instructions travel as one cached block (prompt caching, llm.ts); these checks read their text.
+    if (body && Array.isArray(body.system)) body.system = body.system.map((block: { text?: string }) => block.text ?? '').join('');
     const host = hostOf(url);
     if (host === 'api.openai.com' || host === 'api.anthropic.com') {
       models.push({ host, body });

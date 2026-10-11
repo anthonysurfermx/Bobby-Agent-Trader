@@ -45,6 +45,8 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const raw = init?.body ? String(init.body) : '';
   let body: any = null;
   try { body = raw ? JSON.parse(raw) : null; } catch { body = raw; }
+  // The instructions travel as one cached block (prompt caching, llm.ts); these checks read their text.
+  if (body && Array.isArray(body.system)) body.system = body.system.map((block: { text?: string }) => block.text ?? '').join('');
   const c: Call = { url: String(input), method: init?.method ?? 'GET', body };
   calls.push(c);
   const url = new URL(c.url);
