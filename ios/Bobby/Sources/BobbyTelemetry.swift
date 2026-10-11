@@ -65,6 +65,8 @@ final class BobbyTelemetry {
     }
     private let owner: () -> UUID
     private let enabled: () -> Bool
+    private let riskAccepted: () -> Bool
+    private var permitted: Bool { enabled() && riskAccepted() }
     private let transport: Transport
     private let now: () -> Date
     private let automaticHeartbeat: Bool
@@ -82,12 +84,14 @@ final class BobbyTelemetry {
     private var heartbeatTask: Task<Void, Never>?
     var pendingCount: Int { queue.count }
 
-    init(owner: @escaping () -> UUID, enabled: @escaping () -> Bool = { true },
+    init(owner: @escaping () -> UUID, riskAccepted: @escaping () -> Bool = {
+        UserDefaults.standard.integer(forKey: "agent.riskNoticeVersion") >= RiskNotice.currentVersion
+    }, enabled: @escaping () -> Bool = { true },
          now: @escaping () -> Date = { Date() }, automaticHeartbeat: Bool = true,
          version: String? = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
          build: String? = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
          transport: @escaping Transport) {
-        self.owner = owner; self.enabled = enabled; self.transport = transport; self.now = now
+        self.owner = owner; self.riskAccepted = riskAccepted; self.enabled = enabled; self.transport = transport; self.now = now
         self.automaticHeartbeat = automaticHeartbeat; self.version = Self.shortTag(version); self.build = Self.shortTag(build)
         lastOwner = owner()
     }
@@ -100,10 +104,11 @@ final class BobbyTelemetry {
     }
 
     func becameActive() {
-        guard enabled() else { return }
+        let wasActive = isActive
         synchronizeOwner()
-        guard !isActive else { return }
         isActive = true
+        guard permitted else { consentChanged(); return }
+        guard !wasActive || sessionId == nil else { return }
         if sessionId == nil { beginSession() } else { enqueue(.foreground) }
         startHeartbeat()
     }
@@ -119,8 +124,9 @@ final class BobbyTelemetry {
         heartbeatTask?.cancel(); heartbeatTask = nil
         isActive = false
         synchronizeOwner()
-        guard enabled(), sessionId != nil else { return }
+        let hadSession = sessionId != nil
         discardPending()
+        guard permitted, hadSession else { consentChanged(); return }
         reads.removeAll(); readOrder.removeAll()
         enqueue(.background)
         sessionId = nil
@@ -128,8 +134,19 @@ final class BobbyTelemetry {
 
     func accountChanged() { synchronizeOwner() }
 
+    /// Acceptance starts observations only if foregrounded; withdrawal erases RAM synchronously.
+    func consentChanged() {
+        guard permitted else {
+            heartbeatTask?.cancel(); heartbeatTask = nil
+            discardPending(); reads.removeAll(); readOrder.removeAll(); sessionId = nil
+            return
+        }
+        synchronizeOwner()
+        if isActive && sessionId == nil { beginSession(); startHeartbeat() }
+    }
+
     func heartbeat() {
-        guard enabled(), isActive else { return }
+        guard permitted, isActive else { return }
         synchronizeOwner()
         guard sessionId != nil else { return }
         // Keep one current heartbeat; neither a retry nor an older queue item can revive presence.
@@ -138,7 +155,7 @@ final class BobbyTelemetry {
     }
 
     func readStarted(_ requestId: String) {
-        guard enabled(), isActive, UUID(uuidString: requestId) != nil else { return }
+        guard permitted, isActive, UUID(uuidString: requestId) != nil else { return }
         synchronizeOwner()
         guard let sessionId, reads[requestId] == nil else { return }
         reads[requestId] = Read(owner: lastOwner, sessionId: sessionId)
@@ -163,13 +180,13 @@ final class BobbyTelemetry {
     }
 
     func webviewTerminated() {
-        guard enabled(), isActive else { return }
+        guard permitted, isActive else { return }
         synchronizeOwner()
         enqueue(.webviewTerminated)
     }
 
     private func currentRead(_ id: String) -> Bool {
-        guard enabled(), isActive else { return false }
+        guard permitted, isActive else { return false }
         synchronizeOwner()
         guard let read = reads[id] else { return false }
         return read.owner == lastOwner && read.sessionId == sessionId
@@ -185,6 +202,7 @@ final class BobbyTelemetry {
     }
 
     private func beginSession() {
+        guard permitted else { return }
         discardPending()
         sessionId = UUID().uuidString.lowercased(); sequence = 0
         reads.removeAll(); readOrder.removeAll()
@@ -209,7 +227,7 @@ final class BobbyTelemetry {
     }
 
     private func enqueue(_ event: Event, requestId: String? = nil, receipt: String? = nil) {
-        guard let sessionId else { return }
+        guard permitted, let sessionId else { return }
         let createdAt = now()
         lastMilliseconds = max(lastMilliseconds + 1, Int64(createdAt.timeIntervalSince1970 * 1000))
         let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -231,13 +249,13 @@ final class BobbyTelemetry {
                 self.queue.removeFirst()
                 let readEvent = [.readStarted, .readReceived, .readRendered].contains(item.payload.event)
                 let maxAge: TimeInterval = readEvent ? 30 : 5
-                guard self.enabled(), item.owner == self.owner(), item.epoch == self.epoch,
+                guard self.permitted, item.owner == self.owner(), item.epoch == self.epoch,
                       self.now().timeIntervalSince(item.createdAt) <= maxAge,
                       item.payload.event == .background || self.isActive else { continue }
                 // Lifecycle observations are never retried. Read acknowledgments get one bounded retry,
                 // with the exact same id, sequence and captured timestamp for server-side deduplication.
                 for attempt in 0..<(readEvent ? 2 : 1) {
-                    guard !Task.isCancelled, self.epoch == runningEpoch, item.owner == self.owner(),
+                    guard !Task.isCancelled, self.permitted, self.epoch == runningEpoch, item.owner == self.owner(),
                           self.isActive || item.payload.event == .background,
                           self.now().timeIntervalSince(item.createdAt) <= maxAge else { break }
                     let transport = self.transport

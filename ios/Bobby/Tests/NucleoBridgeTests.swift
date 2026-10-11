@@ -42,11 +42,11 @@ final class NucleoBridgeTests: XCTestCase {
         try await super.tearDown()
     }
 
-    private func make(riskAccepted: Bool = true) -> (NucleoSession, NucleoBridge, Recorder) {
+    private func make(riskAccepted: Bool = true, telemetry: BobbyTelemetry = .shared) -> (NucleoSession, NucleoBridge, Recorder) {
         let profile = AgentProfile()
         profile.riskNoticeVersion = riskAccepted ? RiskNotice.currentVersion : 0
         let session = NucleoSession(fixtures: true, profile: profile, companions: CompanionStore(defaults: defaults),
-                                    ledger: NucleoLedger(defaults: defaults), defaults: defaults)
+                                    ledger: NucleoLedger(defaults: defaults), defaults: defaults, telemetry: telemetry)
         // These recorded bridge contracts are Quick reads. Do not inherit the simulator's
         // selected premium level; premium ordering and refusals have their own injected tests.
         session.desk.currentLevel = { .rapido }
@@ -395,7 +395,14 @@ final class NucleoBridgeTests: XCTestCase {
     }
 
     func testRiskGateAndConsentNeverReachTheNetwork() async throws {
-        let (_, bridge, _) = make(riskAccepted: false)
+        var observations: [BobbyTelemetry.Payload] = []
+        // Uses the production native consent predicate, with a recorded transport only.
+        let telemetry = BobbyTelemetry(owner: { UUID(uuidString: "00000000-0000-4000-8000-000000000001")! },
+                                       automaticHeartbeat: false, transport: { p, _ in observations.append(p); return 200 })
+        let (session, bridge, _) = make(riskAccepted: false, telemetry: telemetry)
+        telemetry.becameActive(); telemetry.heartbeat(); telemetry.readStarted(UUID().uuidString)
+        telemetry.webviewTerminated()
+        XCTAssertNil(telemetry.sessionId); XCTAssertEqual(telemetry.pendingCount, 0)
         NucleoFixtures.clearLog()
         try assertGolden(await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"]), "risk")
         let speak = await result(bridge, "speak", ["id": "hello-1", "text": "Hello."])
@@ -407,8 +414,17 @@ final class NucleoBridgeTests: XCTestCase {
         XCTAssertEqual(signIn["status"] as? String, "unavailable")
         try await Task.sleep(nanoseconds: 200_000_000)
         XCTAssertEqual(NucleoFixtures.log, [], "no request before the risk notice is accepted")
+        XCTAssertTrue(observations.isEmpty, "telemetry is also silent before acceptance")
         let accepted = await result(bridge, "acceptRisk", ["version": RiskNotice.currentVersion])
         XCTAssertEqual(accepted["accepted"] as? Bool, true)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(observations.map(\.event), [.foreground])
+        telemetry.heartbeat()
+        session.revokeRiskNoticeConsent()
+        XCTAssertNil(telemetry.sessionId); XCTAssertEqual(telemetry.pendingCount, 0)
+        telemetry.heartbeat(); telemetry.webviewTerminated()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(observations.map(\.event), [.foreground], "withdrawal drops queued observations")
         let stale = await result(bridge, "acceptRisk", ["version": RiskNotice.currentVersion - 1])
         XCTAssertEqual(stale["accepted"] as? Bool, false)
     }

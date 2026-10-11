@@ -148,6 +148,7 @@ struct RiskNoticeView: View {
                         guard allChecked else { return }
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
                         withAnimation(.spring(duration: 0.45)) { profile.riskNoticeVersion = RiskNotice.currentVersion }
+                        BobbyTelemetry.shared.consentChanged()
                     } label: {
                         HStack {
                             Text(allChecked

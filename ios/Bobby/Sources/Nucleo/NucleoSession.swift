@@ -82,6 +82,7 @@ final class NucleoSession: ObservableObject {
     let companions: CompanionStore
     let voice: NeuralVoice
     let fixtures: Bool
+    let telemetry: BobbyTelemetry
     let desk: NucleoDesk
     let speech: NucleoSpeech
     let nucleoVoice: NucleoVoice
@@ -146,8 +147,10 @@ final class NucleoSession: ObservableObject {
          newsIntent: NewsPushIntent? = nil,
          reminderIntent: ReminderIntent? = nil,
          harnessIntent: HarnessIntent? = nil,
-         harness: HarnessCenter? = nil) {
+         harness: HarnessCenter? = nil,
+         telemetry: BobbyTelemetry = .shared) {
         self.fixtures = fixtures
+        self.telemetry = telemetry
         if fixtures || BobbyApp.isUnitTestHost {
             var data: Data?
             companionContext = CompanionContextStore(read: { data }, write: { data = $0; return true })
@@ -1008,6 +1011,7 @@ final class NucleoSession: ObservableObject {
     func acceptRisk(_ version: Int) -> [String: Any] {
         guard version == RiskNotice.currentVersion else { return ["accepted": false, "version": RiskNotice.currentVersion] }
         profile.riskNoticeVersion = RiskNotice.currentVersion
+        telemetry.consentChanged()
         // Consent given: purchases may now reach RevenueCat (§8.4).
         BobbyStore.shared.start()
         if signedIn {
@@ -1026,6 +1030,7 @@ final class NucleoSession: ObservableObject {
         guard !tornDown else { return }
         consentGeneration = UUID()
         profile.riskNoticeVersion = 0
+        telemetry.consentChanged()
         AccountSession.shared.cancelPendingSignIn()
         desk.invalidatePending()
         notch.reset()
