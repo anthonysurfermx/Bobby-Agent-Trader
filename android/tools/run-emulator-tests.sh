@@ -63,6 +63,7 @@ part() {
 
 if [ "${BOBBY_TEST_LOCALE:-suite}" != suite ]; then
   part locale "$argument.class=xyz.bobbyprotocol.android.ReleaseLocaleSmokeInstrumentedTest" "$argument.bobbyLocale=$BOBBY_TEST_LOCALE" "$@"
+  python3 tools/check-locale-captures.py || status=1
 else
   part screens "$argument.class=$screens" "$@"
   part device "$argument.class=$device" "$@"

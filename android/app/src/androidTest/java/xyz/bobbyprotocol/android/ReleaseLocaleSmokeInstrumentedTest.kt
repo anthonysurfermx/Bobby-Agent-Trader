@@ -36,6 +36,7 @@ import xyz.bobbyprotocol.android.data.SecureStore
 import xyz.bobbyprotocol.android.nucleo.NucleoSession
 import xyz.bobbyprotocol.android.nucleo.NucleoStateStore
 import xyz.bobbyprotocol.android.platform.NucleoWebView
+import xyz.bobbyprotocol.android.ui.reportContentTitle
 import xyz.bobbyprotocol.android.v18.StageNetwork
 import xyz.bobbyprotocol.android.v18.V18Fixtures
 import xyz.bobbyprotocol.android.v18.V18Routes
@@ -116,6 +117,13 @@ class ReleaseLocaleSmokeInstrumentedTest {
         js("window.nucleoBridge.call('finishOnboarding',{}).catch(function(){});true")
         waitFor { js("window.nucleo && window.nucleo.state() === 'IDLE'") == true }
         shot("03-home")
+        val speech = bridge("speech.permission")
+        if (speech.optString("state") == "unavailable") {
+            // Hosted images may lack offline recognition: never request the mic or fall back remotely.
+            assertFalse(speech.getBoolean("onDevice"))
+            assertEquals("unavailable", bridge("speech.requestPermission").getString("state"))
+            assertEquals("unavailable", bridge("speech.start").getString("status"))
+        }
         // A physical tap opens the real IME on API 35, even on the shipped software fallback.
         tapDom("pill")
         waitFor { js("window.nucleo.state()==='TYPING' && document.activeElement.id==='ta'") == true }
@@ -135,6 +143,11 @@ class ReleaseLocaleSmokeInstrumentedTest {
         assertEquals("ok", JSONObject(js("JSON.stringify(window.nucleo.read())") as String).getString("status"))
         assertEquals(session.text("Report this answer", "Reportar esta respuesta"), js("document.querySelector('.report-answer').textContent"))
         shot("04-read")
+        // Exercise the finished answer's shipping handler, not only the generic native route.
+        js("document.querySelector('.report-answer').click();true")
+        compose.waitUntil(30_000) { runCatching { compose.onNodeWithText(reportContentTitle(language)).assertExists() }.isSuccess }
+        shot("04b-report-from-read")
+        close()
         open("account")
         compose.onNodeWithTag("account-profile").assertExists()
         shot("05-profile-guest")
