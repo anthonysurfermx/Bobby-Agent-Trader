@@ -139,7 +139,9 @@ export class MemoryAgentStore implements AgentStore {
     if (!task || !task.lease || task.lease.fence !== fence || isFinal(task)) return null;
     // The person's cancel and a runner's result can cross: the runner looked, the cancel was accepted, the result
     // arrives here. Decided in this critical section, not by the runner's earlier look: the cancel wins.
-    if (CANCEL_BEATS.includes(kind) && task.steps.some((step) => step.kind === 'cancel_requested')) { this.endCancelled(task, now, 'runner'); this.changed(); return null; }
+    // The result of a metered tool is one of those: the cancel was accepted while the sources were asked, the person
+    // will see nothing of it, and so the read that paid for it goes back.
+    if ((CANCEL_BEATS.includes(kind) || (kind === 'tool_call' && data.metered === true)) && task.steps.some((step) => step.kind === 'cancel_requested')) { this.endCancelled(task, now, 'runner', data.readerUsd); this.changed(); return null; }
     // A metered tool that brought no figure gives the read back in the write that says so.
     if (kind === 'tool_call' && data.metered === true && data.refunded === true) delete this.state.reads[id];
     const step: Step = { n: task.steps.length + 1, at: new Date(now).toISOString(), kind, data: clone(data) };
@@ -206,12 +208,13 @@ export class MemoryAgentStore implements AgentStore {
   }
 
   /** Writes `cancelled`. A read taken for a metered action that never ran asked no source: it goes back in the same critical section. */
-  protected endCancelled(task: Task, now: number, by: string): void {
+  protected endCancelled(task: Task, now: number, by: string, readerUsd?: unknown): void {
     task.lease = null;
     const ran = task.steps.some((step) => step.kind === 'tool_call' && step.data.metered === true);
     const givenBack = !ran && Boolean(this.state.reads[task.id]);
     if (givenBack) delete this.state.reads[task.id];
-    task.steps.push({ n: task.steps.length + 1, at: new Date(now).toISOString(), kind: 'cancelled', data: { by, ...(givenBack ? { readGivenBack: true } : {}) } });
+    // What a second reader cost before the cancel discarded its result stays on the record.
+    task.steps.push({ n: task.steps.length + 1, at: new Date(now).toISOString(), kind: 'cancelled', data: { by, ...(givenBack ? { readGivenBack: true } : {}), ...(Number(readerUsd) > 0 ? { readerUsd: Number(readerUsd) } : {}) } });
   }
 
   async refund(id: string): Promise<void> {

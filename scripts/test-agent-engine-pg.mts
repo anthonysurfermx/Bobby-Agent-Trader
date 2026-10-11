@@ -30,7 +30,7 @@ const pool = new pg.Pool({ connectionString: url, max: 12 });
 await pool.query('drop table if exists agent_steps, agent_reads, agent_attempts, agent_tasks cascade');
 // As on Supabase: the API's roles exist, and whatever is created in `public` is granted to anon and authenticated by default.
 for (const role of ['anon', 'authenticated', 'service_role']) await pool.query(`do $$ begin if not exists (select 1 from pg_roles where rolname = '${role}') then create role ${role} nologin; end if; end $$`);
-await pool.query('alter default privileges in schema public grant all on functions to anon, authenticated; alter default privileges in schema public grant all on tables to anon, authenticated');
+await pool.query('alter default privileges in schema public grant all on functions to anon, authenticated; alter default privileges in schema public grant all on tables to anon, authenticated; alter default privileges in schema public grant all on sequences to anon, authenticated');
 await pool.query(`do $$ declare f regprocedure; begin for f in select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'agent\\_%' loop execute format('drop function %s cascade', f); end loop; end $$`);
 const sql = readFileSync(new URL('../docs/agent-engine/agent-engine.sql', import.meta.url), 'utf8');
 await pool.query(sql);
@@ -53,6 +53,10 @@ try {
   const open = (await pool.query(`select count(*) filter (where has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute')) as open, count(*) filter (where has_function_privilege('service_role', p.oid, 'execute')) as service, count(*) as fns, count(*) filter (where p.proconfig is null or not p.proconfig::text like '%search_path=public, pg_temp%') as loose from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'agent\\_%'`)).rows[0];
   const tables = (await pool.query(`select count(*) as n from unnest(array['agent_tasks','agent_steps','agent_reads','agent_attempts']) t, unnest(array['anon','authenticated']) r, unnest(array['select','insert','update','delete']) p where has_table_privilege(r, t, p)`)).rows[0];
   eq([Number(open.fns), Number(open.open), Number(open.service), Number(open.loose), Number(tables.n)], [20, 0, 20, 0, 0], 'twenty functions, each with a fixed search path, callable by the service role and by neither API role; the tables are closed to both');
+  // Tried as the roles themselves, not only asked of the catalog: the service role can really run a function (it needs the
+  // tables too), and the one object a table brings with it, its sequence, is closed to both API roles.
+  const asRole = async (role: string, sql: string) => { const client = await pool.connect(); try { await client.query('begin'); await client.query(`set local role ${role}`); await client.query(sql); return 'ok'; } catch (error) { return /permission denied/.test(String((error as Error).message)) ? 'denied' : String((error as Error).message); } finally { await client.query('rollback'); client.release(); } };
+  eq([await asRole('service_role', "select agent_get('o', 't')"), await asRole('anon', "select agent_get('o', 't')"), await asRole('authenticated', 'select count(*) from agent_tasks'), await asRole('anon', "select nextval(pg_get_serial_sequence('agent_tasks', 'seq'))"), await asRole('authenticated', "select last_value from agent_tasks_seq_seq")], ['ok', 'denied', 'denied', 'denied', 'denied'], 'as the roles themselves: the service role runs a function; neither API role runs one, reads a table or touches the sequence');
   // 1. One errand per owner and request, whoever arrives first.
   const first = await store.begin(newTask('ana', 'k1'), { question: 'q' }, T0);
   eq([first.state, (await store.begin(newTask('ana', 'k1'), {}, T0)).state, (await store.begin(newTask('ana', 'k1', { bodyDigest: 'other' }), {}, T0)).state, (await store.begin(newTask('ben', 'k1'), {}, T0)).state], ['new', 'replay', 'mismatch', 'new'], 'the same key and body is the same task; another body is refused; another owner\'s key is theirs');
@@ -213,6 +217,34 @@ try {
     await s.append(`task_${owner}_k`, c!.fence, 'model_call', {}, T0 + 5000); await s.cancel(owner, `task_${owner}_k`, T0 + 1); await s.release(`task_${owner}_k`, c!.fence);
     return (await s.get(owner, `task_${owner}_k`))!.steps.at(-1)!.at;
   }, new Date(T0 + 1).toISOString(), 'a cancel completed by release is dated by the last step, whichever clock wrote it');
+  // 9. What the third review found (2026-10-11).
+  // A cancel accepted while the sources are asked beats the tool's result: it is not stored and the read goes back.
+  await same(async (s) => {
+    const owner = `tc${fresh()}`, id = `task_${owner}_k`, d = await waiting(s as InstanceType<typeof PgAgentStore>, owner, 'k') as string;
+    await s.approve(owner, id, d, T0);
+    const run = await s.claim(id, 'w', 60_000, T0);
+    await s.append(id, run!.fence, 'tool_started', { tool: 'read_assets' }, T0 + 1);
+    await s.cancel(owner, id, T0 + 2);
+    const stored = await s.append(id, run!.fence, 'tool_call', { tool: 'read_assets', metered: true, refunded: false }, T0 + 3);
+    const ended = (await s.get(owner, id))!;
+    return [stored, ended.steps.map((step) => step.kind).slice(-3), ended.steps.at(-1)!.data, await s.remaining(owner, T0), taskUsage(ended).reads];
+  }, [null, ['tool_started', 'cancel_requested', 'cancelled'], { by: 'runner', readGivenBack: true }, 6, 0], 'a cancel accepted while the sources are asked: the tool\'s result is not stored and the read goes back');
+  // What a second reader cost stays on the record when the cancel discards its result.
+  await same(async (s) => {
+    const owner = `rc${fresh()}`, id = `task_${owner}_k`;
+    await s.begin(newTask(owner, 'k'), {}, T0); const run = await s.claim(id, 'w', 60_000, T0);
+    await s.cancel(owner, id, T0 + 1);
+    await s.append(id, run!.fence, 'answer', { result: {}, readerUsd: 0.0011 }, T0 + 2);
+    const ended = (await s.get(owner, id))!;
+    return [ended.steps.at(-1)!.kind, ended.steps.at(-1)!.data, taskUsage(ended).usd];
+  }, ['cancelled', { by: 'runner', readerUsd: 0.0011 }, 0.0011], 'an answer that crosses a cancel is dropped, and what its reading cost is kept');
+  // The keys of a tool's input are the model's too.
+  await same(async (s) => {
+    const owner = `ky${fresh()}`, id = `task_${owner}_k`;
+    await s.begin(newTask(owner, 'k'), {}, T0); const run = await s.claim(id, 'w', 60_000, T0);
+    const step = await s.append(id, run!.fence, 'model_call', { outcome: 'ok', blocks: [{ type: 'tool_use', id: 'u', name: 'answer', input: { 'a\u0000b': 1, 'a\ud83d': 2, fine: 'x' } }] }, T0 + 1);
+    return [step?.n, Object.keys(((step?.data.blocks as any[])?.[0].input) ?? {}).length, ((step?.data.blocks as any[])?.[0].input).fine];
+  }, [2, 3, 'x'], 'a key the database cannot hold does not make a paid step unwritable');
   // Money to the last decimal; one id under twelve owners at once; a cost that is not a number.
   const tiny = { partition: 'tiny', capUsd: 0.00001, taskCapUsd: 1 }, fits: boolean[] = [];
   for (let n = 0; n < 9; n++) fits.push((await store.reserve(tiny, `tiny${n}`, 'm', 0.0000014, T0)).ok);

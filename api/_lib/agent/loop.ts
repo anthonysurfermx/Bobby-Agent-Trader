@@ -23,6 +23,7 @@ import { z } from 'zod';
 import { appLocale, languageName, type AppLanguage } from '../../../src/lib/app-language.js';
 import { companionFallback } from '../companion.js';
 import { judgeCompanionReply, companionJudgeModel } from '../companion-judge.js';
+import { reviewCompanionReply } from '../companion-review.js';
 import { modelPrice, type LlmUsage } from '../llm.js';
 import { composeByCode, limitationsInWords, present, unanswered, type Draft, type OwnWords } from './present.js';
 import { judgeAnalysis } from './reader.js';
@@ -46,7 +47,7 @@ export type Reader = (p: {
   measured?: boolean;
   /** Where the person's own numbers are read from, when it is more than the question (a follow-up: the exchange on screen). */
   numbersFrom?: string;
-}) => Promise<Verdict | { verdict: Verdict; keepNext: boolean; usd?: number }>;
+}) => Promise<Verdict | { verdict: Verdict; keepNext: boolean; usd?: number; by?: 'lists' }>;
 export interface Deps { store: AgentStore; call: CallModel; tools: ToolContext; read: Reader; now: () => number; budget: { partition: string; capUsd: number }; limits: Limits; worker: string }
 
 const ADDRESS: Record<AppLanguage, string> = { en: '', es: ' Address them as "tú".', fr: ' Address them as "tu", never "vous".', it: ' Address them as "tu", never "Lei".', de: ' Address them as "du", never "Sie".', pt: ' Address them informally.' };
@@ -70,7 +71,7 @@ What kind of errand it is decides what you do:
 - "previous" in the input is their last question, your answer to it and the figures behind it. A follow-up about those figures is answered from them, with no new tool call. Use a tool again only if they ask for other assets or another window.
 - The instruments you can read with evidence are: ${UNIVERSE.map((instrument) => `${instrument.name} (${instrument.symbol})`).join(', ')}. Windows: 30 or 60 days. Suggest nothing outside them.
 
-Numbers. You never write a market number. Every figure lives in a tool result (or in "previous") and has an id: to state it, write {{f:ID}} and the app writes the number with its unit, so never put a percent sign or the word for percent after it. {{days}} writes only the number of days of the window: write the word for "days" right after it. A figure that is one day's (the worst day, the best day) carries that day: {{d:ID}} writes its date. {{from:ID}} and {{to:ID}} write the first and the last day a figure covers. Never type a date or a count of days yourself. Never state a number of your own, in digits or in words. Three things are not that: a window length the tool offers (30 or 60) followed by the word for days; a number the person wrote, said back exactly as they wrote it; a name that holds a number (S&P 500, Nasdaq 100, 24/7). Never compute, never round, never restate a figure in words, never put two placeholders side by side. A figure whose value is null does not exist: say that it could not be established.
+Numbers. You never write a market number. Every figure lives in a tool result (or in "previous") and has an id: to state it, write {{f:ID}} and the app writes the number with its unit, so never put a percent sign or the word for percent after it. {{days}} writes only the number of calendar days of the window: write the plain word for "days" right after it (never sessions or trading days: the window holds fewer of those). A figure that is one day's (the worst day, the best day) carries that day: {{d:ID}} writes its date. {{from:ID}} and {{to:ID}} write the first and the last day a figure covers. Never type a date or a count of days yourself. Never state a number of your own, in digits or in words. Three things are not that: the length of the window you read, or the two lengths the tool offers named together ("30 or 60 days"), followed by the word for days; a number the person wrote, said back exactly as they wrote it; a name that holds a number (S&P 500, Nasdaq 100, 24/7). Never compute, never round, never restate a figure in words, never put two placeholders side by side. A figure whose value is null does not exist: say that it could not be established.
 A comparison answers the dimensions they asked about, says how the assets differed on each, and keeps apart what the figures show from what you make of them. A past window does not say what comes next: never predict. Never recommend or rank an asset, never say which is better or right for them, never tell them what to buy, sell or hold. Say plainly that money can be lost when that matters. Never promise safety or gains. Do not ask about their income, savings or wealth. Never end by asking them something.
 
 Write nothing outside tool calls. Finish by calling the tool "answer" exactly once:
@@ -162,11 +163,12 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
   const write = (kind: StepKind, data: Record<string, unknown>) => deps.store.append(id, fence, kind, data, deps.now());
   // Asked after every wait (a model call, a tool, the second reader): a result that arrives after the person
   // cancelled is recorded for what it cost and goes no further.
-  const stopped = async () => {
+  const stopped = async (readerUsd = 0) => {
     const current = await deps.store.get(owner, id);
     if (!current || isFinal(current)) return true;
     if (!current.steps.some((step) => step.kind === 'cancel_requested')) return false;
-    await write('cancelled', { by: 'runner' });
+    // A reading that was paid for and whose result the cancel discards is still recorded for what it cost.
+    await write('cancelled', { by: 'runner', ...(readerUsd > 0 ? { readerUsd } : {}) });
     return true;
   };
   // The task cannot go on (no call left, the provider failed, no money). When the person's read already brought
@@ -202,6 +204,13 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
       }
       if (waitingApproval(task)) return;
       const calls = task.steps.filter((step) => step.kind === 'model_call');
+      // A reply already paid for and stored, after which the run wrote nothing (it was killed, or storage failed once),
+      // is used: the same reply is never bought twice.
+      const last = task.steps.at(-1)!;
+      const kept = last.kind === 'model_call' && last.data.outcome === 'ok' && Array.isArray(last.data.blocks) ? (last.data.blocks as Block[]) : null;
+      let blocks: Block[];
+      if (kept) blocks = kept;
+      else {
       if (calls.length >= deps.limits.maxRounds) { await end(task, 'limit_rounds'); return; }
       // A call starts only when this run has the time for it and for the reading after it: otherwise stop here.
       // The steps are enough for the next run to go on.
@@ -212,6 +221,9 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
       const reply = await reservedCall(deps.store, budget, id, request, deps.call, deps.now);
       if (!reply.ok) {
         const failed = reply as Extract<typeof reply, { ok: false }>;
+        // Storage that did not answer is not a fact about the errand: nothing is written, the caller is told (the door
+        // answers 503) and the next request goes on from the steps.
+        if (failed.code === 'storage_unavailable') throw new Error('agent storage unavailable');
         if (failed.outcome !== 'none' && !await write('model_call', { outcome: failed.outcome, code: failed.detail, usd: failed.usd, reservedUsd: failed.reservedUsd })) return;
         // Nothing was billed (the provider refused), or a reply was paid for and could not be used (cut off
         // mid-thought): its cost is known, so one more reserved attempt is safe. An attempt of unknown cost is
@@ -223,10 +235,14 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
       }
       if (!await write('model_call', { outcome: 'ok', usd: reply.usd, reservedUsd: reply.reservedUsd, usage: reply.usage, stop: reply.turn.stop, modelReturned: reply.turn.modelReturned, blocks: reply.turn.blocks })) return;
       if (await stopped()) return;
-      const uses = reply.turn.blocks.filter((block): block is Extract<Block, { type: 'tool_use' }> => block.type === 'tool_use');
+      blocks = reply.turn.blocks;
+      }
+      // Model calls made so far, the one just made (or kept) included.
+      const made = calls.length + (kept ? 0 : 1);
+      const uses = blocks.filter((block): block is Extract<Block, { type: 'tool_use' }> => block.type === 'tool_use');
       const answer = uses.find((use) => use.name === 'answer');
       if (answer || !uses.length) {
-        const said = reply.turn.blocks.filter((block): block is Extract<Block, { type: 'text' }> => block.type === 'text').map((block) => block.text).join(' ').trim();
+        const said = blocks.filter((block): block is Extract<Block, { type: 'text' }> => block.type === 'text').map((block) => block.text).join(' ').trim();
         const input = answer ? answer.input : { kind: 'explanation', gist: said.split(/(?<=[.!?…])\s+/)[0] ?? said, text: said, claims: [], limitations: [], next: '' };
         if (await finish(deps, write, stopped, task, parent, answer?.id ?? null, input)) return;
         continue;
@@ -250,7 +266,7 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
         // One metered action per task: after it ran, its figures are in the conversation; a second one is a new errand.
         if (asked || task.steps.some((step) => step.kind === 'approval_requested')) { if (!await write('tool_refused', { useId: use.id, tool: tool.name, reason: 'one_metered_action_per_task' })) return; continue; }
         // The person is not asked to spend a read when no call is left to tell them what it found.
-        if (calls.length + 1 >= deps.limits.maxRounds) { if (!await write('tool_refused', { useId: use.id, tool: tool.name, reason: 'no_call_left' })) return; continue; }
+        if (made >= deps.limits.maxRounds) { if (!await write('tool_refused', { useId: use.id, tool: tool.name, reason: 'no_call_left' })) return; continue; }
         const scope = tool.scope!(ready);
         if (!await write('approval_requested', { scope: { ...scope, digest: scopeDigest(owner, id, scope) }, call: { useId: use.id, tool: tool.name, args: ready } })) return;
         asked = true;
@@ -263,15 +279,18 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
 }
 
 /** Checks the draft, has it read, stores the result. False when the model was asked to correct it (the loop goes on). */
-async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, unknown>) => Promise<unknown>, stopped: () => Promise<boolean>, task: Task, parent: Parameters<typeof rebuild>[1], useId: string | null, input: unknown): Promise<boolean> {
+async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, unknown>) => Promise<unknown>, stopped: (readerUsd?: number) => Promise<boolean>, task: Task, parent: Parameters<typeof rebuild>[1], useId: string | null, input: unknown): Promise<boolean> {
   const analysis = ownAnalysis(task) ?? parent?.analysis ?? null;
   const repairs = task.steps.filter((step) => step.kind === 'tool_refused' && step.data.tool === 'answer').length;
   const parsed = Answer.safeParse(input);
   const theirs = parent ? `${parent.question} ${task.question}` : task.question;
-  // What a text IS is decided by code: it is an analysis when it cites a figure, or when this task ran a comparison
-  // itself (then its sources and limits are shown even if nothing could be cited); otherwise an explanation, read in full.
-  const cites = parsed.success && (/\{\{(?:f|d|from|to):/.test(`${parsed.data.gist} ${parsed.data.text}`) || ownAnalysis(task) !== null);
-  const draft: Draft | null = parsed.success ? { ...parsed.data, kind: parsed.data.kind === 'clarification' ? 'clarification' : cites ? 'analysis' : 'explanation' } as Draft : null;
+  // What a text IS is decided by code: it is an analysis when it cites a figure anywhere a person will read it (the text,
+  // a limitation, the next question), or when this task ran a comparison itself (then its sources and limits are shown
+  // even if nothing could be cited); otherwise an explanation, read in full.
+  const cites = parsed.success && (/\{\{(?:f|d|from|to):/.test([parsed.data.gist, parsed.data.text, parsed.data.next, ...parsed.data.limitations].join(' ')) || ownAnalysis(task) !== null);
+  // After this task's own read, whatever the model calls its text, it is an analysis: the person's read brought figures and
+  // every path that protects them (told by code when the words cannot be shown) applies.
+  const draft: Draft | null = parsed.success ? { ...parsed.data, kind: ownAnalysis(task) ? 'analysis' : parsed.data.kind === 'clarification' ? 'clarification' : cites ? 'analysis' : 'explanation' } as Draft : null;
   const shown = draft ? present(draft, draft.kind === 'clarification' ? null : analysis, theirs, task.language, task.locale) : null;
   let presentation: Presentation | null = shown && 'presentation' in shown ? shown.presentation : null;
   const ownWords: OwnWords | null = shown && 'own' in shown ? shown.own : null;
@@ -287,7 +306,7 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   }
   // Everything of the model's that a person is about to get is read: the text, the limitations it wrote and the next
   // question. Only a text code wrote itself is not (there is nothing of the model's in it), and the record says so.
-  let verdict: Verdict | 'not_read' = 'not_read', readerUsd = 0;
+  let verdict: Verdict | 'not_read' = 'not_read', readerUsd = 0, readBy: 'lists' | null = null;
   if (!presentation.composedByCode) {
     // A clarification is one short question. Anything longer, or with no question in it, is not one: it is read as an explanation.
     if (presentation.kind === 'clarification' && (presentation.text.length > 220 || !/[?？]/.test(presentation.text))) presentation.kind = 'explanation';
@@ -296,9 +315,9 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
     const read = await deps.read(measured
       ? { task: task.id, question: task.question, text: [ownWords!.text, ...ownWords!.limitations].join(' '), next: ownWords!.next, language: task.language, locale: task.locale, measured: true, numbersFrom: theirs }
       : { task: task.id, question: task.question, text: [presentation.text, ...own].join(' '), next: presentation.next, language: task.language, locale: task.locale, numbersFrom: theirs });
-    if (await stopped()) return true;
-    const said = typeof read === 'string' ? { verdict: read, keepNext: true, usd: 0 } : read;
-    verdict = said.verdict; readerUsd = said.usd ?? 0;
+    const said: { verdict: Verdict; keepNext: boolean; usd?: number; by?: 'lists' } = typeof read === 'string' ? { verdict: read, keepNext: true, usd: 0 } : read;
+    if (await stopped(said.usd ?? 0)) return true;
+    verdict = said.verdict; readerUsd = said.usd ?? 0; readBy = said.by ?? null;
     if (!said.keepNext) presentation.next = null;
     // An analysis was read as the model's own words (code's numbers were marks), so "figure" there is a quantity the
     // model stated itself, in digits or in words: like any other verdict but "pass", its words are not shown.
@@ -310,7 +329,8 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
     }
   }
   // The analysis on the table stays with the thread: a follow-up that cited no figure still hands it to the next one.
-  await write('answer', { result: { presentation, analysis }, reader: verdict, readerUsd });
+  // `readBy: lists`: the owner turned the model reader off and the companion's deterministic lists read the text instead.
+  await write('answer', { result: { presentation, analysis }, reader: verdict, readerUsd, ...(readBy ? { readBy } : {}) });
   return true;
 }
 
@@ -318,15 +338,23 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
 export function companionReader(store: AgentStore, budget: Budget, now: () => number): Reader {
   return async ({ task, question, text, next, language, locale, measured, numbersFrom }) => {
     const model = companionJudgeModel();
-    if (!model) return 'pass';
+    if (!model) {
+      // The owner turned the reader off. That is not a reader that passed: an analysis is told by code, and anything
+      // else is held to the companion's deterministic lists, as the companion itself is.
+      if (measured) return 'unchecked';
+      const reviewed = reviewCompanionReply(numbersFrom ?? question, { text, followUp: next ?? '' }, language);
+      return 'rejected' in reviewed ? { verdict: reviewed.rejected === 'shape' ? 'advice' : reviewed.rejected, keepNext: false, by: 'lists' } : { verdict: 'pass', keepNext: reviewed.followUp !== null, by: 'lists' };
+    }
     const [pIn, , pOut] = modelPrice(model, 2000);
     const reserveUsd = Number((3 * (2000 * pIn + 700 * pOut) / 1e6).toFixed(6));
-    const reserved = await store.reserve(budget, task, model, reserveUsd, now()).catch(() => null);
-    if (!reserved || !reserved.ok) return 'unchecked';
+    // Storage that cannot answer is the caller's to hear (the door's 503), never a verdict.
+    const reserved = await store.reserve(budget, task, model, reserveUsd, now());
+    if (!reserved.ok) return 'unchecked';
+    // No call has left yet: a reservation that cannot be dispatched is given back, so a storage fault holds no money.
+    try { await store.dispatch(reserved.attemptId); } catch (error) { await store.settle(reserved.attemptId, 'no_charge', null).catch(() => undefined); throw error; }
     const usage: LlmUsage[] = [];
     let verdict: Awaited<ReturnType<typeof judgeCompanionReply>> = null;
     try {
-      await store.dispatch(reserved.attemptId);
       verdict = measured ? await judgeAnalysis(question, { text, followUp: next }, language, { model, locale: locale ?? undefined, usage, numbersFrom })
         : await judgeCompanionReply(question, { text, followUp: next }, language, { model, locale: locale ?? undefined, usage, numbersFrom });
     } catch { verdict = null; }

@@ -20,7 +20,9 @@ const UNWRITABLE = /\u0000|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff
  * jsonb refuses U+0000 and half a surrogate pair. A question or a model's reply that holds one must not make an
  * errand unwritable (a paid call whose step cannot be stored would be paid again): each is written as U+FFFD.
  */
-const writable = <T>(value: T): T => JSON.parse(JSON.stringify(value, (_key, part) => (typeof part === 'string' ? part.replace(UNWRITABLE, '\ufffd') : part))) as T;
+const clean = (text: string) => text.replace(UNWRITABLE, '\ufffd');
+/** Values and KEYS: the keys of a tool's input are the model's too, stored before anything validates them. */
+const writable = <T>(value: T): T => JSON.parse(JSON.stringify(value, (_key, part) => (typeof part === 'string' ? clean(part) : part && typeof part === 'object' && !Array.isArray(part) ? Object.fromEntries(Object.entries(part as Record<string, unknown>).map(([key, inner]) => [clean(key), inner])) : part))) as T;
 
 /** Storage that did not answer, or answered something that is not an answer. Carries the function's name and the status, never an argument. */
 export class AgentStorageError extends Error {

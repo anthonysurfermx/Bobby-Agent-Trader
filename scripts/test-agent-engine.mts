@@ -13,7 +13,7 @@ const { MemoryAgentStore, FileAgentStore, waitingApproval } = await import('../a
 const { taskState, taskResult, taskEvents, taskUsage, taskError } = await import('../api/_lib/agent/state.ts');
 const { metrics, readAssets, resolveMention, TOOLS, MIN_CHANGES } = await import('../api/_lib/agent/tools.ts');
 const { present, composeByCode, formatFigure, limitationsInWords } = await import('../api/_lib/agent/present.ts');
-const { createTask, runTask, rebuild, agentPrompt, scopeDigest, taskView, engineDeps, WIRE_TOOLS } = await import('../api/_lib/agent/loop.ts');
+const { createTask, runTask, rebuild, agentPrompt, scopeDigest, taskView, engineDeps, companionReader, WIRE_TOOLS } = await import('../api/_lib/agent/loop.ts');
 const { worstCaseUsd, reservedCall, callAnthropicOnce } = await import('../api/_lib/agent/provider.ts');
 type ModelAttempt = import('../api/_lib/agent/provider.ts').ModelAttempt;
 type ModelRequest = import('../api/_lib/agent/provider.ts').ModelRequest;
@@ -710,6 +710,120 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   process.env.BOBBY_AGENT_DAILY_USD = 'Infinity';
   eq(engineDeps(new MemoryAgentStore()).budget.capUsd, 5, 'a ceiling that is not a number is no ceiling anybody set: the default stands');
   delete process.env.BOBBY_AGENT_DAILY_USD;
+}
+
+// ---------- 7d. what the third review found (2026-10-11), each with the check that would have caught it ----------
+{
+  type L = 'es' | 'en' | 'de' | 'fr';
+  const no = (over: Record<string, unknown>, question = 'Compara Bitcoin y Ethereum', language: L = 'es') => { const r = present(draft(over), crypto, question, language); return 'refusal' in r ? `${r.refusal.code}:${r.refusal.detail}` : 'shown'; };
+  const expl = (text: string, question: string, language: L = 'es') => { const r = present({ kind: 'explanation', gist: text, text, limitations: [], next: '', claims: [] }, null, question, language); return 'refusal' in r ? `${r.refusal.code}:${r.refusal.detail}` : 'shown'; };
+  const code = (said: string) => said.split(':')[0];
+
+  // A verb, a level and an amount are not names (the list of names that hold a number is the engine's own, each with its number).
+  eq([no({ text: 'Bitcoin pasó 12 días por debajo de su máximo.' }), no({ text: 'Bitcoin pasó 70 mil dólares.' }), no({ next: '¿Por qué Bitcoin pasó 15 días en rojo?' }), no({ text: 'Subió hasta el nivel DAX 9000.' }), no({ text: 'It is worth 401 k dollars more.' }, 'Compare', 'en'), no({ limitations: ['Cada paso 50 dólares más arriba.'] })].map(code),
+    ['typed_number', 'typed_number', 'typed_number', 'typed_number', 'typed_number', 'typed_number'], 'a verb ("pasó"), a level ("DAX 9000") and an amount ("401 k") are not names');
+  eq([expl('A classic mix is called 60/40: more in shares, the rest in bonds.', 'What is a balanced portfolio?', 'en'), expl('A fast fall, like the one at the start of COVID-19.', 'What is a crash?', 'en'), expl('El DAX 40 es un índice de empresas alemanas.', '¿Qué es el DAX?')], ['shown', 'shown', 'shown'], '…and a real name keeps its number');
+  // A percentage in words is refused whatever word says the quantity.
+  eq([no({ text: 'Bitcoin subió un trece por ciento.' }), no({ text: 'Bitcoin rose about one percent.' }, 'Compare', 'en'), no({ text: 'Bitcoin rose half a percent a day.' }, 'Compare', 'en'), no({ text: 'Bitcoin stieg um fünfzehn Prozent.' }, 'Vergleiche', 'de'), no({ text: 'Bitcoin a gagné un pour cent.' }, 'Compare', 'fr'), no({ text: 'Subió un punto porcentual más.' })].map(code),
+    ['typed_number', 'typed_number', 'typed_number', 'typed_number', 'typed_number', 'typed_number'], 'a percentage in words is refused whatever the number word ("thirteen", "one", "half a", "fünfzehn")');
+  eq([expl('Both are measured in percent.', 'How are they measured?', 'en'), expl('It is taken as a percent of what you hold.', 'What is a fee?', 'en'), expl('La diferencia se dice en puntos porcentuales.', '¿Cómo se comparan?'), expl('Invertir el 10 por ciento de lo que ganas es una costumbre común.', '¿Tiene sentido invertir el 10% de mi sueldo?')], ['shown', 'shown', 'shown', 'shown'], '…the word as a unit, and the person\'s own percentage, are still written');
+  // A window length counts calendar days of the window that was read.
+  eq([no({ text: 'En los últimos {{days}} días, 60 mil dólares fue el techo de Bitcoin.' }), no({ text: 'Bitcoin cambió {{f:return_BTC}} en {{days}} días y 60 dólares por moneda.' }), no({ text: 'En los últimos 60 días, Bitcoin cambió {{f:return_BTC}}.' }), no({ text: 'En las últimas {{days}} sesiones, Bitcoin cambió {{f:return_BTC}}.' }), no({ text: 'Over the last {{days}} trading days Bitcoin changed {{f:return_BTC}}.' }, 'Compare', 'en')].map(code),
+    ['typed_number', 'typed_number', 'typed_number', 'bad_placeholder', 'bad_placeholder'], 'after "N días," a 60 is still a 60; a typed length is the window that was read (30 here); {{days}} is no count of sessions');
+  eq([no({ next: '¿Quieres ver 30 días o 60?' }), no({ next: '¿Y en una ventana de 60 días?' }), no({ text: 'Aquí leo 30 o 60 días; en {{days}} días Bitcoin cambió {{f:return_BTC}}.' }), no({ text: 'En los últimos 30 días, Bitcoin cambió {{f:return_BTC}}.' }), no({ limitations: ['Para 60 días haría falta otra lectura.'] })], ['shown', 'shown', 'shown', 'shown', 'shown'], '…the window\'s own length, the list of both, and the other one in a limitation or the next question are still written');
+  // What a person would read as one number, as a sign or as an emoji, whatever characters make it.
+  eq([no({ text: 'Fueron {{f:return_BTC}}​{{f:return_ETH}}.' }), no({ text: 'Cerraron en {{f:close_BTC}}­{{f:close_ETH}}.' }), no({ text: 'En {{days}}​{{f:corr_BTC_ETH}} días.' }), no({ text: 'Bitcoin cambió {{f:return_BTC}} \u{1F1FA}\u{1F1F8}.' }), no({ text: 'Bitcoin cambió {{f:return_BTC}} #️⃣.' }), no({ text: 'Bitcoin subió Ⅻ puntos.' })].map(code),
+    ['bad_placeholder', 'bad_placeholder', 'bad_placeholder', 'typed_number', 'typed_number', 'typed_number'], 'a character nobody sees joins nothing; a flag, a keycap and a number written as a letter are refused');
+  ok(/^[+\-−]/.test(formatFigure(fig(crypto, 'corr_BTC_ETH'), 'es')) && (present(draft({ text: 'Bitcoin cambió {{f:return_BTC}}. La correlación fue de –{{f:corr_BTC_ETH}}.' }), crypto, 'q', 'es') as any).presentation.text.includes(`–${formatFigure(fig(crypto, 'corr_BTC_ETH'), 'es')}`), 'a correlation is written with its sign: a dash before it cannot be read as one');
+  // The person's thousands.
+  eq([no({ text: 'Con tus 10,000 pesos, Bitcoin cambió {{f:return_BTC}}.' }, 'Tengo 10 mil pesos. Compara Bitcoin y Ethereum'), no({ text: 'Con tus 10.000 pesos, Bitcoin cambió {{f:return_BTC}}.' }, 'Tengo 10k. Compara Bitcoin y Ethereum'), code(no({ text: 'Bitcoin subió 10 dólares.' }, 'Tengo 10 mil pesos. Compara Bitcoin y Ethereum'))], ['shown', 'shown', 'typed_number'], 'their "10 mil" is ten thousand however it is written, and lends no bare 10');
+  eq([no({ text: 'Con tus 10 mil pesos o con otro monto, Bitcoin cambió {{f:return_BTC}}.' }, 'Tengo 10 mil pesos. Compara Bitcoin y Ethereum'), code(no({ text: 'Bitcoin ronda los 70 mil dólares.' }, 'Tengo 10 mil pesos. Compara Bitcoin y Ethereum')), code(no({ text: 'Bitcoin cerró en {{f:close_BTC}} millones.' })), code(no({ text: 'Bitcoin cerró en ${{f:close_BTC}}.' })), code(no({ text: 'La correlación fue de {{f:corr_BTC_ETH}}‱.' }))], ['shown', 'typed_number', 'bad_placeholder', 'bad_placeholder', 'typed_number'], 'their "10 mil" may be said back as they said it; nobody\'s "70 mil" may not; a figure takes no scale word after it, no currency sign before it and no other per-cent sign');
+  // The sentence in front is a whole sentence or the draft goes back.
+  const long = present(draft({ gist: 'Bitcoin and Ethereum moved differently.', text: 'Over the last {{days}} days the two did not move alike at all, because while Bitcoin changed {{f:return_BTC}} with a largest fall of {{f:drawdown_BTC}}, a worst day of {{f:worst_BTC}} and a last close of {{f:close_BTC}}, Ethereum changed {{f:return_ETH}} with a fall of {{f:drawdown_ETH}} and a close of {{f:close_ETH}}.' }), crypto, 'Compare Bitcoin and Ethereum', 'en');
+  eq('refusal' in long ? `${long.refusal.code}:${long.refusal.detail}` : long.presentation.gist, 'too_long:the first sentence', 'a first sentence that does not end in 200 characters sends the draft back: a text is never cut inside a figure');
+  eq((present({ kind: 'clarification', gist: '¿Cuáles dos?', text: '¿Cuáles dos quieres comparar', limitations: [], next: '', claims: [] }, null, 'Compara', 'es') as any).presentation.gist, '¿Cuáles dos quieres comparar', '…a short text with no full stop stands whole');
+
+  // A figure cited anywhere a person reads it makes the answer an analysis: listed, referenced, a mark for the reader.
+  const store = new MemoryAgentStore(6), deps = depsFor(store);
+  const begin = async (question: string, key: string) => (await createTask(deps, { owner: 'ana', session: 'w', requestId: key, question, language: 'es', model: 'claude-test' }) as any).task as import('../api/_lib/agent/types.ts').Task;
+  const read = () => turn([use('read_assets', { assets: ['BTC', 'ETH'], windowDays: 30 }, 'u_cmp')]);
+  const yes = async (id: string) => { await store.approve('ana', id, waitingApproval((await store.get('ana', id))!)!.digest, clock); };
+  script = [read, () => answer({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}}.' })];
+  const base = await ask(deps, 'ana', 'Compara Bitcoin y Ethereum', 'w1'); await yes(base.id); await runTask(deps, 'ana', base.id);
+  readerSaw.length = 0;
+  script = [() => answer({ kind: 'explanation', gist: 'La volatilidad es cuánto se mueve un precio.', text: 'La volatilidad es cuánto se mueve un precio.', limitations: ['La caída de Ethereum fue de {{f:drawdown_ETH}}.'], next: '¿Por qué Ethereum cayó {{f:drawdown_ETH}}?' })];
+  const cited = taskResult(await ask(deps, 'ana', '¿Qué es la volatilidad?', 'w2', true))!.presentation;
+  eq([cited.kind, cited.figures, cited.references.map((r) => r.evidence), readerSaw[0].includes('⟦figure⟧'), /\d/.test(readerSaw[0])], ['analysis', ['drawdown_ETH'], ['ev_ETH'], true, false], 'a figure cited only in a limitation or the next question is still listed, referenced, and a mark for the reader');
+  // After its own read, a text the model calls a clarification is an analysis: the read is never spent on nothing.
+  for (const verdict of ['unchecked', 'advice'] as const) {
+    verdicts = [verdict];
+    script = [read, () => answer({ kind: 'clarification', gist: '¿Quieres que mire también Solana?', text: '¿Quieres que mire también Solana?' })];
+    const t = await begin('Compara', `cl-${verdict}`); await runTask(deps, 'ana', t.id); await yes(t.id); await runTask(deps, 'ana', t.id);
+    const r = taskResult((await store.get('ana', t.id))!);
+    ok(r?.presentation.kind === 'analysis' && r.presentation.composedByCode && r.presentation.figures.length === 4 && r.presentation.references.length === 2, `a "clarification" after the read whose words cannot be shown (${verdict}) is told by code from the figures`);
+  }
+  // A cancel accepted while the sources are being asked: nothing of the read will be seen, so it goes back.
+  script = [read];
+  const during = await begin('Compara', 'during'); await runTask(deps, 'ana', during.id); await yes(during.id);
+  let asked = 0;
+  const cancelling = { ...deps, tools: { ...tools, fetchJson: async (url: string) => { if (asked++ === 0) await store.cancel('ana', during.id, clock); return tools.fetchJson(url); } } };
+  await runTask(cancelling, 'ana', during.id);
+  const gone = (await store.get('ana', during.id))!;
+  eq([asked, taskState(gone, clock), gone.steps.at(-1)!.data, gone.steps.some((s) => s.kind === 'tool_call'), taskUsage(gone).reads, await store.remaining('ana', clock)], [2, 'cancelled', { by: 'runner', readGivenBack: true }, false, 0, 3], 'a cancel accepted while the sources are asked: the tool\'s result is not stored and the read goes back (3 left: three earlier errands used one each)');
+  // The steps a person is told of: a metered tool starts before it finishes, and is told once.
+  const ev = (kinds: Array<[string, Record<string, unknown>]>) => taskEvents({ steps: kinds.map(([kind, data], n) => ({ n: n + 1, at: '', kind: kind as never, data })) }).map((e) => ('tool' in e ? `${e.type}(${e.tool})` : e.type));
+  eq([ev([['received', {}], ['tool_started', { tool: 'read_assets' }]]), ev([['tool_started', { tool: 'read_assets' }], ['tool_started', { tool: 'read_assets' }], ['tool_call', { tool: 'read_assets', metered: true }]]), ev([['tool_call', { tool: 'resolve_assets', metered: false }]]), ev([['tool_call', { tool: 'read_assets', metered: true }]])],
+    [['received', 'tool_started(read_assets)'], ['tool_started(read_assets)', 'tool_finished(read_assets)'], ['tool_started(resolve_assets)', 'tool_finished(resolve_assets)'], ['tool_started(read_assets)', 'tool_finished(read_assets)']], 'while the sources are asked a person is told the tool started; a run repeated after it died tells it once');
+
+  // A reply already paid for and stored is used, not bought again.
+  for (const lost of ['answer', 'approval_requested'] as const) {
+    const st = new MemoryAgentStore(6), d = depsFor(st);
+    const realAppend = st.append.bind(st); let thrown = false;
+    st.append = async (id: string, fence: number, kind: never, data: Record<string, unknown>, now: number) => { if (kind === lost && !thrown) { thrown = true; throw new Error('storage'); } return realAppend(id, fence, kind, data, now); };
+    script = lost === 'answer' ? [() => answer({ kind: 'explanation', gist: 'Un ETF es un fondo.', text: 'Un ETF es un fondo.' })] : [read];
+    const begun = await createTask(d, { owner: 'ana', session: 'k', requestId: `kept-${lost}`, question: lost === 'answer' ? '¿Qué es un ETF?' : 'Compara', language: 'es', model: 'claude-test' }) as any;
+    const before = calls.length;
+    await assert.rejects(runTask(d, 'ana', begun.task.id)); checks++;
+    await runTask(d, 'ana', begun.task.id);
+    const after = (await st.get('ana', begun.task.id))!;
+    eq([calls.length - before, after.steps.filter((s) => s.kind === 'model_call').length, taskState(after, clock), script.length], [1, 1, lost === 'answer' ? 'completed' : 'waiting_approval', 0], `storage that fails once at the write of "${lost}": the stored reply is used on the next run, the model is called once`);
+  }
+  // Storage that fails while money is being reserved is the caller's to hear, never an errand that failed for good.
+  for (const fault of ['reserve', 'dispatch'] as const) {
+    const st = new MemoryAgentStore(6), d = depsFor(st);
+    const real = (st[fault] as (...args: unknown[]) => Promise<unknown>).bind(st); let thrown = false;
+    (st as any)[fault] = async (...args: unknown[]) => { if (!thrown) { thrown = true; throw new Error('storage'); } return real(...args); };
+    script = [() => answer({ kind: 'explanation', gist: 'Un ETF es un fondo.', text: 'Un ETF es un fondo.' })];
+    const begun = await createTask(d, { owner: 'ana', session: 'f', requestId: `fault-${fault}`, question: '¿Qué es un ETF?', language: 'es', model: 'claude-test' }) as any;
+    await assert.rejects(runTask(d, 'ana', begun.task.id)); checks++;
+    const between = (await st.get('ana', begun.task.id))!;
+    await runTask(d, 'ana', begun.task.id);
+    eq([between.steps.map((s) => s.kind), between.lease, taskState((await st.get('ana', begun.task.id))!, clock), st.attempts().filter((a) => a.state === 'reserved' || a.state === 'dispatched').length], [['received'], null, 'completed', 0], `storage that fails once at ${fault}: nothing is written, no money is left held, and the same errand goes on`);
+  }
+  // What the second reader cost stays on the record when a cancel discards its result.
+  {
+    const st = new MemoryAgentStore(6);
+    script = [() => answer({ kind: 'explanation', gist: 'Un ETF es un fondo.', text: 'Un ETF es un fondo.' })];
+    const d = depsFor(st, { read: async ({ task }) => { await st.cancel('ana', task, clock); return { verdict: 'pass', keepNext: true, usd: 0.0011 }; } });
+    const t = await ask(d, 'ana', '¿Qué es un ETF?', 'rc1');
+    eq([taskState(t, clock), t.steps.at(-1)!.data, taskUsage(t).usd], ['cancelled', { by: 'runner', readerUsd: 0.0011 }, 0.0051], 'a cancel that crosses the reading: cancelled, and what the reading cost is in the task\'s record');
+  }
+  // The reader switched off is not a reader that passed.
+  process.env.BOBBY_COMPANION_JUDGE = 'off';
+  try {
+    const st = new MemoryAgentStore(6), d = depsFor(st);
+    d.read = companionReader(st, { partition: 'agent', capUsd: 1, taskCapUsd: 0.25 }, () => clock);
+    script = [() => answer({ kind: 'explanation', gist: 'Un ETF es un fondo que cotiza.', text: 'Un ETF es un fondo que cotiza. Te recomiendo comprar uno del S&P 500 ya: no puedes perder.', next: '¿Cuál compro hoy?' })];
+    const bad = await ask(d, 'ana', '¿Qué es un ETF?', 'off1');
+    script = [() => answer({ kind: 'explanation', gist: 'Un ETF es un fondo que se compra y se vende como una acción.', text: 'Un ETF es un fondo que se compra y se vende como una acción. Puedes perder dinero.' })];
+    const good = await ask(d, 'ana', '¿Qué es un ETF?', 'off2');
+    script = [read, () => answer({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}}. Ethereum cayó el doble y va a recuperarse pronto.' })];
+    const t = await createTask(d, { owner: 'ana', session: 'off', requestId: 'off3', question: 'Compara', language: 'es', model: 'claude-test' }) as any;
+    await runTask(d, 'ana', t.task.id); await st.approve('ana', t.task.id, waitingApproval((await st.get('ana', t.task.id))!)!.digest, clock); await runTask(d, 'ana', t.task.id);
+    const measured = (await st.get('ana', t.task.id))!;
+    eq([taskResult(bad)!.presentation.composedByCode, taskResult(bad)!.presentation.next, bad.steps.at(-1)!.data.reader !== 'pass', bad.steps.at(-1)!.data.readBy, taskResult(good)!.presentation.composedByCode, good.steps.at(-1)!.data.reader, good.steps.at(-1)!.data.readBy, taskResult(measured)!.presentation.composedByCode, taskResult(measured)!.presentation.text.includes('doble'), measured.steps.at(-1)!.data.reader, st.attempts().length],
+      [true, null, true, 'lists', false, 'pass', 'lists', true, false, 'unchecked', 4], 'with the reader switched off an explanation is held to the companion\'s lists (and the record says so), and an analysis is told by code: nothing is shown unread');
+  } finally { delete process.env.BOBBY_COMPANION_JUDGE; }
 }
 
 // ---------- 8. the door ----------

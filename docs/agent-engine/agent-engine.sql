@@ -73,7 +73,7 @@ begin
   return jsonb_build_object('n', v_n, 'at', to_char(p_now at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'), 'kind', p_kind, 'data', p_data);
 end $$;
 -- Writes `cancelled`. A read taken for a metered action that never ran asked no source: it goes back here.
-create or replace function agent_end_cancelled(p_id text, p_now timestamptz, p_by text) returns void language plpgsql set search_path = public, pg_temp as $$
+create or replace function agent_end_cancelled(p_id text, p_now timestamptz, p_by text, p_reader_usd numeric default null) returns void language plpgsql set search_path = public, pg_temp as $$
 declare v_back boolean := false;
 begin
   update agent_tasks set lease_worker = null, lease_until = null where id = p_id;
@@ -81,7 +81,8 @@ begin
     delete from agent_reads where task = p_id;
     v_back := found;
   end if;
-  perform agent_push(p_id, 'cancelled', case when v_back then jsonb_build_object('by', p_by, 'readGivenBack', true) else jsonb_build_object('by', p_by) end, p_now);
+  -- What a second reader cost before the cancel discarded its result stays on the record.
+  perform agent_push(p_id, 'cancelled', jsonb_strip_nulls(jsonb_build_object('by', p_by, 'readGivenBack', case when v_back then true end, 'readerUsd', case when p_reader_usd > 0 then p_reader_usd end)), p_now);
 end $$;
 
 create or replace function agent_get(p_owner text, p_id text) returns jsonb language sql stable set search_path = public, pg_temp as $$
@@ -141,8 +142,10 @@ begin
   if not found or v.lease_worker is null or v.fence is distinct from p_fence or agent_is_final(p_id) then return null; end if;
   -- What would end or advance the task (an answer, an error, a request for approval, the start of metered work) and
   -- crosses an accepted cancel is not stored: decided here, in the same transaction as the write.
-  if p_kind in ('answer', 'error', 'approval_requested', 'cancelled', 'tool_started') and exists (select 1 from agent_steps where task = p_id and kind = 'cancel_requested') then
-    perform agent_end_cancelled(p_id, p_now, 'runner'); return null;
+  -- The result of a metered tool is one of those: the person will see nothing of it, so the read that paid for it goes back.
+  if (p_kind in ('answer', 'error', 'approval_requested', 'cancelled', 'tool_started') or (p_kind = 'tool_call' and p_data->>'metered' = 'true'))
+    and exists (select 1 from agent_steps where task = p_id and kind = 'cancel_requested') then
+    perform agent_end_cancelled(p_id, p_now, 'runner', (p_data->>'readerUsd')::numeric); return null;
   end if;
   -- A metered tool that brought no figure gives the read back in the write that says so.
   if p_kind = 'tool_call' and p_data->>'metered' = 'true' and p_data->>'refunded' = 'true' then delete from agent_reads where task = p_id; end if;
@@ -268,10 +271,15 @@ begin
       if exists (select 1 from pg_roles where rolname = v_role) then
         execute format('revoke all on function %s from %I', v_fn, v_role);
         execute format('revoke all on agent_tasks, agent_steps, agent_reads, agent_attempts from %I', v_role);
+        execute format('revoke all on sequence %s from %I', pg_get_serial_sequence('agent_tasks', 'seq'), v_role);   -- the one object a table brings with it
       end if;
     end loop;
     if exists (select 1 from pg_roles where rolname = 'service_role') then execute format('grant execute on function %s to service_role', v_fn); end if;
   end loop;
+  -- The functions run with the caller's rights: the service role needs the tables too, said here and not left to a database's defaults.
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    execute 'grant select, insert, update, delete on agent_tasks, agent_steps, agent_reads, agent_attempts to service_role';
+  end if;
 end $$;
 
 -- Still to write before this is a migration: a purge of finished tasks after the retention the owner decides, and

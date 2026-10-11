@@ -78,7 +78,8 @@ async function door(req: VercelRequest, res: VercelResponse) {
     let task = await store.get(owner!, id);
     // A cancel that was accepted while a runner held the task, and whose runner never came back, is completed by
     // whoever looks next: a person who cancelled never reads "cancelling" for ever, and a read no tool used goes back.
-    if (task && !isFinal(task) && task.steps.some((step) => step.kind === 'cancel_requested') && !(task.lease && task.lease.until > deps.now()) && await store.cancel(owner!, id, deps.now())) task = await store.get(owner!, id);
+    // Read again whatever the cancel answered: another look may have completed it in between.
+    if (task && !isFinal(task) && task.steps.some((step) => step.kind === 'cancel_requested') && !(task.lease && task.lease.until > deps.now())) { await store.cancel(owner!, id, deps.now()); task = await store.get(owner!, id); }
     return task ? res.status(status).json(taskView(task, deps.now(), await store.remaining(owner!, deps.now()))) : refuse(404, 'not_found');
   };
 

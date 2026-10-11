@@ -12,7 +12,7 @@
 // The analysis itself is never edited here: the presentation is a reading of it.
 // ============================================================
 import { appLocale, type AppLanguage } from '../../../src/lib/app-language.js';
-import { NAMED_NUMBER, NUMBER_WORD, fold } from '../companion-review.js';
+import { NUMBER_WORD, fold } from '../companion-review.js';
 import { DATE_MARK, FIGURE_MARK } from './reader.js';
 import { UNIVERSE, WINDOWS, instrumentName, resolveMention } from './tools.js';
 import type { Analysis, Figure, Presentation } from './types.js';
@@ -23,7 +23,8 @@ export interface OwnWords { text: string; limitations: string[]; next: string | 
 export type Refusal = { code: 'unknown_figure' | 'figure_without_value' | 'typed_number' | 'bad_placeholder' | 'claim_contradicts_figures' | 'claim_cannot_be_checked' | 'too_long' | 'empty'; detail: string };
 
 const PLACEHOLDER = /\{\{((?:f|d|from|to):[A-Za-z0-9_~]+|days)\}\}/g;
-const SIGNED = new Set(['return', 'drawdown', 'worst', 'best']);
+/** Written with its sign, so no dash before it can be read as one. */
+const SIGNED = new Set(['return', 'drawdown', 'worst', 'best', 'correlation']);
 
 /** One figure as a person reads it: 12.3 → "+12.3%" (en-US), "+12,3 %" (de-DE). The value is never rounded elsewhere. */
 export function formatFigure(figure: Figure, language: AppLanguage, locale?: string | null): string {
@@ -31,7 +32,7 @@ export function formatFigure(figure: Figure, language: AppLanguage, locale?: str
   if (figure.value === null) return '';
   if (figure.unit === 'percent') return new Intl.NumberFormat(tag, { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: SIGNED.has(figure.metric) ? 'exceptZero' : 'auto' }).format(figure.value / 100);
   if (figure.unit === 'price') return `${new Intl.NumberFormat(tag, { minimumFractionDigits: 2, maximumFractionDigits: figure.value < 1 ? 6 : 2 }).format(figure.value)}${figure.currency ? ` ${figure.currency}` : ''}`;
-  return new Intl.NumberFormat(tag, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(figure.value);
+  return new Intl.NumberFormat(tag, { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: SIGNED.has(figure.metric) ? 'exceptZero' : 'auto' }).format(figure.value);
 }
 
 /** A day as a person reads it: "15 de septiembre", "September 15". The year is the window's and is not repeated. */
@@ -39,33 +40,51 @@ export const formatDay = (day: string, language: AppLanguage, locale?: string | 
 
 // ---------- what the model may not write ----------
 // Everything below reads FOLDED text (lower case, no accents, look-alike digits as digits, one space between words):
-// the same folding as the companion's own reader, whose lists of number words and of names that hold a number are reused.
+// the same folding as the companion's own reader, whose list of number words is reused. The names that hold a number are
+// the engine's own list: the companion's is looser on purpose (it has a second reader for every text; here code is the promise).
 /** Stands where code will write a figure or a date. */
 const MARK = '\uFFFC';
 /** Stands where code will write the window's length, which is a count of days and nothing else. */
 const COUNT = '\uE000';
 const MARKS = `${MARK}${COUNT}`;
 const marksShown = (text: string) => text.replace(new RegExp(`[${MARKS}]`, 'g'), '{{…}}');
-const read = (text: string) => fold(text).replace(/[‐‑]/g, '-').replace(/\s+/g, ' ');
+/** Characters nobody sees (a zero-width space, a soft hyphen, a joiner) separate nothing: they are dropped before anything is looked for. */
+const read = (text: string) => fold(text).replace(/\p{Cf}/gu, '').replace(/[‐‑]/g, '-').replace(/\s+/g, ' ');
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** The engine's instruments whose name holds a number, in any spelling of the spaces: "S&P 500", "S&P-500-ETF", "Nasdaq‑100". */
 const INSTRUMENT_NAMES = [...new Set(UNIVERSE.flatMap((instrument) => [instrument.name, ...instrument.aliases]).filter((name) => /\d/.test(name)).map(read))]
   .sort((a, b) => b.length - a.length).map((name) => new RegExp(`(?<![a-z0-9])${name.split(/[\s-]+/).map(escaped).join('[\\s-]*')}(?![a-z0-9])`, 'g'));
+/**
+ * Names that hold a number, each with ITS number: an index is "DAX 40", never "DAX 9000"; "paso 12" is no name at
+ * all (folded, the verb "pasó" is the same word).
+ */
+const NAMES = /(?<![a-z0-9])(?:s&p\s*500|nasdaq[\s-]*100|russell[\s-]*[123]000|dax[\s-]*40|cac[\s-]*40|ftse[\s-]*(?:100|250)|ibex[\s-]*35|(?:euro\s*)?stoxx[\s-]*(?:50|600)|nikkei[\s-]*225|dow(?:\s+jones)?[\s-]*30|401\s?\(k\)|401k|403\s?\(b\)|403b|web\s?3|covid[\s-]?19|t\+[0-3]|60\/40|magnificent\s+7|24\s*(?:\/\s*7|horas|hours|heures|ore|stunden))(?![a-z0-9])/g;
 /** A name is a name: an instrument, an index, "24/7", "Web3". What is left holds only numbers somebody is stating. */
-const withoutNames = (folded: string) => INSTRUMENT_NAMES.reduce((left, name) => left.replace(name, ' '), folded).replace(NAMED_NUMBER, ' ');
+const withoutNames = (folded: string) => INSTRUMENT_NAMES.reduce((left, name) => left.replace(name, ' '), folded).replace(NAMES, ' ');
 
 const LENGTHS = new Set<string>(WINDOWS.map(String));
 const A_LENGTH = `(?:${[...LENGTHS].join('|')}|${COUNT})`;
 const OR = '(?:,|o|or|ou|oder|e|y|and|und|et)';
-const DAY_WORD = '(?:(?:derniers|dernieres|premiers|prochains|trading|calendar|business|market)\\s+)?(?:(?:handels|kalender|borsen)?tag(?:e[ns]?|ig[a-z]*)?|dias?|days?|jours?|giorn[io]|sesiones|sessions?|sedute|sessoes)(?![a-z])';
+// The window is in CALENDAR days: a word for sessions or trading days after its length would state a wrong count
+// (thirty calendar days hold about twenty-two sessions).
+const DAY_WORD = '(?:(?:derniers|dernieres|premiers|prochains|calendar)\\s+)?(?:(?:kalender)?tag(?:e[ns]?|ig[a-z]*)?|dias?|days?|jours?|giorn[io])(?![a-z])';
 const DAYS_AFTER = new RegExp(`^(?:\\s*${OR}\\s*${A_LENGTH})*[\\s-]*${DAY_WORD}`);
-const DAYS_BEFORE = new RegExp(`${A_LENGTH}[\\s-]*${DAY_WORD}\\s*${OR}\\s*$`);
+// "30 días o 60": only an "or"/"and" between them (never a comma: "En los últimos 30 días, 60 mil…"), and the second ends the phrase.
+const DAYS_BEFORE = new RegExp(`${A_LENGTH}[\\s-]*${DAY_WORD}\\s*(?:o|or|ou|oder|e|y|and|und|et)\\s*$`);
+const ENDS_THERE = /^\s*(?:[.,;:!?)\]»”"']|$)/;
 /** A window length is one only where it counts days: "60 días", "30-day", "30 or 60 days", "30 días o 60". Never "60 mil", "un 60". */
-const countsDays = (folded: string, at: number, length: number) => DAYS_AFTER.test(folded.slice(at + length)) || DAYS_BEFORE.test(folded.slice(0, at));
+const countsDays = (folded: string, at: number, length: number) => DAYS_AFTER.test(folded.slice(at + length)) || (DAYS_BEFORE.test(folded.slice(0, at)) && ENDS_THERE.test(folded.slice(at + length)));
+/** Both lengths named together ("30 o 60 días"): what the tool offers, not a claim about the window that was read. */
+const IN_A_LIST = new RegExp(`^\\s*${OR}\\s*${A_LENGTH}`), AFTER_A_LENGTH = new RegExp(`${A_LENGTH}(?:[\\s-]*${DAY_WORD})?\\s*${OR}\\s*$`);
 
-const PERCENT_WORD = 'por\\s?cien(?:to)?|percent|per[\\s-]?cent|pour[\\s-]?cent|prozent(?:ig[a-z]*)?|per\\s?cento|por\\s?cento|pct|puntos?\\s+porcentuales|percentage\\s+points?|prozentpunkte?n?|punti\\s+percentuali|points?\\s+de\\s+pourcentage|pontos?\\s+percentuais';
+const PERCENT_WORD = 'por\\s?cien(?:to)?|percent|per[\\s-]?cent|pour[\\s-]?cent|prozent(?:ig[a-z]*)?|per\\s?cento|por\\s?cento|pct|puntos?\\s+porcentual(?:es)?|percentage\\s+points?|prozentpunkte?n?|punt[oi]\\s+percentual[ei]|points?\\s+de\\s+pourcentage|pontos?\\s+percentua(?:l|is)';
+/** The word alone is fine where it names the unit ("in percent", "as a percent of"). Anywhere else a quantity stands before it, whatever word says it ("thirteen percent", "un trece por ciento", "half a percent"). */
+const BARE_PERCENT = new RegExp(`(?<![a-z])(?:(in|en|em|as an?|como|als)\\s+)?(?:${PERCENT_WORD})(?![a-z])`, 'g');
 /** A percentage OF something: a number, a placeholder or a number in words, then the sign or the word. The bare word ("a percentage of what you hold") is not one. */
-const WITH_PERCENT = new RegExp(`(\\p{N}+(?:[.,]\\p{N}+)*|[${MARKS}]|(?<![a-z])${NUMBER_WORD}(?![a-z]))(?:\\s?[%‰٪]|[\\s-]*(?:${PERCENT_WORD})(?![a-z]))`, 'gu');
+const WITH_PERCENT = new RegExp(`(\\p{N}+(?:[.,]\\p{N}+)*|[${MARKS}]|(?<![a-z])${NUMBER_WORD}(?![a-z]))(?:\\s?[%‰‱٪]|[\\s-]*(?:${PERCENT_WORD})(?![a-z]))`, 'gu');
+/** Words that scale the number before them. */
+const SCALE = 'k|m|bn|mil|miles|millon(?:es)?|thousand|million|billion|mille|milliers?|millions?|milliards?|mila|milion[ei]|miliard[oi]|tausend|millionen|milliarden?|milhao|milhoes|bilhoes';
+const THOUSANDS = /(?<![\p{N}.,])(\p{N}{1,3})\s?(?:k|mil|thousand|mille|mila|tausend)(?![a-z])/gu;
 /** "1 000" (the French way) is one number. */
 const NUMBER = /\p{N}{1,3}(?: \p{N}{3})+(?!\p{N})|\p{N}+(?:[.,]\p{N}+)*/gu;
 const wholeOf = (n: string) => (/^\p{N}{1,3}(?:[., ]\p{N}{3})+$/u.test(n) ? n.replace(/[., ]/g, '') : /^\p{N}+$/u.test(n) ? n : null);
@@ -76,14 +95,16 @@ const decimalOf = (n: string) => (/^\p{N}+[.,](?:\p{N}{1,2}|\p{N}{4,})$/u.test(n
  * is replaced by a mark and the text is folded. Then:
  *   · nothing may be glued to a placeholder (a letter, a digit, a sign), and two placeholders may not join into one
  *     number: "60{{f:x}}", "{{days}}{{days}}", "60.{{days}}";
- *   · {{days}} and a typed window length count days and nothing else: "60 días" yes, "60 mil dólares" no;
+ *   · {{days}} and a typed window length count calendar days and nothing else: "60 días" yes, "60 mil dólares" and
+ *     "60 sesiones" no; in the answer itself a typed length is the window that was read (`aside` lifts that for a
+ *     limitation and the next question, which may name the other one);
  *   · a percentage is code's to write. The model may say back a percentage the person wrote ("your 10%") and may
  *     use the bare word ("a percentage of what you hold"); it may not state one of its own, in digits or in words;
  *   · any other number is allowed only when it is part of a name ("S&P 500", "24/7") or is a number the person
  *     wrote, as a whole number of theirs: their 1000 lets 1,000 through, never 100 nor 10.00; a name in their
  *     question ("Nasdaq 100") lends no number at all.
  */
-function refuse(text: string, figures: Map<string, Figure>, question: string, days: number | null): Refusal | null {
+function refuse(text: string, figures: Map<string, Figure>, question: string, days: number | null, aside = false): Refusal | null {
   // The marks code puts in place of a number (here, and for the second reader) are code's: a draft that types one is refused.
   if (new RegExp(`[${MARKS}\u27E6\u27E7]`).test(text)) return { code: 'bad_placeholder', detail: 'a character only the app writes' };
   for (const match of text.matchAll(PLACEHOLDER)) {
@@ -92,15 +113,22 @@ function refuse(text: string, figures: Map<string, Figure>, question: string, da
     if (!figure) return { code: 'unknown_figure', detail: id };
     if (kind === 'f' ? figure.value === null : kind === 'd' ? !figure.day : !figure[kind as 'from' | 'to']) return { code: 'figure_without_value', detail: figure.id };
   }
+  // Read on the text as written, before folding hides them: a keycap's enclosing mark, and a number that is a letter (Ⅻ).
+  if (/\u20E3/.test(text)) return { code: 'typed_number', detail: 'an emoji' };
+  const lettered = /\p{Nl}/u.exec(text);
+  if (lettered) return { code: 'typed_number', detail: lettered[0] };
   let own = read(text.replace(PLACEHOLDER, (_, key: string) => (key === 'days' ? COUNT : MARK)));
   if (/\{\{|\}\}/.test(own)) return { code: 'bad_placeholder', detail: own.match(/\{\{[^}]{0,30}|[^{]{0,30}\}\}/)?.[0] ?? '' };
-  const glued = new RegExp(`[\\p{L}\\p{N}%+\\-−][${MARKS}]|[${MARKS}][\\p{L}\\p{N}%]`, 'u').exec(own);
+  const glued = new RegExp(`[\\p{L}\\p{N}%+\\-−$€£¥₿][${MARKS}]|[${MARKS}][\\p{L}\\p{N}%]`, 'u').exec(own);
   if (glued) return { code: 'bad_placeholder', detail: `glued: ${marksShown(glued[0])}` };
+  // A figure is whole as code writes it: a word after it that scales it ("millones", "k") makes another number.
+  const scaled = new RegExp(`[${MARKS}]\\s?(?:${SCALE})(?![a-z])`).exec(own);
+  if (scaled) return { code: 'bad_placeholder', detail: `scaled: ${marksShown(scaled[0])}` };
   const joined = new RegExp(`[${MARKS}][.,]?[${MARKS}]|\\p{N}[.,][${MARKS}]|[${MARKS}][.,]\\p{N}`, 'u').exec(own);
   if (joined) return { code: 'bad_placeholder', detail: `joined: ${marksShown(joined[0])}` };
   for (const match of own.matchAll(new RegExp(COUNT, 'g'))) if (!countsDays(own, match.index!, 1)) return { code: 'bad_placeholder', detail: '{{days}} counts days: write the word for days after it' };
-  // No emoji (the instructions say so): a keycap or a counting sign is a number too.
-  const picture = /\p{Extended_Pictographic}|\u20E3/u.exec(own);
+  // No emoji (the instructions say so): a counting sign or a flag is not a word.
+  const picture = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.exec(own);
   if (picture) return { code: 'typed_number', detail: 'an emoji' };
   own = withoutNames(own);
   let asked = withoutNames(read(question.replace(new RegExp(`[${MARKS}]`, 'g'), ' ')));
@@ -108,12 +136,21 @@ function refuse(text: string, figures: Map<string, Figure>, question: string, da
   const theirPercents = new Set([...asked.matchAll(WITH_PERCENT)].map((match) => sameQuantity(match[1])));
   for (const match of own.matchAll(WITH_PERCENT)) if (!theirPercents.has(sameQuantity(match[1]))) return { code: 'typed_number', detail: marksShown(match[0]) };
   own = own.replace(WITH_PERCENT, ' '); asked = asked.replace(WITH_PERCENT, ' ');
-  if (/[%‰٪]/.test(own)) return { code: 'typed_number', detail: '%' };
+  if (/[%‰‱٪]/.test(own)) return { code: 'typed_number', detail: '%' };
+  for (const match of own.matchAll(BARE_PERCENT)) if (!match[1]) return { code: 'typed_number', detail: match[0] };
+  // Their thousands in short ("10k", "10 mil") are the whole number, and lend it; the 10 alone is not a number they wrote.
+  const thousands: string[] = [];
+  asked = asked.replace(THOUSANDS, (_, n: string) => { thousands.push(String(Number(n) * 1000)); return ' '; });
+  // The same short form in the draft is read as the number it says: "tus 10 mil" is their 10,000; "60 mil" is nobody's 60,000.
+  own = own.replace(THOUSANDS, (_, n: string) => ` ${Number(n) * 1000} `);
   const said = [...asked.matchAll(NUMBER)].map((match) => match[0]);
-  const theirs = new Set(said), wholes = new Set(said.map(wholeOf)), decimals = new Set(said.map(decimalOf));
+  const theirs = new Set(said), wholes = new Set([...said.map(wholeOf), ...thousands]), decimals = new Set(said.map(decimalOf));
   for (const match of own.matchAll(NUMBER)) {
     const typed = match[0], whole = wholeOf(typed), decimal = decimalOf(typed);
-    if (LENGTHS.has(typed) && countsDays(own, match.index!, typed.length)) continue;
+    // A typed length counts days, and in the answer itself it is the window that was read (or stands in a list of both):
+    // "en los últimos 60 días" over a 30-day read is a number of the model's. A limitation or a next question may name either.
+    if (LENGTHS.has(typed) && countsDays(own, match.index!, typed.length)
+      && (aside || days === null || typed === String(days) || IN_A_LIST.test(own.slice(match.index! + typed.length)) || AFTER_A_LENGTH.test(own.slice(0, match.index!)))) continue;
     if (theirs.has(typed) || (whole !== null && wholes.has(whole)) || (decimal !== null && decimals.has(decimal))) continue;
     return { code: 'typed_number', detail: typed };
   }
@@ -238,7 +275,7 @@ export function present(draft: Draft, analysis: Analysis | null, question: strin
   const gist = draft.gist.trim(), text = draft.text.trim(), next = draft.next.trim();
   if (!gist || !text) return { ok: false, refusal: { code: 'empty', detail: '' } };
   const days = analysis?.windowDays ?? null;
-  for (const part of [gist, text, next, ...draft.limitations]) { const refusal = refuse(part, figures, question, days); if (refusal) return { ok: false, refusal }; }
+  for (const [n, part] of [gist, text, next, ...draft.limitations].entries()) { const refusal = refuse(part, figures, question, days, n > 1); if (refusal) return { ok: false, refusal }; }
   for (const claim of draft.claims) {
     // The model may name the subject by its name: code turns it into the symbol, as for a tool.
     const top = resolveMention(claim.top)?.symbol ?? claim.top;
@@ -247,14 +284,18 @@ export function present(draft: Draft, analysis: Analysis | null, question: strin
   }
   const written = write(text, figures, days, language, locale), front = write(gist, figures, days, language, locale);
   if (front.length > 200 || written.length > 1100) return { ok: false, refusal: { code: 'too_long', detail: `${front.length}/${written.length}` } };
-  const used = [...new Set([...`${gist} ${text}`.matchAll(PLACEHOLDER)].filter((match) => match[1] !== 'days').map((match) => match[1].split(':')[1]))];
+  // Every figure a person will read is listed and referenced, wherever the model put it: in the text, in a limitation
+  // or in the next question. (The sentence in front is always part of the text.)
+  const used = [...new Set([...[text, next, ...draft.limitations].join(' ').matchAll(PLACEHOLDER)].filter((match) => match[1] !== 'days').map((match) => match[1].split(':')[1]))];
   // The analysis's own limits are always on the answer, in code's words; the model's come after them.
   const fixed = draft.kind === 'analysis' ? limitationsInWords(analysis, language) : [];
   const limitations = [...fixed, ...draft.limitations.map((line) => write(line, figures, days, language, locale)).filter((line) => line && !fixed.includes(line))].slice(0, 5);
   // The sentence in front is always the exact start of the text, as in the companion's contract. When the model's
   // gist is not how its text begins, the text's own first sentence stands in front: nothing is said twice.
   // A full stop after a digit ("16. September") or after a single letter ("U.S.") does not end a sentence.
-  const opening = written.startsWith(front) ? front : (/^.{12,200}?(?<!\p{N}|(?<!\p{L})\p{L})[.!?…](?=\s|$)/su.exec(written)?.[0] ?? written.slice(0, 200));
+  // A text is never cut to make one: a first sentence that does not end within 200 characters sends the draft back.
+  const opening = written.startsWith(front) ? front : (/^.{12,200}?(?<!\p{N}|(?<!\p{L})\p{L})[.!?…](?=\s|$)/su.exec(written)?.[0] ?? (written.length <= 200 ? written : null));
+  if (opening === null) return { ok: false, refusal: { code: 'too_long', detail: 'the first sentence' } };
   // The model's own words, for the second reader of an analysis: what code wrote is a mark, so any quantity left is the model's.
   const marked = (part: string) => part.replace(PLACEHOLDER, (_, key: string) => (key === 'days' ? String(days ?? '') : key.startsWith('f:') ? FIGURE_MARK : DATE_MARK)).replace(/[ \t\r\n]+/g, ' ').trim();
   const own: OwnWords = { text: marked(text), limitations: draft.limitations.map(marked).filter(Boolean), next: next ? marked(next) : null };

@@ -108,8 +108,13 @@ export async function reservedCall(store: AgentStore, budget: Budget, task: stri
     const reserved = await store.reserve(budget, task, request.model, reserveUsd, now());
     if (!reserved.ok) return { ok: false, code: reserved.code, detail: null, usd: 0, reservedUsd: 0, outcome: 'none' };
     attemptId = reserved.attemptId;
-    await store.dispatch(attemptId);
   } catch {
+    return { ok: false, code: 'storage_unavailable', detail: null, usd: 0, reservedUsd: 0, outcome: 'none' };
+  }
+  // No call has left yet: a reservation that cannot be dispatched is given back (best effort), so storage that
+  // failed once holds no money until the day turns.
+  try { await store.dispatch(attemptId); } catch {
+    await store.settle(attemptId, 'no_charge', null).catch(() => undefined);
     return { ok: false, code: 'storage_unavailable', detail: null, usd: 0, reservedUsd: 0, outcome: 'none' };
   }
   let attempt: ModelAttempt;

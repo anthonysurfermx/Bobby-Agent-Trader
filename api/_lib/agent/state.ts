@@ -22,9 +22,13 @@ export const taskError = (task: Pick<Task, 'steps'>): string | null => (task.ste
 /** What a client may be told of the work so far. Tool names only: never arguments, thoughts or provider text. */
 export function taskEvents(task: Pick<Task, 'steps'>): AgentEvent[] {
   const events: AgentEvent[] = [];
+  const open = new Set<string>();
   for (const step of task.steps) {
     if (step.kind === 'received') events.push({ type: 'received' });
-    else if (step.kind === 'tool_call') events.push({ type: 'tool_started', tool: String(step.data.tool) }, { type: 'tool_finished', tool: String(step.data.tool) });
+    // A metered tool says it starts before it asks its sources (a step of its own); a free one starts and finishes in one.
+    // A run repeated after it died writes the start twice: a person is told once.
+    else if (step.kind === 'tool_started') { const tool = String(step.data.tool); if (!open.has(tool)) { open.add(tool); events.push({ type: 'tool_started', tool }); } }
+    else if (step.kind === 'tool_call') { const tool = String(step.data.tool); if (!open.has(tool)) events.push({ type: 'tool_started', tool }); open.delete(tool); events.push({ type: 'tool_finished', tool }); }
     else if (step.kind === 'approval_requested') events.push({ type: 'approval_pending', scope: step.data.scope as ApprovalScope });
     else if (step.kind === 'answer') events.push((step.data.result as TaskResult).presentation.kind === 'clarification' ? { type: 'clarification_needed' } : { type: 'answer' });
     else if (step.kind === 'error') events.push({ type: 'error', code: String(step.data.code) });
@@ -37,7 +41,7 @@ export function taskUsage(task: Pick<Task, 'steps'>): { modelCalls: number; tool
   // `reads` is what the person ended up using: a read given back (no evidence came) is not counted.
   let modelCalls = 0, toolCalls = 0, usd = 0, unknownUsd = 0, reads = 0, given = 0;
   for (const step of task.steps) {
-    if (step.kind === 'answer' || step.kind === 'error') usd += Number(step.data.readerUsd ?? 0);
+    if (step.kind === 'answer' || step.kind === 'error' || step.kind === 'cancelled') usd += Number(step.data.readerUsd ?? 0);
     if (step.kind === 'model_call') { modelCalls++; if (step.data.outcome === 'unknown') unknownUsd += Number(step.data.reservedUsd ?? 0); else usd += Number(step.data.usd ?? 0); }
     else if (step.kind === 'tool_call') { toolCalls++; if (step.data.refunded === true) reads -= given; }
     else if (step.kind === 'cancelled' && step.data.readGivenBack === true) reads -= given;
