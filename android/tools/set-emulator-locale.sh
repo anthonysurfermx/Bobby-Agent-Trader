@@ -8,9 +8,18 @@ case "$1" in
   pt) device_locale=pt-BR ;; it) device_locale=it-IT ;; de) device_locale=de-DE ;;
   *) echo 'Unsupported release locale.' >&2; exit 1 ;;
 esac
-adb root
-adb wait-for-device
-[ "$(adb shell id -u | tr -d '\r')" = 0 ] || { echo 'The disposable image must support adb root.' >&2; exit 1; }
+# A cold image can restart adbd just after boot; retry that transport transition,
+# then still require actual root and the exact system locale before running a test.
+locale_root_ready=false
+for locale_root_attempt in $(seq 1 5); do
+  adb wait-for-device
+  if adb root; then
+    adb wait-for-device
+    if [ "$(adb shell id -u | tr -d '\r')" = 0 ]; then locale_root_ready=true; break; fi
+  fi
+  sleep 2
+done
+[ "$locale_root_ready" = true ] || { echo 'The disposable image must support adb root.' >&2; exit 1; }
 adb shell settings put system system_locales "$device_locale"
 adb shell setprop persist.sys.locale "$device_locale"
 adb shell setprop sys.boot_completed 0

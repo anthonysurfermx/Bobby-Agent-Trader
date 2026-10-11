@@ -27,7 +27,10 @@ argument=-Pandroid.testInstrumentationRunnerArguments
 mkdir -p "$out/shots"
 rm -f "$out/instrumentation-crash.txt"
 if [ "${BOBBY_TEST_LOCALE:-suite}" != suite ]; then
-  bash tools/set-emulator-locale.sh "$BOBBY_TEST_LOCALE" || exit 1
+  bash tools/set-emulator-locale.sh "$BOBBY_TEST_LOCALE" || {
+    adb logcat -d -v threadtime > "$out/locale-startup.txt" 2>&1 || true
+    exit 1
+  }
 fi
 adb shell mkdir -p "$device_shots"
 # An emulator that draws in software sometimes shows "isn't responding" for its own launcher, over
