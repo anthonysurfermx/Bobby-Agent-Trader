@@ -54,7 +54,7 @@ jobs:
         run: python3 android/tools/export-public-client-config.py
       - name: Build, test and lint Android
         working-directory: android
-        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:lintDebug :app:bundleRelease :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease --no-daemon
+        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:lintDebug :app:bundleRelease :app:assembleRelease :app:testReleaseUnitTest :app:lintRelease --no-daemon --stacktrace
       - name: Inspect the unsigned Play bundle
         if: matrix.fcm == 'false'
         working-directory: android

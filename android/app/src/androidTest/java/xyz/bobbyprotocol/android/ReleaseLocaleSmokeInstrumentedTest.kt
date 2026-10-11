@@ -322,8 +322,17 @@ class ReleaseLocaleSmokeInstrumentedTest {
         val x = (xy[0] + position.getDouble(0)*scale).toFloat()
         val y = (xy[1] + position.getDouble(1)*scale).toFloat()
         val down = SystemClock.uptimeMillis()
-        MotionEvent.obtain(down,down,MotionEvent.ACTION_DOWN,x,y,0).also { instrumentation.sendPointerSync(it); it.recycle() }
-        MotionEvent.obtain(down,down+30,MotionEvent.ACTION_UP,x,y,0).also { instrumentation.sendPointerSync(it); it.recycle() }
+        // Queue both real touchscreen events without waiting for the overloaded WebView
+        // to acknowledge DOWN: synchronous acknowledgement can turn a 30ms tap into a hold.
+        MotionEvent.obtain(down,down,MotionEvent.ACTION_DOWN,x,y,0).also {
+            check(instrumentation.uiAutomation.injectInputEvent(it, false)) { "Touch DOWN was refused" }
+            it.recycle()
+        }
+        SystemClock.sleep(30)
+        MotionEvent.obtain(down,down+30,MotionEvent.ACTION_UP,x,y,0).also {
+            check(instrumentation.uiAutomation.injectInputEvent(it, false)) { "Touch UP was refused" }
+            it.recycle()
+        }
     }
     private fun domVisible(id: String): Boolean = js("(function(){var e=document.getElementById(${JSONObject.quote(id)}),r=e.getBoundingClientRect(),s=getComputedStyle(e),h=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.width>0 && r.height>0 && s.visibility==='visible' && s.pointerEvents!=='none' && h && (h===e || e.contains(h));})()") == true
     private fun close() { device.pressBack(); compose.mainClock.advanceTimeBy(1000); Thread.sleep(800); assertFalse("Back must close the sheet, not finish Bobby", activity.isFinishing || activity.isDestroyed) }
