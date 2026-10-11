@@ -34,6 +34,7 @@ adb shell mkdir -p "$device_shots"
 # the screen being photographed: the system is asked not to show those windows.
 adb shell settings put global hide_error_dialogs 1 || true
 adb logcat -c || true
+: > "$out/logcat.txt"
 adb logcat -v threadtime > "$out/logcat.txt" 2>&1 &
 logcat=$!
 

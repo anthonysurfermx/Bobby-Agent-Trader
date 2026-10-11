@@ -2,9 +2,10 @@
 # WebMessageListener, which does not require JavaScriptInterface reflection.
 -keepattributes Signature,InnerClasses,EnclosingMethod
 
-# AndroidX instrumentation shares the app's Kotlin runtime. Its null checks are external
-# calls that app-only shrinking cannot see; preserve this one runtime class across both APKs.
--keep class kotlin.jvm.internal.Intrinsics { *; }
+# The independently compiled instrumentation APK shares the app's Kotlin standard runtime.
+# App-only R8 removes/inlines its facades (observed Intrinsics and LazyKt startup failures),
+# so preserve this library's ABI across both APKs while Bobby and other libraries stay optimized.
+-keep class kotlin.** { *; }
 
 # AndroidJUnitRunner calls the shared AndroidX tracing facade before JUnit starts. Release-only
 # shrinking otherwise removes it because application tracing is inlined/disabled.
