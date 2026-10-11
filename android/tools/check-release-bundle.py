@@ -13,6 +13,11 @@ android = '{http://schemas.android.com/apk/res/android}'
 manifest = ET.fromstring(subprocess.check_output([
     'java', '-jar', str(bundletool), 'dump', 'manifest', '--bundle=' + str(bundle)
 ]))
+bundle_config = json.loads(subprocess.check_output([
+    'java', '-jar', str(bundletool), 'dump', 'config', '--bundle=' + str(bundle)
+]))
+dimensions = bundle_config.get('optimizations', {}).get('splitsConfig', {}).get('splitDimension', [])
+assert any(d.get('value') == 'LANGUAGE' and d.get('negate') is True for d in dimensions), 'Runtime language picker needs all language resources in the base APK'
 assert manifest.attrib['package'] == 'xyz.bobbyprotocol.bobby'
 assert manifest.attrib[android + 'versionName'] == '1.2.0'
 assert manifest.attrib[android + 'versionCode'] == '10'
@@ -51,6 +56,6 @@ result = {'file': bundle.name, 'sourceCommit': subprocess.check_output(['git', '
           'bytes': bundle.stat().st_size, 'version': '1.2.0 (10)', 'targetSdk': 36,
           'package': manifest.attrib['package'], 'minSdk': int(manifest.find('uses-sdk').attrib[android + 'minSdkVersion']),
           'unsigned': True, 'debuggable': False, 'cleartext': False, 'allowBackup': False,
-          'permissions': permissions, 'firebaseComponents': False, 'nativeLibraries': libraries}
+          'permissions': permissions, 'firebaseComponents': False, 'languageSplits': False, 'nativeLibraries': libraries}
 print(json.dumps(result, indent=2))
 Path('app/build/outputs/bundle/release/evidence.json').write_text(json.dumps(result, indent=2) + '\n')

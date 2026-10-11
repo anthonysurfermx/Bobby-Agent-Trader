@@ -39,6 +39,8 @@ android {
         buildConfigField("String", "FCM_API_KEY", quoted(config("BOBBY_FCM_API_KEY")))
     }
     buildFeatures { compose = true; buildConfig = true }
+    // The in-app six-language picker must also work after Play installs a device-specific APK.
+    bundle { language { enableSplit = false } }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
     val uploadKeystore = config("BOBBY_ANDROID_KEYSTORE")
