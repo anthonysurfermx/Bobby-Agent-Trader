@@ -374,3 +374,11 @@ I-1a follow-up pins: `NucleoBridgeTests.testExpiredConversationConfirmationStart
 `NativeSpeechPipelineTests.testNativeSessionTellsThePageAboutTheAgreementAndWithdrawsItWithTheAIPermission` now explicitly starts at risk version0 (off-device start blocked), then accepts the current notice before the unchanged Apple consent/start/withdrawal assertions. Requirement1.1 forbids off-device speech before risk acceptance; this also removes an inherited test-order dependency exposed by the isolated speech run.
 
 Additional guarantees: `NucleoBridgeTests.testCancelledExplanationResentFromHeldDraftKeepsUUIDAndPrevious` preserves the original server body on a cancelled unaccepted turn(4.1.7/7.10); `testFailedOrLostAssetExplanationReplaysExactCandidateAndUUID` retains exact candidate metadata and permits an explicit replay of the last delivered explanation when its bridge reply was lost(7.10). The page test `a spoken failure cancelled into a held draft resends only its retry UUID` keeps retry params free of plain-only fields(4.5.3/4.6.2). Typed/spoken origin and original after/retry params remain RAM-only with a held draft; the source words never enter persistent storage.
+
+
+A10 second resume: the shared input-pipeline typed-background assertion is restored
+exactly for every surface; adapter additions stay. The native conversation retry
+pin now retains UUID/question/language/previous after background. Existing HOLD
+background/final-transcript pins stand unchanged. New bridge-boot tests exercise
+actual tap/typing/failure/answer lifecycle and native limit refresh. WithoutHelp
+adds real app background/foreground tests and multiline field growth/scroll checks.

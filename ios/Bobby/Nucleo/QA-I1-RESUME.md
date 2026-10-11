@@ -18,12 +18,33 @@ JS and language logs: `resume-page4.log`, `resume-languages2.log`.
 Diagnostic captures: `resume-focused/iphone-17-pro-es/`, with manifest and index.
 Signed app: `../_harness/ios/dd/Build/Products/Debug-iphonesimulator/Bobby.app`.
 
-## Pending checkpoint
+## Second resume: A10, 2026-10-11
 
-**I-1a is not READY.** SPEC 12.2 requires Claude review for an unlisted cross-tree pin change. The proposed exception is in `scripts/test-nucleo-input-pipeline.mjs`: current native/app background requires empty draft and IDLE, per Addendum A2; web, onboarding and historical-source pins retain their existing expectations. The adapter now loads the actual conversation reset and RAM declarations. Its pointer-retry assertion remains unchanged and exposed a real stale-gesture bug, now fixed. The concrete exception is posted in the shared `codex-status.md`; approval is pending. No checkpoint push or I-1b start occurred.
+Claude refused the cross-tree exception and corrected A2 through A10. The original
+all-surface `background/foreground events do not submit or discard a typed draft`
+assertion is restored exactly. The adapter still loads the actual lifecycle helpers.
+Pointer ownership, pending permission and native speech are cancelled on background;
+visible typed/heard drafts, failures with retry UUID/previous, and the answer remain
+in RAM. Native formats the original limit deadline again on return.
 
-Visual review also found the appended dictation wrapping into a clipped second line in diagnostic `23-without-help-appended.png`. This set must not be promoted. `58-level-repriced-no-read.png` still shows the native sheet; the final repriced-state capture must wait for dismissal. The approved failure/recovered-answer composition remains intact. Frozen Spanish Pro and SE +1 matrices remain outstanding.
+`NucleoBridgeTests.testConversationRetryKeepsUUIDLanguageQuestionAndPreviousAndNeverReadsMarket`
+now expects the kept retry after background, per A10. The HOLD pins in
+`NativeSpeechPipelineTests` and the input pipeline remain unchanged.
 
-Interactive prototype review is unverified: browser URL policy blocked `file://`. Physical iPhone speech, audio routing, playback, haptics, VoiceOver and real purchases were not tested. Live tests remain **not run: address limit**; no production requests, archive, Apple upload, merge or authored changes to the forbidden product trees.
+The field now measures after its actual width, font and button padding are placed,
+grows in complete lines up to four, and scrolls beyond that. Capture 58 waits for
+absence of the native level sheet. Neither previous diagnostic set is promoted.
 
-Both saved runs removed result bundles and owned capture simulators. No simulator remains booted.
+Current fast gates: page **311/311**, input **1512/1512**, language **13/13**,
+localization **1384 keys / 1444 rows**, untouched production web build passed.
+Signed full native/UI rerun and the frozen Spanish Pro / SE +1 matrices are pending;
+**I-1a is not READY** until those results and every image are reviewed.
+
+Evidence is under `a10-*` at the shared harness root. The initial `a10-focused`
+binary predates the native A2 pin inversion and the deadline snapshot addition;
+keep its results as diagnostics and use the corrected rerun for completion.
+
+Interactive prototype review remains unverified (the earlier browser blocked
+`file://`). Physical iPhone speech, audio routing, playback, haptics, VoiceOver and
+real purchases are unverified. Live tests remain **not run: address limit**.
+No live request, archive, Apple upload, merge or authored forbidden-tree change.
