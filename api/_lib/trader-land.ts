@@ -384,7 +384,7 @@ export type CloseResult = { ok: true; closed: ClosedThesis } | { ok: false; stat
  * then commit bloom, counters, ledger and season piece in one transaction.
  * Retries return the stored review; concurrent clients cannot claim it twice.
  */
-export async function closeSeed(identity: { id: string; wallet: string | null }, inventoryId: string, opts: { platform: 'ios' | 'web'; tzOffsetMin: number; now?: Date }): Promise<CloseResult> {
+export async function closeSeed(identity: { id: string; wallet: string | null }, inventoryId: string, opts: { platform: 'ios' | 'web' | 'android'; tzOffsetMin: number; now?: Date }): Promise<CloseResult> {
   const now = opts.now ?? new Date();
   const r = await fetch(bobbyRest(`tl_inventory?id=eq.${inventoryId}&identity_id=eq.${identity.id}&select=id,item_id,state,seeded_at,event_id,horizon_hours&limit=1`), { headers: bobbyServiceHeaders() });
   if (!r.ok) throw new Error('Seed read failed');
@@ -422,7 +422,7 @@ async function closedLedgerFields(identityId: string, inventoryId: string): Prom
   return { xp: row.awarded, aura: row.aura ?? 0, xpAfter: row.xp_after, ledgerEventId: row.id };
 }
 
-async function commitSeedReview(identityId: string, seed: SeedRow, opts: { platform: 'ios' | 'web'; tzOffsetMin: number }, closed: Record<string, unknown>): Promise<CloseResult> {
+async function commitSeedReview(identityId: string, seed: SeedRow, opts: { platform: 'ios' | 'web' | 'android'; tzOffsetMin: number }, closed: Record<string, unknown>): Promise<CloseResult> {
   const result = await rpc<{ ok: true; replay?: boolean; closed: ClosedThesis & { seasonItemId?: string | null } }>('bobby_close_seed', {
     p_identity: identityId, p_inventory: seed.id, p_hours: horizonHours(seed.horizon_hours),
     p_platform: opts.platform, p_tz: opts.tzOffsetMin, p_closed: closed, p_season: SEASON.pieces,
