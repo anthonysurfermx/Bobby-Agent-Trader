@@ -48,3 +48,8 @@ Interactive prototype review remains unverified (the earlier browser blocked
 `file://`). Physical iPhone speech, audio routing, playback, haptics, VoiceOver and
 real purchases are unverified. Live tests remain **not run: address limit**.
 No live request, archive, Apple upload, merge or authored forbidden-tree change.
+
+Final Spanish SE3 at +1 from `bd0e14be`: **60/60 UI passed**, 65 numbered
+PNGs exported under `i1a-final-se/iphone-se3-es-plus1`. Every-image visual
+review is in progress. Pro full native/UI, compatibility and actual HOLD
+verification remain pending; this is still **not I-1a READY**.
