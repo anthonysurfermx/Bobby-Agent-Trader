@@ -194,7 +194,7 @@ final class ConversationShots: ConversationFixtureCase {
         launch(); ask("Bitcoin"); ready(button("risk.notNow")); confirmLevel.tap()
         ready(app.buttons["nucleo.level.profundo"]); app.buttons["nucleo.level.profundo"].tap()
         let sheetOption = app.buttons["nucleo.level.profundo"]
-        if sheetOption.exists { app.swipeDown() }
+        ready(app.buttons["nucleo-level-close"]); app.buttons["nucleo-level-close"].tap()
         let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format:"exists == false"), object:sheetOption)
         XCTAssertEqual(XCTWaiter.wait(for:[gone],timeout:10),.completed)
         ready(button("risk.notNow"))
