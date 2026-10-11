@@ -11,6 +11,11 @@
 # removed by app-only shrinking). Preserve that library ABI; Bobby classes remain optimized.
 -keep class kotlinx.coroutines.** { *; }
 
+# The external Compose test clock/idling engine calls runtime APIs absent from application-only
+# reachability (observed InfiniteAnimationPolicy). Preserve this library ABI for the identical
+# instrumented/shipping release; Bobby's own composables and domain classes still undergo R8.
+-keep class androidx.compose.** { *; }
+
 # AndroidJUnitRunner calls the shared AndroidX tracing facade before JUnit starts. Release-only
 # shrinking otherwise removes it because application tracing is inlined/disabled.
 -keep class androidx.tracing.Trace { *; }
