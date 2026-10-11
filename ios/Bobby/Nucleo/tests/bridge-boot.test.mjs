@@ -802,3 +802,28 @@ test('the fact fixture is separate from narration and retains its source and yea
   assert.equal(app.calls.filter(c=>c.method==='speak').at(-1).params.text,fixture.reply.text);
   assert.deepEqual(app.errors,[]);
 });
+
+function leaveAndReturn(app){app.context.nucleoBridge.emit('app.state',{state:'background'});app.context.nucleoBridge.emit('app.state',{state:'active'});}
+test('A10: typed background keeps exact Unicode words without any send',async()=>{
+ const app=await idle();app.nodes.get('ui').children.find(node=>node.id==='conversation-keyboard')._guideAction();app.nodes.get('ta').value='¿Qué es un ETF? 123,45 €';
+ leaveAndReturn(app);app.advance(12);await flush();
+ assert.equal(app.context.nucleo.state(),'TYPING');assert.equal(app.nodes.get('ta').value,'¿Qué es un ETF? 123,45 €');assert.equal(asksOf(app).length,0);assert.deepEqual(app.errors,[]);
+});
+test('A10: tap capture cut by background becomes a stopped held draft and rejects the late final',async()=>{
+ const app=await idle();app.session.mic.state='granted';tap(app,app.nodes.get('pill'));await flush();
+ app.context.nucleoBridge.emit('speech.partial',{text:'my complete words'});leaveAndReturn(app);
+ app.context.nucleoBridge.emit('speech.final',{text:'late words'});app.advance(12);await flush();
+ assert.equal(app.context.nucleo.state(),'HELD_DRAFT');assert.equal(app.nodes.get('ui').children.find(node=>node.id==='conversation-draft').textContent,'my complete words');assert.ok(app.nodes.get('hint').textContent.includes('Your question is still here'));assert.equal(asksOf(app).length,0);assert.deepEqual(app.errors,[]);
+});
+test('A10: background keeps the failure and retry id, then explicit retry uses it',async()=>{
+ const app=await idle(),id='90d2564c-6064-4275-95cd-5a3c7c0b5b56';
+ await companionReply(app,{status:'companion_error',requestId:id,code:'unavailable',retryable:true});
+ leaveAndReturn(app);app.advance(12);await flush();assert.equal(app.context.nucleo.state(),'COMPANION');assert.equal(guideActionsOf(app).children.length,1);
+ guideActionsOf(app).children[0]._guideAction();await flush();assert.deepEqual(asksOf(app).at(-1),{retry:id});assert.deepEqual(app.errors,[]);
+});
+test('A10: background keeps the answer and drops an invitation that has not arrived',async()=>{
+ const app=await idle({speak:'queued'});
+ await companionReply(app,{status:'companion',requestId:'90d2564c-6064-4275-95cd-5a3c7c0b5b56',gist:'First sentence.',text:'First sentence. More detail.',followUp:'Next question?',questionSpoken:true});
+ leaveAndReturn(app);app.advance(12);await flush();
+ assert.equal(app.context.nucleo.state(),'COMPANION');assert.equal(companionPanel(app).children[0].children[0].textContent,'First sentence.');assert.equal(guideActionsOf(app).children.length,0);assert.equal(asksOf(app).length,1);assert.deepEqual(app.errors,[]);
+});

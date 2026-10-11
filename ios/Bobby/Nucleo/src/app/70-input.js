@@ -113,13 +113,22 @@ function showTypeBox(on){
 function focusTa(){ try { el.typeBox.style.visibility = 'visible'; el.ta.focus({ preventScroll: true }); } catch (e) { try { el.ta.focus(); } catch (x) {} } }
 function taAutosize(){
   el.ta.style.height = 'auto';
-  var h = el.ta.value ? Math.min(116, Math.max(50, el.ta.scrollHeight || 50)) : 50; el.ta.style.height = h + 'px'; TB.h = h;
+  var line = parseFloat(el.ta.style.lineHeight) || 22, padding = 28, max = padding + 4 * line;
+  el.ta.style.maxHeight = max + 'px';
+  var lines = Math.max(1, Math.ceil(((el.ta.scrollHeight || 50) - padding) / line));
+  var h = padding + Math.min(4, lines) * line;
+  el.ta.style.height = h + 'px'; TB.h = h;
   el.taSend.disabled = TB.composing || !el.ta.value.trim();
 }
 function placeTypeBox(){
   if (!el.typeBox) return;
   var s = fitS || 1, vv = W.visualViewport, bottom = vv ? vv.offsetTop + vv.height : W.innerHeight;
-  var w = 350 * s, left = fitX + 20 * s, fs = Math.max(16, 17 * s);
+  var w = 350 * s, left = fitX + 20 * s, fs = Math.max(16, 17 * (SES && SES.textScale || 1));
+  var metrics = w.toFixed(1) + ':' + fs.toFixed(1);
+  st(el.typeBox, 'width', Math.round(w) + 'px');
+  st(el.ta, 'fontSize', fs.toFixed(1) + 'px');
+  st(el.ta, 'lineHeight', Math.ceil(fs * 22 / 17) + 'px');
+  if (TB.metrics !== metrics){ TB.metrics = metrics; taAutosize(); }
   var pillTop = fitY + 742 * s, rest = Math.min(pillTop + 56 * s - TB.h, bottom - TB.h - 12);
   var p = A ? clamp(A.type.p.x, 0, 1.2) : 1, y = lerp(pillTop + 8 * s, rest, p);
   st(el.typeBox, 'width', Math.round(w) + 'px'); st(el.typeBox, 'left', Math.round(left) + 'px'); st(el.typeBox, 'top', Math.round(y) + 'px');

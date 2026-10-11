@@ -1446,7 +1446,7 @@ final class NucleoSession: ObservableObject {
         readHandoff = nil
         dropReadOffer()
         speech.cancel()
-        desk.clearConversation()
+        // A10: failed turns, retry ids and the last exchange remain in session RAM.
         nucleoVoice.stop()
         emit("app.state", ["state": "background"])
     }

@@ -65,6 +65,26 @@ class ConversationFixtureCase: XCTestCase {
 }
 
 final class WithoutHelpUITests: ConversationFixtureCase {
+    func backgroundAndReturn() {
+        XCUIDevice.shared.press(.home)
+        Thread.sleep(forTimeInterval:1)
+        app.activate()
+    }
+    func testBackgroundKeepsTypedDraft() {
+        launch(); type(word("ex.1")); backgroundAndReturn(); ready(web.textViews.firstMatch)
+        XCTAssertEqual(web.textViews.firstMatch.value as? String,word("ex.1"))
+        XCTAssertFalse(button("aria.closeAnswer").exists); shot("61-background-typed-draft")
+    }
+    func testBackgroundKeepsHeardDraftWithoutSending() {
+        launch(); listening(); backgroundAndReturn(); ready(button("type.send"))
+        XCTAssertTrue(web.staticTexts[word("cap.stopped")].exists)
+        XCTAssertFalse(button("aria.closeAnswer").exists); type()
+        XCTAssertEqual(web.textViews.firstMatch.value as? String,word("ex.1")); shot("62-background-heard-draft")
+    }
+    func testBackgroundKeepsFailureRetry() {
+        launch("companion-retry"); ask(); ready(button("fail.retry")); backgroundAndReturn(); ready(button("fail.retry"))
+        shot("63-background-failure-kept"); button("fail.retry").tap(); answered()
+    }
     func testAskByVoice() {
         launch(); listening(); button("aria.sendSpoken").tap(); answered(); shot("21-without-help-voice")
     }
@@ -161,7 +181,11 @@ final class ConversationShots: ConversationFixtureCase {
     func test58LevelRepricesWithoutRead() {
         launch(); ask("Bitcoin"); ready(button("risk.notNow")); confirmLevel.tap()
         ready(app.buttons["nucleo.level.profundo"]); app.buttons["nucleo.level.profundo"].tap()
-        app.swipeDown(); ready(button("risk.notNow"))
+        let sheetOption = app.buttons["nucleo.level.profundo"]
+        if sheetOption.exists { app.swipeDown() }
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format:"exists == false"), object:sheetOption)
+        XCTAssertEqual(XCTWaiter.wait(for:[gone],timeout:10),.completed)
+        ready(button("risk.notNow"))
         XCTAssertTrue(web.buttons[nativeWord("deep")].waitForExistence(timeout:10))
         XCTAssertFalse(button("aria.cancelQuestion").exists); shot("58-level-repriced-no-read")
     }
