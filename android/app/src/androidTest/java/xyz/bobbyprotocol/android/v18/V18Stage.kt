@@ -216,10 +216,15 @@ object V18Shots {
         sendAwayNotResponding()
         shell("mkdir -p $FOLDER")
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        val bitmap = checkNotNull(automation.takeScreenshot()) { "Native screenshot failed" }
+        val captured = checkNotNull(automation.takeScreenshot()) { "Native screenshot failed" }
+        val bitmap = captured.copy(Bitmap.Config.ARGB_8888, false)
+            ?: error("Native screenshot pixel copy failed")
+        captured.recycle()
         try {
             bitmap.setHasAlpha(false)
-            val pipes = automation.executeShellCommandRw("cat > $FOLDER/$name.png")
+            // UiAutomation executes argv directly: redirection is not parsed. dd writes stdin to
+            // the capture file without echoing the PNG into a second pipe that could fill up.
+            val pipes = automation.executeShellCommandRw("dd of=$FOLDER/$name.png bs=65536")
             ParcelFileDescriptor.AutoCloseInputStream(pipes[0]).use { output ->
                 ParcelFileDescriptor.AutoCloseOutputStream(pipes[1]).use { input ->
                     check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, input)) { "PNG encoding failed" }
