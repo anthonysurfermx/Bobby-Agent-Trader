@@ -15,7 +15,7 @@
 // without them the app skips Apple's sheet and shows the manual steps.
 // Update EFFECTIVE_DATE whenever the substance changes.
 // Language: a supported ?lang value wins, then the saved choice and browser locale.
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Helmet } from 'react-helmet-async';
 import NucleoTopBar from '@/components/protocol/NucleoTopBar';
 import { useNucleoPages } from '@/hooks/useNucleoPages';
@@ -26,8 +26,8 @@ import { NEWS_PRIVACY_COPY } from '@/lib/news-privacy-copy';
 
 type PolicyLang = Lang;
 const EFFECTIVE_DATE: Record<PolicyLang, string> = {
-  en: 'October 7, 2026', es: '7 de octubre de 2026', fr: '7 octobre 2026',
-  pt: '7 de outubro de 2026', it: '7 ottobre 2026', de: '7. Oktober 2026',
+  en: 'October 11, 2026', es: '11 de octubre de 2026', fr: '11 octobre 2026',
+  pt: '11 de outubro de 2026', it: '11 ottobre 2026', de: '11. Oktober 2026',
 };
 const APPLE_STOP_USING_URL = 'https://support.apple.com/en-us/102571';
 
@@ -39,9 +39,9 @@ function policyLang(): PolicyLang {
   return lang();
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ id, title, children }: { id?: string; title: string; children: ReactNode }) {
   return (
-    <section className="mb-10">
+    <section id={id} className="mb-10">
       <h2 className="mb-3 text-[22px] text-white">{title}</h2>
       <div className="space-y-3 text-[15px] leading-7 text-white/75">{children}</div>
     </section>
@@ -57,6 +57,23 @@ const linkClass = 'text-white underline decoration-white/30 underline-offset-4 h
 export default function PrivacyPage() {
   useNucleoPages();
   const language = policyLang();
+  // The route is lazy-rendered; the browser may look for the anchor before it exists.
+  // Wait one frame after commit so router scroll restoration has also completed.
+  useEffect(() => {
+    let frame: number;
+    const scrollToNotes = () => {
+      cancelAnimationFrame(frame);
+      if (window.location.hash === '#notes') {
+        frame = requestAnimationFrame(() => document.getElementById('notes')?.scrollIntoView());
+      }
+    };
+    scrollToNotes();
+    window.addEventListener('hashchange', scrollToNotes);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('hashchange', scrollToNotes);
+    };
+  }, [language]);
   const news = NEWS_PRIVACY_COPY[language];
   const tr = (en: string, es: string) => (language === 'es' ? es : translateText(language, en));
   const strong = (text: string) => <span className="text-white">{text}</span>;
@@ -95,8 +112,8 @@ export default function PrivacyPage() {
           </p>
           <p>
             {tr(
-              'The iPhone app (version 1.5, build 45 onward) offers typed or dictated market questions, optional reply narration and Trader Land exploration. Dictation uses the microphone only while you hold the button, with your permission. From version 1.7, it is transcribed on your iPhone when the language is installed; otherwise, and only after you allow it, Apple’s speech service transcribes it. Bobby does not store the audio, and you can always type instead. The app does not connect wallets or execute trades. An optional Sign in with Apple account syncs progress and lets you publish your island; some analysis levels require an account and have usage limits. Bobby Pro subscribers can also opt in to scheduled market briefings with notifications.',
-              'La app para iPhone (versión 1.5, build 45 en adelante) ofrece preguntas de mercado por escrito o dictadas, narración opcional y exploración de Trader Land. El dictado usa el micrófono solo mientras mantienes pulsado el botón, con tu permiso. Desde la versión 1.7, se transcribe en tu iPhone si el idioma está instalado; si no, y solo después de que lo permitas, lo transcribe el servicio de voz de Apple. Bobby no guarda el audio y siempre puedes escribir. La app no conecta wallets ni ejecuta operaciones. Una cuenta opcional con Iniciar sesión con Apple sincroniza el progreso y permite publicar tu isla; algunos niveles de análisis requieren cuenta y tienen límites de uso. Quienes tienen Bobby Pro también pueden activar resúmenes de mercado programados con notificaciones.',
+              'The iPhone app (version 1.5, build 45 onward) offers typed or dictated market questions, optional reply narration and Trader Land exploration. Dictation uses the microphone only after you tap the microphone button and until you send or cancel, with your permission. From version 1.7, it is transcribed on your iPhone when the language is installed; otherwise, and only after you allow it, Apple’s speech service transcribes it. Bobby does not store the audio, and you can always type instead. The app does not connect wallets or execute trades. An optional Sign in with Apple account syncs progress and lets you publish your island; some analysis levels require an account and have usage limits. Bobby Pro subscribers can also opt in to scheduled market briefings with notifications.',
+              'La app para iPhone (versión 1.5, build 45 en adelante) ofrece preguntas de mercado por escrito o dictadas, narración opcional y exploración de Trader Land. El dictado usa el micrófono solo desde que tocas el botón del micrófono y hasta que envías o cancelas, con tu permiso. Desde la versión 1.7, se transcribe en tu iPhone si el idioma está instalado; si no, y solo después de que lo permitas, lo transcribe el servicio de voz de Apple. Bobby no guarda el audio y siempre puedes escribir. La app no conecta wallets ni ejecuta operaciones. Una cuenta opcional con Iniciar sesión con Apple sincroniza el progreso y permite publicar tu isla; algunos niveles de análisis requieren cuenta y tienen límites de uso. Quienes tienen Bobby Pro también pueden activar resúmenes de mercado programados con notificaciones.',
             )}
           </p>
           <p>
@@ -205,6 +222,15 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
+        <Section id="notes" title={tr('Bobby’s notes (iPhone, from version 1.8)', 'Los apuntes de Bobby (iPhone, desde la versión 1.8)')}>
+          <p>
+            {tr(
+              'Bobby may ask whether you want it to remember what you tell it. Only if you accept, it asks you a question now and then (for example, what you want to learn or when you might need your money) and notes your answer: the option you chose, whether you said it, confirmed it or Bobby worked it out from your words, and when it expires. The notes are stored on your iPhone, not on Bobby’s servers or in your account. With each question Bobby explains, a short summary of those notes travels to Bobby’s server and to Anthropic, only to answer that question; Bobby’s server does not store it, and Anthropic processes it under its own terms. If you answer in your own words, typed or dictated, the AI reads them once to pick an option and Bobby does not keep your words. Notes about money and notes Bobby worked out expire after 7 days; the others after 30. In Profile → Memory you can see each note, correct it, delete it, delete them all, or turn memory off, which deletes them too. They stay on the iPhone when you sign out and are deleted if a different account signs in. Bobby works the same if you never accept.',
+              'Bobby puede preguntarte si quieres que recuerde lo que le cuentas. Solo si aceptas, te hace de vez en cuando una pregunta (por ejemplo, qué quieres aprender o cuándo podrías necesitar tu dinero) y apunta tu respuesta: la opción que elegiste, si la dijiste, la confirmaste o Bobby la dedujo de tus palabras, y cuándo caduca. Los apuntes se guardan en tu iPhone, no en los servidores de Bobby ni en tu cuenta. Con cada pregunta que Bobby te explica viaja un resumen corto de esos apuntes al servidor de Bobby y a Anthropic, solo para responder esa pregunta; el servidor de Bobby no lo guarda y Anthropic lo procesa según sus propios términos. Si respondes con tus propias palabras, escritas o dictadas, la IA las lee una vez para elegir una opción y Bobby no guarda tus palabras. Los apuntes sobre dinero y los que Bobby dedujo caducan a los 7 días; los demás, a los 30. En Perfil → Memoria puedes ver cada apunte, corregirlo, borrarlo, borrarlos todos o apagar la memoria, que también los borra. Se quedan en el iPhone cuando cierras sesión y se borran si entra otra cuenta. Bobby funciona igual si nunca aceptas.',
+            )}
+          </p>
+        </Section>
+
         <Section title={tr('Questions and market analysis', 'Preguntas y análisis de mercado')}>
           <p>
             {tr(
@@ -227,7 +253,7 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title={tr('Dictation and your AI choice', 'Dictado y tu elección sobre la IA')}>
-          <p>{tr('Dictation is optional and typing is always available. Bobby listens only while you hold the button, for at most 60 seconds, once you have allowed the microphone and speech recognition in iOS. From iPhone version 1.7, your speech is transcribed on the iPhone when Apple’s recognition for the app language is installed on it; otherwise, and only after you have allowed speech recognition, the audio goes to Apple’s speech service, which transcribes it in the same language and handles it under its own terms. Bobby does not store the audio and does not receive it on its servers. In versions 1.5 and 1.6, dictation ran only on the iPhone. If recognition is unavailable or you decline the permission, use the keyboard. The resulting question text is processed like a typed question. On the website, dictation uses your browser’s speech recognition, as before; the browser may send audio to its own speech service.', 'El dictado es opcional y siempre puedes escribir. Bobby escucha solo mientras mantienes pulsado el botón, durante un máximo de 60 segundos, una vez que permites el micrófono y el reconocimiento de voz en iOS. Desde la versión 1.7 para iPhone, tu voz se transcribe en el iPhone si el reconocimiento de Apple para el idioma de la app está instalado en él; si no, y solo después de que hayas permitido el reconocimiento de voz, el audio va al servicio de voz de Apple, que lo transcribe en ese mismo idioma y lo trata según sus propios términos. Bobby no guarda el audio ni lo recibe en sus servidores. En las versiones 1.5 y 1.6, el dictado funcionaba solo en el iPhone. Si el reconocimiento no está disponible o rechazas el permiso, usa el teclado. El texto resultante se procesa como una pregunta escrita. En el sitio web, el dictado usa el reconocimiento de voz de tu navegador, como antes; el navegador puede enviar audio a su propio servicio de voz.')}</p>
+          <p>{tr('Dictation is optional and typing is always available. From iPhone version 1.8, Bobby listens only after you tap the microphone button and until you send or cancel; it stops by itself after a few seconds without words and after 60 seconds at most. Pressing and holding the button still works: Bobby then listens while you hold. In earlier versions Bobby listened only while you held the button. All of this applies once you have allowed the microphone and speech recognition in iOS. From iPhone version 1.7, your speech is transcribed on the iPhone when Apple’s recognition for the app language is installed on it; otherwise, and only after you have allowed speech recognition, the audio goes to Apple’s speech service, which transcribes it in the same language and handles it under its own terms. Bobby does not store the audio and does not receive it on its servers. In versions 1.5 and 1.6, dictation ran only on the iPhone. If recognition is unavailable or you decline the permission, use the keyboard. The resulting question text is processed like a typed question. On the website, dictation uses your browser’s speech recognition, as before; the browser may send audio to its own speech service.', 'El dictado es opcional y siempre puedes escribir. Desde la versión 1.8 para iPhone, Bobby escucha solo desde que tocas el botón del micrófono y hasta que envías o cancelas; se detiene solo tras unos segundos sin palabras y, como máximo, a los 60 segundos. Mantener pulsado el botón sigue funcionando: entonces Bobby escucha mientras lo mantienes. En versiones anteriores Bobby escuchaba solo mientras mantenías pulsado el botón. Todo esto aplica una vez que permitiste el micrófono y el reconocimiento de voz en iOS. Desde la versión 1.7 para iPhone, tu voz se transcribe en el iPhone si el reconocimiento de Apple para el idioma de la app está instalado en él; si no, y solo después de que hayas permitido el reconocimiento de voz, el audio va al servicio de voz de Apple, que lo transcribe en ese mismo idioma y lo trata según sus propios términos. Bobby no guarda el audio ni lo recibe en sus servidores. En las versiones 1.5 y 1.6, el dictado funcionaba solo en el iPhone. Si el reconocimiento no está disponible o rechazas el permiso, usa el teclado. El texto resultante se procesa como una pregunta escrita. En el sitio web, el dictado usa el reconocimiento de voz de tu navegador, como antes; el navegador puede enviar audio a su propio servicio de voz.')}</p>
           <p>{tr('You can withdraw AI consent from Profile → Risk notice → Withdraw AI consent. This stops future AI analysis and generated-speech requests in the app until you agree again; it does not erase requests already processed by providers. Withdrawal does not delete your account or locally saved content. The full notice includes privacy and support links. To disable microphone access separately, use iOS Settings → Bobby; to silence replies, turn narration off in Profile or Squad.', 'Puedes retirar el consentimiento de IA en Perfil → Aviso de riesgo → Retirar consentimiento de IA. Esto detiene nuevas solicitudes de análisis y voz generada en la app hasta que vuelvas a aceptar; no borra las solicitudes ya procesadas por los proveedores. Retirarlo no borra tu cuenta ni el contenido guardado localmente. El aviso completo incluye enlaces de privacidad y soporte. Para desactivar el micrófono por separado, usa Configuración de iOS → Bobby; para silenciar respuestas, desactiva la narración en Perfil o Squad.')}</p>
         </Section>
 
