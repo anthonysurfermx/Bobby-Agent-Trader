@@ -80,4 +80,6 @@ jobs:
           path: |
             android/app/build/reports/tests/
             android/app/build/reports/lint-results-*.html
+            android/app/build/test-results/
+            android/app/build/reports/lint-results-*.xml
           retention-days: 14

@@ -14,7 +14,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-emulator-${{ github.ref }}
+  # Keep an earlier commit's device logs while the next candidate compiles; cancel duplicate runs only.
+  group: android-emulator-${{ github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
