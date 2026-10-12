@@ -1,5 +1,6 @@
-import { bobbyAnonKey, bobbyDbUrl, bobbyServiceKeyOptional } from './bobby-db.js';
-const SB_URL = bobbyDbUrl();
+import { bobbyAnonKey, bobbyDbUrlOptional, bobbyServiceKeyOptional } from './bobby-db.js';
+// '' when no database is configured: hasSupabaseConfig() below already makes every call a no-op then.
+const SB_URL = bobbyDbUrlOptional();
 const SB_KEY = bobbyServiceKeyOptional()
   || bobbyAnonKey()
   || '';
