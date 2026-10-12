@@ -14,7 +14,7 @@
 import { appLocale, type AppLanguage } from '../../../src/lib/app-language.js';
 import { NUMBER_WORD, fold } from '../companion-review.js';
 import { DATE_MARK, FIGURE_MARK } from './reader.js';
-import { UNIVERSE, WINDOWS, instrumentKind, instrumentName, resolveMention, spokenName } from './tools.js';
+import { UNIVERSE, WINDOWS, correlationBand, instrumentKind, instrumentName, resolveMention, spokenName, type Band } from './tools.js';
 import type { Analysis, Figure, Presentation } from './types.js';
 
 export interface Draft { kind: Presentation['kind']; gist: string; text: string; limitations: string[]; next: string; claims: Array<{ metric: string; top: string }>; asked?: string[] }
@@ -327,9 +327,24 @@ const AN_AVERAGE: Record<AppLanguage, RegExp> = {
   it: /\b(?:media|medio|mediamente|tipic[oa])\b/i,
   de: /\b(?:Durchschnitt|durchschnittlich(?:e[nmrs]?)?|im\s+Schnitt|im\s+Mittel|typisch(?:e[nmrs]?)?|mittler(?:e[nmrs]?))(?![a-zäöüß])/i,
 };
+/**
+ * A sentence about WHEN something trades ("Solana trades every day, Apple only on exchange days") says nothing of how
+ * it moved: it is the calendar. In the eighth run that sentence, written as a limitation, set off the rule above three
+ * times and three good answers were replaced by code's.
+ */
+const CALENDAR: Record<AppLanguage, RegExp> = {
+  en: /\b(?:trad(?:e|es|ed|ing)|exchange|sessions?|market (?:days?|hours)|weekends?|holidays?|calendars?)\b/i,
+  es: /(?<![a-záéíóúñ])(?:cotiza[a-z]*|opera[a-z]*|negocia[a-z]*|bolsa|bursátil(?:es)?|sesi[oó]n(?:es)?|fines? de semana|festivos?|calendarios?)(?![a-záéíóúñ])/i,
+  fr: /(?:s['’]échange[a-z]*|\b(?:cot(?:e|ent|é|ée|és|ées)|bourse|boursiers?|séances?|week-?ends?|jours? fériés?|calendriers?|ouvr(?:é|és|able|ables))\b)/i,
+  pt: /(?<![a-zà-ú])(?:negocia[a-z]*|opera[a-z]*|bolsa|preg[aã]o|preg[oõ]es|sess(?:ão|ões)|fins? de semana|feriados?|calend[aá]rios?)(?![a-zà-ú])/i,
+  it: /\b(?:scambi[a-z]*|quotat[a-z]*|borsa|sedut[ae]|fine settimana|weekend|festivi|calendari[o]?|negozi[a-z]*)\b/i,
+  de: /(?:handel[a-zäöüß]*|gehandelt|B[oö]rse[a-zäöüß]*|Wochenende[n]?|Feiertag[a-zäöüß]*|Kalender[a-zäöüß]*)/i,
+};
+/** True when a sentence is about the trading calendar. */
+export const aboutCalendar = (sentence: string, language: AppLanguage) => CALENDAR[language].test(sentence);
 /** True when the model's own words claim something about every day of the window without saying it is an average. */
 export function everyDayClaim(text: string, language: AppLanguage): boolean {
-  return text.split(/(?<=[.!?…])\s+|\n+/).some((sentence) => EVERY_DAY[language].test(sentence) && !AN_AVERAGE[language].test(sentence));
+  return text.split(/(?<=[.!?…])\s+|\n+/).some((sentence) => EVERY_DAY[language].test(sentence) && !AN_AVERAGE[language].test(sentence) && !aboutCalendar(sentence, language));
 }
 
 /** Code's plain reading: change, average daily move and largest fall (and the two days, for one instrument). */
@@ -359,8 +374,6 @@ function composeBase(analysis: Analysis | null, language: AppLanguage, locale?: 
  * nothing (eighth run: code told three correlations as numbers alone). The words are code's and say closeness, never
  * frequency ("often") and never cause.
  */
-type Band = 'very' | 'fairly' | 'loosely' | 'none' | 'opposite';
-export const correlationBand = (r: number): Band => (r >= 0.8 ? 'very' : r >= 0.5 ? 'fairly' : r >= 0.2 ? 'loosely' : r > -0.2 ? 'none' : 'opposite');
 const TOGETHER: Record<AppLanguage, Record<Band, string>> = {
   en: { very: 'moved very closely together', fairly: 'moved fairly closely together', loosely: 'moved together only loosely', none: 'had almost no relation to each other', opposite: 'leaned in opposite directions' },
   es: { very: 'se movieron muy a la par', fairly: 'se movieron bastante a la par', loosely: 'se movieron a la par solo un poco', none: 'casi no tuvieron relación entre sí', opposite: 'tendieron a ir en sentidos opuestos' },
@@ -387,12 +400,33 @@ const WINDOW: Record<AppLanguage, string> = {
   en: 'That is over the last {{days}} days.', es: 'Eso es en los últimos {{days}} días.', fr: 'Cela porte sur les {{days}} derniers jours.',
   pt: 'Isso vale para os últimos {{days}} dias.', it: 'Questo riguarda gli ultimi {{days}} giorni.', de: 'Das gilt für die letzten {{days}} Tage.',
 };
-/** Said when more was asked than is told aloud. */
-export const REST: Record<AppLanguage, string> = {
-  en: 'The other figures I read are on screen.', es: 'Las demás cifras que leí están en pantalla.', fr: 'Les autres chiffres que j’ai lus sont à l’écran.',
-  pt: 'Os outros números que li estão na tela.', it: 'Le altre cifre che ho letto sono sullo schermo.', de: 'Die übrigen Zahlen, die ich gelesen habe, stehen auf dem Bildschirm.',
-};
 const ORDER = ['return', 'move', 'drawdown', 'worst', 'best', 'correlation'] as const;
+/**
+ * When more was asked than an ear follows, code says what else it read and leaves the chip that asks for it: the
+ * follow-up is answered from the same figures and costs nothing. (It used to say "the other figures are on screen",
+ * which nothing in the answer showed: eighth blind set.)
+ */
+type Asked = typeof ORDER[number];
+const ALSO: Record<AppLanguage, { say: (items: string) => string; name: Record<Asked, string>; ask: Record<Asked, string> }> = {
+  en: { say: (items) => `I also read ${items}: ask me for it.`,
+    name: { return: 'how much each one changed', move: 'how much each moved on an average day', drawdown: 'the largest fall of each', worst: 'the worst day of each', best: 'the best day of each', correlation: 'how closely they moved together' },
+    ask: { return: 'How much did each one change?', move: 'How much did each move on an average day?', drawdown: 'What was the largest fall of each?', worst: 'What was the worst day of each?', best: 'What was the best day of each?', correlation: 'How closely did they move together?' } },
+  es: { say: (items) => `También leí ${items}: pídemelo.`,
+    name: { return: 'cuánto cambió cada uno', move: 'cuánto se movió cada uno en un día promedio', drawdown: 'la mayor caída de cada uno', worst: 'el peor día de cada uno', best: 'el mejor día de cada uno', correlation: 'qué tan a la par se movieron' },
+    ask: { return: '¿Cuánto cambió cada uno?', move: '¿Cuánto se movió cada uno en un día promedio?', drawdown: '¿Cuál fue la mayor caída de cada uno?', worst: '¿Cuál fue el peor día de cada uno?', best: '¿Cuál fue el mejor día de cada uno?', correlation: '¿Qué tan a la par se movieron?' } },
+  fr: { say: (items) => `J’ai aussi lu ${items} : demande-le-moi.`,
+    name: { return: 'de combien chacun a varié', move: 'de combien chacun a bougé un jour moyen', drawdown: 'la plus forte baisse de chacun', worst: 'le pire jour de chacun', best: 'le meilleur jour de chacun', correlation: 'à quel point ils ont évolué ensemble' },
+    ask: { return: 'De combien chacun a-t-il varié ?', move: 'De combien chacun a-t-il bougé un jour moyen ?', drawdown: 'Quelle a été la plus forte baisse de chacun ?', worst: 'Quel a été le pire jour de chacun ?', best: 'Quel a été le meilleur jour de chacun ?', correlation: 'À quel point ont-ils évolué ensemble ?' } },
+  pt: { say: (items) => `Também li ${items}: é só pedir.`,
+    name: { return: 'quanto cada um variou', move: 'quanto cada um variou num dia médio', drawdown: 'a maior queda de cada um', worst: 'o pior dia de cada um', best: 'o melhor dia de cada um', correlation: 'o quanto andaram juntos' },
+    ask: { return: 'Quanto cada um variou?', move: 'Quanto cada um variou num dia médio?', drawdown: 'Qual foi a maior queda de cada um?', worst: 'Qual foi o pior dia de cada um?', best: 'Qual foi o melhor dia de cada um?', correlation: 'O quanto andaram juntos?' } },
+  it: { say: (items) => `Ho letto anche ${items}: chiedimelo.`,
+    name: { return: 'di quanto è variato ciascuno', move: 'di quanto si è mosso ciascuno in un giorno medio', drawdown: 'il calo più ampio di ciascuno', worst: 'il giorno peggiore di ciascuno', best: 'il giorno migliore di ciascuno', correlation: 'quanto si sono mossi insieme' },
+    ask: { return: 'Di quanto è variato ciascuno?', move: 'Di quanto si è mosso ciascuno in un giorno medio?', drawdown: 'Qual è stato il calo più ampio di ciascuno?', worst: 'Qual è stato il giorno peggiore di ciascuno?', best: 'Qual è stato il giorno migliore di ciascuno?', correlation: 'Quanto si sono mossi insieme?' } },
+  de: { say: (items) => `Gelesen habe ich auch ${items}: Frag mich danach.`,
+    name: { return: 'die Veränderung von jedem', move: 'die durchschnittliche Tagesbewegung von jedem', drawdown: 'den größten Rückgang von jedem', worst: 'den schwächsten Tag von jedem', best: 'den stärksten Tag von jedem', correlation: 'die Ähnlichkeit ihrer Bewegungen' },
+    ask: { return: 'Wie stark hat sich jeder verändert?', move: 'Wie stark hat sich jeder an einem durchschnittlichen Tag bewegt?', drawdown: 'Was war der größte Rückgang von jedem?', worst: 'Was war der schwächste Tag von jedem?', best: 'Was war der stärkste Tag von jedem?', correlation: 'Wie ähnlich haben sie sich bewegt?' } },
+};
 
 /**
  * What the person asked about, told by code and nothing else: the figures of each asked metric, in a fixed order, up to
@@ -403,7 +437,7 @@ function composeFocused(analysis: Analysis, language: AppLanguage, locale: strin
   const valued = (id: string) => figures.get(id)?.value != null;
   const many = COMPOSED_MANY[language], move = COMPOSED_MOVE[language], words = ASKED[language];
   const sentences: string[] = [], used: string[] = [];
-  let left = false;
+  const left: Asked[] = [];
   for (const metric of ORDER) {
     if (!asked.includes(metric)) continue;
     let ids: string[] = [], sentence = '';
@@ -424,14 +458,14 @@ function composeFocused(analysis: Analysis, language: AppLanguage, locale: strin
     }
     if (!sentence) continue;
     // The first thing asked is always told; anything after it only while it fits what an ear can follow.
-    if (used.length && used.length + ids.length > SPOKEN) { left = true; continue; }
+    if (used.length && used.length + ids.length > SPOKEN) { left.push(metric); continue; }
     sentences.push(sentence); used.push(...ids);
   }
   if (!sentences.length) return null;
   if (!used.some((id) => id.startsWith('return_'))) sentences.push(WINDOW[language]);
-  if (left) sentences.push(REST[language]);
+  if (left.length) sentences.push(ALSO[language].say(several(left.map((metric) => ALSO[language].name[metric]), language)));
   const said = sentences.map((sentence) => write(sentence, figures, analysis.windowDays, language, locale));
-  return { kind: 'analysis', gist: said[0], text: said.join(' '), figures: used, references: references(analysis, used), limitations: limitationsInWords(analysis, language), next: null, composedByCode: true };
+  return { kind: 'analysis', gist: said[0], text: said.join(' '), figures: used, references: references(analysis, used), limitations: limitationsInWords(analysis, language), next: left.length ? ALSO[language].ask[left[0]] : null, composedByCode: true };
 }
 
 /**
@@ -466,7 +500,8 @@ const NOT_FROM_THESE: Record<AppLanguage, [string, string]> = {
  * can be told, it says only that.
  */
 export function followUpByCode(analysis: Analysis, language: AppLanguage, locale: string | null | undefined, asked: string[], ownNumber: boolean): Presentation {
-  const focused = asked.length ? composeFocused(analysis, language, locale, asked) : null;
+  // The read's own limits were on its first answer, which is still on the person's screen: they are not said again.
+  const told = asked.length ? composeFocused(analysis, language, locale, asked) : null, focused = told ? { ...told, limitations: [] } : null;
   if (focused && !ownNumber) return focused;
   const [cannot, still] = NOT_FROM_THESE[language];
   if (!focused) return { kind: 'explanation', gist: cannot, text: `${cannot} ${still}`, figures: [], references: [], limitations: [], next: null, composedByCode: true };
@@ -515,7 +550,7 @@ export const SAID: Record<SaidFor, Record<AppLanguage, string>> = {
  * The model's draft, checked and written out. A refusal says what to repair; the caller may ask the model once
  * more and then falls back to composeByCode.
  */
-export function present(draft: Draft, analysis: Analysis | null, question: string, language: AppLanguage, locale?: string | null): { ok: true; presentation: Presentation; own: OwnWords } | { ok: false; refusal: Refusal } {
+export function present(draft: Draft, analysis: Analysis | null, question: string, language: AppLanguage, locale?: string | null, /** A follow-up on figures already told: the read's own limits were on its first answer and are not repeated. */ again = false): { ok: true; presentation: Presentation; own: OwnWords } | { ok: false; refusal: Refusal } {
   const figures = new Map((analysis?.figures ?? []).map((figure) => [figure.id, figure]));
   // An id is code's: typed in another case it is still that id, and is written back as the tool gave it. Nothing else is repaired.
   const byFold = new Map([...figures.keys()].map((id) => [id.toLowerCase(), id]));
@@ -553,8 +588,10 @@ export function present(draft: Draft, analysis: Analysis | null, question: strin
   // or in the next question. (The sentence in front is always part of the text.)
   const used = [...new Set([...[text, next, ...draft.limitations].join(' ').matchAll(PLACEHOLDER)].filter((match) => match[1] !== 'days').map((match) => match[1].split(':')[1]))];
   // The analysis's own limits are always on the answer, in code's words; the model's come after them.
-  const fixed = draft.kind === 'analysis' ? limitationsInWords(analysis, language) : [];
-  const limitations = [...fixed, ...draft.limitations.map((line) => write(line, figures, days, language, locale)).filter((line) => line && !fixed.includes(line))].slice(0, 5);
+  const fixed = draft.kind === 'analysis' && !again ? limitationsInWords(analysis, language) : [];
+  // The calendars are code's to state (mixed_calendars), once: the model's own sentence about them is words said twice.
+  const mixed = draft.kind === 'analysis' && Boolean(analysis?.limitations.includes('mixed_calendars'));
+  const limitations = [...fixed, ...draft.limitations.filter((line) => !(mixed && aboutCalendar(line, language))).map((line) => write(line, figures, days, language, locale)).filter((line) => line && !fixed.includes(line))].slice(0, 5);
   // The sentence in front is always the exact start of the text, as in the companion's contract. When the model's
   // gist is not how its text begins, the text's own first sentence stands in front: nothing is said twice.
   // The first sentence is found in the DRAFT, where a date is still a placeholder and no decimal exists: there a full

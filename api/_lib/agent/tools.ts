@@ -316,8 +316,15 @@ export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<T
   const analysis: Analysis = { kind: args.symbols.length > 1 ? 'comparison' : 'single', subjects: args.symbols, windowDays: args.windowDays, figures, evidence, limitations, computedAt: now.toISOString() };
   return { evidence, analysis, data: { figures: figures.map(forModel), evidence: evidence.map(({ id, source, instrument, asOf, quality, note }) => ({ id, source, instrument, asOf, quality, note })), limitations, windowDays: args.windowDays } };
 }
-/** A figure as the model sees it: rounded, so it can reason about more and less; it may only cite the id. */
-export const forModel = (figure: Figure) => ({ ...(figure.day ? { day: figure.day } : {}), id: figure.id, metric: figure.metric, subject: figure.subject, value: figure.value === null ? null : Number(figure.value.toFixed(figure.unit === 'ratio' ? 2 : figure.unit === 'price' ? 2 : 1)), unit: figure.unit, basis: figure.basis, quality: figure.quality });
+/**
+ * How closely two series moved together, by the size of their correlation: the one scale code and the model both use,
+ * so that a bare "+0.09" is never all a beginner hears. Closeness, never frequency ("often") and never cause.
+ */
+export type Band = 'very' | 'fairly' | 'loosely' | 'none' | 'opposite';
+export const correlationBand = (r: number): Band => (r >= 0.8 ? 'very' : r >= 0.5 ? 'fairly' : r >= 0.2 ? 'loosely' : r > -0.2 ? 'none' : 'opposite');
+const BAND_MEANS: Record<Band, string> = { very: 'they moved very closely together', fairly: 'they moved fairly closely together', loosely: 'they moved together only loosely', none: 'almost no relation between their moves', opposite: 'they leaned in opposite directions' };
+/** A figure as the model sees it: rounded, so it can reason about more and less; it may only cite the id. A correlation comes with what its size means. */
+export const forModel = (figure: Figure) => ({ ...(figure.day ? { day: figure.day } : {}), ...(figure.metric === 'correlation' && figure.value !== null ? { means: BAND_MEANS[correlationBand(figure.value)] } : {}), id: figure.id, metric: figure.metric, subject: figure.subject, value: figure.value === null ? null : Number(figure.value.toFixed(figure.unit === 'ratio' ? 2 : figure.unit === 'price' ? 2 : 1)), unit: figure.unit, basis: figure.basis, quality: figure.quality });
 
 // ---------- the registry ----------
 const Resolve = z.object({ mentions: z.array(z.string().trim().min(1).max(60)).min(1).max(4) }).strict();
