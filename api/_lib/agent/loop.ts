@@ -468,7 +468,7 @@ export function engineDeps(store: AgentStore, over: Partial<Deps> = {}): Deps {
 
 /** Which plain sentence goes with a way of ending without an answer (a task's error, or the door's refusal). */
 export function saidFor(code: string): SaidFor {
-  return code === 'too_many_errands' ? 'busy' : code === 'reads_limit' ? 'no_reads' : code === 'empty_question' ? 'empty' : code.startsWith('engine_') || code.startsWith('budget_') ? 'not_now' : 'try_again';
+  return code === 'too_many_errands' ? 'busy' : code === 'reads_limit' ? 'no_reads' : code === 'empty_question' ? 'empty' : code === 'question_too_long' ? 'too_long' : code.startsWith('engine_') || code.startsWith('budget_') ? 'not_now' : 'try_again';
 }
 
 /** What a client is told of a task. Money spent on providers is the server's business and is not here. */

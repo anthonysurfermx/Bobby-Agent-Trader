@@ -998,6 +998,8 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
     // Nothing was said: the person is told so in their language, not handed a malformed-request code.
     const silent = await send('POST', askBody({ requestId: '5a5a5a5a-0000-4000-8000-00000000000a', question: ' \t ', language: 'de' }));
     eq([silent.statusCode, silent.body.error.code, silent.body.error.message], [400, 'empty_question', 'Ich habe nichts verstanden. Sag oder schreib deine Frage.'], 'an empty utterance is answered with one plain sentence in the language the request names');
+    const endless = await send('POST', askBody({ requestId: '5a5a5a5a-0000-4000-8000-00000000000b', question: 'y luego '.repeat(200), language: 'es' }));
+    eq([endless.statusCode, endless.body.error.code, endless.body.error.message], [400, 'question_too_long', 'Eso es demasiado largo para tomarlo de una vez. Dime lo principal en unas pocas frases.'], 'a dictation that ran on past what one errand holds is told so, in one sentence');
     const malformed = await send('POST', { op: 'ask', version: 1 });
     eq([malformed.statusCode, malformed.body.error.code, Object.keys(malformed.body.error)], [400, 'invalid_request', ['code']], '…and a request the app built wrong stays a bare code: that one is not the person\'s to read');
   } finally { globalThis.fetch = realFetch; __setAgentTestDeps(null); delete process.env.BOBBY_AGENT_ENGINE; delete process.env.BOBBY_AGENT_STORE; }

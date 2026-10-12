@@ -54,7 +54,9 @@ export function agentStore(env: NodeJS.ProcessEnv = process.env): AgentStore | n
   return where && where.startsWith('/') ? new FileAgentStore(where, 6) : null;
 }
 
-const Ask = z.object({ op: z.literal('ask'), version: z.literal(ENGINE_VERSION), requestId: z.string().uuid(), sessionId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/), question: z.string().trim().min(1).max(1200), language: z.enum(APP_LANGUAGES).default('en'), locale: z.enum(APP_LOCALES).optional().catch(undefined), follow: z.boolean().optional().catch(undefined) });
+/** The longest errand the door takes, in characters. */
+export const MAX_QUESTION = 1200;
+const Ask = z.object({ op: z.literal('ask'), version: z.literal(ENGINE_VERSION), requestId: z.string().uuid(), sessionId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/), question: z.string().trim().min(1).max(MAX_QUESTION), language: z.enum(APP_LANGUAGES).default('en'), locale: z.enum(APP_LOCALES).optional().catch(undefined), follow: z.boolean().optional().catch(undefined) });
 const Act = z.object({ op: z.enum(['approve', 'deny', 'cancel']), taskId: z.string().regex(/^task_[a-f0-9]{32}$/), digest: z.string().regex(/^[a-f0-9]{64}$/).optional() });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -71,7 +73,7 @@ function languageOf(req: VercelRequest): AppLanguage {
   } catch { return 'en'; }
 }
 /** The refusals a person can meet through no fault of the app: each carries one plain sentence, so nobody is left with a code. */
-const SPOKEN_REFUSALS = new Set(['empty_question', 'too_many_errands', 'reads_limit', 'engine_unavailable', 'engine_storage_unavailable']);
+const SPOKEN_REFUSALS = new Set(['empty_question', 'question_too_long', 'too_many_errands', 'reads_limit', 'engine_unavailable', 'engine_storage_unavailable']);
 
 async function door(req: VercelRequest, res: VercelResponse) {
   if (!agentEngineOn()) return res.status(404).json({ error: 'Not found' });
@@ -104,6 +106,8 @@ async function door(req: VercelRequest, res: VercelResponse) {
   // Nothing was said (a microphone that caught silence, a send with no words): that is told, not answered as a malformed request.
   const sent = body as { op?: unknown; question?: unknown } | null;
   if (sent?.op === 'ask' && typeof sent.question === 'string' && !sent.question.trim()) return refuse(400, 'empty_question');
+  // …and so is a dictation that ran on past what one errand can hold.
+  if (sent?.op === 'ask' && typeof sent.question === 'string' && sent.question.trim().length > MAX_QUESTION) return refuse(400, 'question_too_long');
   const ask = Ask.safeParse(body);
   if (ask.success) {
     if (!process.env.ANTHROPIC_API_KEY && !testDeps?.call) return refuse(503, 'engine_unavailable');
