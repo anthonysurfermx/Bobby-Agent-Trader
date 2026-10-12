@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import KineticShell from '@/components/kinetic/KineticShell';
 import { Helmet } from 'react-helmet-async';
 import { lang, LANGS, LANG_NAME, htmlLang, translateText, type Lang } from '@/lib/companions/i18n';
@@ -33,6 +33,18 @@ export default function BobbySupportPage() {
   const [email, setEmail] = useState('');
   const [kind, setKind] = useState('support');
   const [status, setStatus] = useState<'idle' | 'sending' | 'saved' | 'error'>('idle');
+  // The page is drawn after it loads, so the browser has nothing to scroll to when the address carries a section
+  // (#delete-account is the address given to Google Play for deletion requests; #contact is linked from the apps).
+  useEffect(() => {
+    let frame = 0;
+    const toSection = () => {
+      const id = window.location.hash.slice(1);
+      if (id === 'delete-account' || id === 'contact') frame = requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView());
+    };
+    toSection();
+    window.addEventListener('hashchange', toSection);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener('hashchange', toSection); };
+  }, []);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (status === 'sending' || message.trim().length < 3) return;
@@ -87,6 +99,7 @@ export default function BobbySupportPage() {
       <section className="space-y-3">
         <h2 className="text-xl">{t('Your account and data', 'Tu cuenta y tus datos')}</h2>
         <p>{t('Tap the companion avatar at the top right to open Profile. Sign in with Apple is optional; its given name stays on this iPhone for a greeting. When signed in, choose “Delete account” and confirm “Delete account permanently” to remove your account, synced progress and Trader Land data. Apple may ask you to authorize once more. Signing out does not delete the account.', 'Toca el avatar del compañero arriba a la derecha para abrir Perfil. Iniciar sesión con Apple es opcional; su nombre de pila se guarda en este iPhone para saludarte. Con sesión iniciada, elige “Borrar cuenta” y confirma “Borrar cuenta definitivamente” para borrar la cuenta, el progreso sincronizado y los datos de Trader Land. Apple puede pedirte autorizar una vez más. Cerrar sesión no borra la cuenta.')}</p>
+        <p id="delete-account" className="scroll-mt-24">{t('On Android, open Profile, choose “Delete account” and confirm; there you sign in with Google. If you cannot use the app, ask for the deletion with the private form above: choose “Privacy or data request”, write that you want your Bobby account deleted and give the email of that account as the reply email. We answer at that address to confirm the account is yours, and then delete the account, its synced progress and its Trader Land data. Limited security and audit records can remain, as the privacy policy explains.', 'En Android, abre Perfil, elige “Eliminar cuenta” y confirma; ahí la sesión es con Google. Si no puedes usar la app, pide el borrado con el formulario privado de arriba: elige “Privacidad o solicitud de datos”, escribe que quieres borrar tu cuenta de Bobby y pon el correo de esa cuenta como correo para responderte. Te respondemos a esa dirección para confirmar que la cuenta es tuya y después borramos la cuenta, su progreso sincronizado y sus datos de Trader Land. Pueden conservarse registros limitados de seguridad y auditoría, como explica el aviso de privacidad.')}</p>
         <p>{t('Guest Quick reads have a limited allowance. Deep and Max availability follows the usage limits shown in the app. Bobby Pro is an optional auto-renewing monthly subscription bought through Apple: unlimited Quick reads (fair use) plus 60 Deep and 10 Max every 30 days. It renews until you cancel it in Settings › Apple Account › Subscriptions; deleting your Bobby account does not cancel it. To restore it on a new iPhone, open Profile → Restore Purchases. Optional invitations can earn promotional Pro access with an expiry; that is not an Apple subscription.', 'Las lecturas Rápidas de invitado tienen un cupo limitado. La disponibilidad de Profundo y Máximo sigue los límites que muestra la app. Bobby Pro es una suscripción mensual opcional con renovación automática que se compra con Apple: lecturas Rápidas ilimitadas (uso justo) más 60 Profundo y 10 Máximo cada 30 días. Se renueva hasta que la canceles en Ajustes › Cuenta de Apple › Suscripciones; borrar tu cuenta de Bobby no la cancela. Para restaurarla en otro iPhone, abre Perfil → Restaurar compras. Las invitaciones opcionales pueden dar acceso Pro promocional con vencimiento; eso no es una suscripción de Apple.')}</p>
         <a className="text-white underline" href={clientLanguagePath('/privacy')}>{t('Privacy policy', 'Aviso de privacidad')}</a>
       </section>
