@@ -33,7 +33,7 @@ export interface Tool<A = unknown> {
   name: string; description: string; metered: boolean;
   schema: z.ZodType<A>; wire: Record<string, unknown>;
   /** Turns what the model wrote into what will run (names into symbols), or says why it cannot: checked by the server before anything is asked of the person. */
-  prepare?: (args: A) => { ok: true; args: unknown } | { ok: false; reason: string; detail: string };
+  prepare?: (args: A, settled?: Settled) => { ok: true; args: unknown } | { ok: false; reason: string; detail: string };
   /** What the person is asked to approve, for a metered tool. Given the prepared arguments. */
   scope?: (args: any) => Omit<ApprovalScope, 'digest'>;
   run: (args: any, ctx: ToolContext) => Promise<ToolOutput>;
@@ -42,22 +42,22 @@ export interface Tool<A = unknown> {
 export const WINDOWS = [30, 60] as const;
 
 // ---------- the universe: what the engine can read with evidence ----------
-interface Instrument { symbol: string; name: string; kind: 'crypto' | 'equity' | 'etf'; assetClass: AssetClass; aliases: readonly string[] }
+interface Instrument { symbol: string; name: string; /** How code says it aloud: the short name people use, never a legal one. */ say: string; kind: 'crypto' | 'equity' | 'etf'; assetClass: AssetClass; aliases: readonly string[] }
 export const UNIVERSE: readonly Instrument[] = [
-  { symbol: 'BTC', name: 'Bitcoin', kind: 'crypto', assetClass: 'crypto', aliases: ['bitcoin', 'btc'] },
-  { symbol: 'ETH', name: 'Ethereum', kind: 'crypto', assetClass: 'crypto', aliases: ['ethereum', 'eth', 'ether'] },
-  { symbol: 'SOL', name: 'Solana', kind: 'crypto', assetClass: 'crypto', aliases: ['solana', 'sol'] },
-  { symbol: 'SPY', name: 'SPDR S&P 500 ETF', kind: 'etf', assetClass: 'equity', aliases: ['spy', 's&p 500', 'sp500', 's&p500', 'sp 500', 'etf del s&p 500', 's&p 500 etf'] },
-  { symbol: 'QQQ', name: 'Invesco QQQ (Nasdaq-100) ETF', kind: 'etf', assetClass: 'equity', aliases: ['qqq', 'nasdaq 100', 'nasdaq-100', 'nasdaq100', 'nasdaq', 'etf del nasdaq', 'nasdaq 100 etf'] },
-  { symbol: 'NVDA', name: 'NVIDIA', kind: 'equity', assetClass: 'equity', aliases: ['nvidia', 'nvda'] },
-  { symbol: 'AAPL', name: 'Apple', kind: 'equity', assetClass: 'equity', aliases: ['apple', 'aapl'] },
-  { symbol: 'TSLA', name: 'Tesla', kind: 'equity', assetClass: 'equity', aliases: ['tesla', 'tsla'] },
-  { symbol: 'META', name: 'Meta Platforms', kind: 'equity', assetClass: 'equity', aliases: ['meta', 'facebook', 'meta platforms'] },
-  { symbol: 'MSFT', name: 'Microsoft', kind: 'equity', assetClass: 'equity', aliases: ['microsoft', 'msft'] },
-  { symbol: 'GOOGL', name: 'Alphabet (Google)', kind: 'equity', assetClass: 'equity', aliases: ['google', 'alphabet', 'googl'] },
-  { symbol: 'AMZN', name: 'Amazon', kind: 'equity', assetClass: 'equity', aliases: ['amazon', 'amzn'] },
-  { symbol: 'AMD', name: 'AMD', kind: 'equity', assetClass: 'equity', aliases: ['amd', 'advanced micro devices'] },
-  { symbol: 'COIN', name: 'Coinbase', kind: 'equity', assetClass: 'equity', aliases: ['coinbase', 'coin'] },
+  { symbol: 'BTC', name: 'Bitcoin', say: 'Bitcoin', kind: 'crypto', assetClass: 'crypto', aliases: ['bitcoin', 'btc'] },
+  { symbol: 'ETH', name: 'Ethereum', say: 'Ethereum', kind: 'crypto', assetClass: 'crypto', aliases: ['ethereum', 'eth', 'ether'] },
+  { symbol: 'SOL', name: 'Solana', say: 'Solana', kind: 'crypto', assetClass: 'crypto', aliases: ['solana', 'sol'] },
+  { symbol: 'SPY', name: 'SPDR S&P 500 ETF', say: 'SPY', kind: 'etf', assetClass: 'equity', aliases: ['spy', 's&p 500', 'sp500', 's&p500', 'sp 500', 'etf del s&p 500', 's&p 500 etf'] },
+  { symbol: 'QQQ', name: 'Invesco QQQ (Nasdaq-100) ETF', say: 'QQQ', kind: 'etf', assetClass: 'equity', aliases: ['qqq', 'nasdaq 100', 'nasdaq-100', 'nasdaq100', 'nasdaq', 'etf del nasdaq', 'nasdaq 100 etf'] },
+  { symbol: 'NVDA', name: 'NVIDIA', say: 'NVIDIA', kind: 'equity', assetClass: 'equity', aliases: ['nvidia', 'nvda'] },
+  { symbol: 'AAPL', name: 'Apple', say: 'Apple', kind: 'equity', assetClass: 'equity', aliases: ['apple', 'aapl'] },
+  { symbol: 'TSLA', name: 'Tesla', say: 'Tesla', kind: 'equity', assetClass: 'equity', aliases: ['tesla', 'tsla'] },
+  { symbol: 'META', name: 'Meta Platforms', say: 'Meta', kind: 'equity', assetClass: 'equity', aliases: ['meta', 'facebook', 'meta platforms'] },
+  { symbol: 'MSFT', name: 'Microsoft', say: 'Microsoft', kind: 'equity', assetClass: 'equity', aliases: ['microsoft', 'msft'] },
+  { symbol: 'GOOGL', name: 'Alphabet (Google)', say: 'Alphabet', kind: 'equity', assetClass: 'equity', aliases: ['google', 'alphabet', 'googl'] },
+  { symbol: 'AMZN', name: 'Amazon', say: 'Amazon', kind: 'equity', assetClass: 'equity', aliases: ['amazon', 'amzn'] },
+  { symbol: 'AMD', name: 'AMD', say: 'AMD', kind: 'equity', assetClass: 'equity', aliases: ['amd', 'advanced micro devices'] },
+  { symbol: 'COIN', name: 'Coinbase', say: 'Coinbase', kind: 'equity', assetClass: 'equity', aliases: ['coinbase', 'coin'] },
 ];
 const BY_SYMBOL = new Map(UNIVERSE.map((instrument) => [instrument.symbol, instrument]));
 const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[¿?¡!.,;:"“”«»()]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -72,6 +72,79 @@ export function resolveMention(mention: string): Instrument | null {
   if (paired) { const a = resolveMention(paired[1]), b = resolveMention(paired[2]); if (a && a === b) return a; }
   return UNIVERSE.find((instrument) => instrument.symbol.toLowerCase() === text || instrument.aliases.includes(text) || fold(instrument.name) === text) ?? null;
 }
+
+// ---------- names that are also everyday words ----------
+// "sol", "meta", "apple" and "coin" are aliases, and they are also the sun, a goal, a fruit and any coin at all. Alone
+// they do not settle an instrument: whether the person's own words did is decided here, by code, so that neither a
+// read nor a sentence can treat as chosen what the person never chose (seventh blind set: "one was coin … please
+// don't guess" was answered "alongside Coinbase").
+const EVERYDAY: Readonly<Record<string, readonly string[]>> = { SOL: ['sol'], META: ['meta'], AAPL: ['apple'], COIN: ['coin'] };
+/** An everyday word that is a generic noun of the market itself: among assets it still does not say which one. */
+const GENERIC = new Set(['coin']);
+/** A word right beside the name that says it is the security or the token: "apple stock", "meta la empresa", "sol token". */
+const SAYS_ASSET = new Set(['stock', 'stocks', 'share', 'shares', 'ticker', 'company', 'inc', 'corp', 'equity', 'token', 'crypto', 'cryptocurrency', 'blockchain', 'exchange',
+  'accion', 'acciones', 'empresa', 'compania', 'cripto', 'criptomoneda', 'action', 'actions', 'societe', 'entreprise', 'boite', 'cryptomonnaie', 'jeton',
+  'acao', 'acoes', 'criptomoeda', 'azione', 'azioni', 'societa', 'azienda', 'criptovaluta', 'titolo', 'aktie', 'aktien', 'unternehmen', 'firma', 'konzern', 'krypto', 'kryptowahrung', 'wertpapier']);
+const wordsOf = (text: string) => fold(text).replace(/[^a-z0-9&$ ]+/g, ' ').split(' ').filter(Boolean);
+const escapedName = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const namedIn = (folded: string, name: string) => new RegExp(`(?<![a-z0-9])${escapedName(name).replace(/ /g, '[ -]?')}(?![a-z0-9])`).test(folded);
+/** The names of an instrument that are not everyday words: its symbol, its name and its other aliases. */
+const plainNames = (instrument: Instrument) => [...new Set([instrument.symbol.toLowerCase(), fold(instrument.name), fold(instrument.say), ...instrument.aliases])].filter((name) => !(EVERYDAY[instrument.symbol] ?? []).includes(name));
+/** The instruments a text names, by any of their names (an everyday word counts: this is what a text mentions, not what it settles). */
+export function instrumentsNamed(text: string): string[] {
+  const folded = ` ${fold(text)} `;
+  return UNIVERSE.filter((instrument) => [instrument.symbol.toLowerCase(), fold(instrument.name), fold(instrument.say), ...instrument.aliases].some((name) => namedIn(folded, name))).map((instrument) => instrument.symbol);
+}
+/** What the conversation already settled without these words: what was read before, what a card offered, what Bobby's last question named. */
+export interface Settled { /** The person's words: this errand's, and the question before it when there is one. */ theirs: string; /** This errand's own words. */ now: string; known: readonly string[]; /** True when the thread already holds a read: a short "and sol?" is then about assets. */ reading: boolean }
+/**
+ * The everyday word through which alone the person named this instrument, or null when their words settle it. Settled
+ * by: another name of it (Solana, Coinbase, Facebook, AAPL), the ticker written as one ($sol, SOL in capitals), a word
+ * beside it that says it is the security ("apple stock", "meta la empresa"), or the conversation (`known`). Otherwise
+ * the word stands unsettled when it is all they said (three words or fewer, with no read on the table), or when it is
+ * a generic noun of the market ("coin"), which no context of assets settles.
+ */
+export function unsettledWord(symbol: string, settled: Settled): string | null {
+  const instrument = BY_SYMBOL.get(symbol), everyday = EVERYDAY[symbol];
+  if (!instrument || !everyday || settled.known.includes(symbol)) return null;
+  const folded = ` ${fold(settled.theirs)} `;
+  if (plainNames(instrument).some((name) => namedIn(folded, name))) return null;
+  for (const word of everyday) {
+    if (!namedIn(folded, word)) continue;
+    // Written as a ticker: "$coin", or COIN in capitals inside a sentence that is not all capitals.
+    if (new RegExp(`\\$\\s?${word}(?![a-z0-9])`, 'i').test(settled.theirs)) return null;
+    if (/\p{Ll}/u.test(settled.theirs) && new RegExp(`(?<![\\p{L}\\p{N}])${word.toUpperCase()}(?![\\p{L}\\p{N}])`, 'u').test(settled.theirs)) return null;
+    const words = wordsOf(settled.theirs);
+    if (words.some((entry, at) => entry === word && words.slice(Math.max(0, at - 3), at + 4).some((near) => near !== word && SAYS_ASSET.has(near)))) return null;
+    if (GENERIC.has(word)) return word;
+    if (!settled.reading && namedIn(` ${fold(settled.now)} `, word) && wordsOf(settled.now).length <= 3) return word;
+  }
+  return null;
+}
+
+const ALTERNATIVE = /(?<![a-z])(?:or|o|u|ou|oder|oppure|ovvero)(?![a-z])/;
+/**
+ * The instrument a text treats as chosen although the person's words left it open, with the word that left it open; null
+ * when there is none. Asking is not presuming: a sentence that is a question and offers an alternative ("do you mean
+ * the company Apple, or the fruit?") may name it. Saying their word back ("coin") names nothing.
+ */
+export function presumedIn(text: string, settled: Settled): { word: string; symbol: string } | null {
+  for (const sentence of text.split(/(?<=[.!?…])\s+/)) {
+    const folded = ` ${fold(sentence)} `;
+    for (const instrument of UNIVERSE) {
+      const word = unsettledWord(instrument.symbol, settled);
+      if (!word) continue;
+      // Their own word said back is theirs, unless that word IS the instrument's name ("Apple", "Meta").
+      const names = [...plainNames(instrument), ...(fold(instrument.say) === word ? [word] : [])];
+      if (!names.some((name) => namedIn(folded, name))) continue;
+      if (/[?？]["'»”’)\]]*\s*$/.test(sentence) && ALTERNATIVE.test(folded)) continue;
+      return { word, symbol: instrument.symbol };
+    }
+  }
+  return null;
+}
+/** What kind of thing an instrument is, for a question code asks about it. */
+export const instrumentKind = (symbol: string) => BY_SYMBOL.get(symbol)?.kind ?? 'equity';
 
 // ---------- arithmetic ----------
 const pct = (ratio: number) => 100 * ratio;
@@ -128,12 +201,15 @@ const Read = z.object({ assets: z.array(z.string().trim().min(1).max(60)).min(1)
 /** What runs after the server resolved the names. */
 export interface ReadArgs { symbols: string[]; windowDays: 30 | 60 }
 type CompareArgs = ReadArgs;
-function prepareRead(args: z.infer<typeof Read>): { ok: true; args: ReadArgs } | { ok: false; reason: string; detail: string } {
+function prepareRead(args: z.infer<typeof Read>, settled?: Settled): { ok: true; args: ReadArgs } | { ok: false; reason: string; detail: string } {
   const symbols: string[] = [];
   for (const mention of args.assets) {
     const hit = resolveMention(mention);
     if (!hit) return { ok: false, reason: 'unknown_asset', detail: mention.slice(0, 40) };
     if (symbols.includes(hit.symbol)) return { ok: false, reason: 'same_asset_twice', detail: hit.symbol };
+    // The person is never shown a card for something they did not choose: an everyday word their own words left open is asked about first.
+    const open = settled ? unsettledWord(hit.symbol, settled) : null;
+    if (open) return { ok: false, reason: 'ambiguous_name', detail: `their word "${open}" may be ${hit.name} or something else: read nothing; ask which they mean in one question that names both readings` };
     symbols.push(hit.symbol);
   }
   return { ok: true, args: { symbols, windowDays: args.windowDays } };
@@ -267,3 +343,5 @@ export const TOOLS: Record<string, Tool<any>> = {
   },
 };
 export const instrumentName = (symbol: string) => BY_SYMBOL.get(symbol)?.name ?? symbol;
+/** The short name code says aloud. */
+export const spokenName = (symbol: string) => BY_SYMBOL.get(symbol)?.say ?? symbol;

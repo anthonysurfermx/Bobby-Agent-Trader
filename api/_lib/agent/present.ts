@@ -14,13 +14,13 @@
 import { appLocale, type AppLanguage } from '../../../src/lib/app-language.js';
 import { NUMBER_WORD, fold } from '../companion-review.js';
 import { DATE_MARK, FIGURE_MARK } from './reader.js';
-import { UNIVERSE, WINDOWS, instrumentName, resolveMention } from './tools.js';
+import { UNIVERSE, WINDOWS, instrumentKind, instrumentName, resolveMention, spokenName } from './tools.js';
 import type { Analysis, Figure, Presentation } from './types.js';
 
 export interface Draft { kind: Presentation['kind']; gist: string; text: string; limitations: string[]; next: string; claims: Array<{ metric: string; top: string }>; asked?: string[] }
 /** A draft as its author wrote it, with every number and date of code's replaced by a mark. */
 export interface OwnWords { text: string; limitations: string[]; next: string | null }
-export type Refusal = { code: 'unknown_figure' | 'figure_without_value' | 'typed_number' | 'bad_placeholder' | 'claim_contradicts_figures' | 'claim_cannot_be_checked' | 'asked_not_answered' | 'too_long' | 'empty'; detail: string };
+export type Refusal = { code: 'unknown_figure' | 'figure_without_value' | 'typed_number' | 'bad_placeholder' | 'claim_contradicts_figures' | 'claim_cannot_be_checked' | 'asked_not_answered' | 'presumed_asset' | 'too_long' | 'empty'; detail: string };
 
 const PLACEHOLDER = /\{\{((?:f|d|from|to):[A-Za-z0-9_~]+|days)\}\}/g;
 /** Written with its sign, so no dash before it can be read as one. */
@@ -340,15 +340,15 @@ function composeBase(analysis: Analysis | null, language: AppLanguage, locale?: 
   if (!analysis || !ready.length) return { kind: 'unavailable', gist: UNAVAILABLE[language], text: UNAVAILABLE[language], figures: [], references: references(analysis, []), limitations: limitationsInWords(analysis, language).filter((_, n) => analysis?.limitations[n] !== 'past_window_only'), next: null, composedByCode: true };
   if (ready.length > 2) {
     const many = COMPOSED_MANY[language];
-    const moved = ready.every((symbol) => figures.get(`move_${symbol}`)?.value != null);
-    const text = write(`${many.changes(listed(ready.map((symbol) => many.change(instrumentName(symbol), symbol)), language))}${moved ? ` ${COMPOSED_MOVE[language].many(listed(ready.map((symbol) => COMPOSED_MOVE[language].each(instrumentName(symbol), symbol)), language))}` : ''} ${many.falls(listed(ready.map((symbol) => many.fall(instrumentName(symbol), symbol)), language))}`, figures, analysis.windowDays, language, locale);
-    const used = [...ready.map((symbol) => `return_${symbol}`), ...(moved ? ready.map((symbol) => `move_${symbol}`) : []), ...ready.map((symbol) => `drawdown_${symbol}`)];
+    // Three read, six figures said: the change and the fall of each. Their average day is told when it is asked about (SPOKEN).
+    const text = write(`${many.changes(listed(ready.map((symbol) => many.change(spokenName(symbol), symbol)), language))} ${many.falls(listed(ready.map((symbol) => many.fall(spokenName(symbol), symbol)), language))}`, figures, analysis.windowDays, language, locale);
+    const used = [...ready.map((symbol) => `return_${symbol}`), ...ready.map((symbol) => `drawdown_${symbol}`)];
     return { kind: 'analysis', gist: text.slice(0, text.indexOf('. ') + 1) || text, text, figures: used, references: references(analysis, used), limitations: limitationsInWords(analysis, language), next: null, composedByCode: true };
   }
   const [a, b] = ready;
   const days = !b && ['worst', 'best'].every((metric) => { const figure = figures.get(`${metric}_${a}`); return figure?.value != null && Boolean(figure.day); });
   const moved = [a, b].filter(Boolean).every((symbol) => figures.get(`move_${symbol}`)?.value != null);
-  const draft = (b ? COMPOSED[language](instrumentName(a), instrumentName(b)) + (moved ? COMPOSED_MOVE[language].two(instrumentName(a), instrumentName(b)) : '') : COMPOSED_ONE[language](instrumentName(a)) + (moved ? COMPOSED_MOVE[language].one : '') + (days ? COMPOSED_DAYS[language] : '')).replace(/_A\}\}/g, `_${a}}}`).replace(/_B\}\}/g, `_${b}}}`);
+  const draft = (b ? COMPOSED[language](spokenName(a), spokenName(b)) + (moved ? COMPOSED_MOVE[language].two(spokenName(a), spokenName(b)) : '') : COMPOSED_ONE[language](spokenName(a)) + (moved ? COMPOSED_MOVE[language].one : '') + (days ? COMPOSED_DAYS[language] : '')).replace(/_A\}\}/g, `_${a}}}`).replace(/_B\}\}/g, `_${b}}}`);
   const text = write(draft, figures, analysis.windowDays, language, locale);
   const used = b ? [`return_${a}`, `return_${b}`, `drawdown_${a}`, `drawdown_${b}`, ...(moved ? [`move_${a}`, `move_${b}`] : [])] : [`return_${a}`, `drawdown_${a}`, ...(moved ? [`move_${a}`] : []), ...(days ? [`worst_${a}`, `best_${a}`] : [])];
   return { kind: 'analysis', gist: text.slice(0, text.indexOf('. ') + 1) || text, text, figures: used, references: references(analysis, used), limitations: limitationsInWords(analysis, language), next: null, composedByCode: true };
@@ -365,35 +365,128 @@ const ASKED: Record<AppLanguage, { correlation: (pairs: string) => string; pair:
 };
 const several = (parts: string[], language: AppLanguage) => (parts.length > 1 ? listed(parts, language) : parts[0]);
 
+/** How many figures code says aloud in one answer: more than this nobody follows by ear (seventh blind set: twelve were told). */
+export const SPOKEN = 6;
+/** Said last when the change over the window is not among what is told: the figures still say which window they are of. */
+const WINDOW: Record<AppLanguage, string> = {
+  en: 'That is over the last {{days}} days.', es: 'Eso es en los últimos {{days}} días.', fr: 'Cela porte sur les {{days}} derniers jours.',
+  pt: 'Isso vale para os últimos {{days}} dias.', it: 'Questo riguarda gli ultimi {{days}} giorni.', de: 'Das gilt für die letzten {{days}} Tage.',
+};
+/** Said when more was asked than is told aloud. */
+export const REST: Record<AppLanguage, string> = {
+  en: 'The other figures I read are on screen.', es: 'Las demás cifras que leí están en pantalla.', fr: 'Les autres chiffres que j’ai lus sont à l’écran.',
+  pt: 'Os outros números que li estão na tela.', it: 'Le altre cifre che ho letto sono sullo schermo.', de: 'Die übrigen Zahlen, die ich gelesen habe, stehen auf dem Bildschirm.',
+};
+const ORDER = ['return', 'move', 'drawdown', 'worst', 'best', 'correlation'] as const;
+
+/**
+ * What the person asked about, told by code and nothing else: the figures of each asked metric, in a fixed order, up to
+ * SPOKEN of them. Null when nothing asked has a value (the caller then decides what to say instead).
+ */
+function composeFocused(analysis: Analysis, language: AppLanguage, locale: string | null | undefined, asked: string[]): Presentation | null {
+  const figures = new Map(analysis.figures.map((figure) => [figure.id, figure]));
+  const valued = (id: string) => figures.get(id)?.value != null;
+  const many = COMPOSED_MANY[language], move = COMPOSED_MOVE[language], words = ASKED[language];
+  const sentences: string[] = [], used: string[] = [];
+  let left = false;
+  for (const metric of ORDER) {
+    if (!asked.includes(metric)) continue;
+    let ids: string[] = [], sentence = '';
+    if (metric === 'correlation') {
+      const pairs: string[] = [];
+      for (let i = 0; i < analysis.subjects.length; i++) for (let j = i + 1; j < analysis.subjects.length; j++) {
+        const [a, b] = [analysis.subjects[i], analysis.subjects[j]], id = [`corr_${a}_${b}`, `corr_${b}_${a}`].find(valued);
+        if (id) { pairs.push(words.pair(spokenName(a), spokenName(b), id)); ids.push(id); }
+      }
+      if (pairs.length) sentence = words.correlation(several(pairs, language));
+    } else {
+      const have = analysis.subjects.filter((symbol) => valued(`${metric}_${symbol}`) && (metric === 'worst' || metric === 'best' ? Boolean(figures.get(`${metric}_${symbol}`)?.day) : true));
+      ids = have.map((symbol) => `${metric}_${symbol}`);
+      if (have.length) sentence = metric === 'return' ? many.changes(several(have.map((symbol) => many.change(spokenName(symbol), symbol)), language))
+        : metric === 'move' ? move.many(several(have.map((symbol) => move.each(spokenName(symbol), symbol)), language))
+        : metric === 'drawdown' ? many.falls(several(have.map((symbol) => many.fall(spokenName(symbol), symbol)), language))
+        : words[metric](several(have.map((symbol) => words.day(spokenName(symbol), `${metric}_${symbol}`)), language));
+    }
+    if (!sentence) continue;
+    // The first thing asked is always told; anything after it only while it fits what an ear can follow.
+    if (used.length && used.length + ids.length > SPOKEN) { left = true; continue; }
+    sentences.push(sentence); used.push(...ids);
+  }
+  if (!sentences.length) return null;
+  if (!used.some((id) => id.startsWith('return_'))) sentences.push(WINDOW[language]);
+  if (left) sentences.push(REST[language]);
+  const said = sentences.map((sentence) => write(sentence, figures, analysis.windowDays, language, locale));
+  return { kind: 'analysis', gist: said[0], text: said.join(' '), figures: used, references: references(analysis, used), limitations: limitationsInWords(analysis, language), next: null, composedByCode: true };
+}
+
 /**
  * A plain reading of the analysis written by code: what is served when the model's text cannot be shown. `asked` is
- * what the model said the person asked about (metric names): code adds those figures when its plain reading does not
- * already carry them, so a read someone spent on "how do they move together" is not answered with something else
- * (fourth and fifth blind sets: correlations and worst days asked, a safe summary told).
+ * what the model said the person asked about (metric names): code then tells those figures and only those, so a read
+ * someone spent on "how do they move together" is answered with that (fourth and fifth blind sets: correlations and
+ * worst days asked, a safe summary told; seventh: the summary and the answer together were twelve figures).
  */
 export function composeByCode(analysis: Analysis | null, language: AppLanguage, locale?: string | null, asked: string[] = []): Presentation {
   const base = composeBase(analysis, language, locale);
   if (!analysis || base.kind !== 'analysis' || !asked.length) return base;
-  const figures = new Map(analysis.figures.map((figure) => [figure.id, figure]));
-  const ready = analysis.subjects.filter((symbol) => figures.get(`return_${symbol}`)?.value != null && figures.get(`drawdown_${symbol}`)?.value != null);
-  const words = ASKED[language], sentences: string[] = [], used: string[] = [];
-  if (asked.includes('correlation') && ready.length > 1) {
-    const pairs: string[] = [];
-    for (let i = 0; i < ready.length; i++) for (let j = i + 1; j < ready.length; j++) {
-      const id = [`corr_${ready[i]}_${ready[j]}`, `corr_${ready[j]}_${ready[i]}`].find((key) => figures.get(key)?.value != null);
-      if (id) { pairs.push(words.pair(instrumentName(ready[i]), instrumentName(ready[j]), id)); used.push(id); }
-    }
-    if (pairs.length) sentences.push(words.correlation(several(pairs, language)));
-  }
-  for (const metric of ['worst', 'best'] as const) {
-    if (!asked.includes(metric)) continue;
-    const ids = ready.map((symbol) => `${metric}_${symbol}`).filter((id) => !base.figures.includes(id) && figures.get(id)?.value != null && Boolean(figures.get(id)?.day));
-    if (ids.length) { sentences.push(words[metric](several(ids.map((id) => words.day(instrumentName(id.slice(metric.length + 1)), id)), language))); used.push(...ids); }
-  }
-  if (!used.length) return base;
-  const all = [...base.figures, ...used];
-  return { ...base, text: `${base.text} ${write(sentences.join(' '), figures, analysis.windowDays, language, locale)}`, figures: all, references: references(analysis, all) };
+  return composeFocused(analysis, language, locale, asked) ?? base;
 }
+
+/** Said in front when a follow-up asked for something the figures on the table do not hold (a sum with the person's money, a date nobody read). */
+const NOT_FROM_THESE: Record<AppLanguage, [string, string]> = {
+  en: ['I can’t establish that from what I read.', 'The figures I read are still here.'], es: ['Eso no lo puedo establecer con lo que leí.', 'Las cifras que leí siguen aquí.'],
+  fr: ['Je ne peux pas établir cela avec ce que j’ai lu.', 'Les chiffres que j’ai lus sont toujours là.'], pt: ['Não consigo estabelecer isso com o que li.', 'Os números que li continuam aqui.'],
+  it: ['Non posso stabilirlo con quello che ho letto.', 'Le cifre che ho letto sono ancora qui.'], de: ['Das kann ich aus dem, was ich gelesen habe, nicht ableiten.', 'Die Zahlen, die ich gelesen habe, sind noch da.'],
+};
+/**
+ * Code's answer to a follow-up whose words could not be shown. The figures on the table answered an earlier question:
+ * reciting them again answers nothing (seventh blind set: a sum with the person's money was answered with the whole
+ * comparison). So code tells only what was asked about, and when the model had stated a number nobody computed
+ * (`ownNumber`), or nothing asked can be told, it says first that this cannot be established from what was read.
+ */
+export function followUpByCode(analysis: Analysis, language: AppLanguage, locale: string | null | undefined, asked: string[], ownNumber: boolean): Presentation {
+  const focused = asked.length ? composeFocused(analysis, language, locale, asked) : null;
+  if (focused && !ownNumber) return focused;
+  const [cannot, still] = NOT_FROM_THESE[language];
+  if (!focused) return { kind: 'explanation', gist: cannot, text: `${cannot} ${still}`, figures: [], references: [], limitations: [], next: null, composedByCode: true };
+  return { ...focused, gist: cannot, text: `${cannot} ${focused.text}` };
+}
+
+/** For words the provider itself would not answer, and for anything else outside what Bobby does: one plain sentence and what it can do. */
+export const OUTSIDE: Record<AppLanguage, string> = {
+  en: 'That is not something I can help with. I can explain an investing idea or read how an asset moved.', es: 'Con eso no puedo ayudarte. Puedo explicarte una idea de inversión o leer cómo se movió un activo.',
+  fr: 'Je ne peux pas t’aider pour cela. Je peux t’expliquer une idée d’investissement ou lire comment un actif a évolué.', pt: 'Com isso não posso ajudar. Posso explicar uma ideia de investimento ou ler como um ativo se moveu.',
+  it: 'In questo non posso aiutarti. Posso spiegarti un’idea di investimento o leggere come si è mosso un asset.', de: 'Dabei kann ich dir nicht helfen. Ich kann dir eine Idee rund ums Investieren erklären oder lesen, wie sich ein Wert bewegt hat.',
+};
+export const outside = (language: AppLanguage): Presentation => ({ kind: 'explanation', gist: OUTSIDE[language].split(/(?<=\.)\s/)[0], text: OUTSIDE[language], figures: [], references: [], limitations: [], next: null, composedByCode: true });
+
+const KIND_NAMED: Record<AppLanguage, Record<'equity' | 'crypto' | 'etf', (name: string) => string>> = {
+  en: { equity: (n) => `the company ${n}`, crypto: (n) => `the crypto asset ${n}`, etf: (n) => `the fund ${n}` },
+  es: { equity: (n) => `la empresa ${n}`, crypto: (n) => `el criptoactivo ${n}`, etf: (n) => `el fondo ${n}` },
+  fr: { equity: (n) => `l’entreprise ${n}`, crypto: (n) => `le cryptoactif ${n}`, etf: (n) => `le fonds ${n}` },
+  pt: { equity: (n) => `a empresa ${n}`, crypto: (n) => `o criptoativo ${n}`, etf: (n) => `o fundo ${n}` },
+  it: { equity: (n) => `l’azienda ${n}`, crypto: (n) => `la criptovaluta ${n}`, etf: (n) => `il fondo ${n}` },
+  de: { equity: (n) => `das Unternehmen ${n}`, crypto: (n) => `die Kryptowährung ${n}`, etf: (n) => `den Fonds ${n}` },
+};
+const WHICH: Record<AppLanguage, (word: string, named: string) => string> = {
+  en: (word, named) => `By “${word}”, do you mean ${named} or something else?`, es: (word, named) => `Con «${word}», ¿te refieres a ${named} o a otra cosa?`,
+  fr: (word, named) => `Par « ${word} », tu veux dire ${named} ou autre chose ?`, pt: (word, named) => `“${word}” quer dizer ${named} ou outra coisa?`,
+  it: (word, named) => `Con «${word}» intendi ${named} o qualcos’altro?`, de: (word, named) => `Meinst du mit „${word}“ ${named} oder etwas anderes?`,
+};
+/** Code's own question about an everyday word the person's words left open: it names both readings and settles neither. */
+export function whichReading(word: string, symbol: string, language: AppLanguage): Presentation {
+  const text = WHICH[language](word, KIND_NAMED[language][instrumentKind(symbol)](spokenName(symbol)));
+  return { kind: 'clarification', gist: text, text, figures: [], references: [], limitations: [], next: null, composedByCode: true };
+}
+
+/** One plain sentence for every way an errand can end without an answer: a person is never left with a code. */
+export type SaidFor = 'try_again' | 'empty' | 'busy' | 'no_reads' | 'not_now';
+export const SAID: Record<SaidFor, Record<AppLanguage, string>> = {
+  try_again: { en: 'I could not answer this time. Your question is still here: try again in a moment.', es: 'Esta vez no pude responder. Tu pregunta sigue aquí: inténtalo de nuevo en un momento.', fr: 'Je n’ai pas pu répondre cette fois. Ta question est toujours là : réessaie dans un instant.', pt: 'Desta vez não consegui responder. A pergunta continua aqui: é só tentar de novo daqui a pouco.', it: 'Questa volta non sono riuscito a rispondere. La tua domanda è ancora qui: riprova tra un momento.', de: 'Diesmal konnte ich nicht antworten. Deine Frage ist noch da: Versuch es gleich noch einmal.' },
+  empty: { en: 'I did not catch anything. Say or write your question.', es: 'No alcancé a entender nada. Di o escribe tu pregunta.', fr: 'Je n’ai rien saisi. Dis ou écris ta question.', pt: 'Não captei nada. É só dizer ou escrever a pergunta.', it: 'Non ho colto nulla. Di’ o scrivi la tua domanda.', de: 'Ich habe nichts verstanden. Sag oder schreib deine Frage.' },
+  busy: { en: 'That is a lot at once. Give me a moment and ask again.', es: 'Son muchas cosas a la vez. Dame un momento y pregunta de nuevo.', fr: 'Cela fait beaucoup à la fois. Laisse-moi un instant et redemande.', pt: 'É muita coisa de uma vez. Um momento, e é só perguntar de novo.', it: 'Sono tante cose insieme. Dammi un momento e chiedi di nuovo.', de: 'Das ist viel auf einmal. Gib mir einen Moment und frag noch einmal.' },
+  no_reads: { en: 'You have no reads left for now. I can still explain an idea.', es: 'Por ahora no te quedan lecturas. Todavía puedo explicarte una idea.', fr: 'Il ne te reste plus de lectures pour l’instant. Je peux toujours t’expliquer une idée.', pt: 'Por enquanto não há mais leituras. Ainda posso explicar uma ideia.', it: 'Per ora non hai più letture. Posso ancora spiegarti un’idea.', de: 'Im Moment hast du keine Lesungen mehr. Eine Idee kann ich dir weiterhin erklären.' },
+  not_now: { en: 'I can’t work on that right now. Try again in a moment.', es: 'Ahora mismo no puedo con eso. Inténtalo de nuevo en un momento.', fr: 'Je ne peux pas m’en occuper pour l’instant. Réessaie dans un instant.', pt: 'Agora não consigo tratar disso. É só tentar de novo daqui a pouco.', it: 'In questo momento non riesco a occuparmene. Riprova tra un momento.', de: 'Das schaffe ich gerade nicht. Versuch es gleich noch einmal.' },
+};
 
 /**
  * The model's draft, checked and written out. A refusal says what to repair; the caller may ask the model once

@@ -27,11 +27,12 @@
 // ============================================================
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
-import { APP_LANGUAGES, APP_LOCALES } from '../src/lib/app-language.js';
+import { APP_LANGUAGES, APP_LOCALES, type AppLanguage } from '../src/lib/app-language.js';
 import { deviceHash } from './_lib/access.js';
 import { requestOriginHost } from './_lib/origins.js';
 import { getClientQuotaKeys } from './_lib/rate-limit.js';
-import { createTask, engineDeps, runTask, taskView } from './_lib/agent/loop.js';
+import { createTask, engineDeps, runTask, saidFor, taskView } from './_lib/agent/loop.js';
+import { SAID } from './_lib/agent/present.js';
 import { FileAgentStore, MemoryAgentStore, isFinal, type AgentStore } from './_lib/agent/store.js';
 import { PgAgentStore, postgrestAgentRpc } from './_lib/agent/store-pg.js';
 import { ENGINE_VERSION } from './_lib/agent/types.js';
@@ -59,14 +60,25 @@ const Act = z.object({ op: z.enum(['approve', 'deny', 'cancel']), taskId: z.stri
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store');
   // Storage that cannot answer is never guessed around: whatever it was doing, the door says so and the errand stays as the store last recorded it.
-  try { return await door(req, res); } catch { console.error(JSON.stringify({ route: 'agent-task', event: 'storage_failed' })); return res.status(503).json({ version: ENGINE_VERSION, error: { code: 'engine_storage_unavailable' } }); }
+  try { return await door(req, res); } catch { console.error(JSON.stringify({ route: 'agent-task', event: 'storage_failed' })); return res.status(503).json({ version: ENGINE_VERSION, error: { code: 'engine_storage_unavailable', message: SAID.not_now[languageOf(req)] } }); }
 }
+
+/** The language a request says it is in, for the one sentence a refusal carries; English when it says none. Never trusted for anything else. */
+function languageOf(req: VercelRequest): AppLanguage {
+  try {
+    const body = (typeof req.body === 'string' ? JSON.parse(req.body) : req.body) as { language?: unknown } | null;
+    return (APP_LANGUAGES as readonly string[]).includes(String(body?.language)) ? body!.language as AppLanguage : 'en';
+  } catch { return 'en'; }
+}
+/** The refusals a person can meet through no fault of the app: each carries one plain sentence, so nobody is left with a code. */
+const SPOKEN_REFUSALS = new Set(['empty_question', 'too_many_errands', 'reads_limit', 'engine_unavailable', 'engine_storage_unavailable']);
 
 async function door(req: VercelRequest, res: VercelResponse) {
   if (!agentEngineOn()) return res.status(404).json({ error: 'Not found' });
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed', engine: { version: ENGINE_VERSION } });
   if (!requestOriginHost(req.headers)) return res.status(403).json({ error: 'Origin not allowed' });
-  const refuse = (status: number, code: string) => res.status(status).json({ version: ENGINE_VERSION, error: { code } });
+  let language = languageOf(req);
+  const refuse = (status: number, code: string) => res.status(status).json({ version: ENGINE_VERSION, error: { code, ...(SPOKEN_REFUSALS.has(code) ? { message: SAID[saidFor(code)][language] } : {}) } });
   let owner: string | null = null, address: string | null = null;
   try { address = getClientQuotaKeys(req)?.caller ?? null; owner = deviceHash(req) ?? address; } catch { owner = null; }
   // The install id is a header a caller chooses: without the address nothing bounds a caller who invents installs.
@@ -89,6 +101,9 @@ async function door(req: VercelRequest, res: VercelResponse) {
   }
   let body: unknown = null;
   try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; } catch { return refuse(400, 'invalid_request'); }
+  // Nothing was said (a microphone that caught silence, a send with no words): that is told, not answered as a malformed request.
+  const sent = body as { op?: unknown; question?: unknown } | null;
+  if (sent?.op === 'ask' && typeof sent.question === 'string' && !sent.question.trim()) return refuse(400, 'empty_question');
   const ask = Ask.safeParse(body);
   if (ask.success) {
     if (!process.env.ANTHROPIC_API_KEY && !testDeps?.call) return refuse(503, 'engine_unavailable');
@@ -105,7 +120,7 @@ async function door(req: VercelRequest, res: VercelResponse) {
     if (!act.data.digest) return refuse(400, 'invalid_request');
     const said = await store.approve(owner, act.data.taskId, act.data.digest, deps.now());
     if (said.state === 'not_found') return refuse(404, 'not_found');
-    if (said.state === 'limit') return refuse(429, 'reads_limit');
+    if (said.state === 'limit') { language = (await store.get(owner, act.data.taskId))?.language ?? language; return refuse(429, 'reads_limit'); }
     if (said.state === 'mismatch' || said.state === 'not_waiting') return refuse(409, said.state === 'mismatch' ? 'approval_mismatch' : 'not_waiting');
     await runTask(deps, owner, act.data.taskId);
     return view(act.data.taskId);

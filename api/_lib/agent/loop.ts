@@ -24,12 +24,12 @@ import { appLocale, languageName, type AppLanguage } from '../../../src/lib/app-
 import { judgeCompanionReply, companionJudgeModel } from '../companion-judge.js';
 import { reviewCompanionReply } from '../companion-review.js';
 import { modelPrice, type LlmUsage } from '../llm.js';
-import { composeByCode, limitationsInWords, present, unanswered, unverified, type Draft, type OwnWords, everyDayClaim } from './present.js';
+import { SAID, composeByCode, followUpByCode, limitationsInWords, outside, present, unanswered, unverified, whichReading, type Draft, type OwnWords, type SaidFor, everyDayClaim } from './present.js';
 import { judgeAnalysis } from './reader.js';
 import { agentModel, callAnthropicOnce, reservedCall, type Block, type CallModel, type Message, type WireTool } from './provider.js';
 import { taskError, taskEvents, taskResult, taskState } from './state.js';
 import { isFinal, waitingApproval, type AgentStore, type Begin, type Budget } from './store.js';
-import { TOOLS, UNIVERSE, forModel, type ToolContext } from './tools.js';
+import { TOOLS, UNIVERSE, forModel, instrumentsNamed, presumedIn, type Settled, type ToolContext } from './tools.js';
 import { DEFAULT_LIMITS, ENGINE_VERSION, PROMPT_VERSION, TOOLSET_VERSION, type Analysis, type ApprovalScope, type Limits, type Presentation, type StepKind, type Task } from './types.js';
 
 export type Verdict = 'pass' | 'advice' | 'guarantee' | 'figure' | 'unchecked';
@@ -66,9 +66,11 @@ What kind of errand it is decides what you do:
 - They want to understand something (what a thing is, how it works, what people weigh): answer directly, with no tool, kind "explanation". Naming an asset is not a reason to use a tool.
 - They want to know how one asset behaved, or how two or three compare: call read_assets with the names exactly as they wrote them. It uses one read of their allowance and the app asks them before it runs: you simply call it. One, two or three assets read together cost one read, whatever the window: say so when they ask what it costs; how many reads they have left is not something you can see. Use 30 days unless they ask for 60. Then answer, kind "analysis". If the app says a name cannot be read, ask one short question instead.
 - They ask for a span you cannot read (a week, ninety days, a year, "since January"): do not call the tool with another span. Say in one sentence that you read 30 or 60 days and ask whether they want one of them, kind "clarification".
+- They rule a substitute out themselves ("exactly those seven days", "no substitute", "not a fund", "no rounding", "only that"): say in one sentence what you cannot read and stop there, kind "explanation". Do not offer what they ruled out, do not offer another asset or window in its place, and leave next empty.
+- They ask for a sum with their own money (what their amount would have become, what they would need to get back to where they were): you do not do sums with a person's money and you never offer to ("shall I work it out"). Say so in one sentence, and what the figure itself says.
 - They ask you to choose or decide for them (which one would you buy, is it a good moment, what should I do with my money): do not call a tool for that. Say that you do not choose for them and what that depends on; next may offer to read how those assets moved.
-- Their words are not about investing, money or markets at all (a device, a game, a greeting, noise): say in one short sentence what you can help with and leave it there; do not turn it into a market question and offer no read.
-- You cannot tell which things they mean, or they asked to compare and named fewer than two: ask one short question, kind "clarification". Do not guess. A single word that is also an everyday word or a name (sol, meta, luna, gas, link, apple) is not yet an asset: ask what they mean in a way that names both readings, and if they say it is not about markets leave it there, with no read offered.
+- Their words are not about investing, money or markets at all (a device, a game, a greeting, noise): when it is something tiny you can settle in a few words (a greeting, thanks, how a word is said in another language), settle it in those few words; otherwise say in one short, kind sentence what you can help with. Either way leave it there: do not turn it into a market question and offer no read. When they say it was a mistake, or that they are done, acknowledge it in a few words and add nothing.
+- You cannot tell which things they mean, or they asked to compare and named fewer than two: ask one short question, kind "clarification". Do not guess. A single word that is also an everyday word or a name (sol, meta, luna, gas, link, apple) is not yet an asset: ask what they mean in a way that names both readings, and if they say it is not about markets leave it there, with no read offered. A word that among assets still does not say which one ("coin", "the index", "the fund") is the same: ask which they mean, and until they answer put no name of yours on it in any sentence that is not that question. When the app answers ambiguous_name, do exactly that.
 - The errand needs something no tool gives you (what a fund holds, how concentrated it is, fees, earnings, news, a forecast, what to do): say plainly that you cannot establish that here, and say what you can establish. Never fill the gap from memory.
 - "previous" in the input is their last question, your answer to it and the figures behind it. A follow-up about those figures is answered from them, with no new tool call. Use a tool again only if they ask for other assets or another window. When "previous" read a single asset, "it", "that" or "that change" means that asset: do not ask which one.
 - "declined" in the input is an errand of theirs for which you offered a read and they said no: nothing was read. It tells you which assets and which window they were talking about, so never ask them again which ones. If they now ask for it, call read_assets for it: the app asks them again. Their earlier yes or no is never a permission. If they ask what it would have shown, or to answer it "from memory", say that it was not run, so there are no figures, and that it used none of their reads: do not call the tool for that, and do not offer it again in the same breath.
@@ -77,8 +79,9 @@ What kind of errand it is decides what you do:
 
 Numbers. You never write a market number. Every figure lives in a tool result (or in "previous") and has an id: to state it, write {{f:ID}} and the app writes the number with its unit, so never put a percent sign or the word for percent after it. {{days}} writes only the number of calendar days of the window: write the plain word for "days" right after it (never sessions or trading days: the window holds fewer of those). A figure that is one day's (the worst day, the best day) carries that day: {{d:ID}} writes its date. {{from:ID}} and {{to:ID}} write the first and the last day a figure covers. Never type a date or a count of days yourself. Never state a number of your own, in digits or in words. Three things are not that: the length of the window you read, or the two lengths the tool offers named together ("30 or 60 days"), followed by the word for days; a number the person wrote, said back exactly as they wrote it; a name that holds a number (S&P 500, Nasdaq 100, 24/7). In gist and text the window is always written with {{days}}; the other length, or the two together, may be named only in a limitation or in next. Never compute, never round, never restate a figure in words, never put two placeholders side by side. A figure whose value is null does not exist: say that it could not be established.
 What a figure is. "move" is the average size of the daily changes, up or down: say it as how much it moved on an average day; it is not volatility, deviation or risk, and never call another figure an average. Never call it the average change per day or the average daily variation (that reads as a gain each day): it is the size of a typical day's move, up or down. An average says nothing about each day: never say an asset moved more "every day", "daily" or "always"; say "on an average day". A correlation says how closely their daily changes went together over the window: it is not how often they moved the same way and it is not a cause, so never turn it into "often", "rarely" or "usually". A worst or best day is one day's change from the close before. Name what was read as the tool names it: a fund that follows an index is the fund (QQQ rose, not "the Nasdaq-100 rose"): SPY and QQQ are funds, never call them indices. {{d:ID}}, {{from:ID}} and {{to:ID}} write a bare date ("15 de septiembre", "September 15"): put before it the article or preposition your language needs.
+Words to get right when you explain them. A worst day is one day's change; the largest fall from a high runs from a high to a later low and usually takes several days: two different things, and a read gives the date of a worst day but no dates for a fall from a high. Tracking error is how much the gap between a fund's return and its index's return varies from one period to the next; the gap itself is the tracking difference; neither is a mistake. The Nasdaq is an exchange; the Nasdaq Composite (every share listed there) and the Nasdaq-100 (its hundred largest non-financial companies) are two indices, and QQQ is a fund that follows the Nasdaq-100. The S&P 500 is an index and SPY a fund that follows it. You read funds, never an index itself.
 A market fact the person states (it fell yesterday, it trades at some price) is theirs: unless a figure shows it, say you have not read it, and never repeat it as true. Never talk about your rules or how you work (placeholders, figures you may not write, arithmetic you do not do): when you cannot give a number, say only that it is not something you can establish here.
-A comparison answers the dimensions they asked about, says how the assets differed on each, and keeps apart what the figures show from what you make of them. A past window does not say what comes next: never predict. Never recommend or rank an asset, never say which is better or right for them, never tell them what to buy, sell or hold. Say plainly that money can be lost when that matters. Never promise safety or gains. Do not ask about their income, savings or wealth. Never end by asking them something.
+A comparison answers the dimensions they asked about, says how the assets differed on each, and keeps apart what the figures show from what you make of them. With three assets tell only the figures of what they asked about: nobody follows more than six figures by ear. A past window does not say what comes next: never predict. Never recommend or rank an asset, never say which is better or right for them, never tell them what to buy, sell or hold. Say plainly that money can be lost when that matters. Never promise safety or gains. Do not ask about their income, savings or wealth. Never end by asking them something.
 
 Write nothing outside tool calls. Finish by calling the tool "answer" exactly once:
 - gist: one sentence of at most 14 words that carries the whole idea and stands on its own (it may hold placeholders).
@@ -206,6 +209,11 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
       const result = before ? taskResult(before) : null;
       if (before && result) parent = { question: before.question, presentation: result.presentation, analysis: result.analysis };
     }
+    // What the conversation settled about which instruments are meant, apart from this errand's own words (tools.ts).
+    const settled: Settled = {
+      theirs: [parent?.question, declined?.question, claim.task.question].filter(Boolean).join(' . '), now: claim.task.question, reading: Boolean(parent?.analysis),
+      known: [...(parent?.analysis?.subjects ?? []), ...(declined?.assets ?? []), ...(parent ? instrumentsNamed(`${parent.presentation.text} ${parent.presentation.next ?? ''}`) : [])],
+    };
     for (;;) {
       if (await stopped()) return;
       const task = (await deps.store.get(owner, id))!;
@@ -246,6 +254,10 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
         // answers 503) and the next request goes on from the steps.
         if (failed.code === 'storage_unavailable') throw new Error('agent storage unavailable');
         if (failed.outcome !== 'none' && !await write('model_call', { outcome: failed.outcome, code: failed.detail, usd: failed.usd, reservedUsd: failed.reservedUsd })) return;
+        // The provider itself would not answer these words (seventh blind set: a request for the instructions, twice
+        // refused, ended as a bare error). That is an answer, and asking again would buy the same refusal: the person
+        // is told in one sentence what Bobby can do. A read already made is told by code instead, as always.
+        if (failed.outcome === 'charged' && failed.detail === 'stop_refusal' && !ownAnalysis(task)) { await write('answer', { result: { presentation: outside(task.language), analysis: null }, reader: 'not_read', instead: 'provider_refused' }); return; }
         // Nothing was billed (the provider refused), or a reply was paid for and could not be used (cut off
         // mid-thought): its cost is known, so one more reserved attempt is safe. An attempt of unknown cost is
         // never followed by a blind second one: that ends the task in a named state.
@@ -265,7 +277,7 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
       if (answer || !uses.length) {
         const said = blocks.filter((block): block is Extract<Block, { type: 'text' }> => block.type === 'text').map((block) => block.text).join(' ').trim();
         const input = answer ? answer.input : { kind: 'explanation', gist: said.split(/(?<=[.!?…])\s+/)[0] ?? said, text: said, claims: [], limitations: [], next: '' };
-        if (await finish(deps, write, stopped, task, parent, answer?.id ?? null, input)) return;
+        if (await finish(deps, write, stopped, task, parent, settled, answer?.id ?? null, input)) return;
         continue;
       }
       let asked = false;
@@ -275,7 +287,7 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
         const args = tool?.schema.safeParse(use.input);
         if (!tool || !args?.success) { if (!await write('tool_refused', { useId: use.id, tool: use.name, reason: tool ? 'invalid_arguments' : 'unknown_tool' })) return; continue; }
         // What will run is what the server made of the arguments (names into symbols), or nothing.
-        const prepared = tool.prepare ? tool.prepare(args.data) : { ok: true as const, args: args.data as unknown };
+        const prepared = tool.prepare ? tool.prepare(args.data, settled) : { ok: true as const, args: args.data as unknown };
         if (!prepared.ok) { const no = prepared as { reason: string; detail: string }; if (!await write('tool_refused', { useId: use.id, tool: tool.name, reason: no.reason, detail: no.detail })) return; continue; }
         const ready = (prepared as { args: unknown }).args;
         if (!tool.metered) {
@@ -317,8 +329,8 @@ function answerArguments(input: unknown): unknown {
 }
 
 /** Checks the draft, has it read, stores the result. False when the model was asked to correct it (the loop goes on). */
-async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, unknown>) => Promise<unknown>, stopped: (readerUsd?: number) => Promise<boolean>, task: Task, parent: Parameters<typeof rebuild>[1], useId: string | null, input: unknown): Promise<boolean> {
-  const analysis = ownAnalysis(task) ?? parent?.analysis ?? null;
+async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, unknown>) => Promise<unknown>, stopped: (readerUsd?: number) => Promise<boolean>, task: Task, parent: Parameters<typeof rebuild>[1], settled: Settled, useId: string | null, input: unknown): Promise<boolean> {
+  const mine = ownAnalysis(task), analysis = mine ?? parent?.analysis ?? null;
   const repairs = task.steps.filter((step) => step.kind === 'tool_refused' && step.data.tool === 'answer').length;
   const parsed = Answer.safeParse(answerArguments(input));
   const theirs = parent ? `${parent.question} ${task.question}` : task.question;
@@ -332,16 +344,26 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   const shown = draft ? present(draft, draft.kind === 'clarification' ? null : analysis, theirs, task.language, task.locale) : null;
   let presentation: Presentation | null = shown && 'presentation' in shown ? shown.presentation : null;
   const ownWords: OwnWords | null = shown && 'own' in shown ? shown.own : null;
-  if (!presentation) {
-    const reason = !parsed.success ? 'invalid_arguments' : (shown as { refusal: { code: string; detail: string } }).refusal.code;
+  // An instrument the person's words left open is not treated as chosen, in any sentence that is not an analysis
+  // (seventh blind set: "one was coin … please don't guess" → "alongside Coinbase"). Asking which they mean is fine.
+  const open = presentation && presentation.kind !== 'analysis' ? presumedIn([presentation.text, presentation.next ?? ''].join(' '), settled) : null;
+  // Code's own telling when the model's words cannot be shown. After this task's own read: its figures, those asked
+  // about first. On a follow-up the figures on the table answered an earlier question, so only what was asked is told,
+  // and a number the model made up is answered with "that cannot be established from what I read".
+  const told = (ownNumber: boolean): Presentation => mine ? composeByCode(mine, task.language, task.locale, draft?.asked)
+    : draft?.kind === 'analysis' && analysis ? followUpByCode(analysis, task.language, task.locale, draft.asked ?? [], ownNumber)
+    : unanswered(task.language);
+  if (!presentation || open) {
+    const reason = !parsed.success ? 'invalid_arguments' : open ? 'presumed_asset' : (shown as { refusal: { code: string; detail: string } }).refusal.code;
     // For arguments the server cannot read, which field and what kind of fault: the schema's own words, never the model's.
-    const detail = !parsed.success ? parsed.error.issues.slice(0, 3).map((issue) => `${issue.path.join('.')}: ${issue.code}`).join('; ') : (shown as { refusal: { code: string; detail: string } }).refusal.detail;
+    const detail = !parsed.success ? parsed.error.issues.slice(0, 3).map((issue) => `${issue.path.join('.')}: ${issue.code}`).join('; ')
+      : open ? `their word "${open.word}" does not settle which instrument they mean: ask in one question that names both readings, and treat none as chosen`
+      : (shown as { refusal: { code: string; detail: string } }).refusal.detail;
     // A write the store refused (a stale runner) ends this run, like every other write of the loop: never "go round again".
     if (repairs < 1) return !await write('tool_refused', { useId, tool: 'answer', reason, detail });
-    // Code tells the figures when there are figures. An answer that needed none says only that it could not be given:
-    // it never blames data nobody asked for.
-    const figures = ownAnalysis(task) ?? (draft?.kind === 'analysis' ? analysis : null);
-    presentation = figures ? composeByCode(figures, task.language, task.locale, draft?.asked) : unanswered(task.language);
+    // Code tells the figures when there are figures, and asks its own question about a word left open. An answer that
+    // needed neither says only that it could not be given: it never blames data nobody asked for.
+    presentation = open ? whichReading(open.word, open.symbol, task.language) : told(reason === 'typed_number');
   }
   // Everything of the model's that a person is about to get is read: the text, the limitations it wrote and the next
   // question. Only a text code wrote itself is not (there is nothing of the model's in it), and the record says so.
@@ -350,7 +372,7 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   // about an average states what no figure holds. Code tells the figures instead, and the reader is not asked.
   let rule: 'every_day' | null = null;
   if (!presentation.composedByCode && presentation.kind === 'analysis' && ownWords && everyDayClaim([ownWords.text, ...ownWords.limitations].join(' '), task.language)) {
-    presentation = composeByCode(analysis, task.language, task.locale, draft?.asked); rule = 'every_day';
+    presentation = told(false); rule = 'every_day';
   }
   if (!presentation.composedByCode) {
     // A clarification is one short question. Anything longer, or with no question in it, is not one: it is read as an explanation.
@@ -371,7 +393,7 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
       // The model's words cannot be shown: an analysis is told by code from its figures. Anything else gets the engine's own
       // sentence: when the reader found a number nobody computed, that there is no verified figure for it here (and what
       // Bobby can do); otherwise that it could not be answered this time. Never a sentence about something else.
-      presentation = presentation.kind === 'analysis' ? composeByCode(analysis, task.language, task.locale, draft?.asked) : verdict === 'figure' ? unverified(task.language) : unanswered(task.language);
+      presentation = presentation.kind === 'analysis' ? told(verdict === 'figure') : verdict === 'figure' ? unverified(task.language) : unanswered(task.language);
     }
   }
   // The analysis on the table stays with the thread: a follow-up that cited no figure still hands it to the next one.
@@ -444,6 +466,11 @@ export function engineDeps(store: AgentStore, over: Partial<Deps> = {}): Deps {
   };
 }
 
+/** Which plain sentence goes with a way of ending without an answer (a task's error, or the door's refusal). */
+export function saidFor(code: string): SaidFor {
+  return code === 'too_many_errands' ? 'busy' : code === 'reads_limit' ? 'no_reads' : code === 'empty_question' ? 'empty' : code.startsWith('engine_') || code.startsWith('budget_') ? 'not_now' : 'try_again';
+}
+
 /** What a client is told of a task. Money spent on providers is the server's business and is not here. */
 export function taskView(task: Task, now: number, remaining: number | null) {
   const result = taskResult(task), state = taskState(task, now);
@@ -453,7 +480,7 @@ export function taskView(task: Task, now: number, remaining: number | null) {
     // A client is given the analysis only with an answer that rests on it.
     result: result ? { ...result.presentation, analysis: result.analysis && result.presentation.kind === 'analysis' ? { subjects: result.analysis.subjects, windowDays: result.analysis.windowDays, figures: result.analysis.figures, evidence: result.analysis.evidence } : null } : null,
     // A failed task is final: the same requestId returns this same failure. `retryable` says a NEW request can help.
-    error: taskError(task) ? { code: taskError(task), retryable: ['provider_failed', 'provider_unknown', 'unchecked'].includes(taskError(task)!) } : null,
+    error: taskError(task) ? { code: taskError(task), retryable: ['provider_failed', 'provider_unknown', 'unchecked'].includes(taskError(task)!), message: SAID[saidFor(taskError(task)!)][task.language] } : null,
     allowance: { kind: 'reads' as const, remaining },
     engine: { model: task.model, prompt: task.promptVersion, tools: task.toolsetVersion },
   };
