@@ -108,6 +108,23 @@ export function buildInsights(input: InsightInput): Insight[] {
     }
   }
 
+  // A surface whose every model call failed in the last 48 hours has stopped working, however good its week looks: a job
+  // that runs once a day and has died is two failures here, and it is said the second day (the daily cycle failed five
+  // days in a row unseen, 2026-10-08 to 2026-10-12). The desk has its own rule below, by finished analyses.
+  const SURFACE: Record<string, string> = { 'bobby-cycle': 'El ciclo diario', companion: 'El acompañante', explain: 'Las explicaciones', briefings: 'Los resúmenes', tts: 'La voz', 'agent-task': 'El motor de encargos' };
+  for (const row of a(llm.recentBySurface).map(o)) {
+    const surface = s(row.surface), calls = n(row.calls), failures = n(row.failures);
+    if (!surface || surface === 'desk' || calls < 2 || failures < calls) continue;
+    const name = SURFACE[surface] ?? `«${surface}»`, stop = s(row.lastStop);
+    add({
+      id: `surface-down-${surface}`, level: 'critical', area: 'operacion', tab: 'ia', impact: 92, sample: calls,
+      title: `${name} no obtuvo ninguna respuesta del modelo en 48 h (${int(failures)} de ${int(calls)} llamadas fallaron)`,
+      detail: `Todas las llamadas de «${surface}» al modelo terminaron sin respuesta utilizable en las últimas 48 horas${stop ? `; la última terminó con «${stop}»` : ''}.${stop === 'max_tokens' ? ' «max_tokens» significa que la respuesta se cortó en el límite de tokens que el código le da: suele pasar al cambiar de modelo.' : ''} Mientras siga así, lo que depende de esa función no se produce.`,
+      action: stop === 'max_tokens' ? 'Sube el límite de tokens de esa llamada o acorta lo que se le pide; después comprueba aquí que vuelve a terminar.' : 'Abre IA para ver el proveedor y el error; si el proveedor está bien, revisa el último cambio de esa función.',
+      evidence: [`llamadas 48 h: ${int(calls)}`, `fallidas: ${int(failures)}`, `última falla: ${day(s(row.lastFailureAt))}`, ...(stop ? [`motivo: ${stop}`] : [])],
+    });
+  }
+
   const runs = o(llm.deskRuns);
   // Runs the reader abandoned before the CIO are counted apart by the server (a 'left' ledger marker): never failures.
   const totalRuns = n(runs.runs), finished = n(runs.finished), failedRuns = totalRuns - finished, abandonedRuns = n(runs.abandoned);

@@ -843,6 +843,33 @@ export function adminDays(days: number): string[] {
 }
 
 /** Shared diagnosis inputs for the panel, digest and plan. GET coreOnly avoids delayed external providers. */
+/** One surface's model calls in a recent window: how many, how many failed, the last of each and why the last one failed. */
+export interface RecentSurface { surface: string; calls: number; failures: number; lastOkAt: string | null; lastFailureAt: string | null; lastStop: string | null }
+export const RECENT_CALLS_HOURS = 48;
+/** Rows of the cost ledger, newest first, folded by surface. Pure: tested without a database. */
+export function foldRecentCalls(rows: Array<{ surface?: unknown; ok?: unknown; stop?: unknown; created_at?: unknown }>): RecentSurface[] {
+  const by = new Map<string, RecentSurface>();
+  for (const row of rows) {
+    const surface = typeof row.surface === 'string' && row.surface ? row.surface : 'unknown', at = typeof row.created_at === 'string' ? row.created_at : null;
+    const entry = by.get(surface) ?? { surface, calls: 0, failures: 0, lastOkAt: null, lastFailureAt: null, lastStop: null };
+    entry.calls++;
+    if (row.ok === true) entry.lastOkAt ??= at;
+    else { entry.failures++; if (entry.lastFailureAt === null) { entry.lastFailureAt = at; entry.lastStop = typeof row.stop === 'string' ? row.stop.slice(0, 40) : null; } }
+    by.set(surface, entry);
+  }
+  return [...by.values()].sort((a, b) => b.failures - a.failures || a.surface.localeCompare(b.surface));
+}
+/**
+ * The last 48 hours of model calls by surface. The overview's own per-surface figures cover the whole period, where a
+ * job that runs once a day and has failed five days in a row still reads as "5 of 13" (the daily cycle, 2026-10-08 to
+ * 2026-10-12, noticed by nobody). A `left` marker is a reader who walked away, never a call.
+ */
+async function recentModelCalls(): Promise<{ surfaces: RecentSurface[] }> {
+  const since = new Date(Date.now() - RECENT_CALLS_HOURS * 3_600_000).toISOString();
+  const rows = await rest<Array<{ surface: string; ok: boolean; stop: string | null; created_at: string }>>(`bobby_llm_usage?select=surface,ok,stop,created_at&created_at=gte.${encodeURIComponent(since)}&or=(role.is.null,role.neq.left)&order=created_at.desc&limit=2000`);
+  return { surfaces: foldRecentCalls(Array.isArray(rows) ? rows : []) };
+}
+
 export async function overviewBundle(days: number, internal: boolean, apple: AppleLoad = {}) {
   const [overview, growth, networks] = await Promise.all([
     observeAdminSource('overview', () => rpc<{ days: string[] } & Record<string, unknown>>('bobby_admin_overview', { p_days: days, p_internal: internal }), true),
@@ -857,6 +884,13 @@ export async function overviewBundle(days: number, internal: boolean, apple: App
       integrations(overview!.days ?? adminDays(days), apple),
       observeAdminSource('searchConsole', () => searchConsole(overview!.days ?? adminDays(days))),
     ]);
+  }
+  // What each surface's model calls did in the last 48 hours, put beside the overview's own figures so the server, the
+  // digest and the dashboard read the same thing. Optional: without it the diagnosis simply has no such finding.
+  const recent = await observeAdminSource('modelCalls', () => recentModelCalls());
+  if (recent && overview && typeof overview === 'object') {
+    const all = overview as Record<string, unknown>;
+    all.llm = { ...(all.llm && typeof all.llm === 'object' ? all.llm as Record<string, unknown> : {}), recentBySurface: recent.surfaces };
   }
   const missing = [...(growth == null ? ['growth'] : []), ...(networks == null ? ['networks'] : [])];
   // Operational evidence remains useful when cohorts fail; the bundle identifies the incomplete diagnosis.
