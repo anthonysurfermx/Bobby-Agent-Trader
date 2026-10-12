@@ -327,6 +327,20 @@ export interface LlmUsage {
   usd: number; latencyMs: number; stop: string | null; ok: boolean;
 }
 export class LlmIncompleteError extends Error {}
+
+/**
+ * Runs a model call whose token budget was written as a guess at the length of its answer. The length of an answer is
+ * the prompt's to set; the budget is only a ceiling on cost, and a reply cut at it is no reply. So the call gets twice
+ * its nominal budget, and a reply that is still cut (or refused: the provider's one word for both) is asked for once
+ * more with twice that. Any other failure is the caller's, unchanged.
+ */
+export async function withRoom<T>(ask: (maxTokens: number) => Promise<T>, maxTokens: number): Promise<T> {
+  try { return await ask(maxTokens * 2); } catch (error) {
+    if (!(error instanceof LlmIncompleteError)) throw error;
+    console.warn('[llm] a reply was cut at its budget; asked once more with twice the room');
+    return ask(maxTokens * 4);
+  }
+}
 /** The provider refused the request; `status` lets a caller tell a model-access problem (401/403/404) from an outage. */
 export type ProviderRefusal = 'insufficient_quota' | 'rate_limit_exceeded' | 'billing_hard_limit_reached';
 const providerRefusals = new Set<ProviderRefusal>(['insufficient_quota', 'rate_limit_exceeded', 'billing_hard_limit_reached']);

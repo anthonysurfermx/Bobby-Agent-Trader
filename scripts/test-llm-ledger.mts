@@ -14,7 +14,7 @@ delete process.env.RESEND_API_KEY;
 
 const deferred: Promise<unknown>[] = [];
 (globalThis as Record<symbol, unknown>)[Symbol.for('@vercel/request-context')] = { get: () => ({ waitUntil: (p: Promise<unknown>) => { deferred.push(p); } }) };
-const { completeJson, callLlm, streamText, modelCost, modelPrice, MODEL_PRICES, LlmIncompleteError } = await import('../api/_lib/llm.ts');
+const { completeJson, callLlm, streamText, modelCost, modelPrice, MODEL_PRICES, LlmIncompleteError, withRoom } = await import('../api/_lib/llm.ts');
 const { appTextModel } = await import('../api/_lib/app-model.ts');
 
 let checks = 0;
@@ -418,6 +418,12 @@ try {
 
   ok(!JSON.stringify(serviceWrites).includes(privateMarker) && !JSON.stringify(logs).includes(privateMarker), 'usage, health writes and logs omit private prompts, thinking and provider payloads');
   ok(!/test-anthropic|test-openai/.test(JSON.stringify(serviceWrites) + JSON.stringify(logs)), 'observability does not store synthetic provider keys');
+  // A budget is a ceiling on cost, not the length of the answer: the daily cycle died five days in a row on a reply cut at 350 tokens.
+  const rooms: number[] = [];
+  eq([await withRoom(async (room) => { rooms.push(room); return 'whole'; }, 350), rooms.splice(0)], ['whole', [700]], 'a call gets twice its nominal budget');
+  eq([await withRoom(async (room) => { rooms.push(room); if (room < 1400) throw new LlmIncompleteError('cut'); return 'whole'; }, 350), rooms.splice(0)], ['whole', [700, 1400]], 'a reply that is still cut is asked for once more, with twice the room');
+  await rejects(withRoom(async (room) => { rooms.push(room); throw new LlmIncompleteError('cut'); }, 350), 'cut twice is the caller\'s failure: no third call', error => error instanceof LlmIncompleteError && rooms.splice(0).join() === '700,1400');
+  await rejects(withRoom(async (room) => { rooms.push(room); throw new Error('provider down'); }, 350), 'any other failure is not retried here', error => error instanceof Error && error.message === 'provider down' && rooms.splice(0).join() === '700');
   console.log(`llm-ledger: ${checks} checks passed`);
 } finally {
   await settledLedger();
