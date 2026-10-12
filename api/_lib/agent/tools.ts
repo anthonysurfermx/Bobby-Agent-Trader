@@ -54,7 +54,7 @@ export const UNIVERSE: readonly Instrument[] = [
   { symbol: 'TSLA', name: 'Tesla', say: 'Tesla', kind: 'equity', assetClass: 'equity', aliases: ['tesla', 'tsla'] },
   { symbol: 'META', name: 'Meta Platforms', say: 'Meta', kind: 'equity', assetClass: 'equity', aliases: ['meta', 'facebook', 'meta platforms'] },
   { symbol: 'MSFT', name: 'Microsoft', say: 'Microsoft', kind: 'equity', assetClass: 'equity', aliases: ['microsoft', 'msft'] },
-  { symbol: 'GOOGL', name: 'Alphabet (Google)', say: 'Alphabet', kind: 'equity', assetClass: 'equity', aliases: ['google', 'alphabet', 'googl'] },
+  { symbol: 'GOOGL', name: 'Alphabet (Google)', say: 'Alphabet', kind: 'equity', assetClass: 'equity', aliases: ['google', 'alphabet', 'googl', 'goog', 'google alphabet', 'alphabet google', 'alphabet inc'] },
   { symbol: 'AMZN', name: 'Amazon', say: 'Amazon', kind: 'equity', assetClass: 'equity', aliases: ['amazon', 'amzn'] },
   { symbol: 'AMD', name: 'AMD', say: 'AMD', kind: 'equity', assetClass: 'equity', aliases: ['amd', 'advanced micro devices'] },
   { symbol: 'COIN', name: 'Coinbase', say: 'Coinbase', kind: 'equity', assetClass: 'equity', aliases: ['coinbase', 'coin'] },

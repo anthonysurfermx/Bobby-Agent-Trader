@@ -1040,6 +1040,8 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   eq('presentation' in lower ? [lower.presentation.figures.sort(), /\{\{/.test(lower.presentation.text), lower.presentation.text.includes(formatDay(fig(crypto, 'best_BTC').day!, 'es'))] : lower.refusal, [['best_BTC', 'return_BTC'], false, true], 'an id typed in another case is the same id, written back as the tool gave it');
   const bare = present({ kind: 'analysis', gist: 'Su mejor día fue {{best_BTC}}.', text: 'Su mejor día fue {{best_BTC}}.', limitations: [], next: '', claims: [] }, crypto, 'Compara Bitcoin y Ethereum', 'es');
   ok('refusal' in bare && bare.refusal.code === 'bad_placeholder' && bare.refusal.detail.includes('{{d:ID}}') && bare.refusal.detail.includes('{{f:ID}}'), 'a placeholder with no kind is refused, and the refusal says how one is written');
+  const kindless = present({ kind: 'analysis', gist: 'Bitcoin cambió {{return_btc}}.', text: 'Bitcoin cambió {{return_btc}}. Ethereum cambió {{return:ETH}} y su mayor caída fue de {{drawdown:eth}}.', limitations: [], next: '', claims: [] }, crypto, 'Compara Bitcoin y Ethereum', 'es');
+  eq('presentation' in kindless ? [kindless.presentation.figures.sort(), /\{\{/.test(kindless.presentation.text)] : kindless.refusal, [['drawdown_ETH', 'return_BTC', 'return_ETH'], false], 'a figure that can only be a number is read as one when its kind is left out or written as a colon (each cost a whole call in the eighth run)');
   const unknown = present({ kind: 'analysis', gist: 'Cambió {{f:return_doge}}.', text: 'Cambió {{f:return_doge}}.', limitations: [], next: '', claims: [] }, crypto, 'Compara', 'es');
   eq('refusal' in unknown ? unknown.refusal.code : null, 'unknown_figure', 'and an id no tool gave stays unknown');
 
@@ -1275,8 +1277,8 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
     ok(two.figures.join() === 'move_BTC,move_ETH,move_SOL,corr_BTC_ETH,corr_BTC_SOL,corr_ETH_SOL' && two.text.includes('30') && two.text.startsWith(two.gist) && !two.text.endsWith(REST[language]) && !/\{\{|undefined/.test(two.text), `${language}: daily moves and correlations asked of three: those six figures, the window they are of, and nothing else`);
     ok(all.figures.length === SPOKEN && all.figures.join() === 'return_BTC,return_ETH,return_SOL,move_BTC,move_ETH,move_SOL' && all.text.endsWith(REST[language]), `${language}: more asked than an ear follows: six are said and the person is told the rest is on screen`);
     const sum = followUpByCode(crypto, language, null, ['drawdown'], true), form = followUpByCode(crypto, language, null, ['worst'], false), none = followUpByCode(crypto, language, null, [], false);
-    ok(sum.kind === 'analysis' && sum.figures.join() === 'drawdown_BTC,drawdown_ETH' && sum.text.startsWith(sum.gist) && !form.text.startsWith(sum.gist) && form.figures.join() === 'worst_BTC,worst_ETH' && none.kind === 'explanation' && none.figures.length === 0 && none.text.startsWith(sum.gist) && [sum, form, none].every((told) => told.composedByCode && !/\{\{|undefined/.test(told.text)),
-      `${language}: a follow-up told by code says only what was asked; a number nobody computed, or nothing asked, is answered first with "that cannot be established from what I read"`);
+    ok(sum.kind === 'analysis' && sum.figures.join() === 'drawdown_BTC,drawdown_ETH' && sum.text.startsWith(sum.gist) && sum.text.length > followUpByCode(crypto, language, null, ['drawdown'], false).text.length && form.figures.join() === 'worst_BTC,worst_ETH' && none.kind === 'explanation' && none.figures.length === 0 && none.text.startsWith(none.gist) && [sum, form, none].every((told) => told.composedByCode && !/\{\{|undefined/.test(told.text)),
+      `${language}: a follow-up told by code says only what was asked; a number nobody computed adds that nothing beyond it is established, and nothing asked is answered with "that cannot be established from what I read"`);
   }
   ok(!/SPDR|Invesco|Platforms/.test(composeByCode(await analysisOf(['BTC', 'SPY'], 30), 'en').text), 'code says the short name people use, never a fund\'s legal one');
 
@@ -1288,7 +1290,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   script = [() => answer({ kind: 'analysis', gist: 'La caída fue de {{f:drawdown_ETH}}.', text: 'La caída fue de {{f:drawdown_ETH}}. Con tus 700 necesitarías triplicar.', asked: ['drawdown'] })];
   verdicts.push('figure');
   const summed = taskResult(await ask(deps, 'pia', 'si la caída fue esa con mis 700 necesitaría triplicar para volver haz la cuenta', 'p2', true))!.presentation;
-  eq([summed.composedByCode, summed.figures.join(), summed.text.startsWith('Eso no lo puedo establecer con lo que leí.'), /triplic/.test(summed.text)], [true, 'drawdown_BTC,drawdown_ETH', true, false], 'a sum the model made up on a follow-up: code says it cannot be established from what was read, and tells only the fall they asked about');
+  eq([summed.composedByCode, summed.figures.join(), summed.text.endsWith('Lo que vaya más allá de estas cifras no lo puedo establecer aquí.'), /triplic/.test(summed.text)], [true, 'drawdown_BTC,drawdown_ETH', true, false], 'a sum the model made up on a follow-up: code tells only the fall they asked about, and that what goes beyond it cannot be established here');
 
   // Words the provider itself would not answer end in a sentence, at the price of one call; any other failure carries one too.
   script = [() => ({ ok: false, outcome: 'charged', code: 'stop_refusal', status: 200, usd: 0.0007, usage: { tokensIn: 900, tokensOut: 4, latencyMs: 5 } })];
@@ -1297,6 +1299,17 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   script = [() => ({ ok: false, outcome: 'no_charge', code: 'http_529', status: 529, latencyMs: 1 }), () => ({ ok: false, outcome: 'no_charge', code: 'http_529', status: 529, latencyMs: 1 })];
   const failed = await ask(deps, 'rex', '¿Qué es un ETF?', 'x2');
   eq([taskState(failed, clock), taskView(failed, clock, null).error], ['failed', { code: 'provider_failed', retryable: true, message: SAID.try_again.es }], 'an errand that ends without an answer carries one plain sentence in the person\'s language');
+
+  // The eighth run, before its grades: what code told was right and said too little, or said it in the wrong order.
+  for (const language of ['en', 'es', 'fr', 'pt', 'it', 'de'] as const) {
+    const told = composeByCode(crypto, language, null, ['correlation']), value = formatFigure(fig(crypto, 'corr_BTC_ETH'), language);
+    ok(told.text.includes(value) && told.text.replace(value, '').replace(/\b[01]\b/g, '').length > 60 && !/\{\{|undefined/.test(told.text), `${language}: a correlation told by code says in words how closely they moved together, not the number alone`);
+    const beyond = followUpByCode(crypto, language, null, ['move'], true);
+    ok(beyond.text.startsWith(beyond.gist) && beyond.gist.includes(formatFigure(fig(crypto, 'move_BTC'), language)) && beyond.figures.join() === 'move_BTC,move_ETH', `${language}: a follow-up whose words held a number of the model's own is still told what was asked first, and only then that nothing beyond it is established`);
+  }
+  const { correlationBand } = await import('../api/_lib/agent/present.ts');
+  eq([0.93, 0.8, 0.61, 0.35, 0.09, -0.1, -0.2, -0.7].map(correlationBand), ['very', 'very', 'fairly', 'loosely', 'none', 'none', 'opposite', 'opposite'], 'how closely two series moved together is put in words by the size of their correlation');
+  eq(['Google Alphabet', 'alphabet google', 'GOOG'].map((mention) => resolveMention(mention)?.symbol ?? null), ['GOOGL', 'GOOGL', 'GOOGL'], 'the two names of one company said together are that company');
 
   const prompt = agentPrompt('en', 'en-US');
   for (const [needle, why] of [['They rule a substitute out themselves', 'what a person ruled out is not offered again'], ['you do not do sums with a person\'s money', 'a sum with their money is not done and not offered'], ['Tracking error is how much the gap', 'tracking error is the variability of the gap, not the gap'], ['two different things, and a read gives the date of a worst day', 'a worst day and a fall from a high are told apart'], ['how a word is said in another language', 'something tiny and everyday is settled in a few words'], ['When the app answers ambiguous_name', 'a word left open is asked about, not named']] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);

@@ -354,14 +354,29 @@ function composeBase(analysis: Analysis | null, language: AppLanguage, locale?: 
   return { kind: 'analysis', gist: text.slice(0, text.indexOf('. ') + 1) || text, text, figures: used, references: references(analysis, used), limitations: limitationsInWords(analysis, language), next: null, composedByCode: true };
 }
 
-/** What code adds to its own text when the model said what the person asked about: told by code, a paid read still answers the question. */
-const ASKED: Record<AppLanguage, { correlation: (pairs: string) => string; pair: (a: string, b: string, id: string) => string; worst: (items: string) => string; best: (items: string) => string; day: (name: string, id: string) => string }> = {
-  en: { correlation: (pairs) => `The correlation of their daily changes was ${pairs}.`, pair: (a, b, id) => `{{f:${id}}} for ${a} and ${b}`, worst: (items) => `Worst day: ${items}.`, best: (items) => `Best day: ${items}.`, day: (name, id) => `${name} {{f:${id}}} on {{d:${id}}}` },
-  es: { correlation: (pairs) => `La correlación de sus cambios diarios fue de ${pairs}.`, pair: (a, b, id) => `{{f:${id}}} entre ${a} y ${b}`, worst: (items) => `Peor día: ${items}.`, best: (items) => `Mejor día: ${items}.`, day: (name, id) => `${name} {{f:${id}}} el {{d:${id}}}` },
-  fr: { correlation: (pairs) => `La corrélation de leurs variations quotidiennes a été de ${pairs}.`, pair: (a, b, id) => `{{f:${id}}} entre ${a} et ${b}`, worst: (items) => `Pire jour : ${items}.`, best: (items) => `Meilleur jour : ${items}.`, day: (name, id) => `${name} {{f:${id}}} le {{d:${id}}}` },
-  pt: { correlation: (pairs) => `A correlação das variações diárias foi de ${pairs}.`, pair: (a, b, id) => `{{f:${id}}} entre ${a} e ${b}`, worst: (items) => `Pior dia: ${items}.`, best: (items) => `Melhor dia: ${items}.`, day: (name, id) => `${name} {{f:${id}}} em {{d:${id}}}` },
-  it: { correlation: (pairs) => `La correlazione delle loro variazioni giornaliere è stata di ${pairs}.`, pair: (a, b, id) => `{{f:${id}}} tra ${a} e ${b}`, worst: (items) => `Giorno peggiore: ${items}.`, best: (items) => `Giorno migliore: ${items}.`, day: (name, id) => `${name} {{f:${id}}} il {{d:${id}}}` },
-  de: { correlation: (pairs) => `Die Korrelation ihrer täglichen Veränderungen betrug ${pairs}.`, pair: (a, b, id) => `{{f:${id}}} zwischen ${a} und ${b}`, worst: (items) => `Schwächster Tag: ${items}.`, best: (items) => `Stärkster Tag: ${items}.`, day: (name, id) => `${name} {{f:${id}}} am {{d:${id}}}` },
+/**
+ * How closely two series moved together, in words, by the size of their correlation: a bare "+0.09" tells a beginner
+ * nothing (eighth run: code told three correlations as numbers alone). The words are code's and say closeness, never
+ * frequency ("often") and never cause.
+ */
+type Band = 'very' | 'fairly' | 'loosely' | 'none' | 'opposite';
+export const correlationBand = (r: number): Band => (r >= 0.8 ? 'very' : r >= 0.5 ? 'fairly' : r >= 0.2 ? 'loosely' : r > -0.2 ? 'none' : 'opposite');
+const TOGETHER: Record<AppLanguage, Record<Band, string>> = {
+  en: { very: 'moved very closely together', fairly: 'moved fairly closely together', loosely: 'moved together only loosely', none: 'had almost no relation to each other', opposite: 'leaned in opposite directions' },
+  es: { very: 'se movieron muy a la par', fairly: 'se movieron bastante a la par', loosely: 'se movieron a la par solo un poco', none: 'casi no tuvieron relación entre sí', opposite: 'tendieron a ir en sentidos opuestos' },
+  fr: { very: 'ont évolué de façon très proche', fairly: 'ont évolué de façon assez proche', loosely: 'n’ont évolué ensemble que faiblement', none: 'n’ont presque pas eu de lien entre eux', opposite: 'ont eu tendance à aller en sens opposé' },
+  pt: { very: 'andaram muito juntos', fairly: 'andaram bastante juntos', loosely: 'andaram juntos só um pouco', none: 'quase não tiveram relação entre si', opposite: 'tenderam a ir em sentidos opostos' },
+  it: { very: 'si sono mossi in modo molto simile', fairly: 'si sono mossi in modo abbastanza simile', loosely: 'si sono mossi insieme solo in parte', none: 'non hanno avuto quasi nessun legame tra loro', opposite: 'hanno teso ad andare in direzioni opposte' },
+  de: { very: 'bewegten sich sehr ähnlich', fairly: 'bewegten sich ziemlich ähnlich', loosely: 'bewegten sich nur lose gemeinsam', none: 'hatten fast keinen Zusammenhang', opposite: 'liefen eher gegenläufig' },
+};
+/** What code says about what the person asked: correlations with what they mean, and each asset's worst and best day with its date. */
+const ASKED: Record<AppLanguage, { correlation: (pairs: string) => string; pair: (a: string, b: string, id: string, band: Band) => string; worst: (items: string) => string; best: (items: string) => string; day: (name: string, id: string) => string }> = {
+  en: { correlation: (pairs) => `Day to day, ${pairs}. A correlation of 1 means in step; 0, no relation.`, pair: (a, b, id, band) => `${a} and ${b} ${TOGETHER.en[band]} (correlation {{f:${id}}})`, worst: (items) => `Worst day: ${items}.`, best: (items) => `Best day: ${items}.`, day: (name, id) => `${name} {{f:${id}}} on {{d:${id}}}` },
+  es: { correlation: (pairs) => `De un día a otro, ${pairs}. Una correlación de 1 es ir a la par; 0, ninguna relación.`, pair: (a, b, id, band) => `${a} y ${b} ${TOGETHER.es[band]} (correlación de {{f:${id}}})`, worst: (items) => `Peor día: ${items}.`, best: (items) => `Mejor día: ${items}.`, day: (name, id) => `${name} {{f:${id}}} el {{d:${id}}}` },
+  fr: { correlation: (pairs) => `D’un jour à l’autre, ${pairs}. Une corrélation de 1, c’est évoluer à l’identique ; 0, aucun lien.`, pair: (a, b, id, band) => `${a} et ${b} ${TOGETHER.fr[band]} (corrélation de {{f:${id}}})`, worst: (items) => `Pire jour : ${items}.`, best: (items) => `Meilleur jour : ${items}.`, day: (name, id) => `${name} {{f:${id}}} le {{d:${id}}}` },
+  pt: { correlation: (pairs) => `De um dia para o outro, ${pairs}. Correlação 1 é andar igual; 0, nenhuma relação.`, pair: (a, b, id, band) => `${a} e ${b} ${TOGETHER.pt[band]} (correlação de {{f:${id}}})`, worst: (items) => `Pior dia: ${items}.`, best: (items) => `Melhor dia: ${items}.`, day: (name, id) => `${name} {{f:${id}}} em {{d:${id}}}` },
+  it: { correlation: (pairs) => `Da un giorno all’altro, ${pairs}. Una correlazione di 1 è muoversi allo stesso modo; 0, nessun legame.`, pair: (a, b, id, band) => `${a} e ${b} ${TOGETHER.it[band]} (correlazione di {{f:${id}}})`, worst: (items) => `Giorno peggiore: ${items}.`, best: (items) => `Giorno migliore: ${items}.`, day: (name, id) => `${name} {{f:${id}}} il {{d:${id}}}` },
+  de: { correlation: (pairs) => `Von Tag zu Tag: ${pairs}. Eine Korrelation von 1 heißt im Gleichschritt, 0 kein Zusammenhang.`, pair: (a, b, id, band) => `${a} und ${b} ${TOGETHER.de[band]} (Korrelation {{f:${id}}})`, worst: (items) => `Schwächster Tag: ${items}.`, best: (items) => `Stärkster Tag: ${items}.`, day: (name, id) => `${name} {{f:${id}}} am {{d:${id}}}` },
 };
 const several = (parts: string[], language: AppLanguage) => (parts.length > 1 ? listed(parts, language) : parts[0]);
 
@@ -396,7 +411,7 @@ function composeFocused(analysis: Analysis, language: AppLanguage, locale: strin
       const pairs: string[] = [];
       for (let i = 0; i < analysis.subjects.length; i++) for (let j = i + 1; j < analysis.subjects.length; j++) {
         const [a, b] = [analysis.subjects[i], analysis.subjects[j]], id = [`corr_${a}_${b}`, `corr_${b}_${a}`].find(valued);
-        if (id) { pairs.push(words.pair(spokenName(a), spokenName(b), id)); ids.push(id); }
+        if (id) { pairs.push(words.pair(spokenName(a), spokenName(b), id, correlationBand(figures.get(id)!.value!))); ids.push(id); }
       }
       if (pairs.length) sentence = words.correlation(several(pairs, language));
     } else {
@@ -432,6 +447,11 @@ export function composeByCode(analysis: Analysis | null, language: AppLanguage, 
 }
 
 /** Said in front when a follow-up asked for something the figures on the table do not hold (a sum with the person's money, a date nobody read). */
+/** Said after the figures when the model had added a number of its own to them: the figures stand, the rest is not established. */
+const NOT_BEYOND: Record<AppLanguage, string> = {
+  en: 'What goes beyond these figures I can’t establish here.', es: 'Lo que vaya más allá de estas cifras no lo puedo establecer aquí.', fr: 'Ce qui va au-delà de ces chiffres, je ne peux pas l’établir ici.',
+  pt: 'O que vai além destes números não consigo estabelecer aqui.', it: 'Quello che va oltre queste cifre non posso stabilirlo qui.', de: 'Was über diese Zahlen hinausgeht, kann ich hier nicht ableiten.',
+};
 const NOT_FROM_THESE: Record<AppLanguage, [string, string]> = {
   en: ['I can’t establish that from what I read.', 'The figures I read are still here.'], es: ['Eso no lo puedo establecer con lo que leí.', 'Las cifras que leí siguen aquí.'],
   fr: ['Je ne peux pas établir cela avec ce que j’ai lu.', 'Les chiffres que j’ai lus sont toujours là.'], pt: ['Não consigo estabelecer isso com o que li.', 'Os números que li continuam aqui.'],
@@ -440,15 +460,17 @@ const NOT_FROM_THESE: Record<AppLanguage, [string, string]> = {
 /**
  * Code's answer to a follow-up whose words could not be shown. The figures on the table answered an earlier question:
  * reciting them again answers nothing (seventh blind set: a sum with the person's money was answered with the whole
- * comparison). So code tells only what was asked about, and when the model had stated a number nobody computed
- * (`ownNumber`), or nothing asked can be told, it says first that this cannot be established from what was read.
+ * comparison). So code tells only what was asked about. When the model had stated a number nobody computed
+ * (`ownNumber`), the figures asked about are still told first (eighth run: "I can't establish that" was said in front
+ * of exactly what had been asked) and then that anything beyond them cannot be established here. When nothing asked
+ * can be told, it says only that.
  */
 export function followUpByCode(analysis: Analysis, language: AppLanguage, locale: string | null | undefined, asked: string[], ownNumber: boolean): Presentation {
   const focused = asked.length ? composeFocused(analysis, language, locale, asked) : null;
   if (focused && !ownNumber) return focused;
   const [cannot, still] = NOT_FROM_THESE[language];
   if (!focused) return { kind: 'explanation', gist: cannot, text: `${cannot} ${still}`, figures: [], references: [], limitations: [], next: null, composedByCode: true };
-  return { ...focused, gist: cannot, text: `${cannot} ${focused.text}` };
+  return { ...focused, text: `${focused.text} ${NOT_BEYOND[language]}` };
 }
 
 /** For words the provider itself would not answer, and for anything else outside what Bobby does: one plain sentence and what it can do. */
@@ -497,7 +519,16 @@ export function present(draft: Draft, analysis: Analysis | null, question: strin
   const figures = new Map((analysis?.figures ?? []).map((figure) => [figure.id, figure]));
   // An id is code's: typed in another case it is still that id, and is written back as the tool gave it. Nothing else is repaired.
   const byFold = new Map([...figures.keys()].map((id) => [id.toLowerCase(), id]));
-  const exact = (part: string) => part.replace(/\{\{\s*(f|d|from|to)\s*:\s*([A-Za-z0-9_~]+)\s*\}\}/gi, (whole, kind: string, id: string) => (byFold.has(id.toLowerCase()) ? `{{${kind.toLowerCase()}:${byFold.get(id.toLowerCase())}}}` : whole)).replace(/\{\{\s*days\s*\}\}/gi, '{{days}}');
+  // Two more slips the real model makes, each of which cost a whole extra call in the eighth run: the kind left out
+  // ({{return_tsla}}) and the id written with the kind's colon ({{return:tsla}}). When that names exactly one figure
+  // and the figure has no day of its own, its number is the only thing it can be: read as {{f:ID}}. A worst or best
+  // day is a number AND a date, so a placeholder that does not say which is still sent back, like one that names nothing.
+  const bare = (part: string) => part.replace(/\{\{\s*([A-Za-z]+)[_:]([A-Za-z0-9_~]+)\s*\}\}/g, (whole, head: string, rest: string) => {
+    if (['f', 'd', 'from', 'to'].includes(head.toLowerCase()) && byFold.has(rest.toLowerCase())) return whole;
+    const id = byFold.get(`${head}_${rest}`.toLowerCase());
+    return id && !figures.get(id)!.day ? `{{f:${id}}}` : whole;
+  });
+  const exact = (part: string) => bare(part).replace(/\{\{\s*(f|d|from|to)\s*:\s*([A-Za-z0-9_~]+)\s*\}\}/gi, (whole, kind: string, id: string) => (byFold.has(id.toLowerCase()) ? `{{${kind.toLowerCase()}:${byFold.get(id.toLowerCase())}}}` : whole)).replace(/\{\{\s*days\s*\}\}/gi, '{{days}}');
   draft = { ...draft, gist: exact(draft.gist), text: exact(draft.text), next: exact(draft.next), limitations: draft.limitations.map(exact) };
   const gist = draft.gist.trim(), text = draft.text.trim(), next = draft.next.trim();
   if (!gist || !text) return { ok: false, refusal: { code: 'empty', detail: '' } };
