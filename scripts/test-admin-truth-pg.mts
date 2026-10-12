@@ -52,7 +52,12 @@ const dev = (tag: string) => `dev-${tag}-${randomUUID().slice(0, 8)}`;
 const consume = async (identity: string | null, device: string | null, platform = 'web') =>
   (await one('select public.bobby_consume_read($1, $2, null, $3, $4, false) as r', [identity, device, platform, 'BTC'])).r;
 const growth = async (days = 30, internal = false) => (await one('select public.bobby_admin_growth($1, $2) as r', [days, internal])).r;
-const minsAgo = (m: number) => `now() - make_interval(mins => ${m})`;
+// A first session lasts thirty minutes here. Started in the last hour of a UTC day it would end on the next day and be
+// counted as coming back the day after (seen on 2026-10-11 at 23:52 UTC: "D1 on the exact day after" read 1 for 0).
+// So in that hour every relative time is taken from 22:59: the same dates as "now", and no session crosses midnight.
+const startedAt = new Date();
+const late = startedAt.getUTCHours() === 23 ? startedAt.getUTCMinutes() + 1 : 0;
+const minsAgo = (m: number) => `now() - make_interval(mins => ${m + late})`;
 const DAY = 24 * 60;
 
 try {
