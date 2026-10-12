@@ -14,6 +14,10 @@ class ConversationFixtureCase: XCTestCase {
     var confirmLevel: XCUIElement { web.buttons[nativeWord("quick")] }
     var web: XCUIElement { app.webViews.firstMatch }
     func button(_ key: String) -> XCUIElement { web.buttons[word(key)] }
+    var homeEducation: XCUIElement {
+        web.buttons.matching(NSPredicate(format: "label IN %@", (1...6).map { word("ex.\($0)") })).firstMatch
+    }
+
     override func setUp() { continueAfterFailure = false }
     override func tearDown() { app?.terminate(); super.tearDown() }
     func launch(_ scenario: String = "companion-plain", speech: String = "words", voice: Bool = false, permission: String = "granted", notes: Bool = false, voiceFails: Bool = false, level: String = "rapido", home: String = "fresh", memory: String? = nil, contentSize: String? = nil, memoryFailure: Bool = false) {
@@ -196,9 +200,6 @@ final class WithoutHelpUITests: ConversationFixtureCase {
 }
 
 final class ConversationShots: ConversationFixtureCase {
-    var homeEducation: XCUIElement {
-        web.buttons.matching(NSPredicate(format: "label IN %@", (1...6).map { word("ex.\($0)") })).firstMatch
-    }
     func checkHomeExamples() {
         // The keyboard door appears before WAKE finishes emitting the examples.
         // Wait for the actual education control, then inspect the settled row.
@@ -212,7 +213,7 @@ final class ConversationShots: ConversationFixtureCase {
     func test86HomeNoReadsWholeExamples() {launch();checkHomeExamples();shot("86-home-no-reads-whole-examples")}
     func test87HomeReadsWholeExamples() {launch(home:"reads");checkHomeExamples();shot("87-home-with-reads-whole-examples")}
     func test88HomeNudgeWholeExamples() {launch(home:"nudge");checkHomeExamples();XCTAssertTrue(web.staticTexts.matching(NSPredicate(format:"label ==[c] %@",nativeWord("ready"))).firstMatch.exists);shot("88-home-nudge-whole-examples")}
-    func test99HomeExplanationsOff() {launch("companion-off");Thread.sleep(forTimeInterval:1);XCTAssertFalse(button("ex.1").isHittable);shot("99-home-explanations-off")}
+    func test99HomeExplanationsOff() {launch("companion-off");Thread.sleep(forTimeInterval:1);XCTAssertFalse(homeEducation.isHittable);shot("99-home-explanations-off")}
     func test89HomeWallEducationStays() {
         launch(home:"wall");checkHomeExamples();XCTAssertTrue(homeEducation.isHittable)
         let size=app.windows.firstMatch.frame.size,k=min(size.width/390,size.height/844)
@@ -327,6 +328,9 @@ final class ConsentPreviewShots: ConversationFixtureCase {
 
 class FirstRunFixtureCase: ConversationFixtureCase {
     var firstWords: [String:String] { labels["onboarding"] as! [String:String] }
+    var firstExample: XCUIElement {
+        web.buttons.matching(NSPredicate(format: "label IN %@", (1...6).map { firstWords["ex.\($0)"]! })).firstMatch
+    }
     func fresh(_ scenario: String = "companion-plain", speech: String = "words", stale: Bool = false, wait: Bool = true, permission: String = "granted", voice: Bool = false) {
         app = XCUIApplication()
         app.launchArguments = ["-nucleo-fixtures", scenario, "-nucleo-page", "onboarding", "-nucleo-reset-onboarding", "-qa-speech-fixture", speech, "-qa-speech-permission", permission,
@@ -349,14 +353,14 @@ final class FirstRunShots: FirstRunFixtureCase {
     }
     func testReadyControlsAndWholeExamples() {
         fresh()
-        let keyboard=web.buttons[firstWords["aria.type"]!], example=web.buttons[firstWords["ex.1"]!]
+        let keyboard=web.buttons[firstWords["aria.type"]!], example=firstExample
         ready(example); physicalControls([keyboard], abovePill:false); physicalControls([example])
         ready(web.buttons[firstWords["risk.profile"]!]); shot("71-first-run-ready-caption")
         Thread.sleep(forTimeInterval:3); ready(keyboard); shot("72-first-run-ready-title")
         example.tap(); ready(web.buttons[firstWords["risk.activate"]!]); shot("73-first-run-educational-consent")
     }
     func testEducationalFirstQuestionHandsOverToDailyAnswer() {
-        fresh(); let example=web.buttons[firstWords["ex.1"]!]
+        fresh(); let example=firstExample
         ready(example); example.tap(); let agree=web.buttons[firstWords["risk.activate"]!]
         ready(agree); agree.press(forDuration:1.8)
         answered(); XCTAssertFalse(web.buttons[firstWords["risk.notice"]!].isHittable)
@@ -365,13 +369,13 @@ final class FirstRunShots: FirstRunFixtureCase {
     }
 
     func testConsentNotNowKeepsDraftAndTapNeverAccepts() {
-        fresh(); ready(web.buttons[firstWords["ex.1"]!]); web.buttons[firstWords["ex.1"]!].tap()
+        fresh(); let example=firstExample;ready(example);let question=example.label;example.tap()
         let agree=web.buttons[firstWords["risk.activate"]!],later=web.buttons[firstWords["risk.notNow"]!]
         ready(later); physicalControls([later,agree],abovePill:false); shot("76-consent-with-not-now")
         agree.tap(); XCTAssertTrue(web.staticTexts.matching(NSPredicate(format:"label ==[c] %@",firstWords["risk.holdHint"]!)).firstMatch.exists)
         XCTAssertTrue(later.isHittable); shot("77-consent-short-tap-hint",delay:0)
         later.tap(); ready(web.buttons[firstWords["type.send"]!])
-        XCTAssertTrue(web.staticTexts[firstWords["ex.1"]!].exists)
+        XCTAssertTrue(web.staticTexts[question].exists)
         XCTAssertTrue(web.staticTexts.matching(NSPredicate(format:"label ==[c] %@",firstWords["risk.kept"]!)).firstMatch.exists); shot("78-declined-held-draft")
         web.buttons[firstWords["type.send"]!].tap(); ready(later)
         XCTAssertFalse(button("aria.closeAnswer").exists)
@@ -398,12 +402,12 @@ final class FirstRunShots: FirstRunFixtureCase {
         XCTAssertFalse(web.buttons[firstWords["risk.notNow"]!].isHittable);shot("82-first-run-background-held")
     }
     func testFirstRunHoldAppendsToHeldDraft() {
-        fresh();let q=firstWords["ex.1"]!;web.buttons[q].tap();ready(web.buttons[firstWords["risk.notNow"]!])
+        fresh();let example=firstExample;ready(example);let q=example.label;example.tap();ready(web.buttons[firstWords["risk.notNow"]!])
         web.buttons[firstWords["risk.notNow"]!].tap();ready(web.buttons[firstWords["type.send"]!])
         web.buttons[firstWords["type.send"]!].press(forDuration:1.8)
         ready(web.buttons[firstWords["risk.notNow"]!]);web.buttons[firstWords["risk.notNow"]!].tap()
         ready(web.buttons[firstWords["aria.type"]!]);web.buttons[firstWords["aria.type"]!].tap();ready(web.textViews.firstMatch)
-        XCTAssertEqual(web.textViews.firstMatch.value as? String,q+" "+q)
+        XCTAssertEqual(web.textViews.firstMatch.value as? String,q+" "+firstWords["ex.1"]!)
         XCTAssertGreaterThanOrEqual(web.textViews.firstMatch.frame.height,app.windows.firstMatch.frame.width <= 375 ? 43.5 : 21.5)
         physicalControls([web.buttons[firstWords["type.send"]!]],abovePill:false)
         XCTAssertFalse(button("aria.closeAnswer").exists);shot("99-first-run-held-appended-words")
@@ -444,12 +448,12 @@ final class FirstRunShots: FirstRunFixtureCase {
         XCTAssertFalse(web.buttons[firstWords["risk.notNow"]!].isHittable);shot("99-first-run-typed-background")
     }
     func testHandoverPreparingThenFirstAnswerRecording() {
-        fresh("companion-waiting"); ready(web.buttons[firstWords["ex.1"]!]);web.buttons[firstWords["ex.1"]!].tap()
+        fresh("companion-waiting");let example=firstExample;ready(example);let question=example.label;example.tap()
         let agree=web.buttons[firstWords["risk.activate"]!];ready(agree);shot("83-handover-before-hold")
         agree.press(forDuration:1.3)
         XCTAssertTrue(web.staticTexts[word("status.preparing")].waitForExistence(timeout:1))
         // Rendering latency is measured in the recording, not XCTest query overhead.
-        XCTAssertTrue(web.staticTexts[firstWords["ex.1"]!].exists);shot("84-handover-preparing-no-idle")
+        XCTAssertTrue(web.staticTexts[question].exists);shot("84-handover-preparing-no-idle")
         ready(button("aria.closeAnswer"),timeout:45);shot("85-handover-first-daily-answer")
     }
 
@@ -526,7 +530,7 @@ final class FirstRunDiscardGuarantees: FirstRunControlFixtureCase {
     func testHeaderExitDiscardsHeardWordsAndDeclinedDraftWithoutSending() {
         startFieldCapture();let exit=web.buttons[firstWords["aria.discardSpoken"]!];ready(exit);physicalControls([exit],abovePill:false);shot("99-first-run-listening-exit")
         exit.tap();ready(web.buttons[firstWords["aria.type"]!]);assertEmptyField()
-        fresh();web.buttons[firstWords["ex.1"]!].tap();ready(web.buttons[firstWords["risk.notNow"]!]);web.buttons[firstWords["risk.notNow"]!].tap()
+        fresh();ready(firstExample);firstExample.tap();ready(web.buttons[firstWords["risk.notNow"]!]);web.buttons[firstWords["risk.notNow"]!].tap()
         ready(exit);shot("99-first-run-held-exit");exit.tap();ready(web.buttons[firstWords["aria.type"]!]);assertEmptyField();shot("99-first-run-discarded-empty-field")
         XCTAssertFalse(web.buttons[firstWords["risk.notNow"]!].isHittable)
     }
