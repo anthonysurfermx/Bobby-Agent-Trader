@@ -1155,8 +1155,8 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   // In the loop: such an analysis is told by code from its figures, the record says which rule, and the reader is not asked.
   const store = new MemoryAgentStore(6), deps = depsFor(store);
   script = [() => turn([use('read_assets', { assets: ['Bitcoin', 'Ethereum'], windowDays: 30 })]),
-    () => answer({ kind: 'analysis', gist: 'Los dos se movieron cada día, y no igual.', text: 'Los dos se movieron cada día, y no igual. Bitcoin {{f:move_BTC}} y Ethereum {{f:move_ETH}}.' }),
-    () => answer({ kind: 'analysis', gist: 'Los dos se movieron cada día, y no igual.', text: 'Los dos se movieron cada día, y no igual. Bitcoin {{f:move_BTC}} y Ethereum {{f:move_ETH}}.' })];
+    () => answer({ kind: 'analysis', gist: 'Bitcoin se movió más cada día.', text: 'Bitcoin se movió más cada día. Bitcoin {{f:move_BTC}} y Ethereum {{f:move_ETH}}.' }),
+    () => answer({ kind: 'analysis', gist: 'Bitcoin se movió más cada día.', text: 'Bitcoin se movió más cada día. Bitcoin {{f:move_BTC}} y Ethereum {{f:move_ETH}}.' })];
   const offered = await ask(deps, 'pia', '¿Cuál se movió más, Bitcoin o Ethereum?', 'p1');
   await store.approve('pia', offered.id, waitingApproval(offered)!.digest, clock);
   const before = readerSaw.length;
@@ -1448,6 +1448,15 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
     clock = at;
     const ended = (await store.get('tim', slow.id))!, shown = taskResult(ended)?.presentation;
     eq([taskState(ended, clock), shown?.composedByCode, shown?.figures.length, ended.steps.at(-1)!.data.instead, taskUsage(ended).reads], ['completed', true, 6, 'out_of_time', 1], 'out of time after the read: the person is told its figures at once, not left to wait for a request that may never be sent again');
+  }
+  // How a figure is made is not a claim about every day (tenth run: a good explanation was replaced for "Each day's change is taken without its sign").
+  eq([everyDayClaim("On an average day Tesla moved ⟦figure⟧, and falling days count as much as rising ones. Each day's change is taken without its sign, so a fall and a rise of the same size weigh the same.", 'en'), everyDayClaim('Los dos se movieron cada día, y no igual.', 'es'), everyDayClaim('Tesla moved ⟦figure⟧ every day.', 'en'), everyDayClaim('Bitcoin se movió más cada día.', 'es')], [false, false, true, true], 'the every-day rule looks for a quantity or a comparison said of every day, not for the words alone');
+  // A kind left out is not a draft to send back.
+  {
+    const store = new MemoryAgentStore(6), deps = depsFor(store);
+    script = [() => turn([use('answer', { gist: 'Un ETF es un fondo.', text: 'Un ETF es un fondo.', claims: [], asked: [], limitations: [], next: '' })])];
+    const kindless = await ask(deps, 'kim', '¿Qué es un ETF?', 'kind1');
+    eq([taskResult(kindless)?.presentation.kind, taskResult(kindless)?.presentation.text, kindless.steps.filter((s) => s.kind === 'model_call').length], ['explanation', 'Un ETF es un fondo.', 1], 'an answer whose kind is left out is an explanation until code says otherwise, at no extra call');
   }
   // A session the source dropped from one fund shows when another fund of the same read has it.
   const dropped = () => { const p = structuredClone(yahoo('QQQ', QQQ)) as any, r = p.chart.result[0], at = QQQ.length - 6; r.timestamp.splice(at, 1); r.tradingPeriods.regular.splice(at, 1); for (const key of Object.keys(r.indicators.quote[0])) r.indicators.quote[0][key].splice(at, 1); return p; };

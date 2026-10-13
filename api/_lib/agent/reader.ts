@@ -41,7 +41,7 @@ const VERDICT_SCHEMA: JsonSchemaSpec = {
     properties: { ownNumber: { type: 'boolean' }, misplaced: { type: 'boolean' }, forecast: { type: 'boolean' }, promise: { type: 'boolean' }, recommendation: { type: 'boolean' }, instruction: { type: 'boolean' }, label: { type: 'boolean' }, nextQuestion: { type: 'string', enum: ['keep', 'drop'] } } },
 };
 
-export interface AnalysisVerdict { rejected: 'figure' | 'guarantee' | 'advice' | null; keepNext: boolean }
+export interface AnalysisVerdict { rejected: 'figure' | 'guarantee' | 'advice' | null; keepNext: boolean; /** Which of its questions the reader answered yes to: kept with the errand, so a wrong refusal can be traced to its cause. */ found: string[] }
 
 /** What the reader says of an analysis's own words (numbers already replaced by marks), or null when it did not answer. */
 export async function judgeAnalysis(
@@ -52,7 +52,8 @@ export async function judgeAnalysis(
   try {
     const v = Verdict.parse(await completeJson(spec, analysisJudgePrompt(language, opts.locale), JSON.stringify({ question, personsNumbers: [...theirNumbers(opts.numbersFrom ?? question)].filter((n) => n !== '0'), ...(opts.windowDays ? { windowDays: opts.windowDays } : {}), reply: reply.text, nextQuestion: reply.followUp ?? '' }), VERDICT_SCHEMA,
       { endpoint: 'agent-task', role: 'judge', usage: opts.usage, attempts: 3 }));
-    return { rejected: v.promise || v.forecast ? 'guarantee' : v.recommendation || v.instruction || v.label ? 'advice' : v.ownNumber || v.misplaced ? 'figure' : null, keepNext: v.nextQuestion === 'keep' };
+    return { rejected: v.promise || v.forecast ? 'guarantee' : v.recommendation || v.instruction || v.label ? 'advice' : v.ownNumber || v.misplaced ? 'figure' : null, keepNext: v.nextQuestion === 'keep',
+      found: (['ownNumber', 'misplaced', 'forecast', 'promise', 'recommendation', 'instruction', 'label'] as const).filter((key) => v[key]) };
   } catch {
     return null;
   }

@@ -407,7 +407,10 @@ export const aboutCalendar = (sentence: string, language: AppLanguage) => CALEND
  */
 export function everyDayClaim(text: string, language: AppLanguage): boolean {
   return text.split(/(?<=[.!?…])\s+|\n+/).some((sentence) => !aboutCalendar(sentence, language) && sentence.split(CLAUSE).some((clause) => {
-    const said = EVERY_DAY[language].exec(clause) ?? (COMPARES[language].test(clause) ? ALWAYS[language].exec(clause) : null);
+    // The claim is a quantity or a comparison said of every day: "moved ⟦figure⟧ every day", "moved more every day".
+    // "Each day's change is taken without its sign" says how the figure is made, and was refused for it (tenth run).
+    const measures = COMPARES[language].test(clause) || clause.includes(FIGURE_MARK);
+    const said = measures ? EVERY_DAY[language].exec(clause) ?? ALWAYS[language].exec(clause) : null;
     return said !== null && !AN_AVERAGE[language].test(clause) && !DENIES[language].test(clause.slice(0, said.index));
   }));
 }

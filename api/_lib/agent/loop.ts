@@ -50,7 +50,7 @@ export type Reader = (p: {
   numbersFrom?: string;
   /** The window that was read, for an analysis: any other period attached to a mark is a fault the reader can then see. */
   windowDays?: number | null;
-}) => Promise<Verdict | { verdict: Verdict; keepNext: boolean; usd?: number; by?: 'lists' }>;
+}) => Promise<Verdict | { verdict: Verdict; keepNext: boolean; usd?: number; by?: 'lists'; found?: string[] }>;
 export interface Deps { store: AgentStore; call: CallModel; tools: ToolContext; read: Reader; now: () => number; budget: { partition: string; capUsd: number }; limits: Limits; worker: string }
 
 const ADDRESS: Record<AppLanguage, string> = { en: '', es: ' Address them as "tú".', fr: ' Address them as "tu", never "vous".', it: ' Address them as "tu", never "Lei".', de: ' Address them as "du", never "Sie".', pt: ' Address them informally.' };
@@ -98,7 +98,9 @@ Write nothing outside tool calls. Finish by calling the tool "answer" exactly on
 }
 
 const Answer = z.object({
-  kind: z.enum(['explanation', 'analysis', 'clarification']), gist: z.string().trim().min(2).max(400), text: z.string().trim().min(2).max(2000),
+  // What a text IS is decided by code (finish): a kind left out or misspelt is an explanation until code says otherwise,
+  // not a draft to send back (it cost a whole call, and with it the one correction a draft gets).
+  kind: z.enum(['explanation', 'analysis', 'clarification']).catch('explanation'), gist: z.string().trim().min(2).max(400), text: z.string().trim().min(2).max(2000),
   // No `.catch`: a malformed list is not an empty one. It is sent back once, like any other argument the server cannot read.
   claims: z.array(z.object({ metric: z.enum(['return', 'move', 'drawdown', 'worst', 'best']), top: z.string().trim().min(1).max(60) })).max(12),
   // What the person asked about, in metric names. Left out or unreadable it is empty: the check it feeds is an extra one.
@@ -410,7 +412,7 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   }
   // Everything of the model's that a person is about to get is read: the text, the limitations it wrote and the next
   // question. Only a text code wrote itself is not (there is nothing of the model's in it), and the record says so.
-  let verdict: Verdict | 'not_read' = 'not_read', readerUsd = 0, readBy: 'lists' | null = null;
+  let verdict: Verdict | 'not_read' = 'not_read', readerUsd = 0, readBy: 'lists' | null = null, found: string[] = [];
   if (!presentation.composedByCode) {
     // A clarification is one short question. Anything longer, or with no question in it, is not one: it is read as an explanation.
     if (presentation.kind === 'clarification' && (presentation.text.length > 220 || !/[?？]/.test(presentation.text))) presentation.kind = 'explanation';
@@ -419,9 +421,9 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
     const read = await deps.read(measured
       ? { task: task.id, question: task.question, text: [ownWords!.forReader.text, ...ownWords!.forReader.limitations].join(' '), next: ownWords!.forReader.next, language: task.language, locale: task.locale, measured: true, numbersFrom: theirs, windowDays: analysis?.windowDays ?? null }
       : { task: task.id, question: task.question, text: [presentation.text, ...own].join(' '), next: presentation.next, language: task.language, locale: task.locale, numbersFrom: theirs });
-    const said: { verdict: Verdict; keepNext: boolean; usd?: number; by?: 'lists' } = typeof read === 'string' ? { verdict: read, keepNext: true, usd: 0 } : read;
+    const said: { verdict: Verdict; keepNext: boolean; usd?: number; by?: 'lists'; found?: string[] } = typeof read === 'string' ? { verdict: read, keepNext: true, usd: 0 } : read;
     if (await stopped(said.usd ?? 0)) return true;
-    verdict = said.verdict; readerUsd = said.usd ?? 0; readBy = said.by ?? null;
+    verdict = said.verdict; readerUsd = said.usd ?? 0; readBy = said.by ?? null; found = said.found ?? [];
     if (!said.keepNext) presentation.next = null;
     // An analysis was read as the model's own words (code's numbers were marks), so "figure" there is a quantity the
     // model stated itself, in digits or in words: like any other verdict but "pass", its words are not shown.
@@ -435,7 +437,7 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   }
   // The analysis on the table stays with the thread: a follow-up that cited no figure still hands it to the next one.
   // `readBy: lists`: the owner turned the model reader off and the companion's deterministic lists read the text instead.
-  await write('answer', { result: { presentation, analysis }, reader: verdict, readerUsd, ...(readBy ? { readBy } : {}), ...(rule && presentation.composedByCode ? { rule } : {}) });
+  await write('answer', { result: { presentation, analysis }, reader: verdict, readerUsd, ...(readBy ? { readBy } : {}), ...(found.length ? { found } : {}), ...(rule && presentation.composedByCode ? { rule } : {}) });
   return true;
 }
 
@@ -475,7 +477,7 @@ export function companionReader(store: AgentStore, budget: Budget, now: () => nu
     // Idempotent: tried once more before the attempt is left dispatched (which would block every later call of the task).
     const settle = () => store.settle(reserved.attemptId, unknown || unread ? 'unknown' : 'settled', usd);
     await settle().catch(settle).catch(() => undefined);
-    return { verdict: !verdict ? 'unchecked' : verdict.rejected ?? 'pass', keepNext: verdict?.keepNext ?? false, usd: unknown || unread ? reserveUsd : usd };
+    return { verdict: !verdict ? 'unchecked' : verdict.rejected ?? 'pass', keepNext: verdict?.keepNext ?? false, usd: unknown || unread ? reserveUsd : usd, ...(verdict && 'found' in verdict ? { found: (verdict as { found: string[] }).found } : {}) };
   };
 }
 
