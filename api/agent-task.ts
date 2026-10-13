@@ -12,6 +12,7 @@
 //   POST { op: "approve", taskId, digest }   the person's yes to exactly the scope the task showed.
 //   POST { op: "deny" | "cancel", taskId }
 //   GET  ?id=<taskId>                        the task as it is now: what a client reads when it comes back.
+//   GET  ?sweep=1                            the scheduler only (Bearer CRON_SECRET): removes errands idle for 24 hours.
 // Every reply is the task's view (loop.ts, taskView): its state, the real events so far, the approval it waits
 // for, the result when there is one, and what the person has left. Coming back never calls a provider.
 //
@@ -38,6 +39,7 @@ import { APP_LANGUAGES, APP_LOCALES, type AppLanguage } from '../src/lib/app-lan
 import { waitUntil } from '@vercel/functions';
 import { deviceHash, resolveCaller } from './_lib/access.js';
 import { requestOriginHost } from './_lib/origins.js';
+import { requireInternalAuth } from './_lib/request-security.js';
 import { createLimiter, getClientQuotaKeys } from './_lib/rate-limit.js';
 import { createTask, engineDeps, runTask, saidFor, taskView } from './_lib/agent/loop.js';
 import { SAID } from './_lib/agent/present.js';
@@ -118,6 +120,16 @@ function languageOf(req: VercelRequest): AppLanguage {
 const SPOKEN_REFUSALS = new Set(['empty_question', 'question_too_long', 'too_many_errands', 'reads_limit', 'engine_unavailable', 'engine_storage_unavailable']);
 
 async function door(req: VercelRequest, res: VercelResponse) {
+  // The scheduler's sweep (vercel.json, every fifteen minutes), whatever the mode: what a person asked goes 24 hours
+  // after the errand was last touched even when nobody asks anything, and it keeps going after the door is turned
+  // off. (Found by the review before the pilot: the purge ran only when somebody started a new errand.)
+  if (req.method === 'GET' && req.query.sweep === '1') {
+    if (!requireInternalAuth(req, res)) return;
+    const kept = agentStore();
+    let purged = 0;
+    for (let round = 0; kept?.purge && round < 6; round++) { const went = await kept.purge(Date.now(), AGENT_KEEP_HOURS); purged += went; if (went < 500) break; }
+    return res.status(200).json({ purged });
+  }
   const mode = agentEngineMode();
   // Not on the list is the same answer as off: the door does not say that it exists.
   if (mode === 'off' || (mode === 'pilot' && !await inPilot(req))) return res.status(404).json({ error: 'Not found' });

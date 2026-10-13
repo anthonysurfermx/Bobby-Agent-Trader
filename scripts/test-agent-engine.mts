@@ -1058,6 +1058,24 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
       eq((await withSession('device-other-00000000001')).statusCode, 404, 'pilot: another account does not');
     } finally { globalThis.fetch = noNetwork; }
     process.env.BOBBY_AGENT_ENGINE = 'on'; delete process.env.BOBBY_AGENT_PILOT;
+    // The scheduler's sweep: only the scheduler, whatever the door's mode, and it asks the store until nothing is left.
+    const sweep = async (authorization?: string) => { const res = response(); await handler({ method: 'GET', query: { sweep: '1' }, headers: { ...(authorization ? { authorization } : {}) }, body: null } as never, res as never); return res; };
+    const hadSecret = process.env.CRON_SECRET;
+    delete process.env.CRON_SECRET; delete process.env.BOBBY_CYCLE_SECRET; delete process.env.BOBBY_RECORD_SECRET;
+    const unset = (await sweep('Bearer anything')).statusCode;
+    process.env.CRON_SECRET = 'cron-secret-for-this-test-0001';
+    const rounds: number[] = [];
+    const { PgAgentStore } = await import('../api/_lib/agent/store-pg.ts');
+    const realPurge = PgAgentStore.prototype.purge;
+    PgAgentStore.prototype.purge = async function (_now: number, hours: number) { rounds.push(hours); return rounds.length < 3 ? 500 : 7; };
+    try {
+      process.env.BOBBY_AGENT_STORE = 'postgres';
+      delete process.env.BOBBY_AGENT_ENGINE;   // off: the sweep still runs
+      const stranger = await sweep(), wrong = await sweep('Bearer not-the-secret'), right = await sweep('Bearer cron-secret-for-this-test-0001');
+      eq([unset !== 200, stranger.statusCode, wrong.statusCode, right.statusCode, right.body, rounds], [true, 401, 401, 200, { purged: 1007 }, [24, 24, 24]], 'the sweep answers only the scheduler, runs with the door off, and asks the store again while a full batch comes back');
+      process.env.BOBBY_AGENT_STORE = 'memory';
+      eq((await sweep('Bearer cron-secret-for-this-test-0001')).body, { purged: 0 }, 'a store that keeps nothing beyond its instance has nothing to sweep');
+    } finally { PgAgentStore.prototype.purge = realPurge; if (hadSecret === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = hadSecret; process.env.BOBBY_AGENT_ENGINE = 'on'; }
   } finally { globalThis.fetch = realFetch; __setAgentTestDeps(null); delete process.env.BOBBY_AGENT_ENGINE; delete process.env.BOBBY_AGENT_STORE; delete process.env.BOBBY_AGENT_PILOT; }
   // The migration is the contract, statement for statement: what the database tests run is what production got.
   {
