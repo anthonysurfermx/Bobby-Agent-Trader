@@ -131,7 +131,7 @@ The grader's verdict was the same every time: not ready to open yet. What the se
 The owner's decision: in production for a list of people, and for everyone only after the privacy page is changed.
 
 - `BOBBY_AGENT_ENGINE=pilot`, `BOBBY_AGENT_STORE=postgres`, `BOBBY_AGENT_PILOT` = the list (`id:<identity id>` for a signed-in account, `install:<salted install hash>` for one install). A person who is not on it gets the 404 of a door that is off. Adding someone: their identity id is `bobby_identities.id`; an install's hash is the one `deviceHash` derives (the production salt and the install id, never stored together).
-- Storage: migration `20261013062500_agent_engine.sql` (the same statements as `agent-engine.sql`; a test holds them equal). Four tables and twenty-one functions, closed to `anon` and `authenticated` by name, RLS on with no policy.
+- Storage: migration `20261013062033_agent_engine.sql` (the same statements as `agent-engine.sql`; a test holds them equal). Four tables and twenty-one functions, closed to `anon` and `authenticated` by name, RLS on with no policy.
 - What is kept: an errand's question, steps and answer until it has been idle 24 hours (`agent_purge`, asked for by the door after a new errand, at most every ten minutes); the money ledger 90 days.
 - Turning it off: unset `BOBBY_AGENT_ENGINE` and deploy. Opening it to everyone: `on`, and not before the four points above.
 - What ships is the head the fourteenth set measured; the four wording rules written after it are out (`git revert de80d5d4`) until a set measures them.

@@ -1063,7 +1063,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   {
     const { readFileSync } = await import('node:fs');
     const body = (file: string) => { const text = readFileSync(new URL(file, import.meta.url), 'utf8'); return text.slice(text.indexOf('create table if not exists agent_tasks (')); };
-    ok(body('../docs/agent-engine/agent-engine.sql') === body('../supabase/bobby-protocol/supabase/migrations/20261013062500_agent_engine.sql') && body('../docs/agent-engine/agent-engine.sql').includes('create or replace function agent_purge('), 'the migration applied to production holds the same statements as the contract the database tests run, the purge among them');
+    ok(body('../docs/agent-engine/agent-engine.sql') === body('../supabase/bobby-protocol/supabase/migrations/20261013062033_agent_engine.sql') && body('../docs/agent-engine/agent-engine.sql').includes('create or replace function agent_purge('), 'the migration applied to production holds the same statements as the contract the database tests run, the purge among them');
   }
 }
 

@@ -6,7 +6,7 @@
 // The transport is injected: `rpc(name, args)` calls a function with named arguments and returns its value. In
 // production it is PostgREST with the service role (`postgrestAgentRpc`, below); in the tests it is a
 // node-postgres pool against a LOCAL scratch database. In production the functions exist since the migration
-// 20261013062500_agent_engine.sql.
+// 20261013062033_agent_engine.sql.
 // A transport failure throws: the engine's callers treat storage that cannot answer as "do not go on".
 // ============================================================
 import { bobbyRest, bobbyServiceHeaders } from '../bobby-db.js';

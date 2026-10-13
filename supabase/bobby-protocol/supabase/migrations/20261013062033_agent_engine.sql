@@ -5,7 +5,7 @@
 -- scripts/test-agent-engine-pg.mts runs against a scratch database.
 -- What is kept: a person's question, the steps and the answer until the errand has been idle for 24 hours
 -- (agent_purge); the money ledger, which holds no text and no owner, 90 days.
--- Applied 2026-10-13 with the owner's yes, for a private pilot (BOBBY_AGENT_ENGINE=pilot).
+-- Applied to production on 2026-10-13 (schema_migrations 20261013062033) with the owner's yes, for a private pilot (BOBBY_AGENT_ENGINE=pilot).
 
 create table if not exists agent_tasks (
   id text primary key,

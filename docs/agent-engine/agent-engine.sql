@@ -1,6 +1,6 @@
 -- The agent engine's storage: the contract of AgentStore (api/_lib/agent/store.ts) as Postgres, one function per
 -- method, each one transaction. Applied to production as the migration
--- supabase/bobby-protocol/supabase/migrations/20261013062500_agent_engine.sql on 2026-10-13 (same statements: a test
+-- supabase/bobby-protocol/supabase/migrations/20261013062033_agent_engine.sql on 2026-10-13 (same statements: a test
 -- compares the two files). scripts/test-agent-engine-pg.mts runs this file against a LOCAL scratch database and
 -- checks the same invariants as the memory store, with real concurrent transactions.
 -- All tables are for the service role only.

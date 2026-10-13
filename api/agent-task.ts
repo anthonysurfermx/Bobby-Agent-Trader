@@ -28,7 +28,7 @@
 //     reads (BOBBY_AGENT_READS_PER_DAY, six when unset) and its own dollar ceiling until those are wired: a read
 //     here does not use one of the plan's, and a Pro subscriber gets no more than anyone else.
 // Storage is chosen by BOBBY_AGENT_STORE: "postgres" in production (the functions of the migration
-// 20261013062500_agent_engine.sql through PostgREST with the service role), "memory" (one instance, lost with it:
+// 20261013062033_agent_engine.sql through PostgREST with the service role), "memory" (one instance, lost with it:
 // for a preview only) or a file path (local development). With none, or with storage that does not answer, the
 // door answers 503 `engine_storage_unavailable`: an errand is never accepted that could be silently lost.
 // ============================================================

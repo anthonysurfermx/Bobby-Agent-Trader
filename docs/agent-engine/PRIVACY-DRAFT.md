@@ -25,7 +25,7 @@ question, the yes and the answer; and so that a follow-up ("and its worst day?")
 figures without a second read. Never the person's name or account; never used to train anything; never added to
 "What Bobby remembers".
 
-The purge is `agent_purge` (migration `20261013062500_agent_engine.sql`), asked for by the door after a new errand,
+The purge is `agent_purge` (migration `20261013062033_agent_engine.sql`), asked for by the door after a new errand,
 at most every ten minutes. Tested: `scripts/test-agent-engine-pg.mts`.
 
 ## The sentence that changes
