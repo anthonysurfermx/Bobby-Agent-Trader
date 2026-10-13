@@ -42,7 +42,7 @@ import LimitDialog, { type LimitState } from './LimitDialog';
 import InvitePanel from './InvitePanel';
 import {
   AGENT_TONE, marketQuery, assetSearch, candles, companionTurn, debateFor, isNoTrade, isUnavailable, localizedMomentum, localizedTrend, money as formatMoney, noTradeReason, prettyName, readsAsAQuestion, resolveQuestion, runAgents, runDebate, topMovers, type Agents,
-  type AgentKey, type Answer, type Candle, type Mover, type Resolution, type Snapshot,
+  type AgentKey, type Answer, type Candle, type CompanionExchange, type Mover, type Resolution, type Snapshot,
 } from './deskData';
 
 interface BrowserRecognition {
@@ -255,6 +255,8 @@ export default function NucleoDesk() {
   const phaseRef = useRef<Phase>(phase);
   phaseRef.current = phase;
   const questionRef = useRef<string>('');
+  // The exchange on screen, for the companion's next turn ("ponme un ejemplo"). It goes when the screen does.
+  const exchangeRef = useRef<CompanionExchange | null>(null);
   // The account changed (signed in, signed out, consent withdrawn): what the desk knew about access is dropped, and
   // a question in flight stops, because it was asked as someone else. The desk then returns to idle with the
   // question back in the pill; it is never left waiting for an answer that will not come.
@@ -297,6 +299,7 @@ export default function NucleoDesk() {
     if (revealRef.current) clearTimeout(revealRef.current);
     setDeskError(null);
     setDeskRetry(null); setGuideRetry(null);
+    exchangeRef.current = null;
     setSnapshot(snap);
     setAnswer(null);
     setReadReceipt(null);
@@ -445,6 +448,8 @@ export default function NucleoDesk() {
     const controller = new AbortController();
     requestRef.current = controller;
     voice.stop();
+    const previous = exchangeRef.current;
+    exchangeRef.current = null;
     setDeskError(null);
     setGuide(null);
     setGuideRetry(null);
@@ -471,9 +476,12 @@ export default function NucleoDesk() {
     // A look-alike the search offered for a whole sentence travels with the question: the companion says
     // whether the person meant that asset ("qué opinas de ethereun hoy") or not ("Tengo 1,000 pesos…" → MENGO).
     if (!unavailable && (!r || readsAsAQuestion(q, r))) {
-      const turn = await companionTurn(q, controller.signal, r ? { symbol: r.snapshot.symbol, name: r.confirmName } : undefined);
+      const turn = await companionTurn(q, controller.signal, r ? { symbol: r.snapshot.symbol, name: r.confirmName } : undefined, previous);
       if (controller.signal.aborted) return;
+      // An offer the person has not taken is what is on screen until they take it or ask something else.
+      if (turn?.kind === 'desk' && turn.text && turn.symbol) exchangeRef.current = { question: q, reply: turn.text, offered: turn.symbol };
       if (turn?.kind === 'explanation') {
+        exchangeRef.current = { question: q, reply: turn.text };
         setGuide({ text: turn.text, next: turn.next });
         setMessages((m) => [...m, { from: 'bobby', text: turn.text }]);
         setPhase('guide');
@@ -595,6 +603,7 @@ export default function NucleoDesk() {
     if (revealRef.current) clearTimeout(revealRef.current);
     voice.stop();
     sfxTock();
+    exchangeRef.current = null;
     setPhase('idle'); setSnapshot(null); setAnswer(null); setPending(null); setDeskError(null); setGuide(null); setAward(null); setLandEvent(null); setSeries([]); setLimit(null);
     setLive({}); setAgentsFailed(null); setDeskRetry(null); setGuideRetry(null); setShowDebate(false);
   };
@@ -713,6 +722,7 @@ export default function NucleoDesk() {
     if (revealRef.current) clearTimeout(revealRef.current);
     voice.stop(); closeRecognition();
     setSheet('none'); setLimit(null); setSignInPrompt(false); setInviteOpen(false); setInspected(null);
+    exchangeRef.current = null;
     setPhase('idle'); setSnapshot(null); setAnswer(null); setPending(null); setDeskError(null); setGuide(null); setAward(null); setLandEvent(null); setSeries([]);
     setLive({}); setAgentsFailed(null); setDeskRetry(null); setGuideRetry(null); setShowDebate(false);
     invalidateAccess();
