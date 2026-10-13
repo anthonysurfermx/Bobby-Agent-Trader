@@ -1,0 +1,9 @@
+{
+  "op": "ask",
+  "version": 1,
+  "requestId": "44444444-4444-4444-8444-444444444402",
+  "sessionId": "session-0001",
+  "question": "Compara Bitcoin y Ethereum",
+  "language": "es",
+  "locale": "es-MX"
+}

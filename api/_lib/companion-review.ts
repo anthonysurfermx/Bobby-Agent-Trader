@@ -27,7 +27,7 @@ import { publicTextViolation } from './desk-debate.js';
 export type CompanionRejection = 'advice' | 'guarantee' | 'figure' | 'shape';
 
 /** Lower case, no accents, straight apostrophes: every list below is written that way. */
-const fold = (text: string) => text.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/ß/g, 'ss').replace(/[’‘`´]/g, "'");
+export const fold = (text: string) => text.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/ß/g, 'ss').replace(/[’‘`´]/g, "'");
 const sentencesOf = (text: string) => text.split(/(?<=[.!?…])\s+/u).filter((s) => s.trim());
 const wordsAfter = (text: string, from: number, n: number) => text.slice(from).trim().split(/\s+/).slice(0, n).join(' ');
 const wordsBefore = (text: string, to: number, n: number) => text.slice(0, to).trim().split(/\s+/).slice(-n).join(' ');
@@ -39,7 +39,7 @@ const altAll = (...parts: string[]) => new RegExp(source(parts), 'g');
 
 // ---------- a figure the person did not write ----------
 // Names that carry a number are names: "the S&P 500", "a 401(k)", "24 hours a day", "step 1".
-const NAMED_NUMBER = /(?<![a-z0-9])(?:s&p\s*500|(?:nasdaq|russell|dax|cac|ftse(?:\s+mib)?|ibex|euro\s*stoxx|stoxx|nikkei|dow(?:\s+jones)?|msci\s+world)[\s-]*\d{2,4}|401\s*\(?k\)?|403\s*\(?b\)?|web\s?3|24\s*(?:\/\s*7|horas|hours|heures|ore|stunden)|(?:paso|step|etape|passo|schritt)\s+\d{1,2})(?![a-z0-9])/g;
+export const NAMED_NUMBER = /(?<![a-z0-9])(?:s&p\s*500|(?:nasdaq|russell|dax|cac|ftse(?:\s+mib)?|ibex|euro\s*stoxx|stoxx|nikkei|dow(?:\s+jones)?|msci\s+world)[\s-]*\d{2,4}|401\s*\(?k\)?|403\s*\(?b\)?|web\s?3|24\s*(?:\/\s*7|horas|hours|heures|ore|stunden)|(?:paso|step|etape|passo|schritt)\s+\d{1,2})(?![a-z0-9])/g;
 const NUMERAL = /\d+(?:[.,]\d+)*/g;
 const numerals = (folded: string) => (folded.replace(NAMED_NUMBER, ' ').match(NUMERAL) ?? []).map((n) => n.replace(/\D/g, ''));
 const PERCENT_MARK = /[%‰]/, MONEY_MARK = /[$€£¥₿]/;
@@ -62,7 +62,7 @@ const TIMES: Record<string, number> = {
 };
 // Italian and German write a number as one word ("centomila", "hunderttausend"); so do Spanish hundreds.
 const ONE_WORD = '[a-z]+mila|[a-z]+tausend|[a-z]+hundert|[a-z]+cento|[a-z]+cientos';
-const NUMBER_WORD = `(?:${[...Object.keys(UNITS), ...Object.keys(TIMES)].join('|')}|${ONE_WORD})`;
+export const NUMBER_WORD = `(?:${[...Object.keys(UNITS), ...Object.keys(TIMES)].join('|')}|${ONE_WORD})`;
 const CURRENCY = '(?:dolares|dolar|dollars?|dollari|dollaro|pesos?|euros?|libras?|pounds?|reais|reales|francs?|franken|sterline|yen|usd|mxn|eur|bucks)';
 const WORDED_AMOUNT = new RegExp(`(?<![a-z])(${NUMBER_WORD}(?:\\s+(?:${NUMBER_WORD}|y|and|et|e|und))*)\\s+(?:de\\s+|of\\s+|d'|di\\s+)?${CURRENCY}(?![a-z])`, 'g');
 /** "cien mil" → 100000, "two thousand five hundred" → 2500. A word it cannot read counts for nothing. */

@@ -1,0 +1,380 @@
+// ============================================================
+// The agent engine: the tools its one agent may ask for, and the arithmetic no model is allowed to do.
+//
+// The server owns every tool: the model names one and proposes arguments, code validates them (zod), decides
+// whether the person must approve first (`metered`), runs it and writes what it found as EVIDENCE and FIGURES.
+// Whatever a tool returns is data. Nothing in it can grant a permission, add a tool or change an instruction.
+//
+// Tools of this version (TOOLSET_VERSION):
+//   · resolve_assets  free. Which instruments a mention means, inside the universe the engine can read
+//     with evidence. Deterministic, no network: an alias table, exact after folding case and accents.
+//   · read_assets  METERED: one read of the person's allowance, asked for before it runs. Daily bars
+//     of one, two or three instruments over one window (the model gives names as the person wrote them; the
+//     server turns them into symbols, and a name it cannot read is refused before the person is asked anything), read by the strict reader of the harness
+//     (api/_lib/harness/bars.ts: the same provider request as /api/asset-fact, so there is one source and one
+//     as-of per instrument), then compared by code.
+// What the engine cannot establish is not here on purpose: a fund's holdings or concentration, fees,
+// fundamentals, news, forecasts. The agent is told to say so (loop.ts) instead of answering from memory.
+//
+// Arithmetic rules (each has a test):
+//   · Percent is always percent (12.3 means 12.3 %), never a fraction; a price is in the series' own currency.
+//   · A figure is computed only from a series the reader accepted. A refused series gives evidence with a
+//     quality other than `valid`, figures with value null, and a limitation: never a zero.
+//   · Every instrument is measured on its own days of the window; only the correlation uses the days both traded, and says so.
+//   · The window is the same for every instrument and is stated in every figure's basis.
+// ============================================================
+import { z } from 'zod';
+import { parseOkxDaily, parseYahooDaily, validateBars, type AssetClass, type BarSeries, type DailyBar } from '../harness/bars.js';
+import type { Analysis, ApprovalScope, Evidence, Figure, Quality } from './types.js';
+
+export interface ToolContext { now: () => Date; /** One provider request; null on any transport or HTTP failure. */ fetchJson: (url: string) => Promise<unknown | null>; /** The wait before a source that did not answer is asked the one more time (400 ms unless set). */ retryMs?: number }
+export interface ToolOutput { evidence: Evidence[]; data: Record<string, unknown>; analysis?: Analysis }
+export interface Tool<A = unknown> {
+  name: string; description: string; metered: boolean;
+  schema: z.ZodType<A>; wire: Record<string, unknown>;
+  /** Turns what the model wrote into what will run (names into symbols), or says why it cannot: checked by the server before anything is asked of the person. */
+  prepare?: (args: A, settled?: Settled) => { ok: true; args: unknown } | { ok: false; reason: string; detail: string };
+  /** What the person is asked to approve, for a metered tool. Given the prepared arguments. */
+  scope?: (args: any) => Omit<ApprovalScope, 'digest'>;
+  run: (args: any, ctx: ToolContext) => Promise<ToolOutput>;
+}
+
+export const WINDOWS = [30, 60] as const;
+
+// ---------- the universe: what the engine can read with evidence ----------
+interface Instrument { symbol: string; name: string; /** How code says it aloud: the short name people use, never a legal one. */ say: string; kind: 'crypto' | 'equity' | 'etf'; assetClass: AssetClass; aliases: readonly string[] }
+export const UNIVERSE: readonly Instrument[] = [
+  { symbol: 'BTC', name: 'Bitcoin', say: 'Bitcoin', kind: 'crypto', assetClass: 'crypto', aliases: ['bitcoin', 'btc'] },
+  { symbol: 'ETH', name: 'Ethereum', say: 'Ethereum', kind: 'crypto', assetClass: 'crypto', aliases: ['ethereum', 'eth', 'ether'] },
+  { symbol: 'SOL', name: 'Solana', say: 'Solana', kind: 'crypto', assetClass: 'crypto', aliases: ['solana', 'sol'] },
+  { symbol: 'SPY', name: 'SPDR S&P 500 ETF', say: 'SPY', kind: 'etf', assetClass: 'equity', aliases: ['spy', 's&p 500', 'sp500', 's&p500', 'sp 500', 'etf del s&p 500', 's&p 500 etf'] },
+  { symbol: 'QQQ', name: 'Invesco QQQ (Nasdaq-100) ETF', say: 'QQQ', kind: 'etf', assetClass: 'equity', aliases: ['qqq', 'nasdaq 100', 'nasdaq-100', 'nasdaq100', 'nasdaq', 'etf del nasdaq', 'nasdaq 100 etf'] },
+  { symbol: 'NVDA', name: 'NVIDIA', say: 'NVIDIA', kind: 'equity', assetClass: 'equity', aliases: ['nvidia', 'nvda'] },
+  { symbol: 'AAPL', name: 'Apple', say: 'Apple', kind: 'equity', assetClass: 'equity', aliases: ['apple', 'aapl'] },
+  { symbol: 'TSLA', name: 'Tesla', say: 'Tesla', kind: 'equity', assetClass: 'equity', aliases: ['tesla', 'tsla'] },
+  { symbol: 'META', name: 'Meta Platforms', say: 'Meta', kind: 'equity', assetClass: 'equity', aliases: ['meta', 'facebook', 'meta platforms'] },
+  { symbol: 'MSFT', name: 'Microsoft', say: 'Microsoft', kind: 'equity', assetClass: 'equity', aliases: ['microsoft', 'msft'] },
+  { symbol: 'GOOGL', name: 'Alphabet (Google)', say: 'Alphabet', kind: 'equity', assetClass: 'equity', aliases: ['google', 'alphabet', 'googl', 'goog', 'google alphabet', 'alphabet google', 'alphabet inc'] },
+  { symbol: 'AMZN', name: 'Amazon', say: 'Amazon', kind: 'equity', assetClass: 'equity', aliases: ['amazon', 'amzn'] },
+  { symbol: 'AMD', name: 'AMD', say: 'AMD', kind: 'equity', assetClass: 'equity', aliases: ['amd', 'advanced micro devices'] },
+  { symbol: 'COIN', name: 'Coinbase', say: 'Coinbase', kind: 'equity', assetClass: 'equity', aliases: ['coinbase', 'coin', 'coin base'] },
+];
+const BY_SYMBOL = new Map(UNIVERSE.map((instrument) => [instrument.symbol, instrument]));
+const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[¿?¡!.,;:"“”«»()]/g, ' ').replace(/\s+/g, ' ').trim();
+/** Words that may stand around a name without changing which instrument it is. */
+const AROUND = /^(el|la|los|las|le|les|il|lo|der|die|das|den|dem|des|vom|o|a|os|as|do|da|the|de|del|du|di|von|acciones? de|accion de|shares? of|stock|aktien?|actions?|azion[ei]|aco?es|acao)\s+|^[ld]['’]\s*|^\$|[\s-]+(stock|shares|acciones|aktie|aktien|actions?|azioni)$|['’]s$/g;
+export function resolveMention(mention: string): Instrument | null {
+  let text = fold(mention);
+  for (let n = 0; n < 3; n++) text = text.replace(AROUND, '').trim();
+  if (!text) return null;
+  // "Nombre (TICKER)" or "TICKER (nombre)", as the engine itself writes them: both sides must be the same instrument.
+  const paired = /^(.+?)\s*\(([^()]+)\)$/.exec(mention.trim());
+  if (paired) { const a = resolveMention(paired[1]), b = resolveMention(paired[2]); if (a && a === b) return a; }
+  const named = (said: string) => UNIVERSE.find((instrument) => instrument.symbol.toLowerCase() === said || instrument.aliases.includes(said) || fold(instrument.name) === said) ?? null;
+  const exact = named(text) ?? named(text.replace(/-/g, ' '));
+  if (exact) return exact;
+  // A name said with its ticker, as people do ("Solana SOL", "nvidia nvda"): both halves must be the same instrument,
+  // the rule the parenthesised form already keeps. (Each one refused as unknown cost a model call.)
+  const words = text.split(' ');
+  for (let cut = 1; cut < words.length; cut++) { const a = named(words.slice(0, cut).join(' ')), b = named(words.slice(cut).join(' ')); if (a && a === b) return a; }
+  return null;
+}
+
+// ---------- names that are also everyday words ----------
+// "sol", "meta", "apple" and "coin" are aliases, and they are also the sun, a goal, a fruit and any coin at all. Alone
+// they do not settle an instrument: whether the person's own words did is decided here, by code, so that neither a
+// read nor a sentence can treat as chosen what the person never chose (seventh blind set: "one was coin … please
+// don't guess" was answered "alongside Coinbase").
+const EVERYDAY: Readonly<Record<string, readonly string[]>> = { SOL: ['sol'], META: ['meta'], AAPL: ['apple'], COIN: ['coin'] };
+/** An everyday word that is a generic noun of the market itself: among assets it still does not say which one. */
+const GENERIC = new Set(['coin']);
+/** A word right beside the name that says it is the security or the token: "apple stock", "meta la empresa", "sol token". */
+const SAYS_ASSET = new Set(['stock', 'stocks', 'share', 'shares', 'ticker', 'company', 'inc', 'corp', 'equity', 'token', 'crypto', 'cryptocurrency', 'blockchain', 'exchange',
+  'accion', 'acciones', 'empresa', 'compania', 'cripto', 'criptomoneda', 'action', 'actions', 'societe', 'entreprise', 'boite', 'cryptomonnaie', 'jeton',
+  'acao', 'acoes', 'criptomoeda', 'azione', 'azioni', 'societa', 'azienda', 'criptovaluta', 'titolo', 'aktie', 'aktien', 'unternehmen', 'firma', 'konzern', 'krypto', 'kryptowahrung', 'wertpapier']);
+const wordsOf = (text: string) => fold(text).replace(/[^a-z0-9&$ ]+/g, ' ').split(' ').filter(Boolean);
+const escapedName = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const namedIn = (folded: string, name: string) => new RegExp(`(?<![a-z0-9])${escapedName(name).replace(/ /g, '[ -]?')}(?![a-z0-9])`).test(folded);
+/** The names of an instrument that are not everyday words: its symbol, its name and its other aliases. */
+const plainNames = (instrument: Instrument) => [...new Set([instrument.symbol.toLowerCase(), fold(instrument.name), fold(instrument.say), ...instrument.aliases])].filter((name) => !(EVERYDAY[instrument.symbol] ?? []).includes(name));
+/** The instruments a text names, by any of their names (an everyday word counts: this is what a text mentions, not what it settles). */
+export function instrumentsNamed(text: string): string[] {
+  const folded = ` ${fold(text)} `;
+  return UNIVERSE.filter((instrument) => [instrument.symbol.toLowerCase(), fold(instrument.name), fold(instrument.say), ...instrument.aliases].some((name) => namedIn(folded, name))).map((instrument) => instrument.symbol);
+}
+/** What the conversation already settled without these words: what was read before, what a card offered, what Bobby's last question named. */
+export interface Settled { /** The person's words: this errand's, and the question before it when there is one. */ theirs: string; /** This errand's own words. */ now: string; known: readonly string[]; /** True when the thread already holds a read: a short "and sol?" is then about assets. */ reading: boolean }
+/**
+ * The everyday word through which alone the person named this instrument, or null when their words settle it. Settled
+ * by: another name of it (Solana, Coinbase, Facebook, AAPL), the ticker written as one ($sol, SOL in capitals), a word
+ * beside it that says it is the security ("apple stock", "meta la empresa"), or the conversation (`known`). Otherwise
+ * the word stands unsettled when it is all they said (three words or fewer, with no read on the table), or when it is
+ * a generic noun of the market ("coin"), which no context of assets settles.
+ */
+export function unsettledWord(symbol: string, settled: Settled): string | null {
+  const instrument = BY_SYMBOL.get(symbol), everyday = EVERYDAY[symbol];
+  if (!instrument || !everyday || settled.known.includes(symbol)) return null;
+  const folded = ` ${fold(settled.theirs)} `;
+  if (plainNames(instrument).some((name) => namedIn(folded, name))) return null;
+  for (const word of everyday) {
+    if (!namedIn(folded, word)) continue;
+    // Written as a ticker: "$coin", or COIN in capitals inside a sentence that is not all capitals.
+    if (new RegExp(`\\$\\s?${word}(?![a-z0-9])`, 'i').test(settled.theirs)) return null;
+    if (/\p{Ll}/u.test(settled.theirs) && new RegExp(`(?<![\\p{L}\\p{N}])${word.toUpperCase()}(?![\\p{L}\\p{N}])`, 'u').test(settled.theirs)) return null;
+    const words = wordsOf(settled.theirs);
+    if (words.some((entry, at) => entry === word && words.slice(Math.max(0, at - 3), at + 4).some((near) => near !== word && SAYS_ASSET.has(near)))) return null;
+    if (GENERIC.has(word)) return word;
+    if (!settled.reading && namedIn(` ${fold(settled.now)} `, word) && wordsOf(settled.now).length <= 3) return word;
+  }
+  return null;
+}
+
+const ALTERNATIVE = /(?<![a-z])(?:or|o|u|ou|oder|oppure|ovvero)(?![a-z])/;
+/**
+ * The instrument a text treats as chosen although the person's words left it open, with the word that left it open; null
+ * when there is none. Asking is not presuming: a sentence that is a question and offers an alternative ("do you mean
+ * the company Apple, or the fruit?") may name it. Saying their word back ("coin") names nothing.
+ */
+export function presumedIn(text: string, settled: Settled): { word: string; symbol: string } | null {
+  for (const sentence of text.split(/(?<=[.!?…])\s+/)) {
+    const folded = ` ${fold(sentence)} `;
+    for (const instrument of UNIVERSE) {
+      const word = unsettledWord(instrument.symbol, settled);
+      if (!word) continue;
+      // Their own word said back is theirs, unless that word IS the instrument's name ("Apple", "Meta").
+      const names = [...plainNames(instrument), ...(fold(instrument.say) === word ? [word] : [])];
+      if (!names.some((name) => namedIn(folded, name))) continue;
+      if (/[?？]["'»”’)\]]*\s*$/.test(sentence) && ALTERNATIVE.test(folded)) continue;
+      return { word, symbol: instrument.symbol };
+    }
+  }
+  return null;
+}
+/** What kind of thing an instrument is, for a question code asks about it. */
+export const instrumentKind = (symbol: string) => BY_SYMBOL.get(symbol)?.kind ?? 'equity';
+
+// ---------- arithmetic ----------
+const pct = (ratio: number) => 100 * ratio;
+function correlation(a: number[], b: number[]): number | null {
+  if (a.length !== b.length || a.length < 2) return null;
+  const ma = a.reduce((s, v) => s + v, 0) / a.length, mb = b.reduce((s, v) => s + v, 0) / b.length;
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < a.length; i++) { num += (a[i] - ma) * (b[i] - mb); da += (a[i] - ma) ** 2; db += (b[i] - mb) ** 2; }
+  const r = num / Math.sqrt(da * db);
+  return Number.isFinite(r) ? Math.max(-1, Math.min(1, r)) : null;
+}
+/** Fewer daily changes than this say nothing about how much something moves. */
+export const MIN_CHANGES = 15;
+const dayMs = (day: string) => Date.parse(`${day}T00:00:00Z`);
+/** `move` is the average SIZE of the daily changes (the mean of their absolute values): what a person hears in "it moved about X% a day". A standard deviation is a different number and is not told. */
+export interface Metrics { first: DailyBar; last: DailyBar; changes: number[]; /** True when the first day's own change (from the close before the run) is among the changes. */ led: boolean; totalReturn: number; move: number | null; maxDrawdown: number; worst: { pct: number; day: string } | null; best: { pct: number; day: string } | null }
+/**
+ * What a run of closes did. Percent everywhere; a day's change is its close over the close before it.
+ * `before` is the instrument's own close right before the run: with it, the first day of the run has its change too,
+ * so "the best day of the window" is chosen among every day of the window (sixth blind set: a window's first day,
+ * +3.6% from its own previous close, was left out and the next best, +1.7%, was told as the best). And then every
+ * figure counts those same days: the change of the whole run is the last close over that close before it (the days'
+ * changes, compounded), and the fall from a high may start at it. Until 2026-10-13 the change and the fall were
+ * measured between closes inside the run, one day short of the worst day, the best day and the average move beside
+ * them: a fall on the first day was a "worst day" larger than the "largest fall", and the sign of the change differed
+ * in two of twenty-eight recorded reads. Without a usable close before, nothing counts the first day, and the basis says so.
+ */
+export function metrics(bars: DailyBar[], before: DailyBar | null = null): Metrics | null {
+  if (bars.length < 2 || bars.some((bar) => !(bar.close > 0) || !Number.isFinite(bar.close))) return null;
+  const lead = before && before.close > 0 && Number.isFinite(before.close) && before.day < bars[0].day ? before : null;
+  const changes: number[] = [];
+  let peak = lead ? Math.max(lead.close, bars[0].close) : bars[0].close, maxDrawdown = lead ? Math.min(0, pct(bars[0].close / lead.close - 1)) : 0, worst: Metrics['worst'] = null, best: Metrics['best'] = null;
+  const count = (change: number, day: string) => {
+    changes.push(change);
+    if (!worst || change < worst.pct) worst = { pct: change, day };
+    if (!best || change > best.pct) best = { pct: change, day };
+  };
+  if (lead) count(pct(bars[0].close / lead.close - 1), bars[0].day);
+  for (let i = 1; i < bars.length; i++) {
+    count(pct(bars[i].close / bars[i - 1].close - 1), bars[i].day);
+    peak = Math.max(peak, bars[i].close);
+    maxDrawdown = Math.min(maxDrawdown, pct(bars[i].close / peak - 1));
+  }
+  return { first: bars[0], last: bars.at(-1)!, changes, led: lead !== null, totalReturn: pct(bars.at(-1)!.close / (lead ?? bars[0]).close - 1), move: changes.length >= MIN_CHANGES ? changes.reduce((sum, change) => sum + Math.abs(change), 0) / changes.length : null, maxDrawdown, worst, best };
+}
+/** The whole window must be sound, not only the reader's last 22 bars: no missing crypto day, no equity gap over five days, no impossible jump. */
+function windowSound(bars: DailyBar[], assetClass: AssetClass): boolean {
+  for (let i = 1; i < bars.length; i++) {
+    const gap = (dayMs(bars[i].day) - dayMs(bars[i - 1].day)) / 86_400_000;
+    if (assetClass === 'crypto' ? gap !== 1 : gap < 1 || gap > 5) return false;
+    if (Math.abs(Math.log(bars[i].close / bars[i - 1].close)) > (assetClass === 'equity' ? 0.5 : 0.6)) return false;
+  }
+  return true;
+}
+
+// ---------- read_assets ----------
+const Read = z.object({ assets: z.array(z.string().trim().min(1).max(60)).min(1).max(3), windowDays: z.union([z.literal(30), z.literal(60)]) }).strict();
+/** What runs after the server resolved the names. */
+export interface ReadArgs { symbols: string[]; windowDays: 30 | 60 }
+type CompareArgs = ReadArgs;
+function prepareRead(args: z.infer<typeof Read>, settled?: Settled): { ok: true; args: ReadArgs } | { ok: false; reason: string; detail: string } {
+  const symbols: string[] = [];
+  for (const mention of args.assets) {
+    const hit = resolveMention(mention);
+    if (!hit) return { ok: false, reason: 'unknown_asset', detail: mention.slice(0, 40) };
+    if (symbols.includes(hit.symbol)) return { ok: false, reason: 'same_asset_twice', detail: hit.symbol };
+    // The person is never shown a card for something they did not choose: an everyday word their own words left open is asked about first.
+    const open = settled ? unsettledWord(hit.symbol, settled) : null;
+    if (open) return { ok: false, reason: 'ambiguous_name', detail: `their word "${open}" may be ${hit.name} or something else: read nothing; ask which they mean in one question that names both readings` };
+    symbols.push(hit.symbol);
+  }
+  return { ok: true, args: { symbols, windowDays: args.windowDays } };
+}
+interface Read { instrument: Instrument; url: string; series: BarSeries | null; bars: DailyBar[] | null; quality: Quality; note: string | null }
+
+/** Rows asked of the coin source: the longest window, the day still forming, and the days a fund's last session can lag a coin's. */
+export const COIN_ROWS = Math.max(...WINDOWS) + 10;
+/** The engine's own requests: the sources of /api/asset-fact, asked for enough days to cover the longest window. */
+export const sourceUrl = (instrument: Pick<Instrument, 'symbol' | 'assetClass'>) => (instrument.assetClass === 'equity'
+  ? `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(instrument.symbol)}?range=6mo&interval=1d&events=split`
+  : `https://www.okx.com/api/v5/market/candles?instId=${encodeURIComponent(`${instrument.symbol}-USDT`)}&bar=1Dutc&limit=${COIN_ROWS}`);
+
+async function readSeries(instrument: Instrument, ctx: ToolContext): Promise<Read> {
+  const url = sourceUrl(instrument), now = ctx.now();
+  // A public source that does not answer once often answers the second time: asked twice, never more. The person
+  // already said yes and a read is theirs to lose only when nothing comes back.
+  let json = await ctx.fetchJson(url);
+  if (json === null) { await new Promise((done) => setTimeout(done, ctx.retryMs ?? 400)); json = await ctx.fetchJson(url); }
+  if (json === null) return { instrument, url, series: null, bars: null, quality: 'error', note: 'the source did not answer, twice' };
+  // Crypto is read as the spot pair against USDT, and says so in `currency`.
+  const series = instrument.assetClass === 'equity' ? parseYahooDaily(json, instrument.symbol, now) : parseOkxDaily(json, `${instrument.symbol}-USDT`, now);
+  // A currency is three to five capital letters. Anything else in that field is a source's free text: it would be
+  // written beside a number and read as Bobby's own words, so the whole series is not understood.
+  // Every stock and fund of the universe is US-listed and every coin is read as its USDT pair: one currency each. (Any
+  // three to five capital letters used to pass, and were printed beside the price.) Widen it with the universe.
+  if (!series || series.currency !== (instrument.assetClass === 'equity' ? 'USD' : 'USDT')) return { instrument, url, series: null, bars: null, quality: 'missing', note: 'the source returned nothing the reader understands' };
+  // The reader refuses a series with a split in it. Six months are fetched and at most 69 days are measured (the longest
+  // window, the close before it, and how stale a series may be): a split older than that touches no close that is
+  // used, and refusing the stock for it kept one unreadable for up to six months.
+  const horizon = new Date(now.getTime() - (Math.max(...WINDOWS) + 10) * 86_400_000).toISOString().slice(0, 10);
+  const recent = (series as { corporateActionDays?: string[] }).corporateActionDays?.filter((day) => day > horizon) ?? [];
+  const valid = validateBars({ ...series, corporateActionDays: recent.length ? recent : undefined } as typeof series, now);
+  if ('reason' in valid) return { instrument, url, series, bars: null, quality: valid.reason === 'stale' ? 'stale' : valid.reason === 'too_few' ? 'missing' : 'error', note: `series refused: ${valid.reason}` };
+  return { instrument, url, series, bars: valid.bars, quality: 'valid', note: null };
+}
+
+export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<ToolOutput> {
+  const now = ctx.now(), reads = await Promise.all(args.symbols.map((symbol) => readSeries(BY_SYMBOL.get(symbol)!, ctx)));
+  const limitations: string[] = [];
+  const evidence: Evidence[] = reads.map((read) => ({
+    id: `ev_${read.instrument.symbol}`, tool: 'read_assets', source: read.series?.source ?? (read.instrument.assetClass === 'equity' ? 'yahoo' : 'okx'), url: read.url,
+    instrument: read.instrument.assetClass === 'crypto' ? `${read.instrument.symbol}-USDT spot` : read.instrument.symbol,
+    asOf: null, retrievedAt: now.toISOString(), unit: 'price', scale: 1, currency: read.series?.currency ?? null, quality: read.quality, note: read.note,
+  }));
+  const refuse = (read: Read, quality: Quality, note: string) => { read.bars = null; read.quality = quality; read.note = note; const item = evidence.find((entry) => entry.id === `ev_${read.instrument.symbol}`)!; item.quality = quality; item.note = note; };
+  // One window for all: the last `windowDays` calendar days ending at the earliest "last completed bar" of the
+  // series still standing. Each series is judged ALONE first, on its own days and by its own rules (does it reach
+  // back the whole window? is it sound inside it?): one refused here shapes nothing of the others. Refusing one
+  // can move the window's end, so the judging is repeated until nothing changes.
+  let end: string | null = null, start: string | null = null;
+  const inWindow = (read: Read) => read.bars!.filter((bar) => bar.day >= start! && bar.day <= end!);
+  for (let pass = 0; pass <= reads.length; pass++) {
+    const standing = reads.filter((read) => read.bars);
+    end = standing.length ? standing.map((read) => read.bars!.at(-1)!.day).sort()[0] : null;
+    start = end ? new Date(dayMs(end) - (args.windowDays - 1) * 86_400_000).toISOString().slice(0, 10) : null;
+    let changed = false;
+    const sessions = new Set(standing.filter((read) => read.instrument.assetClass === 'equity').flatMap((read) => inWindow(read).map((bar) => bar.day)));
+    for (const read of standing) {
+      const own = inWindow(read), first = own[0]?.day;
+      // A coin trades every day: its first day is the window's first. A fund may open the window on a weekend or a holiday: up to four days later.
+      const reaches = first !== undefined && (dayMs(first) - dayMs(start!)) / 86_400_000 <= (read.instrument.assetClass === 'crypto' ? 0 : 4);
+      if (!reaches) { refuse(read, 'missing', 'the series does not reach back the whole window'); changed = true; }
+      else if (!windowSound(own, read.instrument.assetClass)) { refuse(read, 'error', 'series refused: the window has a gap or an impossible move'); changed = true; }
+      // A session the source dropped from a fund is invisible alone (a gap of up to five days is a long weekend), and
+      // the two-session change beside it would be told as one day's. Every stock and fund here trades on one exchange
+      // calendar, so the funds of a read are each other's: one that lacks a session another has is refused.
+      else if (read.instrument.assetClass === 'equity' && own.length < sessions.size) { refuse(read, 'error', 'series refused: the window lacks a session another instrument of this read has'); changed = true; }
+    }
+    if (!changed) break;
+  }
+  const usable = reads.filter((read) => read.bars);
+  const mixed = new Set(usable.map((read) => read.instrument.assetClass)).size > 1;
+  if (mixed) limitations.push('mixed_calendars');
+  const figures: Figure[] = [];
+  const used = new Map<string, { bars: DailyBar[]; before: DailyBar | null }>();
+  for (const read of reads) {
+    const symbol = read.instrument.symbol, ev = [`ev_${symbol}`], item = evidence.find((entry) => entry.id === ev[0])!;
+    // Each instrument is measured on its OWN days of the window, so a coin's day is one day whatever it is read beside.
+    // Only the correlation, below, is computed on the days both traded.
+    const bars = read.bars ? inWindow(read) : null;
+    let quality: Quality = read.quality;
+    // The close right before the window gives the window's first day its own change. It counts only when it is the
+    // session right before (a coin: the day before; a fund: at most five days back) and the step is a sound one.
+    const prior = bars?.length ? read.bars!.filter((bar) => bar.day < bars[0].day).at(-1) ?? null : null;
+    const before = prior && windowSound([prior, bars![0]], read.instrument.assetClass) ? prior : null;
+    const m = bars ? metrics(bars, before) : null;
+    if (bars && !m) { quality = 'missing'; item.quality = 'missing'; item.note = 'too few days in the window'; }
+    if (!m) limitations.push(`no_series:${symbol}`);
+    // The evidence is dated by the day its figures end on, which is not always the source's newest bar.
+    else { used.set(symbol, { bars: bars!, before: m.led ? before : null }); item.asOf = m.last.day; }
+    const basis = m ? `${read.instrument.assetClass === 'crypto' ? 'UTC days' : 'exchange sessions'} from ${m.first.day} to ${m.last.day} (${m.changes.length} daily changes, close to close)` : `no usable series (${item.note ?? 'too few days in the window'})`;
+    // A change over the whole window, and a fall from a high, start at the close right before the window when it could
+    // be used: that is the day they run from. (Twelfth blind set: "+2.6 %, from 14 September" read as a change between
+    // the closes of the 14th and the last day, which is another number.)
+    const figure = (metric: string, value: number | null, unit: Figure['unit'], extra = '', since: string | null = null): Figure => ({ id: `${metric}_${symbol}`, metric, subject: symbol, value: m && value !== null && Number.isFinite(value) ? value : null, unit, currency: unit === 'price' ? read.series?.currency ?? null : null, basis: basis + extra, from: m ? since ?? m.first.day : null, to: m?.last.day ?? null, days: m ? m.changes.length : null, evidence: ev, quality: m && value !== null && Number.isFinite(value) ? quality : quality === 'valid' ? 'missing' : quality });
+    figures.push(
+      figure('close', m?.last.close ?? null, 'price'),
+      figure('return', m?.totalReturn ?? null, 'percent', m?.led ? '; last close over the close right before the window, minus one: every day of the window counts' : "; last close over first close of the window, minus one (the first day's own change is not counted: its previous close could not be used)", m?.led ? before!.day : null),
+      figure('move', m?.move ?? null, 'percent', `; average size of the daily changes, up or down (the mean of their absolute values); ${m?.led ? "each day's change is from the instrument's own previous close, the first day's from the close right before the window" : "the first day's own change is not counted: its previous close could not be used"}${m && m.move === null ? `; needs ${MIN_CHANGES} changes` : ''}`),
+      figure('drawdown', m?.maxDrawdown ?? null, 'percent', m?.led ? '; largest fall from a previous high, the close right before the window counting as the first one' : '; largest fall from a previous high inside the window', m?.led ? before!.day : null),
+      { ...figure('worst', m?.worst?.pct ?? null, 'percent', m?.worst ? `; the day was ${m.worst.day}; among the changes of ${m.led ? 'every day of the window' : "the days of the window after its first (the first day's previous close could not be used)"}` : ''), day: m?.worst?.day ?? null },
+      { ...figure('best', m?.best?.pct ?? null, 'percent', m?.best ? `; the day was ${m.best.day}; among the changes of ${m.led ? 'every day of the window' : "the days of the window after its first (the first day's previous close could not be used)"}` : ''), day: m?.best?.day ?? null },
+    );
+  }
+  // Said only when there is something it is about: a window that gave no figure says nothing of the past either.
+  if (used.size) limitations.unshift('past_window_only');
+  const symbols = [...used.keys()];
+  for (let i = 0; i < symbols.length; i++) for (let j = i + 1; j < symbols.length; j++) {
+    // A daily change is always ONE instrument's change from its own previous close, here as in every other figure:
+    // the two are paired on the days both have one. (Changes taken between the closes both have would give a coin
+    // a Monday that carries its weekend, and a number that is not what "daily changes" says.)
+    const own = (symbol: string) => { const { bars, before } = used.get(symbol)!; const changes = new Map(bars.slice(1).map((bar, n) => [bar.day, pct(bar.close / bars[n].close - 1)] as const)); if (before) changes.set(bars[0].day, pct(bars[0].close / before.close - 1)); return changes; };
+    const a = own(symbols[i]), b = own(symbols[j]);
+    const days = [...a.keys()].filter((day) => b.has(day)).sort();
+    const r = days.length >= MIN_CHANGES ? correlation(days.map((day) => a.get(day)!), days.map((day) => b.get(day)!)) : null;
+    figures.push({ id: `corr_${symbols[i]}_${symbols[j]}`, metric: 'correlation', subject: `${symbols[i]}~${symbols[j]}`, value: r, unit: 'ratio', currency: null, basis: `correlation of each one's own daily changes on the ${days.length} days both traded${r === null ? `; needs ${MIN_CHANGES}` : ''}`, from: days[0] ?? null, to: days.at(-1) ?? null, days: days.length, evidence: [`ev_${symbols[i]}`, `ev_${symbols[j]}`], quality: r === null ? 'missing' : 'valid' });
+  }
+  const analysis: Analysis = { kind: args.symbols.length > 1 ? 'comparison' : 'single', subjects: args.symbols, windowDays: args.windowDays, figures, evidence, limitations, computedAt: now.toISOString() };
+  return { evidence, analysis, data: { figures: figures.map(forModel), evidence: evidence.map(({ id, source, instrument, asOf, quality, note }) => ({ id, source, instrument, asOf, quality, note })), limitations, windowDays: args.windowDays } };
+}
+/**
+ * How closely two series moved together, by the size of their correlation: the one scale code and the model both use,
+ * so that a bare "+0.09" is never all a beginner hears. Closeness, never frequency ("often") and never cause.
+ */
+export type Band = 'very' | 'fairly' | 'loosely' | 'none' | 'opposite';
+export const correlationBand = (r: number): Band => (r >= 0.8 ? 'very' : r >= 0.5 ? 'fairly' : r >= 0.2 ? 'loosely' : r > -0.2 ? 'none' : 'opposite');
+const BAND_MEANS: Record<Band, string> = { very: 'their daily changes went together very closely', fairly: 'their daily changes went together fairly closely', loosely: 'their daily changes went together only a little', none: 'their daily changes had hardly anything to do with each other', opposite: 'their daily changes leaned in opposite directions' };
+/** A figure as the model sees it: rounded, so it can reason about more and less; it may only cite the id. A correlation comes with what its size means. */
+export const forModel = (figure: Figure) => ({ ...(figure.day ? { day: figure.day } : {}), ...(figure.metric === 'correlation' && figure.value !== null ? { means: BAND_MEANS[correlationBand(figure.value)] } : {}), id: figure.id, metric: figure.metric, subject: figure.subject, value: figure.value === null ? null : Number(figure.value.toFixed(figure.unit === 'ratio' ? 2 : figure.unit === 'price' ? 2 : 1)), unit: figure.unit, basis: figure.basis, quality: figure.quality });
+
+// ---------- the registry ----------
+const Resolve = z.object({ mentions: z.array(z.string().trim().min(1).max(60)).min(1).max(4) }).strict();
+export const TOOLS: Record<string, Tool<any>> = {
+  resolve_assets: {
+    name: 'resolve_assets', metered: false, schema: Resolve,
+    description: 'Says which instruments the person means, when you are not sure. Give each name or ticker exactly as they wrote it. Free. You do not need it before read_assets, which takes names. Returns, for each, the instrument or that it is not one Bobby can read with evidence.',
+    wire: { type: 'object', additionalProperties: false, required: ['mentions'], properties: { mentions: { type: 'array', minItems: 1, maxItems: 4, items: { type: 'string' } } } },
+    run: async (args: z.infer<typeof Resolve>) => ({
+      evidence: [],
+      data: {
+        resolved: args.mentions.map((mention) => { const hit = resolveMention(mention); return hit ? { mention, match: 'exact', symbol: hit.symbol, name: hit.name, kind: hit.kind } : { mention, match: 'none' }; }),
+        readable: UNIVERSE.map((instrument) => `${instrument.symbol} (${instrument.name})`),
+      },
+    }),
+  },
+  read_assets: {
+    name: 'read_assets', metered: true, schema: Read, prepare: prepareRead,
+    description: 'Reads the daily closes of one, two or three instruments over the last 30 or 60 days and measures them by code: change over the window (return), the average size of its daily changes, up or down (move), its largest fall from a high (drawdown), its worst and best day and, for two or three, how alike their daily changes were (correlation). Give each instrument by the name or ticker the person wrote. Uses one read of the person\'s allowance: the app asks them before it runs. Returns figures with ids; cite a figure only by its id.',
+    wire: { type: 'object', additionalProperties: false, required: ['assets', 'windowDays'], properties: { assets: { type: 'array', minItems: 1, maxItems: 3, items: { type: 'string' } }, windowDays: { type: 'integer', enum: [30, 60] } } },
+    scope: (args: ReadArgs) => ({ action: 'read_assets', assets: [...args.symbols], windowDays: args.windowDays, depth: 'standard', consumption: { reads: 1 } }),
+    run: readAssets,
+  },
+};
+export const instrumentName = (symbol: string) => BY_SYMBOL.get(symbol)?.name ?? symbol;
+/** The short name code says aloud. */
+export const spokenName = (symbol: string) => BY_SYMBOL.get(symbol)?.say ?? symbol;

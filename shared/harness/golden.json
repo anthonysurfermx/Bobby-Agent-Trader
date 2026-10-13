@@ -1,0 +1,2030 @@
+{
+  "v": 1,
+  "conventions": {
+    "maturityHours": 72,
+    "windowEnd": "exclusive",
+    "median": "integer local hours; average middle pair",
+    "timeTie": "null retains caller fallback",
+    "fiveIgnored": "Prior strength 10 prevents suppression after only five failures."
+  },
+  "assetFacts": [
+    {
+      "name": "quiet day",
+      "input": {
+        "series": {
+          "symbol": "TEST",
+          "assetClass": "equity",
+          "currency": "USD",
+          "exchange": "NMS",
+          "source": "yahoo",
+          "bars": [
+            {
+              "day": "2026-09-14",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-15T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-15",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-16T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-16",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-17T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-17",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-18T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-18",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-19T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-19",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-20T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-20",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-21T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-21",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-22T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-22",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-23T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-23",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-24T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-24",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-25T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-25",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-26T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-26",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-27T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-27",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-28T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-28",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-29T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-29",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-30T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-30",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-01T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-01",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-02T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-02",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-03T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-03",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-04T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-04",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-05T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-05",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-06T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-06",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100.5,
+              "volume": 10,
+              "closedAt": "2026-10-07T00:00:00.000Z"
+            }
+          ],
+          "fetchedAt": "2026-10-07T01:00:00.000Z"
+        },
+        "now": "2026-10-07T01:00:00.000Z"
+      },
+      "expected": {
+        "v": 1,
+        "symbol": "TEST",
+        "assetClass": "equity",
+        "currency": "USD",
+        "exchange": "NMS",
+        "source": "yahoo",
+        "day": "2026-10-06",
+        "closedAt": "2026-10-07T00:00:00.000Z",
+        "close": 100.5,
+        "previousClose": 100,
+        "changePct": 0.49999999999998934,
+        "atr20": 2,
+        "atrPct": 2,
+        "unusualMove": false,
+        "rangeHigh20": 101,
+        "rangeLow20": 99,
+        "outsideRange": null,
+        "outsideRangeEntered": false,
+        "eventId": null
+      }
+    },
+    {
+      "name": "unusual up",
+      "input": {
+        "series": {
+          "symbol": "TEST",
+          "assetClass": "equity",
+          "currency": "USD",
+          "exchange": "NMS",
+          "source": "yahoo",
+          "bars": [
+            {
+              "day": "2026-09-14",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-15T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-15",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-16T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-16",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-17T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-17",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-18T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-18",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-19T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-19",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-20T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-20",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-21T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-21",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-22T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-22",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-23T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-23",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-24T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-24",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-25T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-25",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-26T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-26",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-27T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-27",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-28T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-28",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-29T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-29",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-30T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-30",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-01T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-01",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-02T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-02",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-03T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-03",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-04T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-04",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-05T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-05",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-06T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-06",
+              "open": 100,
+              "high": 103,
+              "low": 99,
+              "close": 103,
+              "volume": 10,
+              "closedAt": "2026-10-07T00:00:00.000Z"
+            }
+          ],
+          "fetchedAt": "2026-10-07T01:00:00.000Z"
+        },
+        "now": "2026-10-07T01:00:00.000Z"
+      },
+      "expected": {
+        "v": 1,
+        "symbol": "TEST",
+        "assetClass": "equity",
+        "currency": "USD",
+        "exchange": "NMS",
+        "source": "yahoo",
+        "day": "2026-10-06",
+        "closedAt": "2026-10-07T00:00:00.000Z",
+        "close": 103,
+        "previousClose": 100,
+        "changePct": 3.0000000000000027,
+        "atr20": 2,
+        "atrPct": 2,
+        "unusualMove": true,
+        "rangeHigh20": 101,
+        "rangeLow20": 99,
+        "outsideRange": "above",
+        "outsideRangeEntered": true,
+        "eventId": "TEST:2026-10-06:move+range-above"
+      }
+    },
+    {
+      "name": "unusual down below floor",
+      "input": {
+        "series": {
+          "symbol": "TEST",
+          "assetClass": "equity",
+          "currency": "USD",
+          "exchange": "NMS",
+          "source": "yahoo",
+          "bars": [
+            {
+              "day": "2026-09-14",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-15T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-15",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-16T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-16",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-17T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-17",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-18T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-18",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-19T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-19",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-20T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-20",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-21T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-21",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-22T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-22",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-23T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-23",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-24T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-24",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-25T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-25",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-26T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-26",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-27T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-27",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-28T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-28",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-29T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-29",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-30T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-30",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-01T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-01",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-02T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-02",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-03T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-03",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-04T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-04",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-05T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-05",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.8,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-06T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-06",
+              "open": 100,
+              "high": 100.2,
+              "low": 99.25,
+              "close": 99.25,
+              "volume": 10,
+              "closedAt": "2026-10-07T00:00:00.000Z"
+            }
+          ],
+          "fetchedAt": "2026-10-07T01:00:00.000Z"
+        },
+        "now": "2026-10-07T01:00:00.000Z"
+      },
+      "expected": {
+        "v": 1,
+        "symbol": "TEST",
+        "assetClass": "equity",
+        "currency": "USD",
+        "exchange": "NMS",
+        "source": "yahoo",
+        "day": "2026-10-06",
+        "closedAt": "2026-10-07T00:00:00.000Z",
+        "close": 99.25,
+        "previousClose": 100,
+        "changePct": -0.7499999999999951,
+        "atr20": 0.4000000000000057,
+        "atrPct": 0.40000000000000563,
+        "unusualMove": false,
+        "rangeHigh20": 100.2,
+        "rangeLow20": 99.8,
+        "outsideRange": "below",
+        "outsideRangeEntered": true,
+        "eventId": "TEST:2026-10-06:range-below"
+      }
+    },
+    {
+      "name": "enters above",
+      "input": {
+        "series": {
+          "symbol": "TEST",
+          "assetClass": "equity",
+          "currency": "USD",
+          "exchange": "NMS",
+          "source": "yahoo",
+          "bars": [
+            {
+              "day": "2026-09-14",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-15T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-15",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-16T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-16",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-17T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-17",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-18T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-18",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-19T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-19",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-20T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-20",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-21T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-21",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-22T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-22",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-23T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-23",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-24T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-24",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-25T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-25",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-26T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-26",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-27T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-27",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-28T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-28",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-29T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-29",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-30T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-30",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-01T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-01",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-02T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-02",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-03T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-03",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-04T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-04",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-05T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-05",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-06T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-06",
+              "open": 100,
+              "high": 101.3,
+              "low": 99,
+              "close": 101.3,
+              "volume": 10,
+              "closedAt": "2026-10-07T00:00:00.000Z"
+            }
+          ],
+          "fetchedAt": "2026-10-07T01:00:00.000Z"
+        },
+        "now": "2026-10-07T01:00:00.000Z"
+      },
+      "expected": {
+        "v": 1,
+        "symbol": "TEST",
+        "assetClass": "equity",
+        "currency": "USD",
+        "exchange": "NMS",
+        "source": "yahoo",
+        "day": "2026-10-06",
+        "closedAt": "2026-10-07T00:00:00.000Z",
+        "close": 101.3,
+        "previousClose": 100,
+        "changePct": 1.29999999999999,
+        "atr20": 2,
+        "atrPct": 2,
+        "unusualMove": false,
+        "rangeHigh20": 101,
+        "rangeLow20": 99,
+        "outsideRange": "above",
+        "outsideRangeEntered": true,
+        "eventId": "TEST:2026-10-06:range-above"
+      }
+    },
+    {
+      "name": "stays above",
+      "input": {
+        "series": {
+          "symbol": "TEST",
+          "assetClass": "equity",
+          "currency": "USD",
+          "exchange": "NMS",
+          "source": "yahoo",
+          "bars": [
+            {
+              "day": "2026-09-14",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-15T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-15",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-16T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-16",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-17T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-17",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-18T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-18",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-19T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-19",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-20T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-20",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-21T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-21",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-22T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-22",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-23T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-23",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-24T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-24",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-25T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-25",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-26T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-26",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-27T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-27",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-28T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-28",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-29T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-29",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-30T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-30",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-01T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-01",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-02T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-02",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-03T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-03",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-04T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-04",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-05T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-05",
+              "open": 100,
+              "high": 101.3,
+              "low": 99,
+              "close": 101.3,
+              "volume": 10,
+              "closedAt": "2026-10-06T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-06",
+              "open": 100,
+              "high": 102.5,
+              "low": 99,
+              "close": 102.5,
+              "volume": 10,
+              "closedAt": "2026-10-07T00:00:00.000Z"
+            }
+          ],
+          "fetchedAt": "2026-10-07T01:00:00.000Z"
+        },
+        "now": "2026-10-07T01:00:00.000Z"
+      },
+      "expected": {
+        "v": 1,
+        "symbol": "TEST",
+        "assetClass": "equity",
+        "currency": "USD",
+        "exchange": "NMS",
+        "source": "yahoo",
+        "day": "2026-10-06",
+        "closedAt": "2026-10-07T00:00:00.000Z",
+        "close": 102.5,
+        "previousClose": 101.3,
+        "changePct": 1.1846001974333609,
+        "atr20": 2.0149999999999997,
+        "atrPct": 1.9891411648568607,
+        "unusualMove": false,
+        "rangeHigh20": 101.3,
+        "rangeLow20": 99,
+        "outsideRange": "above",
+        "outsideRangeEntered": false,
+        "eventId": null
+      }
+    },
+    {
+      "name": "crypto",
+      "input": {
+        "series": {
+          "symbol": "BTC-USDT",
+          "assetClass": "crypto",
+          "currency": "USDT",
+          "exchange": "OKX",
+          "source": "okx",
+          "bars": [
+            {
+              "day": "2026-09-14",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-15T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-15",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-16T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-16",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-17T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-17",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-18T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-18",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-19T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-19",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-20T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-20",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-21T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-21",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-22T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-22",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-23T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-23",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-24T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-24",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-25T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-25",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-26T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-26",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-27T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-27",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-28T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-28",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-29T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-29",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-30T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-30",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-01T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-01",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-02T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-02",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-03T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-03",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-04T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-04",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-05T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-05",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-06T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-06",
+              "open": 100,
+              "high": 103,
+              "low": 99,
+              "close": 103,
+              "volume": 10,
+              "closedAt": "2026-10-07T00:00:00.000Z"
+            }
+          ],
+          "fetchedAt": "2026-10-07T01:00:00.000Z"
+        },
+        "now": "2026-10-07T01:00:00.000Z"
+      },
+      "expected": {
+        "v": 1,
+        "symbol": "BTC-USDT",
+        "assetClass": "crypto",
+        "currency": "USDT",
+        "exchange": "OKX",
+        "source": "okx",
+        "day": "2026-10-06",
+        "closedAt": "2026-10-07T00:00:00.000Z",
+        "close": 103,
+        "previousClose": 100,
+        "changePct": 3.0000000000000027,
+        "atr20": 2,
+        "atrPct": 2,
+        "unusualMove": true,
+        "rangeHigh20": 101,
+        "rangeLow20": 99,
+        "outsideRange": "above",
+        "outsideRangeEntered": true,
+        "eventId": "BTC-USDT:2026-10-06:move+range-above"
+      }
+    },
+    {
+      "name": "enters below",
+      "input": {
+        "series": {
+          "symbol": "TEST",
+          "assetClass": "equity",
+          "currency": "USD",
+          "exchange": "NMS",
+          "source": "yahoo",
+          "bars": [
+            {
+              "day": "2026-09-14",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-15T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-15",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-16T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-16",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-17T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-17",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-18T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-18",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-19T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-19",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-20T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-20",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-21T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-21",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-22T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-22",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-23T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-23",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-24T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-24",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-25T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-25",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-26T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-26",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-27T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-27",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-28T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-28",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-29T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-29",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-09-30T00:00:00.000Z"
+            },
+            {
+              "day": "2026-09-30",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-01T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-01",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-02T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-02",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-03T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-03",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-04T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-04",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-05T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-05",
+              "open": 100,
+              "high": 101,
+              "low": 99,
+              "close": 100,
+              "volume": 10,
+              "closedAt": "2026-10-06T00:00:00.000Z"
+            },
+            {
+              "day": "2026-10-06",
+              "open": 100,
+              "high": 101,
+              "low": 98.7,
+              "close": 98.7,
+              "volume": 10,
+              "closedAt": "2026-10-07T00:00:00.000Z"
+            }
+          ],
+          "fetchedAt": "2026-10-07T01:00:00.000Z"
+        },
+        "now": "2026-10-07T01:00:00.000Z"
+      },
+      "expected": {
+        "v": 1,
+        "symbol": "TEST",
+        "assetClass": "equity",
+        "currency": "USD",
+        "exchange": "NMS",
+        "source": "yahoo",
+        "day": "2026-10-06",
+        "closedAt": "2026-10-07T00:00:00.000Z",
+        "close": 98.7,
+        "previousClose": 100,
+        "changePct": -1.3000000000000012,
+        "atr20": 2,
+        "atrPct": 2,
+        "unusualMove": false,
+        "rangeHigh20": 101,
+        "rangeLow20": 99,
+        "outsideRange": "below",
+        "outsideRangeEntered": true,
+        "eventId": "TEST:2026-10-06:range-below"
+      }
+    }
+  ],
+  "policy": [
+    {
+      "name": "cold start = 0.1",
+      "input": {
+        "name": "cold start = 0.1",
+        "op": "estimate",
+        "kind": "asset",
+        "pooled": 0.1,
+        "outcomes": [],
+        "now": "2026-10-07T01:00:00.000Z"
+      },
+      "expected": 0.1
+    },
+    {
+      "name": "one useful",
+      "input": {
+        "name": "one useful",
+        "op": "estimate",
+        "kind": "asset",
+        "pooled": 0.1,
+        "outcomes": [
+          {
+            "kind": "asset",
+            "useful": true,
+            "at": "2026-10-04T01:00:00.000Z"
+          }
+        ],
+        "now": "2026-10-07T01:00:00.000Z"
+      },
+      "expected": 0.1768066549358404
+    },
+    {
+      "name": "five ignored do not yet suppress",
+      "input": {
+        "name": "five ignored do not yet suppress",
+        "op": "suppress",
+        "kind": "asset",
+        "pooled": 0.1,
+        "outcomes": [
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          },
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          },
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          },
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          },
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          }
+        ],
+        "now": "2026-10-07T01:00:00.000Z"
+      },
+      "expected": false
+    },
+    {
+      "name": "eleven ignored suppress",
+      "input": {
+        "name": "eleven ignored suppress",
+        "op": "suppress",
+        "kind": "asset",
+        "pooled": 0.1,
+        "outcomes": [
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          },
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          },
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          },
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          },
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          },
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          },
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          },
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          },
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          },
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          },
+          {
+            "kind": "asset",
+            "useful": false,
+            "at": "2026-10-04T01:00:00.000Z"
+          }
+        ],
+        "now": "2026-10-07T01:00:00.000Z"
+      },
+      "expected": true
+    },
+    {
+      "name": "decay after 60 days",
+      "input": {
+        "name": "decay after 60 days",
+        "op": "estimate",
+        "kind": "asset",
+        "pooled": 0.1,
+        "outcomes": [
+          {
+            "kind": "asset",
+            "useful": true,
+            "at": "2026-08-08T01:00:00.000Z"
+          }
+        ],
+        "now": "2026-10-07T01:00:00.000Z"
+      },
+      "expected": 0.12195121951219512
+    },
+    {
+      "name": "pooled evidence",
+      "input": {
+        "name": "pooled evidence",
+        "op": "pool",
+        "successes": 2,
+        "failures": 8,
+        "now": "2026-10-07T01:00:00.000Z"
+      },
+      "expected": 0.15
+    },
+    {
+      "name": "market substitution wins",
+      "input": {
+        "op": "choose",
+        "candidates": [
+          {
+            "id": "chain",
+            "origin": "chain",
+            "variant": "asset",
+            "interest": 1,
+            "maxInterest": 1,
+            "p": 0.1,
+            "askedAt": "2026-10-07T01:00:00.000Z"
+          },
+          {
+            "id": "market",
+            "origin": "market",
+            "variant": "market",
+            "interest": 1,
+            "maxInterest": 1,
+            "p": 0.1,
+            "askedAt": "2026-10-04T01:00:00.000Z"
+          }
+        ]
+      },
+      "expected": "market"
+    },
+    {
+      "name": "tie favours chain",
+      "input": {
+        "op": "choose",
+        "candidates": [
+          {
+            "id": "chain",
+            "origin": "chain",
+            "variant": "asset",
+            "interest": 1,
+            "maxInterest": 1,
+            "p": 0.1,
+            "askedAt": "2026-10-07T01:00:00.000Z"
+          },
+          {
+            "id": "market",
+            "origin": "market",
+            "variant": "market",
+            "interest": 0.5,
+            "maxInterest": 1,
+            "p": 0.1,
+            "askedAt": "2026-10-04T01:00:00.000Z"
+          }
+        ]
+      },
+      "expected": "chain"
+    }
+  ],
+  "timeWindows": [
+    {
+      "name": "too few days",
+      "input": {
+        "name": "too few days",
+        "tz": "UTC",
+        "visits": [
+          "2026-10-01T09:00:00Z",
+          "2026-10-01T10:00:00Z",
+          "2026-10-02T11:00:00Z"
+        ]
+      },
+      "expected": null
+    },
+    {
+      "name": "morning median",
+      "input": {
+        "name": "morning median",
+        "tz": "UTC",
+        "visits": [
+          "2026-10-01T09:00:00Z",
+          "2026-10-02T10:00:00Z",
+          "2026-10-03T11:00:00Z"
+        ]
+      },
+      "expected": {
+        "window": "09-12",
+        "hour": 10
+      }
+    },
+    {
+      "name": "New York spring DST",
+      "input": {
+        "name": "New York spring DST",
+        "tz": "America/New_York",
+        "visits": [
+          "2026-03-07T15:00:00Z",
+          "2026-03-08T14:00:00Z",
+          "2026-03-09T14:00:00Z"
+        ]
+      },
+      "expected": {
+        "window": "09-12",
+        "hour": 10
+      }
+    },
+    {
+      "name": "New York autumn DST",
+      "input": {
+        "name": "New York autumn DST",
+        "tz": "America/New_York",
+        "visits": [
+          "2026-10-31T22:00:00Z",
+          "2026-11-01T23:00:00Z",
+          "2026-11-02T23:00:00Z"
+        ]
+      },
+      "expected": {
+        "window": "17-21",
+        "hour": 18
+      }
+    },
+    {
+      "name": "tied windows retain fallback",
+      "input": {
+        "name": "tied windows retain fallback",
+        "tz": "UTC",
+        "visits": [
+          "2026-10-01T10:00:00Z",
+          "2026-10-02T14:00:00Z",
+          "2026-10-03T18:00:00Z"
+        ]
+      },
+      "expected": null
+    },
+    {
+      "name": "invalid timezone",
+      "input": {
+        "name": "invalid timezone",
+        "tz": "Mars/Olympus",
+        "visits": [
+          "2026-10-01T10:00:00Z",
+          "2026-10-02T10:00:00Z",
+          "2026-10-03T10:00:00Z"
+        ]
+      },
+      "expected": null
+    }
+  ]
+}

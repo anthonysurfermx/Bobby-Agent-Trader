@@ -1,0 +1,155 @@
+# The agent engine
+
+Bobby's first engine that takes an errand and does the work: it understands what was asked, asks before anything is spent, fetches evidence with tools, computes in code, answers briefly, and can be asked again about the same result. It was started in a sprint on 2026-10-10. It is **off by default** (`BOBBY_AGENT_ENGINE`), wired to no app, and not part of iPhone 1.8.
+
+Code: `api/_lib/agent/`, door `api/agent-task.ts`, tests `scripts/test-agent-engine.mts` (`npm run test:agent-engine`), a terminal client `scripts/agent-dev.mts`, and a page on this machine only, `scripts/agent-lab.mts` (the real door, model and sources; its store is one file, no database).
+
+## What it does today
+
+| Errand | What happens | Uses |
+|---|---|---|
+| "¿Qué es un ETF?" | One model call answers directly; the companion's second reader reads it. Naming an asset starts no tool. | nothing of the allowance |
+| "Compara Bitcoin y Ethereum" | `resolve_assets` (free), then the model asks for `read_assets`. The task stops and shows the person the assets, the window and "uses 1 read". | nothing until the yes |
+| the person says yes | The server runs exactly the approved call: daily bars from the same sources as `/api/asset-fact`, the harness's strict reader, arithmetic in code. The model writes sentences with `{{f:id}}`; code writes the numbers. | 1 read |
+| "¿Y cuál cayó más?" | Answered from the figures of the result on the table. No tool, no fetch. | nothing |
+| "¿Y cuál tiene más concentración?" | No tool gives that: Bobby says it cannot establish it here, and what it can. | nothing |
+| close everything, come back | The stored result is returned. No model call, no read. The same `requestId` sent again is the same task. | nothing |
+| cancel, or another account | Cancel is checked after every wait: a late result is recorded for its cost and shown to nobody. Another owner gets 404 for the task. | nothing |
+
+## The parts
+
+- **`types.ts`** the vocabulary: task, step, evidence, figure, analysis, presentation, approval scope.
+- **`store.ts`** `AgentStore`, the whole contract with storage, and two implementations: memory (the tests; every method one critical section) and a JSON file (local development).
+- **`store-pg.ts`** the same contract on Postgres: one database function per method (`agent-engine.sql` in this folder), so one transaction each. `scripts/test-agent-engine-pg.mts` applies that SQL to a **local scratch database** and checks the invariants with real concurrent transactions (twenty copies of a request, ten yeses against one read left, thirty reservations against room for ten, eight claims of one task) and one whole errand through the loop. The SQL is a **draft, not a migration**: nothing applies it anywhere shared.
+- **`state.ts`** a task's state, events and usage, derived from its steps and nothing else.
+- **`provider.ts`** one model call: reserve the worst case, dispatch, exactly one HTTP attempt, settle. Outcomes `ok`, `charged`, `no_charge`, `unknown`. An `unknown` keeps its reservation and blocks a blind second attempt for that task.
+- **`tools.ts`** the registry (`resolve_assets`, `read_assets`), the universe the engine can read with evidence (14 instruments), and the arithmetic.
+- **`present.ts`** placeholders to numbers, the checks on a draft, and a code-written comparison in six languages for when the model's words cannot be shown.
+- **`loop.ts`** the one agent: instructions, the resumable loop, approval, limits, the second reader, the client's view.
+
+## Invariants, each with a test
+
+1. A task is a list of steps written once; its state is derived from them.
+2. `begin` is idempotent per owner and request id; the same id with another body is refused; owners never see each other's tasks.
+3. One runner at a time (lease and fence); a stale runner writes nothing.
+4. A metered tool never runs without the person's yes, and the yes is bound to owner, task, assets, window and consumption. What runs is what was approved; the model is not asked again.
+5. The yes and the read are one fact. Said twice, one read. A read is given back only in the same write as the fact that justifies it: a metered tool that brought no figure, or a cancel that ends the errand before any metered tool finished.
+6. Provider money: reserved before every call at the worst case; a cap is never exceeded by reserved + settled + unknown; thirty concurrent reservations against room for ten give ten.
+7. A figure is computed only from a series the strict reader accepted. A refused series gives `error`, `missing` or `stale`, a null value and a named limitation. A price that did not move is a valid zero.
+8. Percent is percent; a price carries its currency. Every instrument is measured on its own days of the window, so a coin's day is one day whatever it is read beside; how alike two instruments moved (the correlation) pairs each one's own daily changes on the days both traded, and says so: a daily change is always one instrument's change from its own previous close. The day-to-day measure (`move`) is the average size of the daily changes, the number a person hears in "it moved about X% a day"; a standard deviation is a different number and is not told.
+9. The model states no number of its own. What is read is its own words, folded (look-alike digits, accents, case; characters nobody sees are dropped). Code writes every figure (`{{f:id}}`), every date (`{{d:id}}`, `{{from:id}}`, `{{to:id}}`) and the window's length (`{{days}}`). Refused: anything glued to a placeholder (a currency sign before it, a word that scales it after it), two placeholders that would join into one number, a window length that does not count calendar days ("60 mil", "un 60", "60 sesiones", "60 días hábiles") or, in the answer itself, is not the window that was read (whoever wrote the number first; the other length, or both, may be named only in a limitation or the next question); a percentage of the model's own in digits or with a number word (one, a half, the teens, the tens and their compounds, in six languages); an emoji, a flag, a number written as a letter; and any other number that is not part of a name or a whole number the person wrote. The names are the engine's own list, each with its number ("S&P 500", "DAX 40", "24/7"): "DAX 9000" and "pasó 12" are not names, a name followed by a scale, a percent or a unit is a quantity ("Dow 30 mil puntos"), and "60/40" or "24 horas" are names only where no figures are on the table. A number and its scale word are one number ("10 mil" is 10000). The person's own percentage, thousands and millions may be said back; a piece of their number, or a number inside a name they wrote, lends nothing. An ordering the model states must be listed as a claim; a claim that contradicts the figures, or that cannot be checked, refuses the draft. Twice refused, code tells the figures (two or three instruments, in six languages); an answer that needed no figures says only that it could not be given. A figure cited anywhere a person reads it (the text, a limitation, the next question) is listed and referenced. The sentence in front is a whole sentence of the text, never a cut. A character that reorders text is refused.
+12. Everything of the model's that reaches a person is read by a second reader: the text, the limitations it wrote, the next question, and a text that calls itself a clarification. An explanation is read as written by the companion's reader; an analysis is read by the engine's own, on the model's own words with every number of code's replaced by a mark, so a quantity it finds is the model's. Only a text code wrote is not read, and the task records which. With the reader switched off (`BOBBY_COMPANION_JUDGE=off`) nothing is shown unread: an analysis is told by code and an explanation is held to the companion's deterministic lists (`readBy: lists`).
+13. A read is never spent on nothing that could have been shown: when the answering call fails after the read, or the model's words cannot be shown (whatever it called them), code tells the figures; when nothing came back with a value, or the errand is cancelled before the tool's result was stored, the read goes back.
+14. A cancel wins: once the store accepted it, nothing that would end or advance the errand is stored (an answer, an error, a request for approval, the start of metered work, the result of a metered tool: `tool_started` is its own step so a cancel can beat it before any source is asked). What a second reader cost before the cancel discarded its result stays on the record. A cancel a runner never completed is completed by the store, or by the next person who looks (GET).
+16. Storage that does not answer is never a fact about the errand: nothing is written, the door answers 503, a reservation whose call never left is given back, and the next request goes on from the steps. A reply that was paid for and stored is used by the next run, never bought again.
+15. The two stores answer alike. Every difference a differential review found between the memory store and the Postgres functions is a check that runs against both (`npm run test:agent-engine-pg`).
+10. Cancel is honoured after every wait; a result that arrives after it is never stored as an answer.
+11. Text inside a source's reply is data: an unreadable series, nothing more.
+
+17. Which instrument a person's words settle is code's to decide. An alias that is also an everyday word (`sol`, `meta`, `apple`, `coin`) settles nothing alone: no card is offered for it and no sentence may treat it as chosen until their own words, or the conversation, do.
+18. Every figure of an instrument counts the same days: the change of the window and its largest fall start at the close right before the window, as the worst day, the best day and the average move do. (Until 2026-10-13 the first two were one day short of the others.)
+19. The figures of a window are stated for that window: any other count of days, weeks, months or years in the answer of an analysis is refused by code, and the second reader is given the window and marks that say what each figure is and whose, so a figure placed on another asset, measure or day can be seen.
+20. A follow-up has an age: figures more than a day old are not handed on. The errand is told what was read and when, and reads again.
+21. Told by code, an answer carries what was asked and only that, six figures at most, in sentences no word of which has to agree with a name; a correlation is said with what its size means. When more was asked, code says what else it read and leaves the chip that asks for it.
+22. Every way of ending without an answer has one plain sentence in the person's language: an errand's error, an empty utterance, one too long, too many at once, no reads left, storage that does not answer. Words the provider itself refuses end in a sentence, not in a second paid attempt.
+23. A session that has ended and whose close the source has not published yet is the series ending one session earlier; a close missing before a later bar is a gap and is refused.
+24. The change of the window and its largest fall say the day they run from: the close right before the window. A first or last day written once beside figures of assets that start on another day (a coin and a share) is refused: each asset gets its own date, or none.
+25. A draft the reader refuses goes back to the model once, with what its words did in fixed words (never the reader's own), and the second draft is read like the first; only a second refusal is told by code. A reader that did not answer is asked once more before an errand is lost to it. Every reading is on the record with what it cost.
+
+## Measured by someone else (2026-10-11)
+
+The sprint's own evaluation (31 errands, 0 critical) used questions written by the engine's author. On 2026-10-11 the code was frozen at `658c9e46` and measured on 48 sessions (107 turns, six languages) that Codex wrote blind from the public contract, graded by Codex with every figure recomputed from the raw payloads: **34 useful, 45 correct abstentions, 21 incomplete, 7 critical**; 317 of 317 figures matched; no read before a yes or after a no; no advice, forecast or leaked instruction.
+
+What it found, and what changed after it (each with a check in section 7f of the tests):
+
+| Found | Changed |
+|---|---|
+| A standard deviation told as "on average" (4 criticals) | the measure IS the average size of the daily changes now (`move`); the instructions say what it is |
+| In a coin + stock comparison a "day" spanned the weekend | each instrument on its own days; only the correlation on common days |
+| When the reader refused an explanation, the companion's sentence about "how investing works" was served | the engine's own sentence: no verified figure for that here, and what Bobby can do |
+| "Which was the best day?" told by code as change and largest fall | one instrument told by code carries its worst and best day; an id typed in another case is accepted; a malformed placeholder is told how one is written |
+| A read offered where a question was due ("since January" → 60 days; "which would you buy" → a comparison) | instructions: a span that cannot be read is a question back; a request to choose starts no tool |
+| An ETF told as its index; a premise of the person's repeated as fact; the rules said aloud; dates without their article | instructions |
+
+Not changed, on purpose: a bare name after Bobby asked "which asset?" still gets the approval card (the card is the question, and it can be declined); an empty utterance is refused at the door (a voice client does not send silence); Portuguese with no region falls back to `pt-PT` in the product's shared contract (the iPhone always sends `pt-BR`).
+
+**A seen set is spent.** After those changes the engine was measured on a second blind set (48 new sessions, 130 turns; Codex was not told what had changed): **51 useful, 50 correct abstentions, 14 incomplete, 15 critical**. Twelve of the fifteen are Bobby's own provider cost for preparing an approval card that was then declined, graded under a sentence of the brief ("nothing that costs before the yes") that promised more than the product does; three are the correlation of a coin and a stock, then computed between the closes both have and called "daily changes". The first set's findings did not come back.
+
+What the second set found, and what changed after it (section 7g of the tests):
+
+| Found | Changed |
+|---|---|
+| The correlation of a coin and a stock was computed between common closes (the coin's Monday carried its weekend) | it pairs each one's own daily changes on the days both traded |
+| After a "no", the next turn forgot which assets were asked about | a declined card leaves its question and what was offered (never a figure, never a permission) to the next turn; what was answered before it stays on the table |
+| "Which moved more each day?" told by code as change and largest fall | code's text for one, two or three instruments carries the average daily move |
+| Four assets asked: an offer to split them into two reads | instructions: more than three together is a limit to state |
+| The engine's fixed Portuguese sentences said "a tua", "fiável" | they read the same in Brazil and in Portugal |
+
+The yes covers the person's allowance and every data tool, nothing wider: preparing the card is a model call Bobby pays for, and a declined card costs the person nothing.
+
+The runner and the briefs are in the sprint folder (`independent/`); every round is measured on a new blind set.
+
+## Measured again (2026-10-12 and 2026-10-13)
+
+Seven more blind sets by the same independent grader (8 to 14), each on questions it had never written before, and one adversarial review (five reviewers, every finding reproduced by a second one: 24 confirmed, fixed in `b8a7c18e`). Notes for each set: `_harness/agentic-sprint-2026-10-10/independent/RESULT-8.md` … `RESULT-15.md`.
+
+| set | engine | turns | useful | correct abstention | incomplete | critical | figures that differ |
+|---|---|---|---|---|---|---|---|
+| 8 | bf1a4af1 | 120 | 56 | 57 | 6 | 1 | 0 |
+| 9 | 1981f311 | 120 | 30 | 61 | 29 | 0 | 14 (a window that moved) |
+| 10 | 4c79ce56 | 114 | 51 | 53 | 10 | 0 | 0 of 304 |
+| 11 | 5bd92a3d | 122 | 53 | 62 | 7 | 0 | 0 of 444 |
+| 12 | 94c4f6ea | 124 | 45 | 58 | 20 | 1 | 0 of 117 |
+| 13 | 32223263 | 125 | 50 | 68 | 6 | 1 | 1 of 359 |
+| 14 | 9b779d22 | 129 | 48 | 72 | 9 | 0 | 0 of 368 |
+
+The grader's verdict was the same every time: not ready to open yet. What the sets taught beyond their own fixes:
+
+- The ninth was the first to run on a weekday evening: the source's last row comes with no close for some hours after the bell (nineteen reads failed for it; none has since).
+- The twelfth went back by the author's own hand: a rule added after the eleventh made the model explain the scale of a correlation with two of its three points. A rule that makes the model explain something must hand it the whole of what it explains, and every change to the instructions needs its own set.
+- The thirteenth's one critical turn was a date written once for a share and a coin that do not start at the same close. It is now refused by code (`misdated`), not by one more sentence.
+- **What is in production is what set 14 measured (`9b779d22`).** Four wording rules written after it (`de80d5d4`) had no complete set (the fifteenth was cut short when the provider's account ran out of credit: 67 of its 117 turns failed, and it is void) and were taken out again before the merge.
+
+## What it does not do, and what is missing
+
+- **Before it is opened to everyone** (it runs for a private pilot since 2026-10-13: see "In production" below). Four things, the first is the owner's: (1) the privacy page says today that Bobby stores no question, and an errand keeps its question, steps and answer for 24 hours: the wording to approve is in `PRIVACY-DRAFT.md`, six languages, not published; (2) money per address: the day's ceiling is one pot, so one or two addresses can spend it and close the engine for everyone until 00:00 UTC (a second partition per address in `agent_reserve`); (3) rows are written before any budget check and nothing bounds errands across addresses in a day (refuse new errands once the day is closed); (4) on a shared address a person can be told their reads are gone when it is the address's ceiling (its own state and sentence). Two to four are the findings of the review before the pilot.
+- **The product's own allowance and money caps.** The engine counts its own reads (`BOBBY_AGENT_READS_PER_DAY`, six when unset) and its own dollar ceiling (`BOBBY_AGENT_DAILY_USD`, five when unset): a read here does not use one of the plan's, and a Pro subscriber gets no more than anyone else. Wiring `api/_lib/access.ts` (guest, weekly, Pro) is the next step and decides what "a read" costs here.
+- **Work that outlives a request.** A run stops between steps when it is out of time and the next request continues it. There is no worker or queue: a task advances only when its owner asks again.
+- **More tools.** No holdings or concentration of a fund, no fees, fundamentals, news or calendar, no single-asset analysis through the three-agent desk. Each is a tool with its own evidence contract.
+- **A second source.** `conflicting` is in the vocabulary and no tool can produce it yet: every instrument has one source.
+- **Asset resolution** is an alias table over the 14 instruments, exact after folding. The product's resolver (`src/lib/okx-asset-search.ts`) is not wired: its universe is wider than what the engine can evidence.
+- **Memory between sessions.** A follow-up reads the last completed task of the same session. Nothing is kept as a goal, and nothing here needs or uses the memory consent.
+- **Number words.** A percentage in words is refused by code when a number word stands before it; with an article ("un por ciento", "a percent") or at a distance ("thirteen, in percent") it is not, because the same words explain what a percent is. A bare number word ("doce puntos", "twice as much"), the person's own number said back with another meaning ("subió 1000 dólares") and a window length used as another count ("subió 30 días seguidos") are not: in an analysis they are the engine reader's to catch (36 of 36 on a real-model set, which is a sample and not a guarantee). An ordering the model states without listing it as a claim is not checked.
+- **A paid call whose step could not be written.** When storage fails exactly at the write of a model call's step, the call was paid and is not in the task: the next run pays again. The same holds for a second reading when a run stops between the reader and the stored answer (about a hundredth of a cent each time). Only the task's dollar cap bounds it. A settle or a release is tried twice; when both fail the attempt stays dispatched (the task can make no further call) or the lease runs out in 65 s.
+- **The door's guards.** The address bounds errands started and reads taken in a day, and thirty requests a minute on one instance. The companion's count per network and its shared day of turns are not here.
+- **A second run's time.** A call starts only if the run has time for it; nothing reconciles an attempt left `dispatched` by a function that was killed (the SQL draft names the job).
+- **Languages.** Mechanisms are tested in Spanish; the code-written fallback and the limitation sentences exist in six languages; real runs in the other five are not done.
+- **No client.** Nothing in the apps calls the door.
+
+## In production (since 2026-10-13): a private pilot
+
+The owner's decision: in production for a list of people, and for everyone only after the privacy page is changed.
+
+- `BOBBY_AGENT_ENGINE=pilot`, `BOBBY_AGENT_STORE=postgres`, `BOBBY_AGENT_PILOT` = the list (`id:<identity id>` for a signed-in account, `install:<salted install hash>` for one install). A person who is not on it gets the 404 of a door that is off. Adding someone: their identity id is `bobby_identities.id`; an install's hash is the one `deviceHash` derives (the production salt and the install id, never stored together).
+- Storage: migration `20261013062033_agent_engine.sql` (the same statements as `agent-engine.sql`; a test holds them equal). Four tables and twenty-one functions, closed to `anon` and `authenticated` by name, RLS on with no policy.
+- What is kept: an errand's question, steps and answer until it has been idle 24 hours (`agent_purge`, asked for by the door after a new errand, at most every ten minutes); the money ledger 90 days.
+- Turning it off: unset `BOBBY_AGENT_ENGINE` and deploy. Opening it to everyone: `on`, and not before the four points above.
+- What ships is the head the fourteenth set measured; the four wording rules written after it are out (`git revert de80d5d4`) until a set measures them.
+
+## Reproduce
+
+```bash
+npm run test:agent-engine
+```
+
+```bash
+DATABASE_URL=postgres://postgres@127.0.0.1:54329/agent_engine_test npm run test:agent-engine-pg
+```
+
+```bash
+vercel env run -e production -- npx tsx scripts/agent-dev.mts /tmp/agent.json ask ana s1 "Compara Bitcoin y Ethereum"
+```
+
+```bash
+vercel env run -e production -- npx tsx scripts/agent-dev.mts /tmp/agent.json approve ana <taskId>
+```
