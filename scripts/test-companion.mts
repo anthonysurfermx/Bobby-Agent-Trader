@@ -332,6 +332,50 @@ for (const line of ['I could not finish the explanation. You can try again.', 'T
   for (const language of ['fr', 'pt', 'it', 'de'] as const) ok(WEB_TRANSLATIONS[language][line]?.length > 3, `${language}: "${line}" is translated for the web`);
 }
 
+// The web desk's own call, bundled as the page bundles it, against a scripted network: what leaves with a question.
+{
+  const { build } = await import('esbuild');
+  const stub = (contents: string) => ({ contents, loader: 'ts' as const });
+  const bundle = await build({ entryPoints: [fileURLToPath(new URL('../src/components/nucleo/deskData.ts', import.meta.url))], bundle: true, write: false, format: 'esm', platform: 'node', plugins: [{ name: 'desk-io', setup(b) {
+    b.onResolve({ filter: /^@\// }, (args) => ({ path: args.path, namespace: 'stub' }));
+    b.onLoad({ filter: /.*/, namespace: 'stub' }, ({ path }) => {
+      if (path.endsWith('client-telemetry-browser')) return stub('export const beginClientRead=()=>null; export const receiveClientRead=()=>{};');
+      if (path.endsWith('access-client')) return stub('export const accessHeaders=async()=>({"x-bobby-device":"fixed-install","x-bobby-platform":"web"});');
+      if (path.endsWith('i18n')) return stub('export const lang=()=>"es"; export const speechLocale=()=>"es-MX"; export const t=(en)=>en;');
+      if (path.endsWith('desk-price')) return stub('export const deskPrice=(x)=>String(x);');
+      return stub('export const deskJson=async(url,init)=>globalThis.__deskTest(url,init);');
+    });
+  } }] });
+  const page = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+  const sent: any[] = [];
+  let answer: unknown = { kind: 'explanation', reply: { text: 'Un fondo indexado copia a todo un mercado.', followUp: null } };
+  (globalThis as any).__deskTest = async (_url: string, init: { body: string }) => { sent.push(JSON.parse(init.body)); return { ok: true, data: answer }; };
+  const real = globalThis.fetch;
+  globalThis.fetch = (async () => new Response('{}', { status: 405 })) as typeof fetch;   // the pilot is on
+  try {
+    const signal = new AbortController().signal;
+    const first = await page.companionTurn('¿Qué es un fondo indexado?', signal);
+    eq([first, 'previous' in sent[0]], [{ kind: 'explanation', text: 'Un fondo indexado copia a todo un mercado.', next: null }, false], 'web: a first question travels alone');
+    await page.companionTurn('Ponme un ejemplo', signal, undefined, { question: '¿Qué es un fondo indexado?', reply: first.text });
+    eq(sent[1].previous, { question: '¿Qué es un fondo indexado?', reply: 'Un fondo indexado copia a todo un mercado.' }, 'web: the exchange on screen travels with the next question, as on the phone');
+    ok(CompanionRequest.safeParse(sent[1]).success && CompanionRequest.parse(sent[1]).previous?.reply === first.text, 'web: …in the shape the server reads');
+    await page.companionTurn('otra', signal, undefined, { question: 'q'.repeat(900), reply: ` ${'r'.repeat(900)} ` });
+    eq([sent[2].previous.question.length, sent[2].previous.reply.length], [600, 700], 'web: …within the contract\'s limits');
+    await page.companionTurn('otra', signal, undefined, { question: 'algo', reply: '   ' });
+    await page.companionTurn('otra', signal, undefined, null);
+    eq(['previous' in sent[3], 'previous' in sent[4]], [false, false], 'web: an empty exchange, or none, is not sent');
+    answer = { kind: 'desk_offer', reply: { text: 'Parece que la pregunta es sobre AVAX.', followUp: null }, nextAction: { type: 'open_desk', symbol: 'AVAX' } };
+    const offer = await page.companionTurn('échale un ojo a Avalanche', signal, { symbol: 'AVAX', name: 'Avalanche' });
+    eq(offer, { kind: 'desk', text: 'Parece que la pregunta es sobre AVAX.', symbol: 'AVAX' }, 'web: an offer comes back with its sentence and its asset');
+    await page.companionTurn('¿ya me cobraron?', signal, undefined, { question: 'échale un ojo a Avalanche', reply: offer.text, offered: offer.symbol });
+    eq(sent.at(-1).previous, { question: 'échale un ojo a Avalanche', reply: 'Parece que la pregunta es sobre AVAX.', offered: 'AVAX' }, 'web: an offer not taken travels as the exchange on screen');
+  } finally { globalThis.fetch = real; delete (globalThis as any).__deskTest; }
+  // The desk keeps that exchange in memory only, hands it to the next question once, and drops it when the screen changes.
+  ok(/const previous = exchangeRef\.current;\s+exchangeRef\.current = null;/.test(desk) && desk.includes('exchangeRef.current = { question: q, reply: turn.text };') && desk.includes("exchangeRef.current = { question: q, reply: turn.text, offered: turn.symbol };") && (desk.match(/exchangeRef\.current = null;/g) ?? []).length >= 4,
+    'web: the desk hands the exchange on screen to the next question once, and drops it when a read starts or the screen is cleared');
+  ok(!/localStorage[^\n]*exchange|sessionStorage[^\n]*exchange/i.test(desk), 'web: the exchange is never stored');
+}
+
 // ---------- 5. the endpoint ----------
 type Call = { url: string; method: string; body: any; headers: Record<string, string> };
 const calls: Call[] = [];
