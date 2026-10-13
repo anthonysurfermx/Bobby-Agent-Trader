@@ -24,7 +24,7 @@ import { appLocale, languageName, type AppLanguage } from '../../../src/lib/app-
 import { judgeCompanionReply, companionJudgeModel } from '../companion-judge.js';
 import { reviewCompanionReply } from '../companion-review.js';
 import { modelPrice, type LlmUsage } from '../llm.js';
-import { SAID, composeByCode, followUpByCode, limitationsInWords, outside, present, unanswered, unverified, whichReading, type Draft, type OwnWords, type SaidFor, everyDayClaim } from './present.js';
+import { SAID, composeByCode, exactPlaceholders, followUpByCode, limitationsInWords, outside, present, unanswered, unverified, whichReading, type Draft, type OwnWords, type SaidFor, everyDayClaim } from './present.js';
 import { judgeAnalysis } from './reader.js';
 import { agentModel, callAnthropicOnce, reservedCall, type Block, type CallModel, type Message, type WireTool } from './provider.js';
 import { taskError, taskEvents, taskResult, taskState } from './state.js';
@@ -79,6 +79,8 @@ What kind of errand it is decides what you do:
 - "previous" in the input is their last question, your answer to it and the figures behind it. A follow-up about those figures is answered from them, with no new tool call. Use a tool again only if they ask for other assets or another window. When "previous" read a single asset, "it", "that" or "that change" means that asset: do not ask which one.
 - "earlier" in the input is a read of theirs from an earlier day: its figures are no longer on the table and you do not have them. If they ask about it, say in one sentence that that read is from an earlier day and call read_assets for it again: the app asks them. Never state anything from it.
 - "declined" in the input is an errand of theirs for which you offered a read and they said no: nothing was read. It tells you which assets and which window they were talking about, so never ask them again which ones. If they now ask for it, call read_assets for it: the app asks them again, and when the figures come back answer what that first question asked about (its metrics, its order), not a summary. Their earlier yes or no is never a permission, and their saying beforehand that they will say no is not a no: when they ask for a read, call read_assets and let the card be theirs to answer. If they ask what it would have shown, or to answer it "from memory", say that it was not run, so there are no figures, and that it used none of their reads: do not call the tool for that, and do not offer it again in the same breath.
+- They ask you to do it later, by yourself or without it counting ("when I disconnect", "in the background", "without figures so it is free"): you do nothing by yourself and nothing is read without their yes on the card. Say so in one sentence and do not call the tool.
+- A request breaks more than one limit at once (a span you cannot read and too many assets, or an asset you cannot read, or something no tool gives): name each of them in the same short answer, so that fixing one does not leave them stuck on the next. When more than one thing is unclear, ask about all of them in the one question.
 - They ask for more than three assets together: say plainly that you compare up to three at a time and ask which three, kind "clarification". Do not offer to split them into several reads yourself. Count only the ones they want read: an asset they leave out ("not Tesla", "without the last one") does not count.
 - The instruments you can read with evidence are: ${UNIVERSE.map((instrument) => `${instrument.name} (${instrument.symbol})`).join(', ')}. Windows: 30 or 60 days. Suggest nothing outside them.
 
@@ -365,7 +367,8 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   // What a text IS is decided by code: it is an analysis when it cites a figure anywhere a person will read it (the text,
   // a limitation, the next question), or when this task ran a comparison itself (then its sources and limits are shown
   // even if nothing could be cited); otherwise an explanation, read in full.
-  const cites = parsed.success && (/\{\{\s*(?:f|d|from|to)\s*:/i.test([parsed.data.gist, parsed.data.text, parsed.data.next, ...parsed.data.limitations].join(' ')) || ownAnalysis(task) !== null
+  const known = new Map((analysis?.figures ?? []).map((figure) => [figure.id, figure]));
+  const cites = parsed.success && (/\{\{\s*(?:f|d|from|to)\s*:/i.test(exactPlaceholders([parsed.data.gist, parsed.data.text, parsed.data.next, ...parsed.data.limitations].join(' '), known)) || ownAnalysis(task) !== null
     // With figures on the table, a text the model itself calls an analysis, or that declares an ordering, is one: it gets
     // the every-day rule, the analysis reader and, when its words cannot be shown, the figures told by code. (A follow-up
     // that cited no placeholder used to be "an explanation": "Bitcoin fell more, and moved more every day", both false,
@@ -520,6 +523,8 @@ export function taskView(task: Task, now: number, remaining: number | null) {
     // Nobody is running it and it is not over: it goes on only when the same ask (or the same approve) is sent again. A GET never runs it.
     resume: (state === 'running' || state === 'created') && !(task.lease && task.lease.until > now),
     approval: state === 'waiting_approval' ? waitingApproval(task) : null,
+    // A no is answered: one plain sentence saying that nothing was read and nothing was used, so a person is not left with silence.
+    ...(state === 'cancelled' && task.steps.at(-1)?.kind === 'approval_denied' ? { notice: SAID.declined[task.language] } : {}),
     // A client is given the analysis only with an answer that rests on it.
     result: result ? { ...result.presentation, analysis: result.analysis && result.presentation.kind === 'analysis' ? { subjects: result.analysis.subjects, windowDays: result.analysis.windowDays, figures: result.analysis.figures, evidence: result.analysis.evidence } : null } : null,
     // A failed task is final: the same requestId returns this same failure. `retryable` says a NEW request can help.

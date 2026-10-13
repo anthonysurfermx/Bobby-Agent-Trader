@@ -604,15 +604,36 @@ export function whichReading(word: string, symbol: string, language: AppLanguage
 }
 
 /** One plain sentence for every way an errand can end without an answer: a person is never left with a code. */
-export type SaidFor = 'try_again' | 'empty' | 'too_long' | 'busy' | 'no_reads' | 'not_now';
+export type SaidFor = 'try_again' | 'empty' | 'too_long' | 'busy' | 'no_reads' | 'declined' | 'not_now';
 export const SAID: Record<SaidFor, Record<AppLanguage, string>> = {
   try_again: { en: 'I could not answer this time. Your question is still here: try again in a moment.', es: 'Esta vez no pude responder. Tu pregunta sigue aquí: inténtalo de nuevo en un momento.', fr: 'Je n’ai pas pu répondre cette fois. Ta question est toujours là : réessaie dans un instant.', pt: 'Desta vez não consegui responder. A pergunta continua aqui: é só tentar de novo daqui a pouco.', it: 'Questa volta non sono riuscito a rispondere. La tua domanda è ancora qui: riprova tra un momento.', de: 'Diesmal konnte ich nicht antworten. Deine Frage ist noch da: Versuch es gleich noch einmal.' },
   empty: { en: 'I did not catch anything. Say or write your question.', es: 'No alcancé a entender nada. Di o escribe tu pregunta.', fr: 'Je n’ai rien saisi. Dis ou écris ta question.', pt: 'Não captei nada. É só dizer ou escrever a pergunta.', it: 'Non ho colto nulla. Di’ o scrivi la tua domanda.', de: 'Ich habe nichts verstanden. Sag oder schreib deine Frage.' },
   too_long: { en: 'That is too long for me to take in at once. Tell me the main thing in a few sentences.', es: 'Eso es demasiado largo para tomarlo de una vez. Dime lo principal en unas pocas frases.', fr: 'C’est trop long pour que je le prenne d’un coup. Dis-moi l’essentiel en quelques phrases.', pt: 'Isso é longo demais para acompanhar de uma vez. O principal em poucas frases já basta.', it: 'È troppo lungo per coglierlo tutto insieme. Dimmi l’essenziale in poche frasi.', de: 'Das ist zu lang, um es auf einmal aufzunehmen. Sag mir das Wichtigste in ein paar Sätzen.' },
   busy: { en: 'That is a lot at once. Give me a moment and ask again.', es: 'Son muchas cosas a la vez. Dame un momento y pregunta de nuevo.', fr: 'Cela fait beaucoup à la fois. Laisse-moi un instant et redemande.', pt: 'É muita coisa de uma vez. Um momento, e é só perguntar de novo.', it: 'Sono tante cose insieme. Dammi un momento e chiedi di nuovo.', de: 'Das ist viel auf einmal. Gib mir einen Moment und frag noch einmal.' },
   no_reads: { en: 'You have no reads left for now. I can still explain an idea.', es: 'Por ahora no te quedan lecturas. Todavía puedo explicarte una idea.', fr: 'Il ne te reste plus de lectures pour l’instant. Je peux toujours t’expliquer une idée.', pt: 'Por enquanto não há mais leituras. Ainda posso explicar uma ideia.', it: 'Per ora non hai più letture. Posso ancora spiegarti un’idea.', de: 'Im Moment hast du keine Lesungen mehr. Eine Idee kann ich dir weiterhin erklären.' },
+  declined: { en: 'Nothing was read, and none of your reads was used.', es: 'No leí nada y no se usó ninguna de tus lecturas.', fr: 'Je n’ai rien lu et aucune de tes lectures n’a été utilisée.', pt: 'Não li nada e nenhuma leitura foi usada.', it: 'Non ho letto nulla e nessuna delle tue letture è stata usata.', de: 'Ich habe nichts gelesen, und keine deiner Lesungen wurde verbraucht.' },
   not_now: { en: 'I can’t work on that right now. Try again in a moment.', es: 'Ahora mismo no puedo con eso. Inténtalo de nuevo en un momento.', fr: 'Je ne peux pas m’en occuper pour l’instant. Réessaie dans un instant.', pt: 'Agora não consigo tratar disso. É só tentar de novo daqui a pouco.', it: 'In questo momento non riesco a occuparmene. Riprova tra un momento.', de: 'Das schaffe ich gerade nicht. Versuch es gleich noch einmal.' },
 };
+
+/**
+ * A draft's placeholders, read as what they mean. An id is code's: typed in another case it is still that id, and is
+ * written back as the tool gave it. Two slips the real model makes cost a whole extra call each (eighth run): the kind
+ * left out ({{return_tsla}}) and the id written with the kind's colon ({{return:tsla}}). When that names exactly one
+ * figure and the figure has no day of its own, its number is the only thing it can be: read as {{f:ID}}. A worst or
+ * best day is a number AND a date, so a placeholder that does not say which is left as written, and is sent back.
+ * Used by present() and by the loop's own question "does this draft cite a figure?" (tenth run: {{return_TSLA}} was
+ * repaired here after the loop had already called the text an explanation, and its figure was then read as a number
+ * of the model's own).
+ */
+export function exactPlaceholders(part: string, figures: Map<string, Figure>): string {
+  const byFold = new Map([...figures.keys()].map((id) => [id.toLowerCase(), id]));
+  const bare = part.replace(/\{\{\s*([A-Za-z]+)[_:]([A-Za-z0-9_~]+)\s*\}\}/g, (whole, head: string, rest: string) => {
+    if (['f', 'd', 'from', 'to'].includes(head.toLowerCase()) && byFold.has(rest.toLowerCase())) return whole;
+    const id = byFold.get(`${head}_${rest}`.toLowerCase());
+    return id && !figures.get(id)!.day ? `{{f:${id}}}` : whole;
+  });
+  return bare.replace(/\{\{\s*(f|d|from|to)\s*:\s*([A-Za-z0-9_~]+)\s*\}\}/gi, (whole, kind: string, id: string) => (byFold.has(id.toLowerCase()) ? `{{${kind.toLowerCase()}:${byFold.get(id.toLowerCase())}}}` : whole)).replace(/\{\{\s*days\s*\}\}/gi, '{{days}}');
+}
 
 /**
  * The model's draft, checked and written out. A refusal says what to repair; the caller may ask the model once
@@ -620,18 +641,7 @@ export const SAID: Record<SaidFor, Record<AppLanguage, string>> = {
  */
 export function present(draft: Draft, analysis: Analysis | null, question: string, language: AppLanguage, locale?: string | null, /** A follow-up on figures already told: the read's own limits were on its first answer and are not repeated. */ again = false): { ok: true; presentation: Presentation; own: OwnWords } | { ok: false; refusal: Refusal } {
   const figures = new Map((analysis?.figures ?? []).map((figure) => [figure.id, figure]));
-  // An id is code's: typed in another case it is still that id, and is written back as the tool gave it. Nothing else is repaired.
-  const byFold = new Map([...figures.keys()].map((id) => [id.toLowerCase(), id]));
-  // Two more slips the real model makes, each of which cost a whole extra call in the eighth run: the kind left out
-  // ({{return_tsla}}) and the id written with the kind's colon ({{return:tsla}}). When that names exactly one figure
-  // and the figure has no day of its own, its number is the only thing it can be: read as {{f:ID}}. A worst or best
-  // day is a number AND a date, so a placeholder that does not say which is still sent back, like one that names nothing.
-  const bare = (part: string) => part.replace(/\{\{\s*([A-Za-z]+)[_:]([A-Za-z0-9_~]+)\s*\}\}/g, (whole, head: string, rest: string) => {
-    if (['f', 'd', 'from', 'to'].includes(head.toLowerCase()) && byFold.has(rest.toLowerCase())) return whole;
-    const id = byFold.get(`${head}_${rest}`.toLowerCase());
-    return id && !figures.get(id)!.day ? `{{f:${id}}}` : whole;
-  });
-  const exact = (part: string) => bare(part).replace(/\{\{\s*(f|d|from|to)\s*:\s*([A-Za-z0-9_~]+)\s*\}\}/gi, (whole, kind: string, id: string) => (byFold.has(id.toLowerCase()) ? `{{${kind.toLowerCase()}:${byFold.get(id.toLowerCase())}}}` : whole)).replace(/\{\{\s*days\s*\}\}/gi, '{{days}}');
+  const exact = (part: string) => exactPlaceholders(part, figures);
   draft = { ...draft, gist: exact(draft.gist), text: exact(draft.text), next: exact(draft.next), limitations: draft.limitations.map(exact) };
   const gist = draft.gist.trim(), text = draft.text.trim(), next = draft.next.trim();
   if (!gist || !text) return { ok: false, refusal: { code: 'empty', detail: '' } };

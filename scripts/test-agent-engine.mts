@@ -1468,4 +1468,27 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   for (const [needle, why] of [['their saying beforehand that they will say no is not a no', 'a read they ask for is offered even when they say they will decline: the card is theirs to answer'], ['a sound check such as "can you hear me"', 'a sound check is answered in a few words'], ['"earlier" in the input is a read of theirs from an earlier day', 'figures from an earlier day are not on the table']] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);
 }
 
+// ---------- 7n. what the tenth independent evaluation found (2026-10-13, 114 turns, no critical turn, no figure different) ----------
+{
+  const store = new MemoryAgentStore(6), deps = depsFor(store);
+  script = [() => turn([use('read_assets', { assets: ['Bitcoin', 'Ethereum'], windowDays: 30 })]), () => answer({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}.' })];
+  const read = await ask(deps, 'ann', 'Compara Bitcoin y Ethereum', 'a1');
+  await store.approve('ann', read.id, waitingApproval(read)!.digest, clock);
+  await runTask(deps, 'ann', read.id);
+  // A figure cited with its kind left out, in a text the model calls an explanation: it is an analysis, read as one.
+  readerSaw.length = 0;
+  script = [() => answer({ kind: 'explanation', gist: 'No puedo anualizar ese cambio.', text: 'No puedo anualizar ese cambio. El que leí es el de {{days}} días, {{return_BTC}}, y vale para esa ventana.' })];
+  const bare = await ask(deps, 'ann', 'ponle etiqueta anual al cambio', 'a2', true);
+  eq([taskResult(bare)!.presentation.kind, taskResult(bare)!.presentation.composedByCode, taskResult(bare)!.presentation.figures, readerSaw.at(-1)?.includes('⟦figure: change over the whole window, Bitcoin⟧')], ['analysis', false, ['return_BTC'], true],
+    'a figure cited with its kind left out makes the text an analysis all the same: it is read with its figure as a mark, not as a number of the model\'s own');
+  // A no is answered with a sentence.
+  script = [() => turn([use('read_assets', { assets: ['Bitcoin', 'Ethereum'], windowDays: 60 })])];
+  const offered = await ask(deps, 'ann', 'ahora a sesenta días', 'a3', true);
+  await store.deny('ann', offered.id, clock);
+  const denied = (await store.get('ann', offered.id))!;
+  eq([taskView(denied, clock, null).state, (taskView(denied, clock, null) as any).notice, (taskView(read, clock, null) as any).notice], ['cancelled', 'No leí nada y no se usó ninguna de tus lecturas.', undefined], 'a no is answered with one sentence: nothing was read and nothing was used');
+  const prompt = agentPrompt('en', 'en-US');
+  for (const [needle, why] of [['you do nothing by yourself and nothing is read without their yes on the card', 'nothing is done later or in the background'], ['name each of them in the same short answer', 'every limit a request breaks is named at once'], ['ask about all of them in the one question', 'everything unclear is asked about in one question']] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);
+}
+
 console.log(`agent-engine: ${checks} checks passed`);
