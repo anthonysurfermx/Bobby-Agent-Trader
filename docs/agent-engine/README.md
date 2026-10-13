@@ -108,12 +108,12 @@ The grader's verdict was the same every time: not ready to open yet. What the se
 - The ninth was the first to run on a weekday evening: the source's last row comes with no close for some hours after the bell (nineteen reads failed for it; none has since).
 - The twelfth went back by the author's own hand: a rule added after the eleventh made the model explain the scale of a correlation with two of its three points. A rule that makes the model explain something must hand it the whole of what it explains, and every change to the instructions needs its own set.
 - The thirteenth's one critical turn was a date written once for a share and a coin that do not start at the same close. It is now refused by code (`misdated`), not by one more sentence.
-- **The head best measured is `9b779d22` (set 14).** The commit after it (`de80d5d4`, four wording rules) has no complete set: the fifteenth was cut short when the provider's account ran out of credit, 67 of its 117 turns failed, and it is void.
+- **What is in production is what set 14 measured (`9b779d22`).** Four wording rules written after it (`de80d5d4`) had no complete set (the fifteenth was cut short when the provider's account ran out of credit: 67 of its 117 turns failed, and it is void) and were taken out again before the merge.
 
 ## What it does not do, and what is missing
 
-- **Durable storage in production.** The store, its SQL and the transport that calls it exist: `BOBBY_AGENT_STORE=postgres` makes the door call the functions through PostgREST with the service role. The SQL passes on a local Postgres (51 checks, including that neither API role can call a function or read a table, whatever the defaults grant). What is missing is the owner's decision to make it a migration, and with it how long a person's question is kept. Until then those functions do not exist and the door answers 503.
-- **The product's own allowance and money caps.** The engine counts its own reads (6 a day in the development stores) and its own dollar ceiling. Wiring `api/_lib/access.ts` (guest, weekly, Pro) is the next step and decides what "a read" costs here.
+- **Before it is opened to everyone** (it runs for a private pilot since 2026-10-13: see "In production" below). Four things, the first is the owner's: (1) the privacy page says today that Bobby stores no question, and an errand keeps its question, steps and answer for 24 hours: the wording to approve is in `PRIVACY-DRAFT.md`, six languages, not published; (2) money per address: the day's ceiling is one pot, so one or two addresses can spend it and close the engine for everyone until 00:00 UTC (a second partition per address in `agent_reserve`); (3) rows are written before any budget check and nothing bounds errands across addresses in a day (refuse new errands once the day is closed); (4) on a shared address a person can be told their reads are gone when it is the address's ceiling (its own state and sentence). Two to four are the findings of the review before the pilot.
+- **The product's own allowance and money caps.** The engine counts its own reads (`BOBBY_AGENT_READS_PER_DAY`, six when unset) and its own dollar ceiling (`BOBBY_AGENT_DAILY_USD`, five when unset): a read here does not use one of the plan's, and a Pro subscriber gets no more than anyone else. Wiring `api/_lib/access.ts` (guest, weekly, Pro) is the next step and decides what "a read" costs here.
 - **Work that outlives a request.** A run stops between steps when it is out of time and the next request continues it. There is no worker or queue: a task advances only when its owner asks again.
 - **More tools.** No holdings or concentration of a fund, no fees, fundamentals, news or calendar, no single-asset analysis through the three-agent desk. Each is a tool with its own evidence contract.
 - **A second source.** `conflicting` is in the vocabulary and no tool can produce it yet: every instrument has one source.
@@ -121,10 +121,20 @@ The grader's verdict was the same every time: not ready to open yet. What the se
 - **Memory between sessions.** A follow-up reads the last completed task of the same session. Nothing is kept as a goal, and nothing here needs or uses the memory consent.
 - **Number words.** A percentage in words is refused by code when a number word stands before it; with an article ("un por ciento", "a percent") or at a distance ("thirteen, in percent") it is not, because the same words explain what a percent is. A bare number word ("doce puntos", "twice as much"), the person's own number said back with another meaning ("subió 1000 dólares") and a window length used as another count ("subió 30 días seguidos") are not: in an analysis they are the engine reader's to catch (36 of 36 on a real-model set, which is a sample and not a guarantee). An ordering the model states without listing it as a claim is not checked.
 - **A paid call whose step could not be written.** When storage fails exactly at the write of a model call's step, the call was paid and is not in the task: the next run pays again. The same holds for a second reading when a run stops between the reader and the stored answer (about a hundredth of a cent each time). Only the task's dollar cap bounds it. A settle or a release is tried twice; when both fail the attempt stays dispatched (the task can make no further call) or the lease runs out in 65 s.
-- **The door's guards.** The address bounds errands started and reads taken in a day. The companion's other guards (a per-minute line, a count per network, a shared day of turns) are not here.
+- **The door's guards.** The address bounds errands started and reads taken in a day, and thirty requests a minute on one instance. The companion's count per network and its shared day of turns are not here.
 - **A second run's time.** A call starts only if the run has time for it; nothing reconciles an attempt left `dispatched` by a function that was killed (the SQL draft names the job).
 - **Languages.** Mechanisms are tested in Spanish; the code-written fallback and the limitation sentences exist in six languages; real runs in the other five are not done.
 - **No client.** Nothing in the apps calls the door.
+
+## In production (since 2026-10-13): a private pilot
+
+The owner's decision: in production for a list of people, and for everyone only after the privacy page is changed.
+
+- `BOBBY_AGENT_ENGINE=pilot`, `BOBBY_AGENT_STORE=postgres`, `BOBBY_AGENT_PILOT` = the list (`id:<identity id>` for a signed-in account, `install:<salted install hash>` for one install). A person who is not on it gets the 404 of a door that is off. Adding someone: their identity id is `bobby_identities.id`; an install's hash is the one `deviceHash` derives (the production salt and the install id, never stored together).
+- Storage: migration `20261013062500_agent_engine.sql` (the same statements as `agent-engine.sql`; a test holds them equal). Four tables and twenty-one functions, closed to `anon` and `authenticated` by name, RLS on with no policy.
+- What is kept: an errand's question, steps and answer until it has been idle 24 hours (`agent_purge`, asked for by the door after a new errand, at most every ten minutes); the money ledger 90 days.
+- Turning it off: unset `BOBBY_AGENT_ENGINE` and deploy. Opening it to everyone: `on`, and not before the four points above.
+- What ships is the head the fourteenth set measured; the four wording rules written after it are out (`git revert de80d5d4`) until a set measures them.
 
 ## Reproduce
 
