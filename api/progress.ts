@@ -25,7 +25,7 @@ export const config = { maxDuration: 15 };
 const SYMBOL_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
 const LEGACY_IMPORT_CAP = 300;
 const Body = z.object({
-  platform: z.enum(['ios', 'web']),
+  platform: z.enum(['ios', 'android', 'web']),
   events: z.array(z.object({
     id: z.string().uuid(),
     kind: z.enum(PLANT_KINDS),

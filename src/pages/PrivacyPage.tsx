@@ -3,13 +3,14 @@
 // code (see docs/app-store/app-privacy-answers.md in the ios branch for
 // the verified mapping). Update the date whenever the substance changes.
 import { Helmet } from 'react-helmet-async';
+import ProtocolLayout from '@/components/protocol/ProtocolLayout';
 
 const EFFECTIVE_DATE = 'September 4, 2026';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-10">
-      <h2 className="mb-3 font-mono text-sm font-bold uppercase tracking-[0.18em] text-green-400">{title}</h2>
+    <section>
+      <h2>{title}</h2>
       <div className="space-y-3 text-[15px] leading-7 text-white/75">{children}</div>
     </section>
   );
@@ -17,16 +18,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-[#050505] text-white">
+    <ProtocolLayout active="privacy" title="Your privacy." eyebrow="Bobby / Privacy" description="What stays with you, what Bobby processes, and the choices you control." wide={false}>
       <Helmet>
         <title>Privacy Policy | Bobby</title>
         <meta name="description" content="Privacy policy for the Bobby iOS app and bobbyprotocol.xyz — optional accounts and wallets, synced progress, non-custodial swaps, and no cross-app tracking." />
       </Helmet>
 
-      <div className="mx-auto max-w-3xl px-5 py-16 lg:py-24">
-        <div className="mb-2 font-mono text-xs font-bold uppercase tracking-[0.22em] text-white/40">Bobby Protocol</div>
-        <h1 className="mb-2 text-3xl font-bold tracking-tight">Privacy Policy</h1>
-        <p className="mb-12 font-mono text-xs text-white/40">Effective {EFFECTIVE_DATE}</p>
+      <div className="protocol-prose">
+        <p className="protocol-eyebrow mb-5">Privacy Policy · Effective {EFFECTIVE_DATE}</p>
 
         <Section title="The short version">
           <p>
@@ -179,17 +178,14 @@ export default function PrivacyPage() {
         <Section title="Contact">
           <p>
             Questions about this policy: open an issue at{' '}
-            <a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader" className="text-green-400 underline decoration-green-400/40 underline-offset-4 hover:decoration-green-400">
+            <a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader" className="underline underline-offset-4">
               github.com/anthonysurfermx/Bobby-Agent-Trader
             </a>{' '}
             or reach us through bobbyprotocol.xyz.
           </p>
         </Section>
 
-        <div className="mt-16 border-t border-white/[0.06] pt-6 font-mono text-[11px] uppercase tracking-[0.14em] text-white/30">
-          Bobby · analysis, not advice
-        </div>
       </div>
-    </div>
+    </ProtocolLayout>
   );
 }

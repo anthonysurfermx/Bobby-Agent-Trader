@@ -2,7 +2,9 @@
 // Amounts approved 2026-08-19. Funding goes live after the mainnet Safe handoff;
 // the terms are published now so hunters can start reading the code today.
 import { Helmet } from 'react-helmet-async';
-import { ArrowLeft, ArrowUpRight, Bug, Swords, Trophy } from 'lucide-react';
+import ProtocolLayout from '@/components/protocol/ProtocolLayout';
+import { useProtocolLanguage } from '@/components/protocol/useProtocolLanguage';
+import { ArrowUpRight, Bug, Swords, Trophy } from 'lucide-react';
 
 const GH = 'https://github.com/anthonysurfermx/Bobby-Agent-Trader';
 
@@ -30,67 +32,67 @@ const TIERS: Array<[string, string, string]> = [
 ];
 
 export default function BobbyBountyPage() {
+  const { t } = useProtocolLanguage();
   return (
-    <div className="min-h-screen bg-[#050505] text-white">
+    <ProtocolLayout active="bounty">
       <Helmet>
-        <title>Bug Bounty — Bobby Protocol</title>
+        <title>{t("Bug Bounty — Bobby Protocol", "Recompensas por errores — Bobby Protocol", "Recompensas por falhas — Bobby Protocol")}</title>
         <meta name="description" content="Real rewards for breaking Bobby's track record, contracts or challenge mechanism. $5,000 initial pool." />
       </Helmet>
-      <div className="pointer-events-none fixed inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(255,255,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.6)_1px,transparent_1px)] [background-size:52px_52px]" />
 
-      <div className="relative mx-auto max-w-3xl px-5 py-12 lg:px-8">
-        <a href="/protocol" className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.15em] text-white/50 transition hover:text-white">
-          <ArrowLeft className="h-3.5 w-3.5" /> Bobby Protocol
-        </a>
 
-        <div className="mt-8 flex flex-wrap items-center gap-3">
-          <h1 className="text-4xl font-extrabold tracking-[-0.06em] md:text-6xl">Break Bobby, <span className="text-[#0052ff]">get paid.</span></h1>
-        </div>
-        <p className="mt-5 max-w-2xl text-lg leading-8 text-white/55">
-          Being wrong in public is part of the design — paying you to prove it is too.
-          <b className="text-white/85"> $5,000 USDC initial pool</b>. The contracts are deployed on Base;
-          funding activates after the 2-of-3 Safe handoff and post-deploy gates. Terms are live now; start reading the code.
-        </p>
+      <div className="protocol-content">
 
-        <div className="mt-10 space-y-4">
+
+        <header className="protocol-hero">
+          <p className="protocol-eyebrow">{t("Security / Bug bounty", "Seguridad / Recompensas", "Segurança / Recompensas")}</p>
+          <h1 className="protocol-title">{t("Break Bobby.", "Rompe a Bobby.", "Quebre o Bobby.")}<br /><span className="text-[#A39C91]">{t("Make it stronger.", "Hazlo más fuerte.", "Deixe-o mais forte.")}</span></h1>
+          <p className="protocol-lead">{t(" Being wrong in public is part of the design — paying you to prove it is too. ", " Equivocarse en público es parte del diseño. Pagarte por demostrarlo, también. ", " Errar em público faz parte do projeto. Pagar você para provar isso, também. ")}<b className="font-medium text-[#F2EDE4]">{t(" $5,000 USDC initial pool", " Fondo inicial de $5,000 USDC", " Fundo inicial de $5.000 USDC")}</b>{t(". The contracts are deployed on Base; funding activates after the 2-of-3 Safe handoff and post-deploy gates. Terms are live now; start reading the code. ", ". Los contratos están desplegados en Base; el fondo se activa tras el traspaso al Safe 2 de 3 y las comprobaciones posteriores. Los términos ya están publicados; puedes revisar el código. ", ". Os contratos estão implantados na Base; o fundo é ativado após a transferência ao Safe 2 de 3 e as verificações posteriores. Os termos já estão publicados; comece a revisar o código. ")}</p>
+          <a href={`${GH}/tree/main/contracts/src`} target="_blank" rel="noreferrer" className="protocol-button-secondary mt-7 inline-flex items-center gap-2">{t(" Explore the contracts ", " Explora los contratos ", " Explore os contratos ")}<ArrowUpRight className="h-4 w-4" />
+          </a>
+        </header>
+
+        <section className="grid gap-5 md:grid-cols-2" aria-label="Reward tiers">
           {TIERS.map(([amount, scope, note]) => (
-            <div key={amount} className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-              <div className="flex items-center gap-2 font-mono text-lg font-bold tracking-[-0.02em] text-white">
-                {amount.includes('challenge') ? <Swords className="h-4 w-4 text-[#7da6ff]" /> : <Bug className="h-4 w-4 text-[#7da6ff]" />} {amount} USDC
+            <article key={amount} className="protocol-panel flex flex-col p-6 md:p-8">
+              <div className="mb-6 flex items-center justify-between">
+                <span className="protocol-eyebrow">{amount.split(' · ')[1]}</span>
+                {amount.includes('challenge') ? <Swords className="h-4 w-4 text-[#d6c6ed]" /> : <Bug className="h-4 w-4 text-[#d6c6ed]" />}
               </div>
-              <p className="mt-2 text-sm leading-6 text-white/60">{scope}</p>
-              <p className="mt-1.5 text-xs leading-5 text-white/35">{note}</p>
-            </div>
+              <div className="text-4xl font-light tracking-[-0.05em] text-[#F2EDE4]">
+                {amount.split(' · ')[0]} <span className="font-mono text-xs tracking-normal text-[#8A8378]">USDC</span>
+              </div>
+              <p className="mt-6 text-sm leading-7 text-[#A39C91]">{scope}</p>
+              <p className="mt-6 border-t border-[#F2EDE4]/[0.08] pt-4 text-xs leading-6 text-[#8A8378]">{note}</p>
+            </article>
           ))}
-        </div>
+        </section>
 
-        <h2 className="mt-12 text-2xl font-extrabold tracking-[-0.04em]">Scope</h2>
-        <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-7 text-white/60">
-          <li><b className="text-white/85">In:</b> the frozen contracts (<code className="rounded bg-white/10 px-1.5 text-xs">contracts/src</code>, release 11532f4), the recorder pipeline, the verifiable-calls ledger and challenge scanner (spoofing counts).</li>
-          <li><b className="text-white/85">Out:</b> public RPC outages, social engineering, findings already documented on the <a href="/protocol/risk" className="text-[#7da6ff] hover:text-white">risk page</a> as accepted trust assumptions, and testnet-only issues with no mainnet equivalent.</li>
-          <li>First valid report per finding wins. Duplicates split nothing — check the <a href="/protocol/audits" className="text-[#7da6ff] hover:text-white">audit trail</a> first: four P1s are already dead.</li>
+        <h2 className="protocol-section-title mt-16">{t("Scope", "Alcance", "Escopo")}</h2>
+        <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-7 text-[#A39C91]">
+          <li><b className="text-[#F2EDE4]">{t("In:", "Incluido:", "Incluído:")}</b>{t(" the frozen contracts (", " los contratos congelados (", " os contratos congelados (")}<code className="rounded bg-white/10 px-1.5 text-xs">contracts/src</code>{t(", release 11532f4), the recorder pipeline, the verifiable-calls ledger and challenge scanner (spoofing counts).", ", versión 11532f4), el proceso de registro, el historial de señales verificables y el escáner de desafíos (incluida la suplantación).", ", versão 11532f4), o processo de registro, o histórico de sinais verificáveis e o scanner de desafios (incluindo falsificação).")}</li>
+          <li><b className="text-[#F2EDE4]">{t("Out:", "Excluido:", "Excluído:")}</b>{t(" public RPC outages, social engineering, findings already documented on the ", " caídas de RPC públicos, ingeniería social, hallazgos ya documentados en la ", " quedas de RPCs públicos, engenharia social, achados já documentados na ")}<a href="/protocol/risk" className="text-[#d6c6ed] hover:text-white">{t("risk page", "página de riesgos", "página de riscos")}</a>{t(" as accepted trust assumptions, and testnet-only issues with no mainnet equivalent.", " como supuestos de confianza aceptados y problemas exclusivos de testnet sin equivalente en mainnet.", " como premissas de confiança aceitas e problemas exclusivos da testnet sem equivalente na mainnet.")}</li>
+          <li>{t("First valid report per finding wins. Duplicates split nothing — check the ", "Gana el primer informe válido de cada hallazgo. Los duplicados no comparten recompensa. Revisa las ", "O primeiro relatório válido de cada achado vence. Duplicatas não dividem recompensa. Revise as ")}<a href="/protocol/audits" className="text-[#d6c6ed] hover:text-white">{t("audit trail", "auditorías", "auditorias")}</a>{t(" first: four P1s are already dead.", " primero: cuatro P1 ya están resueltos.", " primeiro: quatro P1 já foram resolvidos.")}</li>
         </ul>
 
-        <h2 className="mt-12 text-2xl font-extrabold tracking-[-0.04em]">How to report</h2>
-        <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-7 text-white/60">
-          <li><b className="text-white/85">Vulnerabilities:</b> private disclosure via <a href={`${GH}/security/advisories/new`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#7da6ff] hover:text-white">GitHub Security Advisories <ArrowUpRight className="h-3 w-3" /></a> — include a reproduction. 90-day coordinated disclosure.</li>
-          <li><b className="text-white/85">Challenges:</b> no report needed — the reclassification tx IS the claim. Drop the tx hash in a <a href={`${GH}/issues/new`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#7da6ff] hover:text-white">GitHub issue <ArrowUpRight className="h-3 w-3" /></a> with your payout address.</li>
-          <li>Payouts in USDC on Base within 14 days of validation, from the treasury Safe. Public hall of fame — or stay anon, your call.</li>
+        <h2 className="protocol-section-title mt-16">{t("How to report", "Cómo reportar", "Como reportar")}</h2>
+        <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-7 text-[#A39C91]">
+          <li><b className="text-[#F2EDE4]">{t("Vulnerabilities:", "Vulnerabilidades:", "Vulnerabilidades:")}</b>{t(" private disclosure via ", " divulgación privada mediante ", " divulgação privada via ")}<a href={`${GH}/security/advisories/new`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#d6c6ed] hover:text-white">GitHub Security Advisories <ArrowUpRight className="h-3 w-3" /></a>{t(" — include a reproduction. 90-day coordinated disclosure.", " — incluye una reproducción. Divulgación coordinada de 90 días.", " — inclua uma reprodução. Divulgação coordenada em 90 dias.")}</li>
+          <li><b className="text-[#F2EDE4]">{t("Challenges:", "Desafíos:", "Desafios:")}</b>{t(" no report needed — the reclassification tx IS the claim. Drop the tx hash in a ", " no hace falta informe: la transacción de reclasificación ES la prueba. Publica su hash en un ", " não é necessário relatório: a transação de reclassificação É a prova. Publique seu hash em uma ")}<a href={`${GH}/issues/new`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#d6c6ed] hover:text-white">{t("GitHub issue ", "issue de GitHub ", "issue do GitHub ")}<ArrowUpRight className="h-3 w-3" /></a>{t(" with your payout address.", " con tu dirección de pago.", " com seu endereço de pagamento.")}</li>
+          <li>{t("Payouts in USDC on Base within 14 days of validation, from the treasury Safe. Public hall of fame — or stay anon, your call.", "Pagos en USDC en Base dentro de los 14 días tras la validación, desde el Safe de tesorería. Reconocimiento público o anonimato: tú eliges.", "Pagamentos em USDC na Base em até 14 dias após a validação, pelo Safe da tesouraria. Reconhecimento público ou anonimato: você escolhe.")}</li>
         </ul>
 
-        <div className="mt-12 flex items-start gap-3 rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] p-5">
+        <div className="mt-12 flex items-start gap-4 rounded-[24px] border border-amber-400/20 bg-amber-400/[0.04] p-6 md:p-8">
           <Trophy className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
-          <p className="text-sm leading-6 text-white/60">
-            <b className="text-amber-200">Program status:</b> contracts deployed; pool activation is staged behind Safe acceptance, verification and soak. Reports are accepted now — anything valid found before funding still pays when the pool activates.
-          </p>
+          <p className="text-sm leading-6 text-[#A39C91]">
+            <b className="text-amber-200">{t("Program status:", "Estado del programa:", "Estado do programa:")}</b>{t(" contracts deployed; pool activation is staged behind Safe acceptance, verification and soak. Reports are accepted now — anything valid found before funding still pays when the pool activates. ", " contratos desplegados; el fondo se activa tras la aceptación del Safe, la verificación y la observación. Ya aceptamos informes: los hallazgos válidos previos a la financiación se pagarán cuando se active el fondo. ", " contratos implantados; o fundo é ativado após a aceitação do Safe, verificação e observação. Já aceitamos relatórios: achados válidos anteriores ao financiamento serão pagos quando o fundo for ativado. ")}</p>
         </div>
 
-        <p className="mt-10 font-mono text-[11px] leading-5 text-white/30">
-          See also: <a href="/protocol/calls" className="text-white/50 underline-offset-2 hover:underline">verifiable calls</a> ·{' '}
-          <a href="/protocol/audits" className="text-white/50 underline-offset-2 hover:underline">audit trail</a> ·{' '}
-          <a href="/protocol/risk" className="text-white/50 underline-offset-2 hover:underline">risk & claims</a>
+        <p className="mt-10 font-mono text-[11px] leading-5 text-[#A39C91]">{t(" See also: ", " Consulta también: ", " Veja também: ")}<a href="/protocol/calls" className="text-[#A39C91] underline-offset-2 hover:underline">{t("verifiable calls", "señales verificables", "sinais verificáveis")}</a> ·{' '}
+          <a href="/protocol/audits" className="text-[#A39C91] underline-offset-2 hover:underline">{t("audit trail", "auditorías", "auditorias")}</a> ·{' '}
+          <a href="/protocol/risk" className="text-[#A39C91] underline-offset-2 hover:underline">{t("risk & claims", "riesgos y afirmaciones", "riscos e afirmações")}</a>
         </p>
       </div>
-    </div>
+    </ProtocolLayout>
   );
 }

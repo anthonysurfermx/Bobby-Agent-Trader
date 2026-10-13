@@ -1,6 +1,6 @@
 // ============================================================
 // Bobby AI Docs — Integration portal for AI agents & developers
-// Base-native dark design
+// Canonical Bobby Protocol integration reference
 // ============================================================
 
 import { useState } from 'react';
@@ -11,7 +11,7 @@ import {
   ChevronRight, Search, ShoppingCart, Globe, BarChart3,
   AlertTriangle, Wallet, MessageSquare, TrendingUp, Lock, Eye
 } from 'lucide-react';
-import KineticShell from '@/components/kinetic/KineticShell';
+import ProtocolLayout from '@/components/protocol/ProtocolLayout';
 import { BOBBY_BASE_MAINNET, bobbyBaseAddressUrl } from '@/config/chains';
 
 // --------------- Shared Components ---------------
@@ -26,20 +26,20 @@ function CopyBlock({ code, label }: { code: string; label?: string }) {
         </div>
       )}
       <div
-        className="bg-black/60 border border-white/10 rounded-xl p-4 font-mono text-[11px] text-[#7da6ff] overflow-x-auto whitespace-pre leading-relaxed"
-        style={{ backdropFilter: 'blur(12px)' }}
+        className="bg-[#0b0a09]/70 border border-white/10 rounded-xl p-5 font-mono text-xs text-[#d1c5e3] overflow-x-auto whitespace-pre leading-7"
       >
         {code}
       </div>
       <button
+        aria-label={copied ? 'Code copied' : 'Copy code'}
         onClick={() => {
           navigator.clipboard.writeText(code);
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         }}
-        className="absolute top-2 right-2 p-1.5 bg-white/10 hover:bg-white/20 rounded-lg border border-white/15 backdrop-blur transition-all opacity-0 group-hover:opacity-100"
+        className="absolute top-2 right-2 p-2 bg-[#15121c] hover:bg-white/10 rounded-lg border border-white/15 transition-all opacity-70 group-hover:opacity-100 focus-visible:opacity-100"
       >
-        {copied ? <Check className="w-3.5 h-3.5 text-[#7da6ff]" /> : <Copy className="w-3.5 h-3.5 text-white/50" />}
+        {copied ? <Check className="w-3.5 h-3.5 text-[#d1c5e3]" /> : <Copy className="w-3.5 h-3.5 text-white/50" />}
       </button>
     </div>
   );
@@ -59,13 +59,12 @@ function GlassCard({
   return (
     <div
       className={`
-        bg-white/[0.04] border rounded-2xl
-        ${accentBorder ? 'border-[#0052ff]/40 hover:border-[#0052ff]/70' : 'border-white/10'}
+        protocol-panel
+        ${accentBorder ? 'hover:border-[#b5a2de]/30' : ''}
         ${className}
       `}
       style={{
-        backdropFilter: 'blur(12px)',
-        ...(glow ? { boxShadow: '0 20px 60px rgba(0,82,255,0.18)' } : {}),
+        ...(glow ? { background: 'radial-gradient(ellipse at top right, rgba(139,108,186,0.07), transparent 65%), rgba(242,237,228,0.02)' } : {}),
       }}
     >
       {children}
@@ -75,19 +74,19 @@ function GlassCard({
 
 function SectionLabel({ icon: Icon, label, right }: { icon: React.ElementType; label: string; right?: string }) {
   return (
-    <div className="flex items-center gap-2.5 mb-6">
-      <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#0052ff]/20 text-[#7da6ff]">
+    <div className="flex flex-wrap items-center gap-3 mb-8">
+      <span className="grid h-9 w-9 place-items-center rounded-full border border-white/10 text-[#a39c91]">
         <Icon className="w-3.5 h-3.5" />
       </span>
-      <span className="font-mono text-xs font-bold text-[#7da6ff] tracking-[0.15em] uppercase">{label}</span>
-      {right && <span className="font-mono text-[10px] text-white/35 ml-auto tracking-[0.15em] uppercase">{right}</span>}
+      <h2 className="text-xl font-light tracking-[-0.035em] text-[#f2ede4]">{label}</h2>
+      {right && <span className="font-mono text-[10px] text-[#8a8378] sm:ml-auto tracking-[0.1em] uppercase">{right}</span>}
     </div>
   );
 }
 
 function Badge() {
   return (
-    <span className="font-mono text-[9px] px-2 py-0.5 rounded-full bg-[#0052ff]/20 text-[#7da6ff] border border-[#0052ff]/40 tracking-[0.15em]">
+    <span className="font-mono text-[9px] px-2 py-0.5 rounded-full bg-[#b5a2de]/20 text-[#d1c5e3] border border-[#b5a2de]/40 tracking-[0.15em]">
       PUBLIC
     </span>
   );
@@ -160,19 +159,19 @@ function ToolCard({ name, desc }: { name: string; desc: string }) {
   const Icon = TOOL_ICONS[name] || Cpu;
   return (
     <motion.div variants={cardItem}>
-      <GlassCard className="p-4 hover:border-[#0052ff]/50 hover:bg-white/[0.07] transition-all group cursor-default">
+      <GlassCard className="h-full p-5 hover:bg-white/[0.035] transition-colors group cursor-default">
         <div className="flex items-start gap-3">
           <div className="w-8 h-8 rounded-lg bg-white/[0.06] border border-white/10 flex items-center justify-center shrink-0 mt-0.5">
-            <Icon className="w-4 h-4 text-white/50 group-hover:text-[#7da6ff] transition-colors" />
+            <Icon className="w-4 h-4 text-white/50 group-hover:text-[#d1c5e3] transition-colors" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
               <Badge />
-              <span className="font-mono text-xs text-white/85 font-bold truncate">{name}</span>
+              <span className="font-mono text-xs text-[#f2ede4] break-all">{name}</span>
             </div>
             <p className="text-xs text-white/60 leading-6">{desc}</p>
           </div>
-          <ChevronRight className="w-3.5 h-3.5 text-white/15 group-hover:text-[#7da6ff] transition-colors shrink-0 mt-1" />
+          <ChevronRight className="w-3.5 h-3.5 text-white/15 group-hover:text-[#d1c5e3] transition-colors shrink-0 mt-1" />
         </div>
       </GlassCard>
     </motion.div>
@@ -185,33 +184,29 @@ export default function BobbyDocsPage() {
   let sectionIndex = 0;
 
   return (
-    <KineticShell activeTab="docs" minimalNav>
+    <ProtocolLayout
+      active="docs"
+      eyebrow="Build with Bobby / Docs & MCP"
+      title="One connection. Every layer of conviction."
+      description="Connect your AI agent to Bobby in one command. Base mainnet proofs, 11 MCP tools, self-custodial quotes and a chain-ordered receipt ledger."
+    >
       <Helmet><title>AI Docs | Bobby Agent Trader</title></Helmet>
 
-      <div className="min-h-screen bg-[#050505] pb-20 md:pb-8">
-        <div className="max-w-5xl mx-auto px-4 py-10 space-y-12 md:py-14 md:space-y-14">
-
-          {/* ===== 1. HEADER ===== */}
-          <motion.div
-            custom={sectionIndex++}
-            variants={fadeUp}
-            initial="hidden"
-            animate="visible"
-            className="text-center pt-4"
-          >
-            <div className="font-mono text-[10px] font-bold text-[#7da6ff] tracking-[0.22em] uppercase mb-4">
-              Bobby Agent Trader / AI Docs
-            </div>
-            <h1 className="text-white text-3xl md:text-5xl font-extrabold tracking-[-0.07em] leading-[1.02] mb-4">
-              Connect your AI agent to Bobby in one command
-            </h1>
-            <p className="text-sm md:text-base leading-7 text-white/60 max-w-xl mx-auto">
-              Base mainnet proofs, 11 MCP tools, self-custodial quotes and a chain-ordered receipt ledger
-            </p>
-          </motion.div>
+      <div className="protocol-content pb-20">
+        <nav aria-label="Documentation sections" className="mb-10 flex flex-wrap gap-x-7 gap-y-3 border-y border-white/10 py-5">
+          {[
+            ['integration', 'Get connected'], ['tools', 'MCP tools'], ['proof-engine', 'Proof engine'],
+            ['contracts', 'Contracts'], ['receipts', 'Receipts'], ['solidity', 'Solidity'], ['asset-search', 'Asset search'],
+          ].map(([id, label], index) => (
+            <a key={id} href={`#${id}`} className="text-sm text-[#a39c91] transition-colors hover:text-[#f2ede4]">
+              <span className="mr-2 font-mono text-[10px] text-[#8a8378]">0{index + 1}</span>{label}
+            </a>
+          ))}
+        </nav>
+        <div className="space-y-7 md:space-y-10">
 
           {/* ===== 2. HERO — INSTANT INTEGRATION ===== */}
-          <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
+          <motion.div id="integration" className="scroll-mt-28" custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard glow accentBorder className="p-6 md:p-8">
               <SectionLabel icon={Zap} label="Instant integration" />
 
@@ -221,14 +216,15 @@ export default function BobbyDocsPage() {
 
               {/* Primary code block */}
               <div
-                className="relative bg-black/60 border border-white/10 rounded-xl p-5 md:p-6 mb-6"
-                style={{ boxShadow: '0 20px 60px rgba(0,82,255,0.14)' }}
+                className="relative bg-[#0b0a09]/70 border border-white/10 rounded-xl p-5 md:p-6 mb-6"
+                style={{ boxShadow: '0 20px 60px rgba(139,108,186,0.05)' }}
               >
                 <div className="font-mono text-[10px] text-white/40 tracking-[0.15em] uppercase mb-2.5">$ Terminal</div>
-                <div className="font-mono text-sm md:text-base text-[#7da6ff] break-all leading-relaxed">
+                <div className="font-mono text-sm md:text-base text-[#d1c5e3] break-all leading-relaxed">
                   claude mcp add bobby-trader https://bobbyprotocol.xyz/api/mcp-bobby
                 </div>
                 <button
+                  aria-label="Copy MCP connection command"
                   onClick={() => {
                     navigator.clipboard.writeText('claude mcp add bobby-trader https://bobbyprotocol.xyz/api/mcp-bobby');
                   }}
@@ -245,7 +241,7 @@ export default function BobbyDocsPage() {
                   href="https://bobbyprotocol.xyz/llms.txt"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-mono text-[11px] text-[#7da6ff] hover:text-white underline underline-offset-2 decoration-[#0052ff]/50 transition-colors"
+                  className="font-mono text-[11px] text-[#d1c5e3] hover:text-white underline underline-offset-2 decoration-[#b5a2de]/50 transition-colors"
                 >
                   https://bobbyprotocol.xyz/llms.txt
                   <ExternalLink className="w-3 h-3 inline ml-1 -mt-0.5" />
@@ -267,12 +263,12 @@ export default function BobbyDocsPage() {
           </motion.div>
 
           {/* ===== 3. MCP TOOLS GRID ===== */}
-          <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
+          <motion.div id="tools" className="scroll-mt-28" custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard className="p-6 md:p-8">
               <SectionLabel icon={Cpu} label="11 public MCP tools" right="live schema via tools/list" />
 
               {/* Public tools */}
-              <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.18em] uppercase mb-3">
+              <div className="font-mono text-[10px] text-[#d1c5e3] tracking-[0.18em] uppercase mb-3">
                 Public tools ({PUBLIC_TOOLS.length})
               </div>
               <motion.div
@@ -290,7 +286,7 @@ export default function BobbyDocsPage() {
           </motion.div>
 
           {/* ===== 4. BASE V2 PROOF ENGINE ===== */}
-          <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
+          <motion.div id="proof-engine" className="scroll-mt-28" custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard glow accentBorder className="p-6 md:p-8">
               <SectionLabel icon={Shield} label="TrackRecord V2 proof engine" right="Base mainnet · deployed" />
               <p className="mb-7 max-w-3xl text-sm leading-7 text-white/60">
@@ -303,26 +299,26 @@ export default function BobbyDocsPage() {
                   ['02 · ORACLE EVIDENCE', 'Unique Pyth updates prove the exact entry and exit instants. The recorder retries Hermes only inside the valid window.'],
                   ['03 · OPEN RESOLUTION', 'Permissionless challenge, expiry and separate VERIFIED / ATTESTED ledgers prevent unproven claims from inflating the record.'],
                 ].map(([title, text]) => (
-                  <div key={title} className="rounded-xl border border-[#0052ff]/25 bg-[#0052ff]/[0.07] p-5">
-                    <div className="font-mono text-[10px] font-bold tracking-[0.15em] text-[#7da6ff]">{title}</div>
+                  <div key={title} className="rounded-xl border border-[#b5a2de]/25 bg-[#b5a2de]/[0.07] p-5">
+                    <div className="font-mono text-[10px] font-bold tracking-[0.15em] text-[#d1c5e3]">{title}</div>
                     <p className="mt-3 text-xs leading-6 text-white/60">{text}</p>
                   </div>
                 ))}
               </div>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <a href={bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.contracts.trackRecord)} target="_blank" rel="noopener noreferrer" className="rounded-xl border border-white/10 bg-black/30 p-4 transition hover:border-[#0052ff]/50">
+                <a href={bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.contracts.trackRecord)} target="_blank" rel="noopener noreferrer" className="rounded-xl border border-white/10 bg-black/30 p-4 transition hover:border-[#b5a2de]/50">
                   <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">TrackRecord V2 · Base mainnet</div>
-                  <div className="mt-2 truncate font-mono text-[11px] text-[#7da6ff]">{BOBBY_BASE_MAINNET.contracts.trackRecord}</div>
+                  <div className="mt-2 truncate font-mono text-[11px] text-[#d1c5e3]">{BOBBY_BASE_MAINNET.contracts.trackRecord}</div>
                 </a>
-                <a href={bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.safe)} target="_blank" rel="noopener noreferrer" className="rounded-xl border border-white/10 bg-black/30 p-4 transition hover:border-[#0052ff]/50">
+                <a href={bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.safe)} target="_blank" rel="noopener noreferrer" className="rounded-xl border border-white/10 bg-black/30 p-4 transition hover:border-[#b5a2de]/50">
                   <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">Production Safe · 2 of 3</div>
-                  <div className="mt-2 truncate font-mono text-[11px] text-[#7da6ff]">{BOBBY_BASE_MAINNET.safe}</div>
+                  <div className="mt-2 truncate font-mono text-[11px] text-[#d1c5e3]">{BOBBY_BASE_MAINNET.safe}</div>
                 </a>
               </div>
 
               <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-5 font-mono text-[10px] uppercase tracking-[0.12em]">
-                <span className="rounded-full border border-[#0052ff]/40 bg-[#0052ff]/10 px-3 py-1 text-[#7da6ff]">Base mainnet live</span>
+                <span className="rounded-full border border-[#b5a2de]/40 bg-[#b5a2de]/10 px-3 py-1 text-[#d1c5e3]">Base mainnet live</span>
                 <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-emerald-300">Dynamic write controls</span>
                 <span className="text-white/35">Safe-owned · runtime verified · public heartbeat</span>
               </div>
@@ -330,11 +326,11 @@ export default function BobbyDocsPage() {
           </motion.div>
 
           {/* ===== 5. BASE MAINNET SMART CONTRACTS ===== */}
-          <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
+          <motion.div id="contracts" className="scroll-mt-28" custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard className="p-6 md:p-8">
               <SectionLabel icon={Shield} label="Base mainnet contracts" right="7 deployed · chain 8453" />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {CONTRACTS.map(c => (
                   <a
                     key={c.name}
@@ -345,9 +341,9 @@ export default function BobbyDocsPage() {
                   >
                     <GlassCard accentBorder className="p-5 h-full hover:bg-white/[0.07] transition-all">
                       <div className="font-mono text-[11px] text-white/85 font-bold mb-2 tracking-[-0.01em]">{c.name}</div>
-                      <div className="font-mono text-[10px] text-[#7da6ff] mb-3 truncate">{c.addr}</div>
+                      <div className="font-mono text-[10px] text-[#d1c5e3] mb-3 truncate">{c.addr}</div>
                       <p className="text-xs text-white/60 leading-6 mb-4">{c.purpose}</p>
-                      <div className="font-mono text-[10px] text-white/40 group-hover:text-[#7da6ff] transition-colors tracking-[0.15em] uppercase flex items-center gap-1.5">
+                      <div className="font-mono text-[10px] text-white/40 group-hover:text-[#d1c5e3] transition-colors tracking-[0.15em] uppercase flex items-center gap-1.5">
                         View on Basescan
                         <ExternalLink className="w-2.5 h-2.5" />
                       </div>
@@ -359,7 +355,7 @@ export default function BobbyDocsPage() {
           </motion.div>
 
           {/* ===== 6. BASE SWAP RECEIPT LEDGER ===== */}
-          <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
+          <motion.div id="receipts" className="scroll-mt-28" custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard className="p-6 md:p-8">
               <SectionLabel icon={Wallet} label="Base execution receipt ledger" right="Self-custody · FIFO" />
               <p className="text-sm leading-7 text-white/60 mb-7 max-w-2xl">
@@ -371,7 +367,7 @@ export default function BobbyDocsPage() {
                 <GlassCard className="p-5 relative overflow-hidden">
                   <div className="absolute top-3 right-3 font-mono text-[32px] text-white/[0.06] font-bold leading-none">1</div>
                   <div className="font-mono text-[10px] text-white/50 tracking-[0.15em] uppercase mb-3">Quote</div>
-                  <div className="bg-black/60 border border-white/10 rounded-xl p-3.5 font-mono text-[10px] text-[#7da6ff] overflow-x-auto whitespace-pre leading-relaxed">
+                  <div className="bg-[#0b0a09]/70 border border-white/10 rounded-xl p-3.5 font-mono text-[10px] text-[#d1c5e3] overflow-x-auto whitespace-pre leading-relaxed">
 {`curl 'bobbyprotocol.xyz/api/base-swap?\
 tokenIn=USDC&tokenOut=NVDAc&amount=10'
 
@@ -387,7 +383,7 @@ tokenIn=USDC&tokenOut=NVDAc&amount=10'
                 <GlassCard className="p-5 relative overflow-hidden">
                   <div className="absolute top-3 right-3 font-mono text-[32px] text-white/[0.06] font-bold leading-none">2</div>
                   <div className="font-mono text-[10px] text-[#ffb95f] tracking-[0.15em] uppercase mb-3">Wallet approval</div>
-                  <div className="bg-black/60 border border-white/10 rounded-xl p-3.5 font-mono text-[10px] text-[#7da6ff] overflow-x-auto whitespace-pre leading-relaxed">
+                  <div className="bg-[#0b0a09]/70 border border-white/10 rounded-xl p-3.5 font-mono text-[10px] text-[#d1c5e3] overflow-x-auto whitespace-pre leading-relaxed">
 {`# POST requires:
 • wallet session proof
 • origin + rate-limit checks
@@ -401,8 +397,8 @@ tokenIn=USDC&tokenOut=NVDAc&amount=10'
                 {/* Step 3 */}
                 <GlassCard className="p-5 relative overflow-hidden">
                   <div className="absolute top-3 right-3 font-mono text-[32px] text-white/[0.06] font-bold leading-none">3</div>
-                  <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.15em] uppercase mb-3">Confirmed receipt</div>
-                  <div className="bg-black/60 border border-white/10 rounded-xl p-3.5 font-mono text-[10px] text-[#7da6ff] overflow-x-auto whitespace-pre leading-relaxed">
+                  <div className="font-mono text-[10px] text-[#d1c5e3] tracking-[0.15em] uppercase mb-3">Confirmed receipt</div>
+                  <div className="bg-[#0b0a09]/70 border border-white/10 rounded-xl p-3.5 font-mono text-[10px] text-[#d1c5e3] overflow-x-auto whitespace-pre leading-relaxed">
 {`receipt.status = "confirmed"
 ledger.order = block + tx index
 matching = FIFO rebuild per pair
@@ -416,7 +412,7 @@ pnl.scope = wallet
           </motion.div>
 
           {/* ===== 6. SOLIDITY INTEGRATION ===== */}
-          <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
+          <motion.div id="solidity" className="scroll-mt-28" custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard className="p-6 md:p-8">
               <SectionLabel icon={Terminal} label="Solidity integration" right="Conviction oracle" />
               <CopyBlock
@@ -442,7 +438,7 @@ IBobbyOracle oracle = IBobbyOracle(
           </motion.div>
 
           {/* ===== 7. UNIVERSAL ASSET SEARCH ===== */}
-          <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
+          <motion.div id="asset-search" className="scroll-mt-28" custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard className="p-6 md:p-8">
               <SectionLabel icon={Search} label="Universal asset search" right="Crypto / stocks / commodities" />
               <p className="text-sm leading-7 text-white/60 mb-5 max-w-2xl">
@@ -467,19 +463,19 @@ IBobbyOracle oracle = IBobbyOracle(
             <a href="/protocol/calls" className="block group">
               <GlassCard glow accentBorder className="p-6 md:p-8 hover:bg-white/[0.07] transition-all">
                 <div className="flex items-center gap-5">
-                  <div className="w-12 h-12 rounded-xl bg-[#0052ff]/20 border border-[#0052ff]/40 flex items-center justify-center shrink-0">
-                    <ShoppingCart className="w-5 h-5 text-[#7da6ff]" />
+                  <div className="w-12 h-12 rounded-xl bg-[#b5a2de]/20 border border-[#b5a2de]/40 flex items-center justify-center shrink-0">
+                    <ShoppingCart className="w-5 h-5 text-[#d1c5e3]" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.18em] uppercase mb-2">Public proof ledger</div>
-                    <div className="text-lg md:text-xl text-white font-extrabold tracking-[-0.05em] mb-1.5">
+                    <div className="font-mono text-[10px] text-[#d1c5e3] tracking-[0.18em] uppercase mb-2">Public proof ledger</div>
+                    <div className="text-lg md:text-xl text-white font-light tracking-[-0.05em] mb-1.5">
                       Inspect verified calls
                     </div>
                     <div className="text-sm leading-6 text-white/60">
                       Committed before outcome, resolved with evidence, and anchored to Base.
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-[#7da6ff]/60 group-hover:text-[#7da6ff] group-hover:translate-x-1 transition-all shrink-0" />
+                  <ChevronRight className="w-5 h-5 text-[#d1c5e3]/60 group-hover:text-[#d1c5e3] group-hover:translate-x-1 transition-all shrink-0" />
                 </div>
               </GlassCard>
             </a>
@@ -491,7 +487,7 @@ IBobbyOracle oracle = IBobbyOracle(
               {/* Powered by */}
               <div className="flex flex-wrap items-center justify-center gap-3">
                 {['Base', 'MCP', 'Uniswap V3', 'Supabase'].map(tech => (
-                  <span key={tech} className="font-mono text-[10px] text-white/40 tracking-[0.15em] px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04]">
+                  <span key={tech} className="font-mono text-[10px] text-white/40 tracking-[0.15em] px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.025]">
                     {tech.toUpperCase()}
                   </span>
                 ))}
@@ -500,9 +496,9 @@ IBobbyOracle oracle = IBobbyOracle(
               {/* Live metrics */}
               <div className="flex items-center justify-center gap-6 font-mono text-[10px] text-white/35 tracking-[0.18em]">
                 <span>LATENCY: 14MS</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-[#0052ff]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#b5a2de]" />
                 <span>CHAIN: 8453</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-[#0052ff]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#b5a2de]" />
                 <span>PUBLIC MCP TOOLS: 11</span>
               </div>
 
@@ -512,7 +508,7 @@ IBobbyOracle oracle = IBobbyOracle(
                   href="https://github.com/anthonysurfermx/Bobby-Agent-Trader"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-mono text-[10px] text-white/40 hover:text-[#7da6ff] tracking-[0.15em] transition-colors"
+                  className="font-mono text-[10px] text-white/40 hover:text-[#d1c5e3] tracking-[0.15em] transition-colors"
                 >
                   GITHUB
                   <ExternalLink className="w-2.5 h-2.5 inline ml-1" />
@@ -521,7 +517,7 @@ IBobbyOracle oracle = IBobbyOracle(
                   href="https://bobbyprotocol.xyz/llms.txt"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-mono text-[10px] text-white/40 hover:text-[#7da6ff] tracking-[0.15em] transition-colors"
+                  className="font-mono text-[10px] text-white/40 hover:text-[#d1c5e3] tracking-[0.15em] transition-colors"
                 >
                   LLMS.TXT
                   <ExternalLink className="w-2.5 h-2.5 inline ml-1" />
@@ -532,6 +528,6 @@ IBobbyOracle oracle = IBobbyOracle(
 
         </div>
       </div>
-    </KineticShell>
+    </ProtocolLayout>
   );
 }

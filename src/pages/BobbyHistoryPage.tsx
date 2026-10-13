@@ -7,7 +7,8 @@
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import KineticShell from '@/components/kinetic/KineticShell';
+import ProtocolLayout from '@/components/protocol/ProtocolLayout';
+import { useProtocolLanguage } from '@/components/protocol/useProtocolLanguage';
 
 interface Trade {
   symbol: string; direction: string; entryPrice: number; exitPrice: number;
@@ -20,6 +21,7 @@ interface Summary {
 }
 
 export default function BobbyHistoryPage() {
+  const { t, locale } = useProtocolLanguage();
   const [trades, setTrades] = useState<Trade[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,81 +55,82 @@ export default function BobbyHistoryPage() {
   });
 
   return (
-    <KineticShell activeTab="history" showSidebar>
-      <Helmet><title>Trade History | Bobby Agent Trader</title></Helmet>
+    <ProtocolLayout active="record" wide>
+      <Helmet><title>{t("Trade History | Bobby Agent Trader", "Historial de operaciones | Bobby Agent Trader", "Histórico de operações | Bobby Agent Trader")}</title></Helmet>
 
-      <div className="p-6 md:p-8 max-w-7xl mx-auto pb-20">
-        {/* Header */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-          <h1 className="text-3xl md:text-5xl font-black tracking-tight">Trade <span className="text-white/20">/</span> History</h1>
-          <p className="text-[10px] font-mono text-white/20 mt-1">
-            Bobby's confirmed Base receipt ledger · Agent theses and simulated signals appear in <a href="/agentic-world/forum" className="text-green-400/50 hover:text-green-400">Debates</a>
+      <div className="protocol-content">
+        <motion.header initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="protocol-hero">
+          <p className="protocol-eyebrow">{t("Evidence / Track record", "Evidencia / Historial", "Evidência / Histórico")}</p>
+          <h1 className="protocol-title">{t("The record.", "El historial.", "O histórico.")}<br /><span className="text-[#A39C91]">{t("In full view.", "A la vista de todos.", "À vista de todos.")}</span></h1>
+          <p className="protocol-lead">{t(" Bobby's confirmed Base receipt ledger. Every closed position, entry, exit and result in one place. Agent theses and simulated signals appear in ", " El registro de recibos confirmados de Bobby en Base. Cada posición cerrada, entrada, salida y resultado en un lugar. Las tesis de agentes y señales simuladas aparecen en ", " O registro de recibos confirmados do Bobby na Base. Cada posição fechada, entrada, saída e resultado em um só lugar. As teses dos agentes e os sinais simulados aparecem em ")}<a href="/agentic-world/forum" className="text-[#F2EDE4] underline decoration-[#F2EDE4]/30 underline-offset-4 hover:decoration-[#F2EDE4]">{t("Debates", "Debates", "Debates")}</a>.
           </p>
-          <div className="flex items-center gap-2 mt-2">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-            <span className="font-mono text-[10px] text-green-400/60 tracking-widest">LIVE_DATA_STREAMING</span>
-          </div>
-        </motion.div>
+          <div className="mt-6 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#8A8378]">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-300" />{t(" Confirmed receipts / Base ", " Recibos confirmados / Base ", " Recibos confirmados / Base ")}</div>
+        </motion.header>
 
         {loading ? (
-          <div className="text-center py-20"><span className="text-[10px] font-mono text-white/20 animate-pulse">LOADING HISTORY...</span></div>
+          <div className="text-center py-20"><span className="text-[10px] font-mono text-[#A39C91] animate-pulse">{t("LOADING HISTORY...", "CARGANDO HISTORIAL...", "CARREGANDO HISTÓRICO...")}</span></div>
         ) : summary ? (
           <>
             {/* Stats Overview */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
               className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {[
-                { label: 'TOTAL_PNL', value: `${summary.totalReturn >= 0 ? '+' : ''}${summary.totalReturn}%`, color: summary.totalReturn >= 0 ? 'text-green-400' : 'text-red-400' },
-                { label: 'WIN_RATE', value: `${summary.winRate.toFixed(1)}%`, color: 'text-white' },
-                { label: 'EQUITY', value: `$${summary.currentEquity.toFixed(2)}`, color: 'text-green-400' },
-                { label: 'TOTAL_TRADES', value: String(summary.totalTrades), color: 'text-white' },
+                { label: 'Total return', value: `${summary.totalReturn >= 0 ? '+' : ''}${summary.totalReturn}%`, color: summary.totalReturn >= 0 ? 'text-green-400' : 'text-red-400' },
+                { label: 'Win rate', value: `${summary.winRate.toFixed(1)}%`, color: 'text-white' },
+                { label: 'Equity', value: `$${summary.currentEquity.toFixed(2)}`, color: 'text-green-400' },
+                { label: 'Total trades', value: String(summary.totalTrades), color: 'text-white' },
               ].map(stat => (
-                <div key={stat.label} className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] p-5 rounded">
-                  <span className="text-[9px] font-mono text-white/30 tracking-widest">{stat.label}</span>
-                  <div className={`text-xl md:text-2xl font-mono font-bold mt-1 ${stat.color}`}>{stat.value}</div>
+                <div key={stat.label} className="protocol-panel p-5 md:p-7">
+                  <span className="text-[10px] font-mono uppercase text-[#8A8378] tracking-[0.14em]">{stat.label}</span>
+                  <div className={`text-2xl md:text-3xl font-light tracking-[-0.04em] mt-5 ${stat.color}`}>{stat.value}</div>
                 </div>
               ))}
             </motion.div>
 
             {/* Trades Table */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
-              className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] rounded overflow-hidden mb-8">
+              className="protocol-panel overflow-hidden mb-8">
+              <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#F2EDE4]/[0.08] p-6 md:p-8">
+                <h2 className="protocol-section-title">{t("Closed positions", "Posiciones cerradas", "Posições fechadas")}</h2>
+                <span className="protocol-eyebrow">{trades.length}{t(" recorded", " registradas", " registradas")}</span>
+              </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left font-mono text-[10px]">
-                  <thead className="bg-[#1c1b1b] text-white/30 sticky top-0">
+                <table className="w-full min-w-[820px] text-left font-mono text-xs">
+                  <thead className="bg-[#F2EDE4]/[0.025] text-[#8A8378] text-[10px] tracking-[0.1em]">
                     <tr>
-                      <th className="p-3 font-normal">TIMESTAMP</th>
-                      <th className="p-3 font-normal">ASSET</th>
-                      <th className="p-3 font-normal">DIRECTION</th>
-                      <th className="p-3 font-normal">LEVERAGE</th>
-                      <th className="p-3 font-normal text-right">ENTRY</th>
-                      <th className="p-3 font-normal text-right">EXIT</th>
-                      <th className="p-3 font-normal text-right">PNL%</th>
-                      <th className="p-3 font-normal text-right">PNL $</th>
-                      <th className="p-3 font-normal">STATUS</th>
+                      <th className="px-5 py-4 font-normal">{t("TIMESTAMP", "FECHA", "DATA")}</th>
+                      <th className="px-5 py-4 font-normal">{t("ASSET", "ACTIVO", "ATIVO")}</th>
+                      <th className="px-5 py-4 font-normal">{t("DIRECTION", "DIRECCIÓN", "DIREÇÃO")}</th>
+                      <th className="px-5 py-4 font-normal">{t("LEVERAGE", "APALANCAMIENTO", "ALAVANCAGEM")}</th>
+                      <th className="px-5 py-4 font-normal text-right">{t("ENTRY", "ENTRADA", "ENTRADA")}</th>
+                      <th className="px-5 py-4 font-normal text-right">{t("EXIT", "SALIDA", "SAÍDA")}</th>
+                      <th className="px-5 py-4 font-normal text-right">PNL%</th>
+                      <th className="px-5 py-4 font-normal text-right">PNL $</th>
+                      <th className="px-5 py-4 font-normal">{t("STATUS", "ESTADO", "ESTADO")}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/[0.02]">
+                  <tbody className="divide-y divide-[#F2EDE4]/[0.06]">
                     {paged.map((t, i) => (
                       <tr key={i} className="hover:bg-white/[0.02] transition-colors">
-                        <td className="p-3 text-white/25">
+                        <td className="px-5 py-4 text-[#A39C91]">
                           {new Date(t.closeTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}{' '}
                           {new Date(t.closeTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </td>
-                        <td className="p-3 font-bold text-white/80">{t.symbol}/USDT</td>
-                        <td className={`p-3 font-bold ${t.direction === 'long' ? 'text-green-400' : 'text-red-400'}`}>
+                        <td className="px-5 py-4 font-bold text-[#F2EDE4]">{t.symbol}/USDT</td>
+                        <td className={`px-5 py-4 font-bold ${t.direction === 'long' ? 'text-green-400' : 'text-red-400'}`}>
                           {t.direction.toUpperCase()}
                         </td>
-                        <td className="p-3 text-white/40">{t.leverage}</td>
-                        <td className="p-3 text-right text-white/60 tabular-nums">{t.entryPrice.toFixed(2)}</td>
-                        <td className="p-3 text-right text-white/60 tabular-nums">{t.exitPrice.toFixed(2)}</td>
-                        <td className={`p-3 text-right tabular-nums ${t.pnlPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        <td className="px-5 py-4 text-[#A39C91]">{t.leverage}</td>
+                        <td className="px-5 py-4 text-right text-[#A39C91] tabular-nums">{t.entryPrice.toFixed(2)}</td>
+                        <td className="px-5 py-4 text-right text-[#A39C91] tabular-nums">{t.exitPrice.toFixed(2)}</td>
+                        <td className={`px-5 py-4 text-right tabular-nums ${t.pnlPct >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                           {t.pnlPct >= 0 ? '+' : ''}{t.pnlPct.toFixed(1)}%
                         </td>
-                        <td className={`p-3 text-right tabular-nums ${t.realizedPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        <td className={`px-5 py-4 text-right tabular-nums ${t.realizedPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                           {t.realizedPnl >= 0 ? '+' : ''}${t.realizedPnl.toFixed(4)}
                         </td>
-                        <td className="p-3">
+                        <td className="px-5 py-4">
                           <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold ${
                             t.result === 'WIN' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
                           }`}>{t.result}</span>
@@ -138,21 +141,17 @@ export default function BobbyHistoryPage() {
                 </table>
               </div>
               {/* Pagination */}
-              <div className="p-3 border-t border-white/[0.04] flex items-center justify-between bg-black/20">
-                <span className="text-[9px] font-mono text-white/20">
+              <div className="p-5 border-t border-[#F2EDE4]/[0.08] flex flex-wrap items-center justify-between gap-4">
+                <span className="text-[9px] font-mono text-[#A39C91]">
                   {trades.length > 0
                     ? `SHOWING ${page * perPage + 1}-${Math.min((page + 1) * perPage, trades.length)} OF ${trades.length} TRADES`
                     : 'NO TRADES RECORDED'}
                 </span>
                 <div className="flex gap-2">
                   <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}
-                    className="px-3 py-1 text-[9px] font-mono bg-white/[0.03] border border-white/[0.06] text-white/30 hover:text-white/60 disabled:opacity-30 transition-colors rounded">
-                    PREV
-                  </button>
+                    className="protocol-button-secondary disabled:opacity-30">{t(" PREV ", " ANTERIOR ", " ANTERIOR ")}</button>
                   <button onClick={() => setPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1}
-                    className="px-3 py-1 text-[9px] font-mono bg-white/[0.03] border border-white/[0.06] text-white/30 hover:text-white/60 disabled:opacity-30 transition-colors rounded">
-                    NEXT
-                  </button>
+                    className="protocol-button-secondary disabled:opacity-30">{t(" NEXT ", " SIGUIENTE ", " PRÓXIMA ")}</button>
                 </div>
               </div>
             </motion.div>
@@ -161,43 +160,44 @@ export default function BobbyHistoryPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Terminal Output Log */}
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
-                className="lg:col-span-2 bg-black/40 border border-white/[0.04] rounded p-4 overflow-hidden">
-                <span className="text-[9px] font-mono text-white/30 tracking-widest block mb-3">TERMINAL_OUTPUT</span>
-                <div className="font-mono text-[10px] space-y-1 max-h-40 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#22c55e transparent' }}>
+                className="lg:col-span-2 protocol-panel p-6 md:p-8 overflow-hidden">
+                <h2 className="protocol-section-title mb-6">{t("Recent activity", "Actividad reciente", "Atividade recente")}</h2>
+                <div className="font-mono text-[11px] space-y-4 overflow-x-auto">
                   {logEntries.map((entry, i) => (
-                    <div key={i} className="flex gap-3">
-                      <span className="text-white/15 w-16 flex-shrink-0">{entry.time}</span>
+                    <div key={i} className="flex gap-3 min-w-max">
+                      <span className="text-[#A39C91] w-16 flex-shrink-0">{entry.time}</span>
                       <span className={`w-10 flex-shrink-0 ${entry.type === 'EXEC' ? 'text-green-400' : 'text-amber-400'}`}>[{entry.type}]</span>
-                      <span className="text-white/50">{entry.msg}</span>
+                      <span className="text-[#A39C91]">{entry.msg}</span>
                     </div>
                   ))}
-                  <div className="flex gap-3 animate-pulse">
-                    <span className="text-white/15 w-16">--:--:--</span>
+                  <div className="flex gap-3 min-w-max border-t border-[#F2EDE4]/[0.08] pt-4">
+                    <span className="text-[#A39C91] w-16">--:--:--</span>
                     <span className="text-green-400 w-10">[INFO]</span>
-                    <span className="text-green-400/40">AWAITING_NEXT_CYCLE... █</span>
+                    <span className="text-green-400/40">{t("Awaiting the next cycle", "Esperando el siguiente ciclo", "Aguardando o próximo ciclo")}</span>
                   </div>
                 </div>
               </motion.div>
 
               {/* Agent Focus Card */}
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
-                className="bg-white/[0.02] backdrop-blur-sm border-l-4 border-l-green-500 border border-white/[0.04] rounded p-5">
-                <span className="text-[9px] font-mono text-white/30 tracking-widest block mb-3">AGENT_FOCUS: BOBBY_CIO</span>
-                <div className="space-y-3 font-mono text-[10px]">
+                className="protocol-panel p-6 md:p-8">
+                <p className="protocol-eyebrow mb-3">{t("Agent focus / Bobby CIO", "Agente destacado / Bobby CIO", "Agente em foco / Bobby CIO")}</p>
+                <h2 className="protocol-section-title mb-6">{t("Performance", "Rendimiento", "Desempenho")}</h2>
+                <div className="space-y-4 font-mono text-[11px]">
                   <div className="flex justify-between">
-                    <span className="text-white/30">WIN_RATE</span>
+                    <span className="text-[#A39C91]">{t("WIN RATE", "TASA DE ACIERTO", "TAXA DE ACERTO")}</span>
                     <span className="text-green-400 font-bold">{summary.winRate.toFixed(1)}%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-white/30">TOTAL_RETURN</span>
+                    <span className="text-[#A39C91]">{t("TOTAL RETURN", "RETORNO TOTAL", "RETORNO TOTAL")}</span>
                     <span className={summary.totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}>{summary.totalReturn}%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-white/30">TRADES</span>
-                    <span className="text-white/60">{summary.totalTrades}</span>
+                    <span className="text-[#A39C91]">{t("TRADES", "OPERACIONES", "OPERAÇÕES")}</span>
+                    <span className="text-[#A39C91]">{summary.totalTrades}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-white/30">BIAS</span>
+                    <span className="text-[#A39C91]">{t("BIAS", "SESGO", "VIÉS")}</span>
                     <span className={summary.winRate >= 60 ? 'text-green-400' : summary.winRate >= 40 ? 'text-amber-400' : 'text-red-400'}>
                       {summary.winRate >= 60 ? 'AGGRESSIVE' : summary.winRate >= 40 ? 'ADAPTIVE' : 'DEFENSIVE'}
                     </span>
@@ -207,9 +207,9 @@ export default function BobbyHistoryPage() {
             </div>
           </>
         ) : (
-          <div className="text-center py-20 text-white/20 text-sm font-mono">No history available</div>
+          <div className="protocol-panel px-6 py-20 text-center"><p className="protocol-section-title">{t("No history available", "No hay historial disponible", "Nenhum histórico disponível")}</p><p className="mt-3 text-sm text-[#A39C91]">{t("Confirmed receipts will appear here once they are recorded.", "Los recibos confirmados aparecerán aquí cuando se registren.", "Os recibos confirmados aparecerão aqui quando forem registrados.")}</p></div>
         )}
       </div>
-    </KineticShell>
+    </ProtocolLayout>
   );
 }

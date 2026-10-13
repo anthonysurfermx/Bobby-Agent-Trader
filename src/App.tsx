@@ -20,7 +20,11 @@ import UserLayout from '@/pages/user/UserLayout';
 const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
 const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
 const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLandingExperience'), 'app-landing');
+// Redesign previews for /app — lifestyle directions A and B (noindex, local review only).
+const BobbyAppLandingA = lazyWithRetry(() => import('@/pages/BobbyAppLandingA'), 'app-landing-a');
+const BobbyAppLandingB = lazyWithRetry(() => import('@/pages/BobbyAppLandingB'), 'app-landing-b');
 const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'));
+const BobbySupportPage = lazy(() => import('@/pages/BobbySupportPage'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
 const StartupsPage = lazy(() => import('@/pages/StartupsPage'));
 const StartupDetailPage = lazy(() => import('@/pages/StartupDetailPage'));
@@ -305,6 +309,30 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyAppLanding />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'app-a',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyAppLandingA />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'app-b',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyAppLandingB />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'support',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbySupportPage />
             </Suspense>
           ),
         },

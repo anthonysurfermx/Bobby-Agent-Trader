@@ -92,3 +92,24 @@
 .land-tools button{display:flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:0 14px;border-radius:10px;color:#c2d8ca;font-size:13px}
 .land-tools button[aria-pressed=true]{background:#d1edb8;color:#17251a}
 @media(max-width:760px){.land-header{gap:6px;padding:0 8px}.land-header-right{gap:0}.land-wordmark h1{font-size:18px}.land-wordmark .land-eyebrow{font-size:9px}.land-discover-nav{padding:0 8px;font-size:12px}.land-discover-nav svg{display:none}.land-header .land-icon{width:36px}.land-growth{padding:12px}.land-growth h3{font-size:14px}.land-tools button{padding:0 12px;font-size:12px}.land-explore-bar>span{max-width:225px;font-size:10px;line-height:1.4}.land-map-caption p{max-width:240px}.land-map-caption{pointer-events:none}.land-map-caption h2{font-size:18px}.land-map-caption p{font-size:12px!important}}
+
+/* Keep the island in focus; the collection opens when needed. */
+.land-header{height:68px}
+.land-wordmark h1{margin:0;font-size:22px}
+.land-workspace.library-closed{grid-template-columns:minmax(0,1fr)}
+.land-library.collapsed{position:absolute;top:20px;left:20px;width:auto;border:1px solid var(--land-border);border-radius:14px;background:#10211eda;backdrop-filter:blur(16px)}
+.land-library.collapsed .land-library-title{min-height:44px;padding:10px 14px;gap:16px;border:0;font-size:13px}
+.land-explore-bar{width:auto;justify-content:center}
+.land-season summary{cursor:pointer;font-size:13px;color:#b8c9ba;min-height:28px;align-content:center}
+.land-help{top:20px;max-height:calc(100% - 40px);overflow-y:auto}
+@media(max-width:760px){
+  .land-header{height:60px}
+  .land-wordmark h1{font-size:18px}
+  .land-library.collapsed{top:12px;left:12px;border-radius:12px;max-height:none;box-shadow:none}
+  .land-library.collapsed .land-library-title{min-height:44px;font-size:12px;padding:8px 12px}
+  .land-help{top:12px;max-height:calc(100% - 24px)}
+}
+
+.land-library .land-library-title>svg{transform:rotate(180deg)}
+.land-library.collapsed .land-library-title>svg{transform:none}
+@media(max-width:760px){.land-mode{display:flex;font-size:10px;gap:4px}.land-mode i{width:4px;height:4px}}

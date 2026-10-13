@@ -115,6 +115,9 @@ export default defineConfig({
         target: 'https://bobbyprotocol.xyz',
         changeOrigin: true,
       },
+      '/api/verified-calls': { target: 'https://bobbyprotocol.xyz', changeOrigin: true },
+      '/api/challenge-scan': { target: 'https://bobbyprotocol.xyz', changeOrigin: true },
+      '/api/bobby-pnl': { target: 'https://bobbyprotocol.xyz', changeOrigin: true },
       '/api/protocol-tx-history': {
         target: 'https://bobbyprotocol.xyz',
         changeOrigin: true,

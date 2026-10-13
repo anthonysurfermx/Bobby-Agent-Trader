@@ -91,9 +91,9 @@ function ComingSoonBadge({ compact = false }: { compact?: boolean }) {
 
 function PhoneFrame({ src, alt, priority = false }: { src: string; alt: string; priority?: boolean }) {
   return (
-    <div className="relative overflow-hidden rounded-[2.25rem] border border-white/15 bg-[#080a0d] p-[6px] shadow-[0_32px_90px_rgba(0,0,0,.65)]">
-      <div className="pointer-events-none absolute left-1/2 top-[12px] z-10 h-[17px] w-[82px] -translate-x-1/2 rounded-full bg-black" />
-      <img src={src} alt={alt} loading={priority ? 'eager' : 'lazy'} className="h-auto w-full rounded-[1.95rem]" />
+    <div className="overflow-hidden rounded-[2rem] border border-white/20 bg-[#090b10] p-1.5 shadow-[0_32px_90px_rgba(0,0,0,.72),0_0_55px_rgba(85,122,255,.12)]">
+      {/* The screenshot is the shipped iOS screen, including its status bar and Dynamic Island. */}
+      <img src={src} alt={alt} loading={priority ? 'eager' : 'lazy'} className="block h-auto w-full rounded-[1.6rem]" />
     </div>
   );
 }
@@ -107,7 +107,7 @@ export default function BobbyAppLandingExperience() {
   const [signupState, setSignupState] = useState<SignupState>('idle');
   const [signupMessage, setSignupMessage] = useState('');
 
-  const pageTitle = t('Bobby — Asking an AI is no longer an edge.', 'Bobby — Preguntarle a una IA ya no es ventaja.');
+  const pageTitle = t('Bobby — The market has a take. Bobby has three.', 'Bobby — El mercado tiene su versión. Bobby tiene tres.');
   useEffect(() => { document.title = pageTitle; }, [pageTitle]);
 
   const record = stats?.debateActivity;
@@ -132,11 +132,11 @@ export default function BobbyAppLandingExperience() {
   // One line of communication: every entry is a beat of the same argument —
   // asking is free, verifying is the edge, and this is what verifying looks like.
   const navItems: Array<[string, string]> = [
-    [t('Why', 'Por qué'), '#verify'],
-    [t('How a call is made', 'Cómo se decide'), '#how'],
+    [t('The Bobby difference', 'Lo que hace distinto a Bobby'), '#verify'],
+    [t('How it works', 'Cómo funciona'), '#how'],
     [t('The record', 'El historial'), '#record'],
-    [t('Discipline', 'Disciplina'), '#aura'],
-    ['Squad', '#squad'],
+    [t('Trader Land', 'Trader Land'), '#aura'],
+    [t('Meet the squad', 'Conoce al squad'), '#squad'],
   ];
 
   const moments = [
@@ -188,11 +188,11 @@ export default function BobbyAppLandingExperience() {
     <div className="min-h-screen overflow-x-clip [&_section[id]]:scroll-mt-24 [&_a:focus-visible]:outline [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-4 [&_a:focus-visible]:outline-[#b7e89c] [&_button:focus-visible]:outline [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-4 [&_button:focus-visible]:outline-[#b7e89c] bg-[#050706] font-sans text-white antialiased selection:bg-[#5cff91] selection:text-[#041009]">
       <Helmet>
         <title>{pageTitle}</title>
-        <meta name="description" content={t('Everyone asks an AI about their assets now. Bobby is what comes after: three agents challenge the answer, a risk gate can veto it, and the verdict goes on the record before the market settles it.', 'Todo el mundo le pregunta a una IA por sus activos. Bobby es lo que viene después: tres agentes refutan la respuesta, una puerta de riesgo puede vetarla, y el veredicto queda registrado antes de que el mercado lo resuelva.')} />
+        <meta name="description" content={t('Pick the Bobby companion that feels like you. Behind every voice, three market agents challenge the idea, a risk gate can say wait, and every call goes on the record.', 'Elige al companion de Bobby que va contigo. Detrás de cada voz, tres agentes de mercado cuestionan la idea, el risk gate puede decir espera y cada decisión queda registrada.')} />
         <link rel="canonical" href="https://bobbyprotocol.xyz/app" />
         <meta property="og:url" content="https://bobbyprotocol.xyz/app" />
         <meta property="og:title" content={pageTitle} />
-        <meta property="og:description" content={t('Everyone can ask an AI now. Bobby is what happens to the answer next.', 'Cualquiera le puede preguntar a una IA. Bobby es lo que le pasa después a esa respuesta.')} />
+        <meta property="og:description" content={t('Three perspectives. One Bobby. A real debate before the market call.', 'Tres perspectivas. Un Bobby. Un debate real antes de la lectura del mercado.')} />
         <meta property="og:image" content="https://bobbyprotocol.xyz/favicon-bobby-v3.png" />
       </Helmet>
 
@@ -225,50 +225,43 @@ export default function BobbyAppLandingExperience() {
       </header>
 
       <main>
-        {/* HERO — the core message */}
-        <section className="relative isolate overflow-hidden border-b border-white/10">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_74%_38%,rgba(245,197,66,.14),transparent_34%),radial-gradient(circle_at_87%_25%,rgba(92,255,145,.18),transparent_40%),radial-gradient(circle_at_18%_70%,rgba(52,121,255,.14),transparent_38%)]" />
-          <div className="pointer-events-none absolute inset-0 opacity-[0.035] [background-image:linear-gradient(rgba(255,255,255,.5)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.5)_1px,transparent_1px)] [background-size:44px_44px]" />
-          <div className="relative mx-auto grid min-h-[calc(100svh-69px)] max-w-7xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[1.02fr_.98fr] lg:px-8 lg:py-20">
-            <motion.div initial={reduceMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : 0.55 }} className="relative z-10">
-              <div className="mb-7 flex flex-wrap items-center gap-3">
-                <ComingSoonBadge compact />
-                <span className="rounded-full border border-[#F5C542]/30 bg-[#F5C542]/[0.08] px-3 py-2 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-[#F5C542]">{t('iPhone beta · Live desk on the web', 'Beta iPhone · Live desk en la web')}</span>
+        {/* HERO — the approved Three Voices artwork, with the real iOS capture overlaid. */}
+        <section className="relative isolate overflow-hidden border-b border-white/10 bg-[#090a0d]">
+          <h1 className="sr-only">{t('The market has a take. Bobby has three.', 'El mercado tiene su versión. Bobby tiene tres.')}</h1>
+          <div className="mx-auto max-w-[1672px]">
+            <div className="relative hidden aspect-[1672/941] w-full overflow-hidden sm:block">
+              <img src="/app/three-voices-hero-base.png" alt={t('Bobby’s three companion characters — Byte, Kora, and Zip — around the real Bobby iPhone app.', 'Los tres companions de Bobby —Byte, Kora y Zip— junto a la app real de Bobby para iPhone.')} className="absolute inset-0 h-full w-full object-contain" fetchPriority="high" />
+              <div className="absolute overflow-hidden bg-[#05070b]" style={{ left: '56.34%', top: '38.68%', width: '14.84%', height: '51.75%', borderRadius: '2.25% / 2.3%' }}>
+                <img src="/app/shot-desk.webp" alt={t('Exact Live Desk screenshot from the Bobby iOS app.', 'Captura exacta del Live Desk de la app iOS de Bobby.')} className="h-full w-full object-contain" fetchPriority="high" />
               </div>
-              <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.24em] text-[#5cff91]">{t('The verification layer', 'La capa de comprobación')}</div>
-              <h1 className="max-w-3xl text-[clamp(2.5rem,6.2vw,5.6rem)] font-black leading-[0.92] tracking-[-0.07em]">
-                {t('Asking an AI about your asset', 'Preguntarle a una IA por tu activo')}<br />
-                <span className="bg-[linear-gradient(100deg,#F5C542_0%,#5cff91_55%,#76d6ff_100%)] bg-clip-text text-transparent">{t('is no longer an edge.', 'ya no es una ventaja.')}</span>
-              </h1>
-              <p className="mt-7 max-w-xl text-base leading-7 text-white/58 sm:text-lg sm:leading-8">
-                {t('Everyone has that answer now, from the same models, in the same confident voice. Bobby gives you what comes after it: three agents challenge the answer, and the verdict goes on the record before the market settles it.', 'Lo hace todo el mundo, con los mismos modelos y con la misma seguridad en la voz. Bobby te da lo que viene después: tres agentes refutan la respuesta y el veredicto queda registrado antes de que el mercado lo resuelva.')}
-              </p>
-              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-                <a href={TRY_IT_URL} className="group inline-flex min-h-14 items-center justify-center gap-3 rounded-xl bg-[#5cff91] px-7 font-mono text-xs font-black uppercase tracking-[0.14em] text-[#041009] transition hover:bg-white">{t('Try the live desk', 'Prueba el live desk')} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
-                <a href="#record" className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl border border-white/15 bg-white/[0.06] px-7 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-white/[0.12]">{t('See the record', 'Ver el historial')}</a>
-              </div>
-              <a href="#early-access" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm text-white/60 underline decoration-white/20 underline-offset-4 hover:text-white">{t('Prefer iPhone? Join the early-access list', '¿Prefieres iPhone? Únete al acceso anticipado')}<ChevronRight size={15} /></a>
-              <div className="mt-7 flex flex-wrap gap-x-6 gap-y-3 font-mono text-[9px] uppercase tracking-[0.12em] text-white/38">
-                <span className="inline-flex items-center gap-2"><Mic className="h-3.5 w-3.5 text-[#5cff91]" /> {t('Talk to it about BTC, NVDA or gold', 'Háblale de BTC, NVDA u oro')}</span>
-                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-[#8dc9ff]" /> {t('Three agents · one verdict', 'Tres agentes · un veredicto')}</span>
-                <span className="inline-flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-[#F5C542]" /> {t('On the record before the outcome', 'Registrado antes del resultado')}</span>
-              </div>
-            </motion.div>
-
-            <div className="relative mx-auto flex w-full max-w-[440px] items-center justify-center lg:max-w-[500px]">
-              <div className="absolute h-[72%] w-[72%] rounded-full bg-[#F5C542]/15 blur-[85px]" />
-              <motion.div initial={reduceMotion ? false : { opacity: 0, y: 28, rotate: 2 }} animate={{ opacity: 1, y: 0, rotate: 2 }} transition={{ duration: reduceMotion ? 0 : 0.7, delay: 0.1 }} className="relative z-10 w-[72%] max-w-[310px]">
-                <PhoneFrame src="/app/shot-desk.webp" alt={t('Bobby Live Desk on iPhone: Byte wearing his gear with Bit the dog', 'Bobby Live Desk en iPhone: Byte con su equipo y Bit el perro')} priority />
-              </motion.div>
-              <motion.div initial={reduceMotion ? false : { opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1, y: reduceMotion ? 0 : [0, -8, 0] }} transition={{ opacity: { delay: 0.3 }, scale: { delay: 0.3 }, y: { duration: 4, repeat: Infinity, ease: 'easeInOut' } }} className="absolute -left-1 top-[12%] z-20 h-24 w-24 -rotate-6 overflow-hidden rounded-3xl border border-[#F5C542]/40 shadow-2xl sm:h-28 sm:w-28" style={{ boxShadow: `0 18px 50px rgba(0,0,0,.5), 0 0 40px ${GOLD}33` }}>
-                <img src="/favicon-bobby-v3.png" alt={t('Golden Byte — the max level', 'Byte dorado — el nivel máximo')} className="h-full w-full object-cover" />
-              </motion.div>
-              {starters.filter((c) => c.id !== 'byte').slice(0, 3).map((item, index) => (
-                <motion.div key={item.id} initial={reduceMotion ? false : { opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1, y: reduceMotion ? 0 : [0, -7, 0] }} transition={{ opacity: { delay: 0.4 + index * 0.1 }, scale: { delay: 0.4 + index * 0.1 }, y: { duration: 3.6 + index, repeat: Infinity, ease: 'easeInOut' } }} className={`absolute z-20 grid h-20 w-20 place-items-center rounded-3xl border border-white/15 bg-[#0a0d0b]/90 p-1 shadow-2xl backdrop-blur-xl sm:h-24 sm:w-24 ${index === 0 ? '-right-1 top-[30%] rotate-6' : index === 1 ? 'bottom-[10%] left-[2%] rotate-3' : '-right-2 bottom-[4%] -rotate-3'}`} style={{ boxShadow: `0 18px 50px rgba(0,0,0,.5), 0 0 30px ${tintFor(item, 0.12)}` }}>
-                  <img src={`/mascots/${item.id}.webp`} alt={`${item.label}, ${pick(item.role)}`} className="h-full w-full rounded-[1.2rem] object-cover" />
-                </motion.div>
-              ))}
             </div>
+
+            <div className="px-4 pb-8 pt-12 sm:hidden">
+              <div className="text-center">
+                <div className="mx-auto mb-4 flex w-fit items-center gap-2 font-mono text-[9px] font-bold uppercase tracking-[.22em] text-white/60"><img src="/favicon-bobby-v3.png" alt="" className="h-5 w-5 rounded" /> BOBBY</div>
+                <p className="text-[clamp(2.25rem,11vw,3.6rem)] font-black leading-[.9] tracking-[-.07em]">{t('The market has a take.', 'El mercado tiene su versión.')}<br /><span className="text-white/45">{t('Bobby has three.', 'Bobby tiene tres.')}</span></p>
+                <p className="mt-4 text-sm leading-6 text-white/60">{t('Hear the case. Hear the pushback. Make your call.', 'Escucha la idea. Escucha lo que la cuestiona. Decide tú.')}</p>
+              </div>
+              <div className="mt-8 grid grid-cols-3 gap-2">
+                {[
+                  { id: 'byte', name: 'BYTE', color: '#38d875' },
+                  { id: 'kora', name: 'KORA', color: '#2084ff' },
+                  { id: 'zip', name: 'ZIP', color: '#ff6045' },
+                ].map((voice) => (
+                  <div key={voice.id} className="relative flex min-h-[155px] items-end justify-center overflow-hidden rounded-2xl border border-white/10 p-2" style={{ background: 'linear-gradient(160deg, ' + voice.color + ' 0%, ' + voice.color + 'aa 55%, #101116 100%)' }}>
+                    <img src={'/mascots/' + voice.id + '.webp'} alt={voice.name} className="h-[145px] max-w-full object-contain object-bottom" />
+                    <span className="absolute left-2 top-2 rounded-full bg-black/40 px-2 py-1 font-mono text-[8px] font-bold tracking-[.12em] text-white">{voice.name}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mx-auto mt-6 w-[48%] max-w-[220px]">
+                <PhoneFrame src="/app/shot-desk.webp" alt={t('Real Bobby iOS Live Desk screen', 'Pantalla real del Live Desk de Bobby para iOS')} priority />
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3 border-t border-white/10 bg-[#0b0d11] px-4 py-4 sm:py-5">
+            <a href={TRY_IT_URL} className="group inline-flex min-h-12 items-center justify-center gap-3 rounded-full bg-[#baff42] px-6 font-mono text-[9px] font-black uppercase tracking-[.16em] text-[#10150b] transition hover:bg-white">{t('Meet Bobby', 'Conoce a Bobby')}<ArrowRight size={15} className="transition group-hover:translate-x-1" /></a>
+            <a href="#how" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/15 px-6 font-mono text-[9px] font-bold uppercase tracking-[.16em] text-white/70 transition hover:border-white/35 hover:text-white">{t('See how it works', 'Así funciona')}</a>
           </div>
         </section>
 
@@ -284,50 +277,45 @@ export default function BobbyAppLandingExperience() {
           </div>
         </div>
 
-        {/* 01 — THE TWO ERAS: the core message. Asking is free now; verifying is what Bobby adds. */}
-        <section id="verify" className="scroll-mt-20 border-b border-white/10 bg-[#080a09] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
-          <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[.9fr_1.1fr] lg:items-start">
+        {/* 01 — the Bobby difference: a bright editorial pause after the dark hero. */}
+        <section id="verify" className="scroll-mt-20 overflow-hidden bg-[#e8f4d1] px-4 py-20 text-[#111610] sm:px-6 lg:px-8 lg:py-28">
+          <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[.9fr_1.1fr] lg:items-center">
             <motion.div {...reveal}>
-              <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.24em] text-[#F5C542]">01 / {t('The two eras', 'Las dos eras')}</div>
-              <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-5xl lg:text-6xl">{t('The first era was asking.', 'La primera era fue preguntar.')}<br /><span className="text-white/38">{t('The second is verifying.', 'La segunda es comprobar.')}</span></h2>
-              <p className="mt-6 max-w-xl text-base leading-7 text-white/48">{t("Two years ago, a reasoned read on an asset in thirty seconds was a privilege. Today it's free, on any phone. Access to analysis stopped being scarce. What's scarce now is knowing whether the answer was any good.", 'Hace dos años, una lectura razonada de un activo en treinta segundos era un privilegio. Hoy es gratis, en cualquier teléfono. El acceso al análisis dejó de ser escaso. Lo escaso ahora es saber si esa respuesta era buena.')}</p>
-              <p className="mt-6 max-w-xl border-l-2 border-[#5cff91]/60 pl-4 text-sm leading-6 text-white/70">{t('Bobby uses the same models. The difference is not the model: it is the procedure around it.', 'Bobby usa los mismos modelos. La diferencia no está en el modelo: está en el procedimiento que lo rodea.')}</p>
+              <div className="mb-5 font-mono text-[10px] font-black uppercase tracking-[0.24em] text-[#285b34]">01 / {t('The Bobby difference', 'Lo que hace distinto a Bobby')}</div>
+              <h2 className="text-4xl font-black leading-[0.93] tracking-[-0.07em] sm:text-5xl lg:text-6xl">{t('Anyone can get an AI take.', 'Cualquiera puede pedirle una opinión a la IA.')}<br /><span className="text-[#547057]">{t('Bobby makes it earn your trust.', 'Bobby hace que se la gane.')}</span></h2>
+              <p className="mt-6 max-w-xl text-base leading-7 text-[#27342a]/75">{t('A confident answer is easy. Bobby puts the idea in front of three market agents, lets them challenge each other, then records what they decided before the market moves.', 'Una respuesta segura es fácil. Bobby pone la idea frente a tres agentes de mercado, deja que la cuestionen y registra qué decidieron antes de que se mueva el mercado.')}</p>
+              <a href="#record" className="mt-7 inline-flex min-h-12 items-center gap-2 rounded-full bg-[#101710] px-5 font-mono text-[9px] font-bold uppercase tracking-[.14em] text-[#c8ff70] transition hover:bg-[#25452d]">{t('See every call, wins and misses', 'Mira cada decisión, aciertos y fallos')}<ArrowRight size={15} /></a>
             </motion.div>
-            <motion.div {...reveal} className="overflow-x-auto rounded-3xl border border-white/10 bg-white/[0.03]">
-              <table className="w-full min-w-[520px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-white/10 font-mono text-[10px] uppercase tracking-[0.16em] text-white/45">
-                    <th scope="col" className="px-5 py-4 font-medium"></th>
-                    <th scope="col" className="px-5 py-4 font-medium">{t('Asking', 'Preguntar')}</th>
-                    <th scope="col" className="px-5 py-4 font-medium text-[#5cff91]">{t('Verifying', 'Comprobar')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    [t('Who answers', 'Quién responde'), t('A model', 'Un modelo'), t('A procedure', 'Un procedimiento')],
-                    [t("When it's recorded", 'Cuándo queda registrado'), t('Never', 'Nunca'), t('Before the outcome', 'Antes del resultado')],
-                    [t("If it's wrong", 'Si se equivoca'), t('Nothing happens', 'No pasa nada'), t('It stays on the record', 'Queda en el registro')],
-                    [t('What you get', 'Lo que obtienes'), t('An opinion', 'Una opinión'), t('A verdict with an invalidation price', 'Un veredicto con precio de invalidación')],
-                    [t('Can it be audited', 'Se puede auditar'), 'No', t('Yes', 'Sí')],
-                  ].map(([label, asking, verifying]) => (
-                    <tr key={label} className="border-b border-white/[0.06] last:border-0">
-                      <th scope="row" className="px-5 py-4 font-medium text-white/60">{label}</th>
-                      <td className="px-5 py-4 text-white/45">{asking}</td>
-                      <td className="px-5 py-4 font-semibold text-white">{verifying}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <motion.div {...reveal} className="relative overflow-hidden rounded-[2rem] bg-[#101710] p-5 text-white shadow-[0_30px_80px_rgba(25,55,33,.2)] sm:p-8">
+              <div className="absolute -right-14 -top-14 h-48 w-48 rounded-full bg-[#baff42]/15 blur-3xl" />
+              <div className="relative mb-6 flex items-center justify-between border-b border-white/10 pb-4 font-mono text-[9px] font-bold uppercase tracking-[.18em]"><span className="text-white/55">{t('Inside every Bobby call', 'Dentro de cada decisión de Bobby')}</span><span className="text-[#baff42]">01 → 02 → 03</span></div>
+              <div className="relative grid gap-3 sm:grid-cols-3">
+                {[
+                  { n: '01', title: t('Make the case', 'Presenta la idea'), who: 'ALPHA HUNTER', color: '#baff42', text: t('What could go right?', '¿Qué podría salir bien?') },
+                  { n: '02', title: t('Push back', 'Busca el otro lado'), who: 'RED TEAM', color: '#70a5ff', text: t('What are we missing?', '¿Qué se nos puede estar escapando?') },
+                  { n: '03', title: t('Call it', 'Toma una decisión'), who: 'THE CIO', color: '#ff826b', text: t('Is the idea worth the risk?', '¿La idea compensa el riesgo?') },
+                ].map((step) => (
+                  <div key={step.n} className="rounded-[1.35rem] border border-white/10 bg-white/[0.045] p-4 sm:p-5">
+                    <div className="font-mono text-[8px] font-bold tracking-[.15em]" style={{ color: step.color }}>{step.n} / {step.who}</div>
+                    <h3 className="mt-5 text-lg font-black tracking-[-.04em] sm:text-xl">{step.title}</h3>
+                    <p className="mt-2 text-xs leading-5 text-white/55">{step.text}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="relative mt-4 flex items-center justify-between gap-4 rounded-2xl border border-[#70a5ff]/20 bg-[#70a5ff]/[0.08] px-4 py-4">
+                <div><div className="font-mono text-[8px] font-bold uppercase tracking-[.16em] text-[#9dc0ff]">{t('Then the risk gate weighs in', 'Después entra el risk gate')}</div><div className="mt-1 text-sm font-semibold">{t('Sometimes the answer is “wait.”', 'A veces la respuesta es «espera».')}</div></div>
+                <img src="/mascots/halo.webp" alt="Halo, Bobby risk guardian" className="h-14 w-14 object-contain" />
+              </div>
             </motion.div>
           </div>
         </section>
 
         {/* 02 — HOW A CALL IS MADE: the procedure, made visible. */}
-        <section id="how" className="scroll-mt-20 bg-[#080a09] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+        <section id="how" className="scroll-mt-20 bg-[#090b13] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
           <div className="mx-auto max-w-7xl">
             <motion.div {...reveal} className="mb-12 max-w-3xl">
-              <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#5cff91]">02 / {t('How a call is made', 'Cómo se decide')}</div>
-              <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-5xl lg:text-7xl">{t('Ask the same question.', 'Haz la misma pregunta.')}<br /><span className="text-white/38">{t('Get an answer that was tested.', 'Recibe una respuesta que ya fue probada.')}</span></h2>
+              <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#5cff91]">02 / {t('The real app', 'La app real')}</div>
+              <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-5xl lg:text-7xl">{t('You bring the question.', 'Tú traes la pregunta.')}<br /><span className="text-white/38">{t('Bobby does the homework.', 'Bobby hace la tarea.')}</span></h2>
               <p className="mt-6 max-w-xl text-base leading-7 text-white/48">{t('Not a chat box. A desk where three agents disagree in front of you, a risk gate that can veto them, and a verdict with the price that invalidates it.', 'No es un chat. Es un desk donde tres agentes discrepan frente a ti, una puerta de riesgo que puede vetarlos, y un veredicto con el precio que lo invalida.')}</p>
             </motion.div>
             <div className="grid gap-5 lg:grid-cols-3">

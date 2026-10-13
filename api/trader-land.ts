@@ -35,7 +35,7 @@ const Body = z.discriminatedUnion('action', [
   z.object({ action: z.literal('remove'), placementId: z.string().uuid() }),
   z.object({ action: z.literal('publish'), title: z.string().max(80).optional() }),
   z.object({ action: z.literal('unpublish') }),
-  z.object({ action: z.literal('close'), inventoryId: z.string().uuid(), tzOffsetMin: z.number().int().min(-840).max(840).default(0), platform: z.enum(['ios', 'web']).default('web') }),
+  z.object({ action: z.literal('close'), inventoryId: z.string().uuid(), tzOffsetMin: z.number().int().min(-840).max(840).default(0), platform: z.enum(['ios', 'android', 'web']).default('web') }),
 ]);
 
 interface Inv { id: string; item_id: string; state: 'seed' | 'bloomed'; source: string; seeded_at: string; bloomed_at: string | null; event_id: string | null }

@@ -3,7 +3,9 @@
 // in the public repo. The chain is the point: every round tried to break the
 // previous fix, verdicts were NO-GO until fixed, and each fix was re-audited.
 import { Helmet } from 'react-helmet-async';
-import { ArrowLeft, ArrowUpRight, ShieldAlert } from 'lucide-react';
+import ProtocolLayout from '@/components/protocol/ProtocolLayout';
+import { useProtocolLanguage } from '@/components/protocol/useProtocolLanguage';
+import { ArrowUpRight, ShieldAlert } from 'lucide-react';
 
 const GH = 'https://github.com/anthonysurfermx/Bobby-Agent-Trader/blob';
 
@@ -60,60 +62,65 @@ const ROUNDS: Round[] = [
 ];
 
 export default function BobbyAuditsPage() {
+  const { t } = useProtocolLanguage();
   return (
-    <div className="min-h-screen bg-[#050505] text-white">
+    <ProtocolLayout active="audits">
       <Helmet>
-        <title>Audit Trail — Bobby Protocol</title>
+        <title>{t("Audit Trail — Bobby Protocol", "Auditorías — Bobby Protocol", "Auditorias — Bobby Protocol")}</title>
         <meta name="description" content="Five adversarial audit rounds on BobbyTrackRecordV2 — findings, severities and fixes, published in full." />
       </Helmet>
-      <div className="pointer-events-none fixed inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(255,255,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.6)_1px,transparent_1px)] [background-size:52px_52px]" />
 
-      <div className="relative mx-auto max-w-3xl px-5 py-12 lg:px-8">
-        <a href="/protocol" className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.15em] text-white/50 transition hover:text-white">
-          <ArrowLeft className="h-3.5 w-3.5" /> Bobby Protocol
-        </a>
 
-        <h1 className="mt-8 text-4xl font-extrabold tracking-[-0.06em] md:text-6xl">Audit <span className="text-[#0052ff]">trail.</span></h1>
-        <p className="mt-5 text-lg leading-8 text-white/55">
-          Five adversarial rounds on the track-record contract. Every round attacked the previous
-          round&apos;s fix, verdicts stayed <b className="text-white/85">NO-GO until fixed</b>, and every
-          fix was re-audited. Four P1s found and killed — being wrong in public is part of the design.
-        </p>
+      <div className="protocol-content">
 
-        <div className="mt-7 rounded-2xl border border-[#0052ff]/40 bg-[#0052ff]/10 p-5">
-          <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#7da6ff]">Release status · Base mainnet</div>
-          <p className="mt-2 text-sm leading-6 text-white/65">The audited seven-contract release is deployed on chain 8453. Ownership acceptance, runtime verification, mainnet canary and soak remain mandatory before public writes.</p>
+
+        <header className="protocol-hero">
+          <p className="protocol-eyebrow">{t("Security / Audit trail", "Seguridad / Auditorías", "Segurança / Auditorias")}</p>
+          <h1 className="protocol-title">{t("Test the claim.", "Pon a prueba la promesa.", "Teste a promessa.")}<br /><span className="text-[#A39C91]">{t("Publish the findings.", "Publica los hallazgos.", "Publique os resultados.")}</span></h1>
+          <p className="protocol-lead">{t(" Five adversarial rounds on the track-record contract. Every round attacked the previous round's fix, verdicts stayed ", " Cinco rondas adversariales sobre el contrato de historial. Cada ronda atacó la corrección de la anterior; los veredictos siguieron siendo ", " Cinco rodadas adversariais sobre o contrato de histórico. Cada rodada atacou a correção da anterior; os veredictos permaneceram ")}<b className="font-medium text-[#F2EDE4]">{t("NO-GO until fixed", "NO-GO hasta corregirse", "NO-GO até a correção")}</b>{t(", and every fix was re-audited. Four P1s found and killed — being wrong in public is part of the design. ", ", y cada corrección volvió a auditarse. Cuatro P1 encontrados y resueltos: equivocarse en público es parte del diseño. ", ", e cada correção foi auditada novamente. Quatro P1 encontrados e resolvidos: errar em público faz parte do projeto. ")}</p>
+        </header>
+
+        <div className="protocol-panel flex flex-col gap-5 p-6 md:flex-row md:items-start md:gap-12 md:p-8">
+          <div className="protocol-eyebrow shrink-0 pt-1">{t("Release status · Base mainnet", "Estado de la versión · Base mainnet", "Estado da versão · Base mainnet")}</div>
+          <p className="max-w-2xl text-sm leading-7 text-[#A39C91]">{t("The audited seven-contract release is deployed on chain 8453. Ownership acceptance, runtime verification, mainnet canary and soak remain mandatory before public writes.", "La versión auditada de siete contratos está desplegada en la red 8453. La aceptación de propiedad, verificación en ejecución, canario y observación en mainnet siguen siendo obligatorios antes de habilitar escrituras públicas.", "A versão auditada de sete contratos está implantada na rede 8453. A aceitação de propriedade, verificação em execução, canário e observação na mainnet continuam obrigatórios antes de habilitar escritas públicas.")}</p>
         </div>
 
-        <div className="mt-10 space-y-5">
-          {ROUNDS.map((r) => (
-            <div key={r.name} className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+        <section className="protocol-section">
+          <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+            <h2 className="protocol-section-title">{t("An open record of review.", "Un registro abierto de revisión.", "Um registro aberto de revisão.")}</h2>
+            <span className="protocol-eyebrow">{t("05 rounds / 04 P1 findings", "05 rondas / 04 hallazgos P1", "05 rodadas / 04 achados P1")}</span>
+          </div>
+          <div className="space-y-5">
+          {ROUNDS.map((r, index) => (
+            <article key={r.name} className="protocol-panel grid gap-5 p-6 md:grid-cols-[56px_1fr] md:gap-8 md:p-8">
+              <span className="font-mono text-sm text-[#8A8378]">0{index + 1}</span>
+              <div>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2 font-mono text-sm font-bold tracking-[0.08em] text-white">
-                  <ShieldAlert className="h-4 w-4 text-[#7da6ff]" /> {r.name}
+                <div className="flex items-center gap-2 text-lg font-normal tracking-tight text-[#F2EDE4]">
+                  <ShieldAlert className="h-4 w-4 text-[#d6c6ed]" /> {r.name}
                 </div>
                 <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em]">
-                  <span className="text-white/35">{r.date}</span>
+                  <span className="text-[#A39C91]">{r.date}</span>
                   <span className={`rounded-full border px-2.5 py-1 font-bold ${r.verdict.startsWith('GO') ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/30 bg-amber-400/10 text-amber-300'}`}>
                     {r.verdict}
                   </span>
                 </div>
               </div>
-              <p className="mt-3 text-sm leading-6 text-white/60">{r.finding}</p>
-              <p className="mt-2 text-sm leading-6 text-white/45"><b className="font-mono text-[11px] uppercase tracking-[0.12em] text-emerald-300/80">Fix · </b>{r.fix}</p>
-              <a href={r.href} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-[#7da6ff] transition hover:text-white">
-                Full report <ArrowUpRight className="h-3 w-3" />
+              <p className="mt-5 text-sm leading-7 text-[#A39C91]">{r.finding}</p>
+              <p className="mt-4 border-t border-[#F2EDE4]/[0.08] pt-4 text-sm leading-7 text-[#A39C91]"><b className="font-mono text-[11px] uppercase tracking-[0.12em] text-emerald-300/80">{t("Fix · ", "Corrección · ", "Correção · ")}</b>{r.fix}</p>
+              <a href={r.href} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 font-mono text-[11px] uppercase tracking-[0.12em] text-[#d6c6ed] transition hover:text-white">{t(" Full report ", " Informe completo ", " Relatório completo ")}<ArrowUpRight className="h-3 w-3" />
               </a>
-            </div>
+              </div>
+            </article>
           ))}
-        </div>
+          </div>
+        </section>
 
-        <p className="mt-10 font-mono text-[11px] leading-5 text-white/30">
-          Reports are the working documents, unedited (Spanish). See also:{' '}
-          <a href="/protocol/calls" className="text-white/50 underline-offset-2 hover:underline">verifiable calls</a> ·{' '}
-          <a href="/protocol/risk" className="text-white/50 underline-offset-2 hover:underline">risk & claims</a>
+        <p className="mt-10 font-mono text-[11px] leading-5 text-[#A39C91]">{t(" Reports are the working documents, unedited (Spanish). See also:", " Los informes son los documentos de trabajo originales, en español. Consulta también:", " Os relatórios são os documentos de trabalho originais, em espanhol. Veja também:")}{' '}
+          <a href="/protocol/calls" className="text-[#A39C91] underline-offset-2 hover:underline">{t("verifiable calls", "señales verificables", "sinais verificáveis")}</a> ·{' '}
+          <a href="/protocol/risk" className="text-[#A39C91] underline-offset-2 hover:underline">{t("risk & claims", "riesgos y afirmaciones", "riscos e afirmações")}</a>
         </p>
       </div>
-    </div>
+    </ProtocolLayout>
   );
 }

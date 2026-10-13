@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
-import KineticShell from '@/components/kinetic/KineticShell';
+import ProtocolLayout from '@/components/protocol/ProtocolLayout';
 import { PLAYBOOKS } from '@/data/playbooks';
 
 // ── Types ──────────────────────────────────────────────────
@@ -90,15 +90,15 @@ interface Verdict {
 }
 
 const AGENT_META: Record<AgentPhase, { label: string; accent: string; glyph: string; tagline: string }> = {
-  alpha_hunter: { label: 'Alpha Hunter', accent: '#7da6ff', glyph: '>>>', tagline: 'Bull thesis' },
+  alpha_hunter: { label: 'Alpha Hunter', accent: '#d1c5e3', glyph: '>>>', tagline: 'Bull thesis' },
   red_team:     { label: 'Red Team',     accent: '#ff716a', glyph: ':::', tagline: 'Adversarial rebuttal' },
   cio:          { label: 'CIO',          accent: '#fcc025', glyph: '[!]', tagline: 'Capital decision' },
-  judge:        { label: 'Judge',        accent: '#60a5fa', glyph: '(6)', tagline: '6-dimension audit' },
+  judge:        { label: 'Judge',        accent: '#c2b0da', glyph: '(6)', tagline: '6-dimension audit' },
   guardrails:   { label: 'Guardrails',   accent: '#c084fc', glyph: '###', tagline: 'Fail-closed checks' },
 };
 
 const ACTION_STYLE: Record<VerdictAction, { bg: string; border: string; text: string; label: string }> = {
-  EXECUTE:    { bg: 'bg-[#0052ff]/10', border: 'border-[#0052ff]/40', text: 'text-[#7da6ff]', label: 'EXECUTE' },
+  EXECUTE:    { bg: 'bg-[#b5a2de]/10', border: 'border-[#b5a2de]/40', text: 'text-[#d1c5e3]', label: 'EXECUTE' },
   YIELD_PARK: { bg: 'bg-[#fcc025]/10', border: 'border-[#fcc025]/40', text: 'text-[#fcc025]', label: 'YIELD PARK' },
   BLOCKED:    { bg: 'bg-[#ff716a]/10', border: 'border-[#ff716a]/40', text: 'text-[#ff716a]', label: 'BLOCKED' },
 };
@@ -343,35 +343,38 @@ export default function BobbySandboxPage() {
           content="Pressure-test a playbook in a live adversarial simulation. Watch Alpha Hunter, Red Team, CIO, Judge, and 11 guardrails run in real time."
         />
       </Helmet>
-      <KineticShell activeTab="sandbox" minimalNav>
-        <div className="mx-auto max-w-7xl px-4 py-10 md:px-8">
-          {/* ── Header ── */}
-          <header className="mb-8">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#0052ff]/40 bg-[#0052ff]/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-[#7da6ff]">
-              Live adversarial simulation · ~60–90s · No capital moves
+      <ProtocolLayout
+        active="sandbox"
+        wide
+        eyebrow="Build with Bobby / Live sandbox"
+        title="Watch a thesis meet its opposition."
+        description="Pick a playbook and a ticker. Follow Alpha Hunter, Red Team, CIO, Judge, and 11 guardrails through a live adversarial simulation."
+      >
+        <div className="protocol-content pb-20">
+          <div className="mb-10 flex flex-wrap items-center justify-between gap-4 border-y border-white/10 py-5">
+            <div className="flex flex-wrap items-center gap-4 font-mono text-[10px] uppercase tracking-[0.12em] text-[#a39c91]">
+              <span className="inline-flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#d1c5e3]" /> Live adversarial simulation</span>
+              <span>~60–90 seconds</span>
+              <span>No capital moves</span>
             </div>
-            <h1 className="max-w-3xl text-4xl font-extrabold leading-tight tracking-[-0.07em] md:text-5xl">
-              Sandbox — watch Bobby pressure-test a thesis
-            </h1>
-            <p className="mt-4 max-w-3xl text-base leading-7 text-white/65">
-              Pick a playbook, choose a ticker, and watch the full adversarial debate run in real time.
-              Alpha Hunter builds the thesis, Red Team attacks it, CIO decides, Judge audits, and 11
-              guardrails gate the outcome. Simulation only — Bobby never moves capital here.
-            </p>
-          </header>
+            <a href="/protocol/playbooks" className="text-sm text-[#f2ede4] transition-colors hover:text-[#d1c5e3]">Explore playbooks <span aria-hidden="true">↗</span></a>
+          </div>
 
-          <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
+          <div className="grid items-start gap-6 lg:grid-cols-[310px_minmax(0,1fr)] xl:gap-9">
             {/* ── LEFT: Controls ── */}
-            <aside className="space-y-5">
-              <div className="rounded-2xl border border-white/10 bg-[#0b0b12]/80 p-5">
-                <label className="mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
+            <aside className="space-y-5 lg:sticky lg:top-28">
+              <div className="protocol-panel p-6">
+                <p className="protocol-eyebrow">Configure / 01</p>
+                <h2 className="mb-7 mt-3 text-2xl font-light tracking-[-0.04em]">Your thesis, tested.</h2>
+                <label htmlFor="sandbox-playbook" className="mb-3 block font-mono text-[10px] uppercase tracking-[0.12em] text-[#a39c91]">
                   Playbook
                 </label>
                 <select
+                  id="sandbox-playbook"
                   value={playbookSlug}
                   onChange={(e) => setPlaybookSlug(e.target.value)}
                   disabled={running}
-                  className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm text-white/90 focus:border-[#0052ff]/60 focus:outline-none disabled:opacity-50"
+                  className="w-full rounded-xl border border-white/10 bg-[#15121c] px-3 py-3 text-sm text-[#f2ede4] focus:border-[#b5a2de]/60 focus:outline-none disabled:opacity-50"
                 >
                   {PLAYBOOKS.map((p) => (
                     <option key={p.slug} value={p.slug}>
@@ -384,7 +387,7 @@ export default function BobbySandboxPage() {
                   <p className="mt-3 text-xs leading-5 text-white/60">{selectedPlaybook.tagline}</p>
                 )}
 
-                <label className="mt-5 mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
+                <label htmlFor="sandbox-ticker" className="mt-6 mb-3 block font-mono text-[10px] uppercase tracking-[0.12em] text-[#a39c91]">
                   Ticker
                 </label>
                 <div className="mb-2 flex flex-wrap gap-1.5">
@@ -394,10 +397,11 @@ export default function BobbySandboxPage() {
                       type="button"
                       onClick={() => setTicker(t)}
                       disabled={running}
-                      className={`rounded-lg border px-2 py-1 font-mono text-[10px] font-bold tracking-[0.14em] transition-colors disabled:opacity-50 ${
+                      aria-pressed={ticker === t}
+                      className={`rounded-full border px-3 py-1.5 font-mono text-[10px] tracking-[0.1em] transition-colors disabled:opacity-50 ${
                         ticker === t
-                          ? 'border-[#0052ff]/50 bg-[#0052ff]/20 text-[#7da6ff]'
-                          : 'border-white/10 bg-white/[0.04] text-white/55 hover:text-white/85'
+                          ? 'border-[#f2ede4] bg-[#f2ede4] text-[#0b0a09]'
+                          : 'border-white/10 bg-white/[0.025] text-white/55 hover:text-white/85'
                       }`}
                     >
                       {t}
@@ -405,19 +409,20 @@ export default function BobbySandboxPage() {
                   ))}
                 </div>
                 <input
+                  id="sandbox-ticker"
                   type="text"
                   value={ticker}
                   onChange={(e) => setTicker(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
                   disabled={running}
                   maxLength={12}
                   placeholder="Or type any OKX spot ticker"
-                  className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm text-white/90 focus:border-[#0052ff]/60 focus:outline-none disabled:opacity-50"
+                  className="w-full rounded-xl border border-white/10 bg-[#0b0a09]/40 px-3 py-3 text-sm text-[#f2ede4] focus:border-[#b5a2de]/60 focus:outline-none disabled:opacity-50"
                 />
 
                 <button
                   onClick={runSandbox}
                   disabled={running || !ticker}
-                  className="mt-5 w-full rounded-lg bg-white px-4 py-3 font-mono text-xs font-bold uppercase tracking-[0.15em] text-black transition-all hover:bg-[#0052ff] hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="protocol-button mt-6 w-full justify-center disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {running ? 'Pressure-testing...' : `Run pressure-test · ${ticker || '—'}`}
                 </button>
@@ -427,14 +432,14 @@ export default function BobbySandboxPage() {
                 </p>
 
                 {runCount > 0 && (
-                  <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-[#7da6ff]/80">
+                  <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-[#d1c5e3]/80">
                     You&apos;ve run {runCount} pressure-test{runCount === 1 ? '' : 's'} in this browser
                   </p>
                 )}
               </div>
 
               {/* Guardrail Gauntlet preview */}
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+              <div className="rounded-[24px] border border-white/10 bg-white/[0.025] p-5">
                 <div className="mb-3 flex items-center justify-between">
                   <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
                     Guardrail gauntlet
@@ -460,7 +465,7 @@ export default function BobbySandboxPage() {
             </aside>
 
             {/* ── RIGHT: Live stream ── */}
-            <section className="space-y-5">
+            <section className="min-w-0 space-y-5" aria-label="Live pressure-test results">
               {error && (
                 <div className="rounded-xl border border-[#ff716a]/40 bg-[#ff716a]/10 p-4 font-mono text-sm text-[#ff716a]">
                   :: STREAM ERROR — {error} ::
@@ -474,7 +479,7 @@ export default function BobbySandboxPage() {
                 <motion.div
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="rounded-2xl border border-[#fcc025]/40 bg-[#fcc025]/10 p-5"
+                  className="rounded-[24px] border border-[#fcc025]/40 bg-[#fcc025]/10 p-5"
                 >
                   <div className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.15em] text-[#fcc025]">
                     <span className="font-bold">[!]</span>
@@ -506,11 +511,11 @@ export default function BobbySandboxPage() {
               <JudgeCard state={agents.judge} scores={judgeScores} />
 
               {/* Live guardrail gauntlet, larger */}
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+              <div className="rounded-[24px] border border-white/10 bg-white/[0.025] p-5">
                 <div className="mb-4 flex items-center gap-3">
                   <span className="font-mono text-lg font-bold text-[#c084fc]">###</span>
                   <div>
-                    <div className="text-lg font-extrabold tracking-[-0.05em] text-white">
+                    <div className="text-lg font-light tracking-[-0.05em] text-white">
                       Guardrail gauntlet
                     </div>
                     <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
@@ -541,13 +546,13 @@ export default function BobbySandboxPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.4 }}
-                    className={`rounded-2xl border-2 p-8 ${ACTION_STYLE[verdict.action].border} ${ACTION_STYLE[verdict.action].bg}`}
+                    className={`rounded-[24px] border-2 p-8 ${ACTION_STYLE[verdict.action].border} ${ACTION_STYLE[verdict.action].bg}`}
                   >
                     <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
                       Final verdict
                     </div>
                     <div
-                      className={`mt-2 text-5xl font-extrabold tracking-[-0.07em] ${ACTION_STYLE[verdict.action].text}`}
+                      className={`mt-2 text-5xl font-light tracking-[-0.05em] ${ACTION_STYLE[verdict.action].text}`}
                     >
                       {ACTION_STYLE[verdict.action].label}
                     </div>
@@ -573,7 +578,7 @@ export default function BobbySandboxPage() {
           <section className="mt-14">
             <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
               <div>
-                <h2 className="text-2xl font-extrabold tracking-[-0.06em] text-white md:text-3xl">
+                <h2 className="text-2xl font-light tracking-[-0.06em] text-white md:text-3xl">
                   Last 20 pressure-tests
                 </h2>
                 <p className="mt-1 text-sm text-white/55">
@@ -583,7 +588,7 @@ export default function BobbySandboxPage() {
               <button
                 onClick={loadFeed}
                 disabled={feedLoading}
-                className="self-start rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-white/70 backdrop-blur transition-colors hover:text-white disabled:opacity-50 md:self-auto"
+                className="protocol-button-secondary self-start disabled:opacity-50 md:self-auto"
               >
                 {feedLoading ? 'Refreshing...' : 'Refresh'}
               </button>
@@ -591,7 +596,7 @@ export default function BobbySandboxPage() {
             <FeedList runs={feed} />
           </section>
         </div>
-      </KineticShell>
+      </ProtocolLayout>
     </>
   );
 }
@@ -608,7 +613,7 @@ function AgentCard({ phase, state }: { phase: AgentPhase; state: AgentState }) {
         boxShadow: isActive ? `0 0 24px ${meta.accent}22` : '0 0 0 transparent',
       }}
       transition={{ duration: 0.3 }}
-      className="rounded-2xl border bg-white/[0.04] p-5"
+      className="rounded-[24px] border bg-white/[0.025] p-5"
     >
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -616,7 +621,7 @@ function AgentCard({ phase, state }: { phase: AgentPhase; state: AgentState }) {
             {meta.glyph}
           </span>
           <div>
-            <div className="text-lg font-extrabold tracking-[-0.05em] text-white">{meta.label}</div>
+            <div className="text-lg font-light tracking-[-0.05em] text-white">{meta.label}</div>
             <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
               {meta.tagline}
             </div>
@@ -648,7 +653,7 @@ function CioCard({
         boxShadow: isActive ? `0 0 24px ${meta.accent}22` : '0 0 0 transparent',
       }}
       transition={{ duration: 0.3 }}
-      className="rounded-2xl border bg-white/[0.04] p-5"
+      className="rounded-[24px] border bg-white/[0.025] p-5"
     >
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -656,7 +661,7 @@ function CioCard({
             {meta.glyph}
           </span>
           <div>
-            <div className="text-lg font-extrabold tracking-[-0.05em] text-white">{meta.label}</div>
+            <div className="text-lg font-light tracking-[-0.05em] text-white">{meta.label}</div>
             <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
               {meta.tagline}
             </div>
@@ -679,7 +684,7 @@ function CioCard({
             <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
               Conviction
             </div>
-            <div className="text-2xl font-extrabold tracking-[-0.05em] text-white">
+            <div className="text-2xl font-light tracking-[-0.05em] text-white">
               {verdict.conviction.toFixed(1)}<span className="text-sm text-white/40">/10</span>
             </div>
           </div>
@@ -706,14 +711,14 @@ function JudgeCard({ state, scores }: { state: AgentState; scores: Record<string
     { id: 'novelty',               label: 'Novelty' },
   ];
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+    <div className="rounded-[24px] border border-white/10 bg-white/[0.025] p-5">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="font-mono text-lg font-bold" style={{ color: meta.accent }}>
             {meta.glyph}
           </span>
           <div>
-            <div className="text-lg font-extrabold tracking-[-0.05em] text-white">{meta.label}</div>
+            <div className="text-lg font-light tracking-[-0.05em] text-white">{meta.label}</div>
             <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
               {meta.tagline}
             </div>
@@ -831,7 +836,7 @@ function StatusPill({ status, accent }: { status: AgentState['status']; accent: 
 
 function ConvictionBar({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(100, (value / 10) * 100));
-  const color = value >= 3.5 ? '#0052ff' : value >= 1.5 ? '#fcc025' : '#ff716a';
+  const color = value >= 3.5 ? '#b5a2de' : value >= 1.5 ? '#fcc025' : '#ff716a';
   return (
     <div className="flex-1">
       <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
@@ -870,7 +875,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">{label}</div>
-      <div className="text-xl font-extrabold tracking-[-0.05em] text-white">{value}</div>
+      <div className="text-xl font-light tracking-[-0.05em] text-white">{value}</div>
     </div>
   );
 }
@@ -898,13 +903,13 @@ function MarketContextCard({ ctx }: { ctx: MarketContext }) {
     <motion.div
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.05] to-transparent p-5"
+      className="rounded-[24px] border border-white/10 bg-gradient-to-br from-white/[0.05] to-transparent p-5"
     >
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="font-mono text-lg font-bold text-white/80">◉</span>
           <div>
-            <div className="text-lg font-extrabold tracking-[-0.05em] text-white">
+            <div className="text-lg font-light tracking-[-0.05em] text-white">
               Market context — {ctx.ticker}
             </div>
             <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
@@ -948,9 +953,9 @@ function IntelCard({ intel }: { intel: BobbyIntel }) {
     <motion.div
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-[#0052ff]/40 bg-[#0052ff]/[0.08] p-5"
+      className="rounded-[24px] border border-[#b5a2de]/40 bg-[#b5a2de]/[0.08] p-5"
     >
-      <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.15em] text-[#7da6ff]">
+      <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.15em] text-[#d1c5e3]">
         <span className="font-bold">◆</span>
         Protocol Intel — injected into Alpha / Red / CIO prompts
       </div>
@@ -958,7 +963,7 @@ function IntelCard({ intel }: { intel: BobbyIntel }) {
         {bits.map((b) => (
           <div key={b.label} className="rounded-lg border border-white/10 bg-black/30 p-2">
             <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/40">{b.label}</div>
-            <div className="mt-0.5 text-sm font-extrabold tracking-[-0.04em] text-white">{b.value}</div>
+            <div className="mt-0.5 text-sm font-light tracking-[-0.04em] text-white">{b.value}</div>
           </div>
         ))}
       </div>
@@ -973,14 +978,14 @@ function FeedList({ runs }: { runs: FeedRun[] }) {
 
   if (!runs.length) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-8 text-center text-sm text-white/45">
+      <div className="rounded-[24px] border border-white/10 bg-white/[0.025] p-8 text-center text-sm text-white/45">
         No pressure-tests logged yet. Be the first — pick a playbook above and run one.
       </div>
     );
   }
 
   const verdictStyle: Record<string, { color: string; label: string }> = {
-    EXECUTE:    { color: '#7da6ff', label: 'EXECUTE' },
+    EXECUTE:    { color: '#d1c5e3', label: 'EXECUTE' },
     YIELD_PARK: { color: '#fcc025', label: 'YIELD PARK' },
     BLOCKED:    { color: '#ff716a', label: 'BLOCKED' },
   };
@@ -1018,7 +1023,7 @@ function FeedList({ runs }: { runs: FeedRun[] }) {
         return (
           <div
             key={r.id}
-            className="rounded-xl border border-white/10 bg-white/[0.04] transition-colors hover:border-[#0052ff]/40"
+            className="rounded-xl border border-white/10 bg-white/[0.025] transition-colors hover:border-[#b5a2de]/40"
           >
             <button
               onClick={() => toggleExpand(r.id)}
@@ -1094,7 +1099,7 @@ function FeedRunExpanded({ run }: { run: FeedRunFull }) {
   return (
     <div className="space-y-4">
       {run.alpha_text && (
-        <TranscriptBlock label="Alpha Hunter" color="#7da6ff" text={run.alpha_text} />
+        <TranscriptBlock label="Alpha Hunter" color="#d1c5e3" text={run.alpha_text} />
       )}
       {run.red_text && (
         <TranscriptBlock label="Red Team" color="#ff716a" text={run.red_text} />
@@ -1104,7 +1109,7 @@ function FeedRunExpanded({ run }: { run: FeedRunFull }) {
       )}
       {run.judge_scores && Object.keys(run.judge_scores).length > 0 && (
         <div>
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.15em] text-[#7da6ff]">
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.15em] text-[#d1c5e3]">
             Judge scores (6D)
           </div>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3">

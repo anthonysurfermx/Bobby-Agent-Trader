@@ -5,13 +5,14 @@
 // explore board, risk notice. Bobby never executes anything.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import * as Dialog from '@radix-ui/react-dialog';
 import { useNavigate } from 'react-router-dom';
-import { Globe, Grid2x2, Lock, Map as MapIcon, Mic, MicOff, MoreHorizontal, RotateCcw, Share2, ShieldAlert, ShieldCheck, Users, Volume2, VolumeX } from 'lucide-react';
+import { Globe, Grid2x2, Lock, Map as MapIcon, Mic, MicOff, MoreHorizontal, RotateCcw, Share2, ShieldAlert, Users, Volume2, VolumeX, X } from 'lucide-react';
 import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
 import { DEFAULT_MASCOT } from '@/lib/mascot';
-import { COMPANIONS, LEVEL_TONE, companionName, getCompanion, getVibe, levelFor, nextLevelFor, tintFor, toolArt, toolHasArt, type Companion, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
+import { COMPANIONS, LEVEL_TONE, companionName, getCompanion, getVibe, levelFor, tintFor, toolArt, toolHasArt, type Companion, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
 import { isSpanish, pick, t } from '@/lib/companions/i18n';
-import { levelProgress, progressStore, useProgress, type ThesisSnapshot } from '@/lib/companions/progress';
+import { progressStore, useProgress, type ThesisSnapshot } from '@/lib/companions/progress';
 import { sfxMuted, sfxShield, sfxSuccess, sfxTock, setSfxMuted } from '@/lib/companions/sfx';
 import { useCompanionVoice } from '@/hooks/useCompanionVoice';
 import RiskNotice from './RiskNotice';
@@ -176,7 +177,6 @@ export default function CompanionDesk() {
   const companion = getCompanion(progress.companionId) ?? COMPANIONS[1];
   const vibe = getVibe(progress.vibeId);
   const level = levelFor(progress.xp);
-  const next = nextLevelFor(progress.xp);
   const tint = tintFor(companion);
   const displayName = companionName(companion, level.number);
 
@@ -356,7 +356,7 @@ export default function CompanionDesk() {
   };
 
   const statusLabel = listening ? t('LISTENING', 'ESCUCHANDO') : voice.speaking ? t('SPEAKING', 'BOBBY HABLA') : ({ idle: t('DESK ONLINE', 'DESK ONLINE'), resolving: t('LINKING ASSET', 'ENLAZANDO ACTIVO'), alpha: 'ALPHA HUNTER', redTeam: 'RED TEAM', cio: 'CIO', complete: t('VERDICT READY', 'VEREDICTO LISTO'), error: t('INCOMPLETE LINK', 'ENLACE INCOMPLETO'), confirm: t('CONFIRM ASSET', 'CONFIRMA EL ACTIVO') } as Record<Phase, string>)[phase];
-  const statusHint = voice.speaking ? t('Your companion reacts to the voice in real time', 'Tu companion reacciona a la voz en tiempo real') : phase === 'idle' ? t('Type or name an asset to begin', 'Escribe o di un activo para empezar') : phase === 'complete' ? t('Market, levels and thesis in sync', 'Mercado, niveles y tesis en sincronía') : phase === 'error' ? t('Try the name or the ticker', 'Prueba con el nombre o ticker') : '';
+  const statusHint = phase === 'error' ? t('Try the name or ticker', 'Prueba con el nombre o ticker') : '';
   const mascotState = listening ? 'listening' : voice.speaking ? 'speaking' : ['alpha', 'redTeam', 'cio', 'resolving'].includes(phase) ? 'thinking' : 'idle';
   const canDictate = typeof window !== 'undefined' && (('SpeechRecognition' in window) || ('webkitSpeechRecognition' in window));
   const isWorking = ['resolving', 'alpha', 'redTeam', 'cio'].includes(phase);
@@ -390,40 +390,32 @@ export default function CompanionDesk() {
   }, [companion.id, progress.xp, drops]);
 
   // The pieces of the desk, composed twice: the phone layout (one column,
-  // composer pinned to the bottom) and the production desktop layout (agents
-  // top-left, companion centered, mic below, the live chart on the right,
-  // status bar at the bottom).
+  // composer pinned to the bottom) and the production desktop layout (companion
+  // centered, mic below, the live chart on the right).
   const headerNode = (
     <>
       {/* header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="relative">
             <img src={`/mascots/${companion.id}.webp`} alt="" className="h-11 w-11 rounded-full object-cover border" style={{ borderColor: tintFor(companion, 0.6) }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
             <span className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-green-400 text-black text-[10px] font-bold flex items-center justify-center">{level.number}</span>
           </div>
           <div>
-            <div className="text-white font-mono tracking-[0.2em] text-sm">BOBBY // LIVE DESK</div>
-            <div className="text-[10px] font-mono tracking-[0.15em]" style={{ color: tint }}>{displayName} · {level.name}</div>
-            <div className="mt-1 h-0.5 w-40 bg-white/[0.06] rounded-full"><div className="h-full rounded-full" style={{ width: `${levelProgress(progress.xp) * 100}%`, background: tint }} /></div>
-            <div className="text-[9px] font-mono text-white/40 mt-0.5">{progress.xp} XP{next ? ` · ${t('next', 'siguiente')} ${next.name} ${next.minXP}` : ''} · 🔥 {progress.streak}</div>
+            <div className="text-white font-mono tracking-[0.2em] text-sm">LIVE DESK</div>
+            <div className="text-[10px] font-mono tracking-[0.15em]" style={{ color: tint }}>{displayName}</div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <LangSelect />
-          <div className="hidden lg:flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-white/50">
-            <ShieldCheck className="h-3 w-3 text-[#7da6ff]" />
-            <span>{t('Bobby never executes · you confirm', 'Bobby no ejecuta · tú confirmas')}</span>
-          </div>
           {/* Trader Land lives here as a compact control: the chart stays the co-star of the desk. */}
-          <button type="button" onClick={openTraderLand} aria-label="Trader Land" title="Trader Land" className="flex h-10 shrink-0 items-center gap-2 rounded-full border border-emerald-200/20 bg-emerald-200/[0.06] pl-1 pr-1 text-emerald-100 transition hover:border-emerald-200/40 hover:bg-emerald-200/[0.12] sm:pr-3">
+          <button type="button" onClick={openTraderLand} aria-label="Trader Land" title="Trader Land" className="flex h-10 shrink-0 items-center gap-2 rounded-full border border-emerald-200/20 bg-emerald-200/[0.06] pl-1 pr-1 text-emerald-100 transition hover:border-emerald-200/40 hover:bg-emerald-200/[0.12]">
             <img src="/land/v1/gate-A/aura_core/ne/stage1_thumb_256.png" alt="" width="32" height="32" className="h-8 w-8 object-contain" />
-            <span className="hidden font-mono text-[9px] uppercase tracking-[0.14em] sm:inline">Trader Land</span>
           </button>
           <ProgressSync onChoose={() => { sfxTock(); setSignInPrompt(true); }} />
-          <button onClick={() => setSpeakEnabled((v) => { if (v) voice.stop(); return !v; })} className="h-10 w-10 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-sky-300">{speakEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}</button>
+          <button aria-label={speakEnabled ? t('Mute voice', 'Silenciar voz') : t('Enable voice', 'Activar voz')} onClick={() => setSpeakEnabled((v) => { if (v) voice.stop(); return !v; })} className="h-10 w-10 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-sky-300">{speakEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}</button>
           <div className="relative">
-            <button onClick={() => setMenu((m) => !m)} className="h-10 w-10 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-white/70"><MoreHorizontal size={16} /></button>
+            <button aria-label={t('More options', 'Más opciones')} onClick={() => setMenu((m) => !m)} className="h-10 w-10 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-white/70"><MoreHorizontal size={16} /></button>
             <AnimatePresence>
               {menu && (
                 <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute right-0 mt-2 w-60 rounded-xl bg-[#0b0b0e] border border-white/[0.08] p-1 z-30 text-sm">
@@ -467,7 +459,7 @@ export default function CompanionDesk() {
         <div className="mt-2 flex items-center gap-2 text-[11px] font-mono tracking-[0.25em]" style={{ color: listening ? '#34D399' : voice.speaking ? '#7ea6ff' : phase === 'error' ? '#f87171' : phase === 'complete' ? '#34D399' : '#7ea6ff' }}>
           <span className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_6px_currentColor]" />{statusLabel}
         </div>
-        <div className="text-[10px] font-mono text-white/45 mt-1 min-h-[16px]">{statusHint}</div>
+        {statusHint && <div className="text-[10px] font-mono text-white/45 mt-1">{statusHint}</div>}
         <div className="mt-3"><ToolBelt companion={companion} xp={progress.xp} onTap={(tool) => { sfxTock(); setInspected(tool); }} onPet={() => { sfxTock(); setSheet('pet'); }} onPlus={() => { sfxTock(); setSheet('catalog'); }} onWorld={openTraderLand} /></div>
       </div>
     </>
@@ -532,7 +524,7 @@ export default function CompanionDesk() {
             </div>
           </div>
           <div className="rounded-xl border border-amber-400/30 bg-amber-400/[0.04] p-4">
-            <div className="flex justify-between text-[10px] font-mono tracking-[0.2em]"><span className="text-amber-300">CIO // {t('VERDICT', 'VEREDICTO')}</span><span className="text-white/40">{t('REFERENCE ONLY', 'SOLO REFERENCIA')}</span></div>
+            <div className="flex justify-between text-[10px] font-mono tracking-[0.2em]"><span className="text-amber-300">{t('Analysis', 'Análisis')}</span><span className="text-white/40">{t('REFERENCE ONLY', 'SOLO REFERENCIA')}</span></div>
             <div className="mt-2 text-white text-lg leading-snug">{summary(answer)}</div>
             <div className="mt-2 text-[10px] font-mono text-white/40">{t('General technical context · Bobby never executes trades', 'Contexto técnico general · Bobby nunca ejecuta operaciones')}</div>
           </div>
@@ -546,7 +538,6 @@ export default function CompanionDesk() {
       {/* quick access */}
       {!snapshot && phase !== 'confirm' && (
         <div className="rounded-2xl p-4 bg-white/[0.02] border border-white/[0.05]">
-          <div className="flex justify-between text-[10px] font-mono tracking-[0.2em] text-white/50"><span>QUICK ACCESS</span><span className="text-sky-300">{t('VOICE OR TEXT', 'VOZ O TEXTO')}</span></div>
           <div className="mt-3 grid grid-cols-3 gap-2">
             <button onClick={() => setSheet('board')} className="rounded-xl p-3 border border-sky-400/40 bg-sky-400/[0.06] text-left"><div className="text-sky-300 font-semibold">{t('EXPLORE', 'EXPLORA')}</div><div className="text-[10px] font-mono text-white/50 tracking-[0.15em]">{t('TOP MARKETS →', 'TOP MERCADOS →')}</div></button>
             {progress.quickAccess.slice(0, 2).map((s) => (
@@ -561,20 +552,14 @@ export default function CompanionDesk() {
   const logNode = (
     <>
       {/* desk log */}
-      <div className="rounded-2xl p-4 bg-white/[0.02] border border-white/[0.05]">
-        <div className="text-[10px] font-mono tracking-[0.2em] text-white/50">DESK LOG</div>
+      <details className="rounded-2xl p-4 bg-white/[0.02] border border-white/[0.05]">
+        <summary className="cursor-pointer text-[10px] font-mono tracking-[0.15em] text-white/50">{t('Conversation', 'Conversación')}</summary>
         <div className="mt-2 space-y-3">
           {messages.slice(-6).map((m, i) => (
             <div key={i} className="flex gap-3 text-sm border-b border-white/[0.04] pb-2"><span className="w-12 shrink-0 text-[10px] font-mono tracking-[0.15em] pt-1" style={{ color: m.from === 'bobby' ? '#7ea6ff' : 'rgba(255,255,255,0.4)' }}>{m.from === 'bobby' ? 'BOBBY' : t('YOU', 'TÚ')}</span><span className="text-white/85">{m.text}</span></div>
           ))}
         </div>
-      </div>
-
-      <div className="rounded-2xl p-4 bg-sky-400/[0.04] border border-sky-400/20 text-[11px] font-mono text-white/55">
-        <div className="text-sky-300 tracking-[0.2em]">{t('BOBBY LEARNS IN PUBLIC', 'BOBBY APRENDE EN PÚBLICO')}</div>
-        {t('His calls are recorded on-chain and anyone can challenge them · this query does not mint an individual receipt yet', 'Sus calls se graban on-chain y cualquiera puede retarlas · esta consulta aún no genera receipt individual')}
-      </div>
-
+      </details>
     </>
   );
   const composerNode = (
@@ -591,24 +576,13 @@ export default function CompanionDesk() {
   );
 
   if (desktop) {
-    const agents: Array<[string, string, Phase]> = [['ALPHA HUNTER', t('finds the setup', 'busca el setup'), 'alpha'], ['RED TEAM', t('attacks the thesis', 'ataca la tesis'), 'redTeam'], ['CIO', t('decides', 'decide'), 'cio']];
-    const statusBar = snapshot && answer ? `${snapshot.symbol}: ${summary(answer)}` : noTrade ? `NO TRADE · ${noTrade.symbol} · ${noTrade.reason}` : t('NO VERDICT YET — ASK BOBBY ABOUT AN ASSET', 'SIN VEREDICTO TODAVÍA — PREGÚNTALE A BOBBY POR UN ACTIVO');
     return (
-      <div className="flex min-h-[calc(100vh-80px)] flex-col text-white">
+      <div className="flex min-h-[calc(100vh-56px)] flex-col text-white">
         <div className="border-b border-white/10 px-6 py-3">{headerNode}</div>
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(340px,0.78fr)_minmax(0,1.22fr)]">
           {/* companion side */}
           <section className="relative flex min-h-0 flex-col items-center justify-center overflow-hidden px-5 py-6" style={{ background: `radial-gradient(circle at 50% 45%, ${tintFor(companion, 0.12)}, transparent 62%)` }}>
-            <div className="absolute left-4 top-4 z-20 flex flex-col gap-2">
-              {agents.map(([name, role, key]) => (
-                <motion.div key={name} animate={phase === key ? { opacity: [0.4, 1, 0.4] } : { opacity: phase === 'complete' ? 0.7 : 0.4 }} transition={phase === key ? { duration: 1.2, repeat: Infinity } : undefined} className="rounded-lg border border-white/10 bg-[#0b0b12]/70 px-3 py-2 backdrop-blur">
-                  <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7da6ff]">{name}</div>
-                  <div className="font-mono text-[9px] text-white/30">{role}</div>
-                  <div className="mt-1 font-mono text-[8px] text-white/20">{displayName} · {t('own voice', 'voz propia')}</div>
-                </motion.div>
-              ))}
-            </div>
-            <div className="relative mt-6 flex flex-col items-center">
+            <div className="relative flex flex-col items-center">
         <div ref={stageRef} className="relative" style={{ width: mascotSize, height: mascotSize }}>
           <BobbyMascot3D
             look={{ ...DEFAULT_MASCOT, body: companion.palette, avatar: companion.id }}
@@ -623,13 +597,13 @@ export default function CompanionDesk() {
         <div className="mt-2 flex items-center gap-2 text-[11px] font-mono tracking-[0.25em]" style={{ color: listening ? '#34D399' : voice.speaking ? '#7ea6ff' : phase === 'error' ? '#f87171' : phase === 'complete' ? '#34D399' : '#7ea6ff' }}>
           <span className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_6px_currentColor]" />{statusLabel}
         </div>
-        <div className="text-[10px] font-mono text-white/45 mt-1 min-h-[16px]">{statusHint}</div>
+        {statusHint && <div className="text-[10px] font-mono text-white/45 mt-1">{statusHint}</div>}
             </div>
             <div className="relative mt-5 flex shrink-0 flex-col items-center gap-2">
               <button type="button" onClick={canDictate ? toggleDictation : () => inputRef.current?.focus()} aria-label={listening ? t('Stop listening', 'Dejar de escuchar') : t('Tap to talk', 'Toca para hablar')} className={`relative grid h-14 w-14 place-items-center rounded-full transition ${listening ? 'scale-105 bg-[#42e6a4] text-[#04130c] shadow-[0_0_36px_rgba(66,230,164,.55)]' : 'bg-[#0052ff] text-white shadow-[0_0_28px_rgba(0,82,255,.45)] hover:bg-[#1c6cff]'}`}>
                 {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
               </button>
-              <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">{listening ? t('LISTENING · SPEAK NORMALLY', 'ESCUCHANDO · HABLA NORMAL') : t('TAP TO ACTIVATE · analysis, not advice', 'TOCA PARA ACTIVAR · análisis, no asesoría')}</p>
+              <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">{listening ? t('Listening…', 'Escuchando…') : t('Tap to talk', 'Toca para hablar')}</p>
             </div>
             <div className="relative mt-5">
         <div className="mt-3"><ToolBelt companion={companion} xp={progress.xp} onTap={(tool) => { sfxTock(); setInspected(tool); }} onPet={() => { sfxTock(); setSheet('pet'); }} onPlus={() => { sfxTock(); setSheet('catalog'); }} onWorld={openTraderLand} /></div>
@@ -639,37 +613,29 @@ export default function CompanionDesk() {
           {/* market side */}
           <section className="flex min-h-0 flex-col gap-3 border-l border-white/10 p-4">
             <form onSubmit={(e) => { e.preventDefault(); void ask(input); }} className="rounded-2xl border border-green-400/25 bg-green-400/[0.045] p-3 shadow-[0_0_36px_rgba(74,222,128,.05)]">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div>
-                  <div className="font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-green-300">{t('START HERE', 'EMPIEZA AQUÍ')}</div>
-                  <div className="mt-0.5 text-sm font-medium text-white">{t('What stock or asset do you want to understand?', '¿Qué acción o activo quieres entender?')}</div>
-                </div>
-                <span className="hidden font-mono text-[9px] uppercase tracking-[0.12em] text-white/35 xl:block">{t('You choose · Bobby analyzes · nothing executes', 'Tú eliges · Bobby analiza · nada se ejecuta')}</span>
-              </div>
               <div className="flex gap-2">
-                <input ref={inputRef} data-desk-input autoFocus value={input} onChange={(e) => setInput(e.target.value)} aria-label={t('Asset to analyze', 'Activo a analizar')} placeholder={listening ? t('Listening…', 'Escuchando…') : t('Try Tesla, NVDA, bitcoin…', 'Prueba Tesla, NVDA, bitcoin…')} className="min-w-0 flex-1 rounded-xl border border-white/[0.10] bg-black/35 px-4 py-3 text-white outline-none placeholder:text-white/30 focus:border-green-400/60" />
+                <input ref={inputRef} data-desk-input autoFocus value={input} onChange={(e) => setInput(e.target.value)} aria-label={t('Asset to analyze', 'Activo a analizar')} placeholder={listening ? t('Listening…', 'Escuchando…') : t('Ask about an asset…', 'Pregunta por un activo…')} className="min-w-0 flex-1 rounded-xl border border-white/[0.10] bg-black/35 px-4 py-3 text-white outline-none placeholder:text-white/30 focus:border-green-400/60" />
                 {canDictate && <button type="button" onClick={toggleDictation} aria-label={listening ? t('Stop listening', 'Dejar de escuchar') : t('Name an asset by voice', 'Di un activo por voz')} className={`h-12 w-12 shrink-0 rounded-xl grid place-items-center ${listening ? 'bg-red-400 text-black' : 'border border-sky-400/30 bg-sky-500/15 text-sky-300'}`}>{listening ? <MicOff size={18} /> : <Mic size={18} />}</button>}
                 <button type="submit" disabled={!input.trim() || isWorking} className="h-12 shrink-0 rounded-xl bg-green-400 px-5 font-mono text-xs font-bold tracking-[0.13em] text-black transition hover:bg-green-300 disabled:cursor-not-allowed disabled:opacity-40">{isWorking ? t('ANALYZING', 'ANALIZANDO') : t('ANALYZE', 'ANALIZAR')}</button>
               </div>
             </form>
             {!snapshot && phase !== 'confirm' && (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">QUICK ACCESS</span>
-                <button onClick={() => setSheet('board')} className="rounded-lg border border-sky-400/40 bg-sky-400/[0.06] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-sky-300">{t('Explore · top markets', 'Explora · top mercados')}</button>
+                <button onClick={() => setSheet('board')} className="rounded-lg border border-sky-400/40 bg-sky-400/[0.06] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-sky-300">{t('Explore', 'Explorar')}</button>
                 {progress.quickAccess.slice(0, 2).map((sym) => (
-                  <button key={sym} onClick={() => void ask(sym)} className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white/80">{sym} · {t('analyze', 'analizar')}</button>
+                  <button key={sym} onClick={() => void ask(sym)} className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white/80">{sym}</button>
                 ))}
               </div>
             )}
             <div className="min-h-[360px] flex-1">
-              <MarketCanvas symbol={chartSymbol} timeframe={chartTimeframe} levels={chartLevels} language={isSpanish() ? 'es' : 'en'} onSymbolChange={(sym) => setChartSymbol(sym)} onTimeframeChange={(tf) => setChartTimeframe(tf)} />
+              <MarketCanvas compact showSymbolSelector={false} symbol={chartSymbol} timeframe={chartTimeframe} levels={chartLevels} language={isSpanish() ? 'es' : 'en'} onSymbolChange={(sym) => setChartSymbol(sym)} onTimeframeChange={(tf) => setChartTimeframe(tf)} />
             </div>
             <div className="max-h-[38vh] space-y-3 overflow-y-auto pr-1">
               {confirmNode}
               {noTradeNode}
               {snapshot && answer && (
                 <div className="rounded-xl border border-amber-400/30 bg-amber-400/[0.04] p-4">
-                  <div className="flex justify-between text-[10px] font-mono tracking-[0.2em]"><span className="text-amber-300">CIO // {t('VERDICT', 'VEREDICTO')} · {snapshot.symbol}</span><span className="text-white/40">{t('REFERENCE ONLY', 'SOLO REFERENCIA')}</span></div>
+                  <div className="flex justify-between text-[10px] font-mono tracking-[0.2em]"><span className="text-amber-300">{t('Analysis', 'Análisis')} · {snapshot.symbol}</span><span className="text-white/40">{t('REFERENCE ONLY', 'SOLO REFERENCIA')}</span></div>
                   <div className="mt-2 text-white text-base leading-snug">{summary(answer)}</div>
                   <div className="mt-3 grid grid-cols-3 gap-2 text-center rounded-lg bg-black/40 p-3">
                     {[[t('ENTRY', 'ENTRADA'), answer.entry, '#7ea6ff'], [t('STOP', 'STOP'), answer.stop, '#f87171'], [t('TARGET', 'OBJETIVO'), answer.target, '#34D399']].map(([label, v, color]) => (
@@ -682,7 +648,6 @@ export default function CompanionDesk() {
             </div>
           </section>
         </div>
-        <div className="flex items-center gap-3 border-t border-white/10 px-6 py-2 font-mono text-[9px] uppercase tracking-[0.2em] text-white/40"><span className="h-1.5 w-1.5 rounded-full bg-white/30" />{statusBar}</div>
       {/* sheets & overlays */}
       <AnimatePresence>
         {sheet === 'board' && <BoardSheet onPick={(s) => { setSheet('none'); void ask(s); }} onClose={() => setSheet('none')} />}
@@ -767,15 +732,15 @@ function buildChart(series: Candle[], answer: Answer | null) {
 
 function BoardSheet({ onPick, onClose }: { onPick: (symbol: string) => void; onClose: () => void }) {
   const [q, setQ] = useState('');
+  const [opener] = useState(() => document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [hits, setHits] = useState<Array<{ symbol: string; name: string; assetClass: string }>>([]);
   const [sections, setSections] = useState<Array<{ title: string; rows: Array<{ symbol: string; name: string; last: number | null }> }>>([]);
-  const [total, setTotal] = useState(0);
   useEffect(() => {
     void (async () => {
       try {
         const res = await fetch('/api/bobby-asset-search?browse=1');
         const obj = (await res.json()) as { browse?: Record<string, Array<{ symbol: string; name: string; last: number | null }>>; totalBases?: number };
-        setTotal(obj.totalBases ?? 0);
         const b = obj.browse ?? {};
         setSections([[t('CRYPTO', 'CRIPTO'), b.crypto], [t('STOCKS & ETFs', 'ACCIONES Y ETFs'), b.equity], [t('METALS', 'METALES'), b.commodity]].filter(([, rows]) => rows?.length).map(([title, rows]) => ({ title: title as string, rows: (rows as Array<{ symbol: string; name: string; last: number | null }>).slice(0, 24) })));
       } catch { /* ignore */ }
@@ -794,17 +759,34 @@ function BoardSheet({ onPick, onClose }: { onPick: (symbol: string) => void; onC
     return () => clearTimeout(id);
   }, [q]);
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/95 overflow-y-auto">
-      <div className="mx-auto max-w-2xl p-4 space-y-4">
-        <div className="flex items-center justify-between"><div><div className="text-white font-mono tracking-[0.2em]">BOBBY // THE BOARD</div><div className="text-[10px] font-mono text-white/40 tracking-[0.15em]">{t(`TOP BY 24H VOLUME · SEARCH REACHES ALL ${total}`, `TOP POR VOLUMEN 24H · LA BÚSQUEDA LLEGA A ${total}`)}</div></div><button onClick={onClose} className="h-9 w-9 rounded-full bg-white/[0.05] text-white/70">✕</button></div>
-        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Search 600+ assets — name or ticker', 'Busca 600+ activos — nombre o ticker')} className="w-full rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 text-white outline-none" />
+    <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/85" />
+        <Dialog.Content
+          aria-describedby={undefined}
+          onOpenAutoFocus={(event) => { event.preventDefault(); searchRef.current?.focus(); }}
+          onCloseAutoFocus={(event) => { event.preventDefault(); opener?.focus({ preventScroll: true }); }}
+          className="fixed left-1/2 top-1/2 z-[61] flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a0c] text-white shadow-2xl"
+        >
+          <div className="shrink-0 space-y-3 border-b border-white/[0.06] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <Dialog.Title className="font-mono text-sm tracking-[0.15em]">{t('Assets', 'Activos')}</Dialog.Title>
+              <Dialog.Close aria-label={t('Close assets and return to desk', 'Cerrar activos y volver al desk')} title={t('Back to desk', 'Volver al desk')} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/[0.06] text-white/80 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300">
+                <X size={20} />
+              </Dialog.Close>
+            </div>
+            <input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('Search assets', 'Buscar activos')} placeholder={t('Name or ticker…', 'Nombre o ticker…')} className="w-full rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 text-white outline-none focus:border-sky-400/50" />
+          </div>
+          <div className="min-h-0 overflow-y-auto overscroll-contain p-4 space-y-4">
         {q.trim().length >= 2 ? (
           <div className="space-y-2">{hits.length === 0 ? <div className="text-white/40 text-sm">{t('Nothing yet — keep typing or say it your way; Bobby resolves typos.', 'Nada aún — sigue escribiendo o dilo a tu manera; Bobby resuelve typos.')}</div> : hits.map((h) => (<button key={h.symbol} onClick={() => onPick(h.symbol)} className="w-full flex justify-between rounded-xl px-4 py-3 bg-white/[0.02] border border-white/[0.05] text-left"><span><span className="text-white font-semibold">{h.symbol}</span><span className="block text-white/50 text-xs">{h.name}</span></span><span className="text-[10px] font-mono text-white/40 tracking-[0.15em] self-center">{h.assetClass.toUpperCase()}</span></button>))}</div>
         ) : sections.map((s) => (
           <div key={s.title}><div className="flex justify-between text-[10px] font-mono tracking-[0.2em] text-sky-300 mb-2"><span>{s.title}</span><span className="text-white/40">{s.rows.length}</span></div><div className="space-y-2">{s.rows.map((r) => (<button key={r.symbol} onClick={() => onPick(r.symbol)} className="w-full flex justify-between rounded-xl px-4 py-3 bg-white/[0.02] border border-white/[0.05] text-left"><span><span className="text-white font-semibold">{r.symbol}</span>{r.name !== r.symbol && <span className="block text-white/50 text-xs">{r.name}</span>}</span><span className="font-mono text-white/80 self-center">{r.last !== null ? `$${r.last >= 1000 ? Math.round(r.last).toLocaleString('en-US') : r.last.toFixed(r.last >= 1 ? 2 : 4)}` : ''} ↗</span></button>))}</div></div>
         ))}
-      </div>
-    </motion.div>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 

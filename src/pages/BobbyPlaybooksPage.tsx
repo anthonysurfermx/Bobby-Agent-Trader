@@ -6,7 +6,7 @@
 
 import { useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import KineticShell from '@/components/kinetic/KineticShell';
+import ProtocolLayout from '@/components/protocol/ProtocolLayout';
 import PlaybookCard from '@/components/playbooks/PlaybookCard';
 import { PLAYBOOKS, type PlaybookCategory } from '@/data/playbooks';
 
@@ -49,40 +49,38 @@ export default function BobbyPlaybooksPage() {
       <Helmet>
         <title>Pressure-Test Playbooks | Bobby Agent Trader</title>
       </Helmet>
-      <KineticShell activeTab="playbooks" minimalNav>
-        <div className="mx-auto max-w-6xl px-4 py-10 md:px-8">
-          {/* ── Header ── */}
-          <header className="mb-8">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#0052ff]/40 bg-[#0052ff]/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-[#7da6ff]">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />
-              Examples of how traders use Bobby before committing capital
+      <ProtocolLayout
+        active="playbooks"
+        eyebrow="Build with Bobby / Playbooks"
+        title="A better question before committing capital."
+        description="Pressure-test playbooks show where Bobby's harness prevents a specific failure mode. Every demo calls live MCP tools against real market data."
+      >
+        <div className="protocol-content pb-20">
+          <div className="mb-14 flex flex-col gap-7 sm:flex-row sm:items-center sm:justify-between">
+            <div className="max-w-lg">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8a8378]">Explore / {PLAYBOOKS.length} playbooks</p>
+              <p className="mt-3 text-sm leading-7 text-[#a39c91]">Examples of how traders use Bobby before committing capital. Choose a strategy to inspect its failure modes, tools, and guardrails.</p>
             </div>
-            <h1 className="max-w-3xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-5xl">
-              Pressure-test playbooks
-            </h1>
-            <p className="mt-5 max-w-3xl text-base leading-7 text-white/55">
-              Example plays showing where Bobby&apos;s harness prevents a specific failure mode. Every demo calls Bobby&apos;s
-              live MCP tools against real market data. Not trading advice.
-            </p>
             <a
               href="/protocol/sandbox"
-              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 font-mono text-xs font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white"
+              className="protocol-button self-start sm:self-auto"
             >
-              Run in sandbox — live simulation →
+              Open the live sandbox <span aria-hidden="true">↗</span>
             </a>
-          </header>
+          </div>
 
           {/* ── Filter + sort rail ── */}
-          <div className="mb-6 flex flex-col gap-3 border-b border-white/10 pb-5 md:flex-row md:items-center md:justify-between">
+          <div className="mb-8 flex flex-col gap-5 border-y border-white/10 py-5 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex flex-wrap gap-2">
               {CATEGORIES.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => setCategory(c.id)}
-                  className={`rounded-lg border px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] transition ${
+                  aria-pressed={category === c.id}
+                  className={`rounded-full border px-4 py-2 text-xs transition ${
                     category === c.id
-                      ? 'border-transparent bg-white text-black'
-                      : 'border-white/15 bg-white/[0.06] text-white/55 hover:bg-white/[0.12] hover:text-white'
+                      ? 'border-[#f2ede4] bg-[#f2ede4] text-[#0b0a09]'
+                      : 'border-white/10 bg-transparent text-[#a39c91] hover:bg-white/[0.04] hover:text-[#f2ede4]'
                   }`}
                 >
                   {c.label}
@@ -90,11 +88,12 @@ export default function BobbyPlaybooksPage() {
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">Sort</span>
+              <label htmlFor="playbook-sort" className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#8a8378]">Sort</label>
               <select
+                id="playbook-sort"
                 value={sort}
                 onChange={(e) => setSort(e.target.value as SortOption)}
-                className="rounded-lg border border-white/15 bg-white/[0.06] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white/70 backdrop-blur focus:border-[#0052ff]/60 focus:outline-none"
+                className="rounded-xl border border-white/10 bg-[#15121c] px-3 py-2 text-xs text-[#f2ede4] focus:border-[#b5a2de]/60 focus:outline-none"
               >
                 {SORT_OPTIONS.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -106,7 +105,11 @@ export default function BobbyPlaybooksPage() {
           </div>
 
           {/* ── Grid ── */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <h2 className="text-2xl font-light tracking-[-0.04em]">Pressure-test playbooks</h2>
+            <span className="font-mono text-[10px] text-[#8a8378]">{playbooks.length} results</span>
+          </div>
+          <div className="grid items-start gap-5 md:grid-cols-2 [&>div]:rounded-[24px] [&>div]:p-6 [&>div]:md:p-8 [&_h3]:font-light [&_a]:rounded-full [&_button]:rounded-full">
             {playbooks.map((playbook) => (
               <PlaybookCard key={playbook.slug} playbook={playbook} />
             ))}
@@ -118,7 +121,7 @@ export default function BobbyPlaybooksPage() {
             your agent decides.
           </p>
         </div>
-      </KineticShell>
+      </ProtocolLayout>
     </>
   );
 }

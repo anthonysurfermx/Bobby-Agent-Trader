@@ -11,7 +11,7 @@ import { RISK_NOTICE_VERSION, useProgress } from '@/lib/companions/progress';
 export default function CompanionDeskPage() {
   const progress = useProgress();
   return (
-    <KineticShell minimalNav>
+    <KineticShell minimalNav showTicker={false} showStatus={false}>
       <Helmet><title>Live Desk | Bobby Agent Trader</title></Helmet>
       {progress.riskNoticeVersion < RISK_NOTICE_VERSION ? (
         <RiskNotice />

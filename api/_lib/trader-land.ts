@@ -210,7 +210,7 @@ export type CloseResult = { ok: true; closed: ClosedThesis } | { ok: false; stat
  * for reasons outside the user (prices, swap history) is read BEFORE the
  * flip, so a retry never finds a bloomed seed that was never paid.
  */
-export async function closeSeed(identity: { id: string; wallet: string | null }, inventoryId: string, opts: { platform: 'ios' | 'web'; tzOffsetMin: number; now?: Date }): Promise<CloseResult> {
+export async function closeSeed(identity: { id: string; wallet: string | null }, inventoryId: string, opts: { platform: 'ios' | 'android' | 'web'; tzOffsetMin: number; now?: Date }): Promise<CloseResult> {
   const now = opts.now ?? new Date();
   const r = await fetch(bobbyRest(`tl_inventory?id=eq.${inventoryId}&identity_id=eq.${identity.id}&select=id,item_id,state,seeded_at,event_id&limit=1`), { headers: bobbyServiceHeaders() });
   if (!r.ok) throw new Error('Seed read failed');

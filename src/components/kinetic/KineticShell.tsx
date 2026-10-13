@@ -26,6 +26,8 @@ interface KineticShellProps {
   showSidebar?: boolean;
   /** Protocol pages: hide the app tab nav + workspace toggle for a clean, focused frame. */
   minimalNav?: boolean;
+  showTicker?: boolean;
+  showStatus?: boolean;
 }
 
 // Shared ticker tape data — fetched on mount, then refreshed while mounted.
@@ -86,17 +88,17 @@ function TickerTape() {
   );
 }
 
-export default function KineticShell({ children, activeTab, showSidebar = false, minimalNav = false }: KineticShellProps) {
+export default function KineticShell({ children, activeTab, showSidebar = false, minimalNav = false, showTicker = true, showStatus = true }: KineticShellProps) {
   return (
     <TradingRoomProvider>
-      <KineticShellInner activeTab={activeTab} showSidebar={showSidebar} minimalNav={minimalNav}>
+      <KineticShellInner activeTab={activeTab} showSidebar={showSidebar} minimalNav={minimalNav} showTicker={showTicker} showStatus={showStatus}>
         {children}
       </KineticShellInner>
     </TradingRoomProvider>
   );
 }
 
-function KineticShellInner({ children, activeTab, showSidebar = false, minimalNav = false }: KineticShellProps) {
+function KineticShellInner({ children, activeTab, showSidebar = false, minimalNav = false, showTicker = true, showStatus = true }: KineticShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const currentTab = activeTab || NAV_ITEMS.find(n => location.pathname === n.path)?.id || 'terminal';
@@ -171,7 +173,7 @@ function KineticShellInner({ children, activeTab, showSidebar = false, minimalNa
             </Link>
           ))}
         </div>
-        <div className="flex items-center gap-3">
+        {showStatus && (<div className="flex items-center gap-3">
           <SkinInTheGameBadge />
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full animate-pulse ${roomMode === 'personal' && hasAgent ? 'bg-current ' + navAccent : 'bg-[#0052ff]'}`} />
@@ -180,10 +182,11 @@ function KineticShellInner({ children, activeTab, showSidebar = false, minimalNa
             </span>
           </div>
         </div>
+        )}
       </nav>
 
       {/* === Ticker Tape === */}
-      <TickerTape />
+      {showTicker && <TickerTape />}
 
       {/* === Content with optional sidebar === */}
       <div className="flex">

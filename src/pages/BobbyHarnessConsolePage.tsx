@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import KineticShell from '../components/kinetic/KineticShell';
+import ProtocolLayout from '@/components/protocol/ProtocolLayout';
 
 interface HarnessEvent {
   id: string;
@@ -33,7 +33,7 @@ const DECISION_COLORS: Record<string, string> = {
   allow: '#6dfe9c',
   reduce: '#fcc025',
   deny: '#ff716a',
-  stable: '#7da6ff',
+  stable: '#d1c5e3',
 };
 
 const EVENT_ICONS: Record<string, string> = {
@@ -119,27 +119,35 @@ export default function BobbyHarnessConsolePage() {
   }, [events, filter]);
 
   return (
-    <KineticShell activeTab="harness" minimalNav>
+    <ProtocolLayout
+      active="harness"
+      wide
+      eyebrow="Protocol evidence / Finance harness"
+      title="Every decision leaves a trace."
+      description="Every guardrail. Every proof. Auditable. Explore the raw audit trail behind each Bobby verdict, from the first signal to the lesson that shapes the next debate."
+    >
       <Helmet>
         <title>Finance Harness Console | Bobby Protocol</title>
       </Helmet>
 
-      <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-        {/* Header */}
+      <div className="protocol-content space-y-8 pb-20">
+        {/* Trace and memory overview */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <div className="mb-3 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#7da6ff]">Audit trail</div>
-          <h1 className="text-3xl md:text-5xl font-extrabold tracking-[-0.07em] text-white">
-            Finance harness console
-          </h1>
-          <p className="font-mono text-[10px] text-white/40 uppercase tracking-[0.15em] mt-2">
-            Every decision. Every guardrail. Every proof. Auditable.
-          </p>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-white/60">
-            This is the raw audit trail behind every Bobby verdict. <span className="text-[#7da6ff]">Trace Layer</span> streams every event Bobby emits — signals received, debates run, guardrails fired, trades executed, MCP calls paid. <span className="text-[#7da6ff]">Memory Layer</span> shows how those traces distill into long-term episodes Bobby uses to sharpen the next debate. If you want to know <em>why</em> Bobby blocked a trade or charged an agent, it happened here first.
-          </p>
+          <div className="grid gap-8 border-y border-white/10 py-8 md:grid-cols-2 md:gap-16">
+            <div>
+              <div className="protocol-eyebrow">01 / Trace layer</div>
+              <h2 className="mt-3 text-2xl font-light tracking-[-0.04em]">Follow what happened.</h2>
+              <p className="mt-3 text-sm leading-7 text-[#a39c91]">Signals received, debates run, guardrails fired, trades executed, MCP calls paid. If you want to know why Bobby blocked a trade or charged an agent, it happened here first.</p>
+            </div>
+            <div>
+              <div className="protocol-eyebrow">02 / Memory layer</div>
+              <h2 className="mt-3 text-2xl font-light tracking-[-0.04em]">See what was learned.</h2>
+              <p className="mt-3 text-sm leading-7 text-[#a39c91]">Raw traces distill into long-term episodes. Explore the outcomes, market regimes, and lessons Bobby uses to sharpen the next debate.</p>
+            </div>
+          </div>
         </motion.div>
 
         {/* Stats strip */}
@@ -147,43 +155,47 @@ export default function BobbyHarnessConsolePage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3"
+          className="protocol-panel grid grid-cols-2 gap-x-6 gap-y-8 p-6 md:grid-cols-4 md:p-8 lg:grid-cols-8"
         >
           {[
-            { label: 'Events', value: stats.total, color: '#7da6ff' },
+            { label: 'Events', value: stats.total, color: '#d1c5e3' },
             { label: 'Executed', value: stats.executions, color: '#6dfe9c' },
             { label: 'Blocked', value: stats.skips, color: '#ff716a' },
-            { label: 'Parked', value: stats.parks, color: '#7da6ff' },
+            { label: 'Parked', value: stats.parks, color: '#d1c5e3' },
             { label: 'MCP calls', value: stats.mcpCalls, color: '#fcc025' },
             { label: 'Block rate', value: `${stats.blockRate}%`, color: '#ff716a' },
-            { label: 'Avg conv', value: `${(stats.avgConv * 10).toFixed(1)}`, color: '#7da6ff' },
+            { label: 'Avg conv', value: `${(stats.avgConv * 10).toFixed(1)}`, color: '#d1c5e3' },
             { label: 'W/L', value: `${stats.wins}/${stats.losses}`, color: '#6dfe9c' },
           ].map(s => (
-            <div key={s.label} className="bg-white/[0.04] border border-white/10 rounded-xl p-3 text-center">
+            <div key={s.label} className="min-w-0">
               <div className="font-mono text-[9px] text-white/40 uppercase tracking-[0.15em]">{s.label}</div>
-              <div className="text-lg font-bold font-mono" style={{ color: s.color }}>{s.value}</div>
+              <div className="mt-3 text-2xl font-light tracking-[-0.04em]" style={{ color: s.color }}>{s.value}</div>
             </div>
           ))}
         </motion.div>
 
         {/* Main tabs: Events vs Memory */}
-        <div className="flex gap-3 font-mono text-[10px] uppercase tracking-[0.15em] border-b border-white/10 pb-2">
+        <div role="tablist" aria-label="Audit layers" className="flex flex-wrap gap-3 border-b border-white/10 pb-3">
           <button
+            role="tab"
+            aria-selected={activeTab === 'events'}
             onClick={() => setActiveTab('events')}
-            className={`px-4 py-2 rounded-t transition-colors ${
+            className={`px-5 py-3 rounded-full text-sm transition-colors ${
               activeTab === 'events'
-                ? 'text-[#7da6ff] border-b-2 border-[#0052ff]'
-                : 'text-white/45 hover:text-white'
+                ? 'bg-[#f2ede4] text-[#0b0a09]'
+                : 'text-[#a39c91] hover:text-[#f2ede4]'
             }`}
           >
             Trace Layer (L0)
           </button>
           <button
+            role="tab"
+            aria-selected={activeTab === 'memory'}
             onClick={() => setActiveTab('memory')}
-            className={`px-4 py-2 rounded-t transition-colors ${
+            className={`px-5 py-3 rounded-full text-sm transition-colors ${
               activeTab === 'memory'
-                ? 'text-[#fcc025] border-b-2 border-[#fcc025]'
-                : 'text-white/45 hover:text-white'
+                ? 'bg-[#f2ede4] text-[#0b0a09]'
+                : 'text-[#a39c91] hover:text-[#f2ede4]'
             }`}
           >
             Memory Layer (L1) — {memories.length} episodes
@@ -194,17 +206,17 @@ export default function BobbyHarnessConsolePage() {
           <div className="space-y-4">
             {/* Memory stats */}
             {memoryStats && memoryStats.total_episodes > 0 && (
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-white/[0.04] border border-white/10 rounded-xl p-4">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="bg-white/[0.025] border border-white/10 rounded-xl p-4">
                   <div className="font-mono text-[9px] text-white/40 uppercase tracking-[0.15em] mb-2">Outcomes</div>
                   {Object.entries(memoryStats.outcome_distribution).map(([k, v]) => (
                     <div key={k} className="flex justify-between font-mono text-[11px]">
-                      <span className={k === 'executed' ? 'text-[#6dfe9c]' : k === 'skip' ? 'text-[#ff716a]' : 'text-[#7da6ff]'}>{k}</span>
+                      <span className={k === 'executed' ? 'text-[#6dfe9c]' : k === 'skip' ? 'text-[#ff716a]' : 'text-[#d1c5e3]'}>{k}</span>
                       <span className="text-white">{v}</span>
                     </div>
                   ))}
                 </div>
-                <div className="bg-white/[0.04] border border-white/10 rounded-xl p-4">
+                <div className="bg-white/[0.025] border border-white/10 rounded-xl p-4">
                   <div className="font-mono text-[9px] text-white/40 uppercase tracking-[0.15em] mb-2">Symbols</div>
                   {Object.entries(memoryStats.symbol_distribution).map(([k, v]) => (
                     <div key={k} className="flex justify-between font-mono text-[11px]">
@@ -213,12 +225,12 @@ export default function BobbyHarnessConsolePage() {
                     </div>
                   ))}
                 </div>
-                <div className="bg-white/[0.04] border border-white/10 rounded-xl p-4">
+                <div className="bg-white/[0.025] border border-white/10 rounded-xl p-4">
                   <div className="font-mono text-[9px] text-white/40 uppercase tracking-[0.15em] mb-2">Regimes</div>
                   {Object.entries(memoryStats.regime_distribution).map(([k, v]) => (
                     <div key={k} className="flex justify-between font-mono text-[11px]">
                       <span className="text-white">{k}</span>
-                      <span className="text-[#7da6ff]">{v}</span>
+                      <span className="text-[#d1c5e3]">{v}</span>
                     </div>
                   ))}
                 </div>
@@ -226,9 +238,9 @@ export default function BobbyHarnessConsolePage() {
             )}
 
             {/* Memory episodes */}
-            <div className="bg-[#0b0b12]/80 border border-white/10 rounded-2xl overflow-hidden">
-              <div className="bg-white/[0.04] px-4 py-2.5 border-b border-white/10 flex justify-between font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
-                <span>memory_episodes.log</span>
+            <div className="bg-[#15121c]/80 border border-white/10 rounded-[24px] overflow-hidden">
+              <div className="bg-white/[0.025] px-4 py-2.5 border-b border-white/10 flex justify-between font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
+                <span>Memory episodes</span>
                 <span className="text-[#fcc025]">{memories.length} episodes</span>
               </div>
               {memories.length === 0 ? (
@@ -238,10 +250,10 @@ export default function BobbyHarnessConsolePage() {
               ) : (
                 <div className="divide-y divide-white/[0.06]">
                   {memories.map((m) => {
-                    const outcomeColor = m.outcome === 'executed' ? '#6dfe9c' : m.outcome === 'park' ? '#7da6ff' : '#ff716a';
+                    const outcomeColor = m.outcome === 'executed' ? '#6dfe9c' : m.outcome === 'park' ? '#d1c5e3' : '#ff716a';
                     return (
                       <div key={m.id} className="px-4 py-3 font-mono text-[11px]">
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
                           <span
                             className="px-2 py-0.5 rounded text-[9px] uppercase font-bold border"
                             style={{ color: outcomeColor, borderColor: `${outcomeColor}40`, backgroundColor: `${outcomeColor}10` }}
@@ -259,11 +271,11 @@ export default function BobbyHarnessConsolePage() {
                             {new Date(m.created_at).toLocaleString()}
                           </span>
                         </div>
-                        <p className="text-white/55 mt-1.5 leading-relaxed">{m.lesson}</p>
+                        <p className="text-[#a39c91] mt-3 font-sans text-sm leading-7">{m.lesson}</p>
                         {m.tags && m.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
                             {(Array.isArray(m.tags) ? m.tags : []).map(t => (
-                              <span key={t} className="px-2 py-0.5 rounded-md border border-white/10 bg-white/[0.04] text-[9px] text-white/45">{t}</span>
+                              <span key={t} className="px-2 py-0.5 rounded-md border border-white/10 bg-white/[0.025] text-[9px] text-white/45">{t}</span>
                             ))}
                           </div>
                         )}
@@ -275,13 +287,13 @@ export default function BobbyHarnessConsolePage() {
             </div>
 
             {/* Memory architecture reference */}
-            <div className="border border-white/10 rounded-2xl p-5 bg-white/[0.04]">
-              <h3 className="font-mono text-[10px] text-[#7da6ff] uppercase tracking-[0.18em] mb-4">
+            <div className="border border-white/10 rounded-[24px] p-5 bg-white/[0.025]">
+              <h3 className="font-mono text-[10px] text-[#d1c5e3] uppercase tracking-[0.18em] mb-4">
                 Experiential memory architecture
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-[10px]">
                 <div>
-                  <div className="text-[#7da6ff] font-bold mb-1">L0 — Raw traces</div>
+                  <div className="text-[#d1c5e3] font-bold mb-1">L0 — Raw traces</div>
                   <div className="text-white/50">agent_events table. Every tool call, debate, quote, payment, rejection.</div>
                 </div>
                 <div>
@@ -303,15 +315,16 @@ export default function BobbyHarnessConsolePage() {
 
         {activeTab === 'events' && <>
         {/* Filter tabs */}
-        <div className="flex flex-wrap gap-2 font-mono text-[10px] uppercase tracking-[0.15em]">
+        <div className="flex flex-wrap gap-2 text-xs">
           {['all', 'decisions', 'allow', 'deny', 'stable', 'mcp'].map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-2 border rounded-lg transition-colors ${
+              aria-pressed={filter === f}
+              className={`px-4 py-2 border rounded-full capitalize transition-colors ${
                 filter === f
-                  ? 'border-[#0052ff] bg-[#0052ff] text-white'
-                  : 'border-white/15 bg-white/10 backdrop-blur text-white/55 hover:text-white'
+                  ? 'border-[#f2ede4]/30 bg-[#f2ede4]/10 text-[#f2ede4]'
+                  : 'border-white/10 text-[#a39c91] hover:text-[#f2ede4]'
               }`}
             >
               {f}
@@ -320,10 +333,10 @@ export default function BobbyHarnessConsolePage() {
         </div>
 
         {/* Event stream */}
-        <div className="bg-[#0b0b12]/80 border border-white/10 rounded-2xl overflow-hidden">
-          <div className="bg-white/[0.04] px-4 py-2.5 border-b border-white/10 flex justify-between font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
-            <span>harness_events.log</span>
-            <span className="text-[#7da6ff]">{filtered.length} events</span>
+        <div className="bg-[#15121c]/80 border border-white/10 rounded-[24px] overflow-hidden">
+          <div className="bg-white/[0.025] px-4 py-2.5 border-b border-white/10 flex justify-between font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
+            <span>Decision & tool activity</span>
+            <span className="text-[#d1c5e3]">{filtered.length} events</span>
           </div>
 
           {loading ? (
@@ -348,9 +361,9 @@ export default function BobbyHarnessConsolePage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="border border-white/10 rounded-2xl p-5 bg-white/[0.04]"
+          className="border border-white/10 rounded-[24px] p-5 bg-white/[0.025]"
         >
-          <h3 className="font-mono text-[10px] text-[#7da6ff] uppercase tracking-[0.18em] mb-4">
+          <h3 className="font-mono text-[10px] text-[#d1c5e3] uppercase tracking-[0.18em] mb-4">
             Harness verdict schema
           </h3>
           <pre className="font-mono text-[11px] text-white/55 leading-relaxed overflow-x-auto rounded-xl border border-white/10 bg-black/50 p-4">
@@ -372,23 +385,33 @@ export default function BobbyHarnessConsolePage() {
         </motion.div>
         </>}
       </div>
-    </KineticShell>
+    </ProtocolLayout>
   );
 }
 
 function EventRow({ event }: { event: HarnessEvent }) {
   const [expanded, setExpanded] = useState(false);
-  const decisionColor = DECISION_COLORS[event.decision || ''] || '#7da6ff';
+  const decisionColor = DECISION_COLORS[event.decision || ''] || '#d1c5e3';
   const icon = EVENT_ICONS[event.event_type] || '··';
   const convStr = event.conviction != null ? `${(event.conviction * 10).toFixed(1)}/10` : '—';
 
   return (
     <div
-      className="px-4 py-3 hover:bg-white/[0.03] cursor-pointer transition-colors"
+      className="px-5 py-5 hover:bg-white/[0.03] cursor-pointer transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#b5a2de]"
       onClick={() => setExpanded(!expanded)}
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          setExpanded(!expanded);
+        }
+      }}
     >
       {/* Main row */}
-      <div className="flex items-center gap-3 font-mono text-[11px]">
+      <div className="flex flex-wrap items-center gap-3 font-mono text-[11px]">
         {/* Icon */}
         <span
           className="w-7 h-7 flex items-center justify-center rounded text-[10px] font-bold border shrink-0"
@@ -450,7 +473,7 @@ function EventRow({ event }: { event: HarnessEvent }) {
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
-          className="mt-3 ml-10 space-y-2 font-mono text-[10px]"
+          className="mt-5 space-y-4 font-mono text-xs sm:ml-10"
         >
           {event.reason && (
             <div>
@@ -507,7 +530,7 @@ function EventRow({ event }: { event: HarnessEvent }) {
                   href={`https://www.oklink.com/xlayer/tx/${event.trade_tx}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-[#7da6ff] hover:underline"
+                  className="text-[#d1c5e3] hover:underline"
                 >
                   Trade TX: {event.trade_tx.slice(0, 14)}...
                 </a>

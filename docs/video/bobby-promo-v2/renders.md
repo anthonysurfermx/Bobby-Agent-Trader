@@ -384,3 +384,15 @@ Credits spent on this film so far: 777.5 + 1 + 1 = 779.5.
 upscale common job 2499b89c → renders/promo-v2-16x9-FINAL-1080p-common.mp4 (0.1 cr); comparison renders/cmp-upscale-presets.jpg
 + local grain pass (ffmpeg noise 7 temporal + light unsharp) → renders/promo-v2-16x9-FINAL-1080p-common-grain.mp4; comparison renders/cmp-upscale-grain.jpg
 Topaz 1080p upscale of V6.5 → job cedba71e → renders/promo-v2-16x9-FINAL-1080p-topaz.mp4; comparison renders/cmp-topaz-vs-bytedance.jpg; balance before/after: 2167.52 credits / 2167.52 credits
+
+## 2026-09-07 — "plastic look" investigation
+- Cause: 480p source. In wide/medium shots her face is ~60 px tall, so any 1080p upscaler invents ~90% of the skin and renders it waxy. The close-up (face fills the frame) and the phone POVs look real for the same reason. Not a prompt or lighting issue.
+- Option 1 ByteDance preset common (0.34 cr) + local grain: marginal. Option 2 Topaz 1080p (5 cr, job cedba71e): visually identical to ByteDance, slightly softer → `renders/promo-v2-16x9-FINAL-1080p-topaz.mp4`, comparison `renders/cmp-topaz-vs-bytedance.jpg`.
+- Conclusion: upscalers cannot create detail that the 480p take never had. Real fix = native render at 720p (97.5 cr, 2.25× pixels per face, then 0.34 cr upscale) or 1080p (135 cr); both are a new take.
+- Actual costs from the transaction log: Seedance 17 s 480p = 42.5; ByteDance upscale = 0.34 (not 1); Topaz = 5. Balance 2026-09-07: 1,741.52 (other sessions spent ~420 on Trader Land assets 09-05/09-07).
+- ffmpeg broke after a brew update (missing libx265); fixed with `brew reinstall x265` (ffmpeg 9.0.1).
+
+## Video 16:9 round 7 (V6.5 native 720p) — 2026-09-07 · AUTHORIZED ("Dale") · seedance_2_5 · 16:9 · 17 s · 720p · audio · 97.5 cr
+Same prompt `prompt-16x9-en-v6-5.txt`, same refs. Goal: real skin detail in medium/wide shots (2.25× pixels vs 480p), then 0.34 cr upscale to 1080p.
+Job c8e04732 → renders/promo-v2-16x9-v6-5-720p.mp4 (1280x720, 17 s); contact renders/contact-16x9-720p.jpg; skin comparison renders/cmp-720-vs-480up.jpg
+Result 720p native (job c8e04732): PASS. Structure identical to V6.5 (all 7 cuts, all texts, she looks at Byte, direct cut to the rear view + lockup). Skin comparison vs 480p→1080: clearly more natural at 720p (real skin texture, hair strands, chips legible). Web copy `renders/promo-v2-16x9-v6-5-720p-web.mp4`. Credits: 97.5. Next: ByteDance upscale 720→1080 (0.34 cr) on Anthony's go.

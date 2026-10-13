@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, Compass, Copy, ExternalLink, Globe, Hand, HelpCircle, Layers3, LoaderCircle, Maximize, Minus, Move, Plus, RotateCw, Share2, Sparkles, Sprout, Undo2, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Copy, ExternalLink, Globe, Hand, HelpCircle, Layers3, LoaderCircle, Maximize, Minus, Move, Plus, RotateCw, Share2, Sparkles, Sprout, Undo2, Volume2, VolumeX, X } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { useAppKit } from '@reown/appkit/react';
 import { useBobbySession } from '@/hooks/useBobbySession';
@@ -234,7 +234,6 @@ type Camera = { x: number; y: number; scale: number };
 type Fixture = { placements: Placement[] };
 const DEMO_KEY = 'bobby.trader-land.studio-demo.v1';
 const districtColors: Record<District, string> = { crypto_bay: '#56d9e8', evidence_mines: '#a7f38a', thesis_citadel: '#8ba8ff', risk_reef: '#c3a1ff', axiom_archive: '#f5d68b' };
-const districtTraits: Record<District, [string, string]> = { crypto_bay: ['Patience', 'Paciencia'], evidence_mines: ['Clarity', 'Claridad'], thesis_citadel: ['Risk', 'Riesgo'], risk_reef: ['Contradiction', 'Contradicción'], axiom_archive: ['Closure', 'Cierre'] };
 function itemName(item: ManifestItem) { return pretty(item.id.replace(item.district + '_', '')); }
 function when(iso: string) { return new Date(iso).toLocaleString(isSpanish() ? 'es-MX' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 /** One line on what a seed is waiting on, from the server's review record. */
@@ -296,7 +295,7 @@ export default function TraderLandGatePage() {
   const [undoWorld, setUndoWorld] = useState<World | null>(null);
   const [undoAction, setUndoAction] = useState<Record<string, unknown> | null>(null);
   const [notice, setNotice] = useState('');
-  const [libraryOpen, setLibraryOpen] = useState(true);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const [help, setHelp] = useState(false);
   const [tool, setTool] = useState<'explore' | 'build'>('explore');
   // Visitor mode: /trader-land/w/:code shows someone else's published island, read-only.
@@ -610,24 +609,17 @@ export default function TraderLandGatePage() {
       <Helmet><title>Trader Land · Bobby</title><meta name="description" content="Build your island, one thoughtful decision at a time."/></Helmet>
       <header className="land-header">
         <Link className="land-icon" to={visitor?WORLDS_PATH:'/desk'} aria-label={visitor?t('Back to worlds','Volver a mundos'):t('Back to desk','Volver al desk')}><ArrowLeft size={20}/></Link>
-        <div className="land-wordmark"><span className="land-eyebrow">BOBBY WORLD</span><h1>{visitor?(visitorMeta?.title||t('Community island','Isla de la comunidad')):'Trader Land'}</h1></div>
-        <div className="land-header-divider"/>
-        <span className="land-mode"><i/>{visitor?t('Visiting','Visitando'):isDemo?t('Playground','Zona de prueba'):t('My island','Mi isla')}</span>
+        <div className="land-wordmark"><h1>{visitor?(visitorMeta?.title||t('Community island','Isla de la comunidad')):'Trader Land'}</h1></div>
+        <span className="land-mode"><i/>{visitor?t('Visiting','Visitando'):isDemo?t('Practice','Práctica'):t('My island','Mi isla')}</span>
         <div className="land-header-right">
-          {!isDemo && !visitor && world && <span className="land-xp">{world.xp} XP <span>· {world.aura} aura</span></span>}
-          <Link className="land-discover-nav" to={`${WORLDS_PATH}#comunidad`}><Globe size={19}/><span>{t('Explore islands','Ver islas')}</span></Link>
+          <Link className="land-icon" to={`${WORLDS_PATH}#comunidad`} aria-label={t('Explore islands','Ver islas')} title={t('Explore islands','Ver islas')}><Globe size={19}/></Link>
           {!visitor && <button className="land-icon" onClick={()=>{setShareOpen(!shareOpen);setHelp(false);}} aria-label={t('Share island','Compartir isla')} aria-expanded={shareOpen} title={t('Share island','Compartir isla')}><Share2 size={19}/></button>}
           <button className="land-icon" onClick={toggleSound} aria-label={t('Toggle sound','Activar o silenciar sonido')} aria-pressed={soundEnabled}>{soundEnabled?<Volume2 size={19}/>:<VolumeX size={19}/>}</button>
           <button className="land-icon" onClick={()=>{setHelp(!help);setShareOpen(false);}} aria-label={t('How to play','Cómo jugar')} aria-expanded={help}><HelpCircle size={20}/></button>
         </div>
       </header>
-      <div className={'land-workspace '+(!libraryOpen?'library-closed':'')}>
+      <div className={'land-workspace '+(!visitor&&!libraryOpen?'library-closed':'')}>
         <section className="land-map" ref={viewport} aria-label={t('Interactive island','Isla interactiva')} tabIndex={0} onKeyDown={keyboard} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp}>
-          <div className="land-map-caption" data-land-ui>
-            <span className="land-eyebrow">{visitor?t('COMMUNITY ISLAND','ISLA DE LA COMUNIDAD'):t('FIRST LIGHT · ISLAND 01','PRIMERA LUZ · ISLA 01')}</span>
-            <h2>{visitor?(visitorMeta?.title||t('Someone else\'s world.','El mundo de alguien más.')):draft?t('Find its place.','Encuentra su lugar.'):t('A little world. All yours.','Un pequeño mundo. Muy tuyo.')}</h2>
-            <p>{visitor?t('Explore it. Nothing here can be changed.','Explórala. Aquí nada se puede cambiar.'):draft?t('Drag the piece or tap a tile. Confirm when it feels right.','Arrastra la pieza o toca una casilla. Confirma cuando esté lista.'):tool==='build'?t('Choose a collection piece to place, or tap a built piece to move it.','Elige una pieza de la colección para colocarla o toca una construida para moverla.'):t('Drag anywhere to explore. Choose Build to arrange your island.','Arrastra para explorar. Elige Construir para diseñar tu isla.')}</p>
-          </div>
           <div className="land-scene" data-testid="trader-land-grid" style={{left:size.width/2+camera.x,top:size.height/2+camera.y,transform:`scale(${effectiveScale}) translate(-430px,-335px)`}}>
             <svg className="land-island-base" width="860" height="720" aria-hidden="true"><defs><linearGradient id="land-edge" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#244547"/><stop offset="1" stopColor="#081a23"/></linearGradient></defs><path d="M62 391 L430 575 L798 391 L798 412 L430 602 L62 412 Z" fill="url(#land-edge)" stroke="#41665f" strokeOpacity=".4"/><path d="M62 391 L430 575 L798 391" fill="none" stroke="#94e7ca" strokeOpacity=".4"/></svg>
             {Array.from({length:64},(_,index)=>{
@@ -656,22 +648,29 @@ export default function TraderLandGatePage() {
           </div>
           <div className="land-map-bottom" data-land-ui>
             {!visitor && <div className="land-tools" role="group" aria-label={t('Map tools','Herramientas del mapa')}>
-              <button aria-pressed={tool==='explore'} disabled={busy} onClick={()=>{setTool('explore');setDraft(null);viewport.current?.focus();}}><Hand size={16}/>{t('Explore','Explorar')}</button>
+              <button aria-pressed={tool==='explore'} disabled={busy} onClick={()=>{setTool('explore');setDraft(null);setLibraryOpen(false);viewport.current?.focus();}}><Hand size={16}/>{t('Explore','Explorar')}</button>
               <button aria-pressed={tool==='build'} disabled={editingBlocked} onClick={()=>{setTool('build');setLibraryOpen(true);viewport.current?.focus();}}><Plus size={16}/>{t('Build','Construir')}</button>
-              <button onClick={resetView}><Maximize size={16}/>{t('Center','Centrar')}</button>
             </div>}
 
             {draft ? <div className="land-placement-bar">
-              <div className={'land-placement-status '+(!validDraft?'invalid':'')}>{validDraft?<Check size={17}/>:<X size={17}/>}<span>{validDraft?t('Ready to place','Lista para colocar'):t('Needs more room','Necesita espacio')}<small>{draft.col+1} / {draft.row+1}</small></span></div>
+              <div className={'land-placement-status '+(!validDraft?'invalid':'')}>{validDraft?<Check size={17}/>:<X size={17}/>}<span>{validDraft?t('Ready to place','Lista para colocar'):t('Needs more room','Necesita espacio')}</span></div>
               <button className="land-icon" disabled={busy} onClick={()=>{setDraft(null);setLibraryOpen(true);}} aria-label={t('Cancel placement','Cancelar colocación')}><X size={20}/></button>
               <button className="land-icon" disabled={busy} onClick={rotate} aria-label={t('Rotate piece','Girar pieza')}><RotateCw size={20}/></button>
               <button className="land-primary" disabled={!validDraft||editingBlocked} onClick={()=>void confirm()}>{busy?<LoaderCircle size={18} className="animate-spin"/>:<Check size={18}/>}<span>{draft.placementId?t('Save move','Guardar cambio'):t('Place','Colocar')}</span></button>
-            </div> : <div className="land-explore-bar"><span><Hand size={15}/>{t('Drag / scroll to move · pinch / Ctrl + scroll to zoom','Arrastra / desplaza para mover · pellizca / Ctrl + rueda para zoom')}</span>{!visitor && <button className="land-subtle" disabled={editingBlocked||!(isDemo?undoWorld:undoAction)} onClick={()=>void undo()}><Undo2 size={17}/>{t('Undo','Deshacer')}</button>}</div>}
+            </div> : <div className="land-explore-bar">{!visitor && Boolean(isDemo?undoWorld:undoAction) && <button className="land-subtle" disabled={editingBlocked} onClick={()=>void undo()}><Undo2 size={17}/>{t('Undo','Deshacer')}</button>}</div>}
             {notice && <div role="status" className="land-notice">{notice}</div>}
             {error && <div role="alert" className="land-error">{error}<button onClick={()=>window.location.reload()} aria-label={t('Reload saved island','Recargar isla guardada')}><RotateCw size={16}/></button></div>}
           </div>
           {!world && <div className="land-load-overlay">{busy?<><LoaderCircle className="animate-spin"/><p>{visitor?t('Loading the island…','Cargando la isla…'):t('Loading your island…','Cargando tu isla…')}</p></>:<><p>{error||t('Your island is unavailable.','Tu isla no está disponible.')}</p><button className="land-primary" onClick={()=>window.location.reload()}>{t('Retry','Reintentar')}</button></>}</div>}
-          {help && <div className="land-help" data-land-ui role="region" aria-label={t('How to play','Cómo jugar')}><button className="land-icon" onClick={()=>setHelp(false)} aria-label={t('Close help','Cerrar ayuda')}><X size={18}/></button><h3>{t('Make room for your ideas.','Dale espacio a tus ideas.')}</h3><p>{t('Choose a piece from your collection. Tap a tile, rotate, then confirm. Tap a built piece to move it or return it to your collection.','Elige una pieza de tu colección. Toca una casilla, gira y confirma. Toca una pieza construida para moverla o devolverla a tu colección.')}</p><p>{t('Drag the ground to explore. Scroll to pan. Pinch or Ctrl + scroll to zoom. Keyboard: arrows to move, + / − to zoom, 0 to center, R to rotate, Enter to place, Esc to cancel.','Arrastra el suelo para explorar. Desplaza para mover la vista. Pellizca o usa Ctrl + rueda para zoom. Teclado: flechas para mover, + / − para zoom, 0 para centrar, R para girar, Enter para colocar y Esc para cancelar.')}</p></div>}
+          {help && <div className="land-help" data-land-ui role="region" aria-label={t('How to play','Cómo jugar')}><button className="land-icon" onClick={()=>setHelp(false)} aria-label={t('Close help','Cerrar ayuda')}><X size={18}/></button><h3>{t('How to play','Cómo jugar')}</h3><p>{t('Choose a piece from your collection. Tap a tile, rotate, then confirm. Tap a built piece to move it or return it to your collection.','Elige una pieza de tu colección. Toca una casilla, gira y confirma. Toca una pieza construida para moverla o devolverla a tu colección.')}</p><p>{t('Drag the ground to explore. Scroll to pan. Pinch or Ctrl + scroll to zoom. Keyboard: arrows to move, + / − to zoom, 0 to center, R to rotate, Enter to place, Esc to cancel.','Arrastra el suelo para explorar. Desplaza para mover la vista. Pellizca o usa Ctrl + rueda para zoom. Teclado: flechas para mover, + / − para zoom, 0 para centrar, R para girar, Enter para colocar y Esc para cancelar.')}</p>
+            {world && !visitor && <LandGrowthGuide practice={isDemo} available={available}
+              seeds={world.inventory.filter((entry)=>entry.state==='seed').length}
+              reviewReady={canClose?readySeeds.length:0} route={world.route}
+              nextName={world.route.next && items.get(world.route.next.id) ? itemName(items.get(world.route.next.id)!) : undefined}
+              waitingUntil={(() => { const date = world.inventory.filter((entry)=>entry.state==='seed' && entry.review && !entry.review.ready).map((entry)=>entry.review!.reviewAt).sort()[0]; return date ? when(date) : undefined; })()}
+              disabled={editingBlocked} onReview={()=>{setHelp(false);jumpToReady();}}
+              onBuild={()=>{setHelp(false);const entry=world.inventory.find((entry)=>!entry.placed&&entry.state==='bloomed'&&items.has(entry.item_id));if(entry){setDistrict(items.get(entry.item_id)!.district as District);startDraft(entry);}}}
+              onSignIn={()=>{void(wallet?ensureSession():open()).catch((err:unknown)=>setError(err instanceof Error?err.message:String(err)));}} />}</div>}
           {shareOpen && !visitor && <div className="land-help land-share" data-land-ui role="region" aria-label={t('Share island','Compartir isla')}>
             <button className="land-icon" onClick={()=>setShareOpen(false)} aria-label={t('Close','Cerrar')}><X size={18}/></button>
             {isDemo ? <>
@@ -692,32 +691,25 @@ export default function TraderLandGatePage() {
           <div className="land-library-content">
             <div className="land-district-heading"><h3>{visitorMeta?.title||t('Untitled island','Isla sin nombre')}</h3><span>{visitorMeta?`${visitorMeta.pieces} ${t('pieces','piezas')} · ${visitorMeta.districts.length} ${t(visitorMeta.districts.length===1?'world':'worlds',visitorMeta.districts.length===1?'mundo':'mundos')}`:''}</span></div>
             {visitorMeta && visitorMeta.districts.length>0 && <div className="land-visitor-districts">{visitorMeta.districts.map((value)=><span key={value} style={{'--district-color':districtColors[value as District]??'#7da6ff'} as React.CSSProperties}><i/>{districtNames[value as District]??pretty(value)}</span>)}</div>}
-            <div className="land-collection-footer"><span><Sparkles size={16}/>{t('Built with discipline','Construida con disciplina')}</span><p>{t('Every piece here came from a real decision: a completed read, a respected no-trade or a closed thesis. Nothing is bought.','Cada pieza nació de una decisión real: una lectura completa, un no-trade respetado o una tesis cerrada. Nada se compra.')}</p><Link className="land-primary land-primary-link" to={STUDIO_PATH}>{t('Build mine','Construir la mía')}</Link><Link className="land-text-link" to={WORLDS_PATH}>{t('See more worlds','Ver más mundos')}</Link></div>
+            <div className="land-collection-footer"><Link className="land-primary land-primary-link" to={STUDIO_PATH}>{t('Build mine','Construir la mía')}</Link><Link className="land-text-link" to={WORLDS_PATH}>{t('See more worlds','Ver más mundos')}</Link></div>
           </div>
         </aside> : <aside className={'land-library '+(!libraryOpen?'collapsed':'')} aria-label={t('Piece collection','Colección de piezas')}>
-          <button className="land-library-title" onClick={()=>setLibraryOpen(!libraryOpen)} aria-expanded={libraryOpen}><span><Layers3 size={20}/>{t('Your collection','Tu colección')}<small>{available}</small></span><ChevronDown size={18}/></button>
+          <button className="land-library-title" onClick={()=>setLibraryOpen(!libraryOpen)} aria-expanded={libraryOpen}><span><Layers3 size={20}/>{t('Collection','Colección')}</span><ChevronDown size={18}/></button>
           {libraryOpen && <div className="land-library-content">
-            {world && !draft && tool==='explore' && <LandGrowthGuide practice={isDemo} available={available}
-              seeds={world.inventory.filter((entry)=>entry.state==='seed').length}
-              reviewReady={canClose?readySeeds.length:0} route={world.route}
-              nextName={world.route.next && items.get(world.route.next.id) ? itemName(items.get(world.route.next.id)!) : undefined}
-              waitingUntil={(() => { const date = world.inventory.filter((entry)=>entry.state==='seed' && entry.review && !entry.review.ready).map((entry)=>entry.review!.reviewAt).sort()[0]; return date ? when(date) : undefined; })()}
-              disabled={editingBlocked} onReview={jumpToReady}
-              onBuild={()=>{const entry=world.inventory.find((entry)=>!entry.placed&&entry.state==='bloomed'&&items.has(entry.item_id));if(entry){setDistrict(items.get(entry.item_id)!.district as District);startDraft(entry);}}}
-              onSignIn={()=>{void(wallet?ensureSession():open()).catch((err:unknown)=>setError(err instanceof Error?err.message:String(err)));}} />}
+
 
             {canClose && readySeeds.length>0 && !draft && <button type="button" className="land-review-banner" onClick={jumpToReady}><Sprout size={15}/>{readySeeds.length===1?t('1 thesis ready to review','1 tesis lista para revisar'):`${readySeeds.length} ${t('theses ready to review','tesis listas para revisar')}`}</button>}
             <div className="land-districts" role="tablist" aria-label={t('Districts','Distritos')}>{districts.map((value,index)=><button key={value} role="tab" aria-selected={district===value} aria-label={districtNames[value]} title={districtNames[value]} style={{'--district-color':districtColors[value]} as React.CSSProperties} className={district===value?'active':''} onClick={()=>{setDistrict(value);if(!draft)setSelectedId(null);}}><span>0{index+1}</span><i/></button>)}</div>
-            <div className="land-district-heading"><h3>{districtNames[district]}</h3><span>{t(...districtTraits[district])}</span></div>
+            <div className="land-district-heading"><h3>{districtNames[district]}</h3></div>
             <div className="land-inventory" role="tabpanel" aria-label={districtNames[district]}>{visibleInventory.map((entry)=>{
               const item=items.get(entry.item_id)!;const art=artFor(item,entry.state==='seed');
               const ready=entry.state==='seed'&&Boolean(entry.review?.ready);
               return <button key={entry.id} disabled={busy||Boolean(draft)} className={'land-piece '+(entry.id===selectedId?'selected':'')+(entry.placed?' placed':'')+(ready?' ready':'')} onClick={()=>{if(entry.state==='bloomed'&&!entry.placed){startDraft(entry);}else{setSelectedId(entry.id);cue('placement_tick');}}} aria-label={itemName(item)+(entry.placed?t(', on island',', en la isla'):ready?t(', ready to review',', lista para revisar'):entry.state==='seed'?t(', seed',', semilla'):t(', available',', disponible'))} aria-pressed={entry.id===selectedId}>
                 <img src={art.thumb?.url??art.albedo.url} alt="" draggable={false}/><span>{itemName(item)}</span><small>{entry.placed?<><Check size={11}/>{t('On island','En la isla')}</>:ready?<><Sprout size={11}/>{t('Ready to review','Lista para revisar')}</>:entry.state==='seed'?t('Growing','Creciendo'):entry.source==='season'?<><Sparkles size={11}/>{t('Season','Temporada')} · {item.footprint.cols} × {item.footprint.rows}</>:`${item.footprint.cols} × ${item.footprint.rows}`}</small>
               </button>;
-            })}{!visibleInventory.length&&<p className="land-empty">{t('Your next discoveries will find a home here. Return to the desk to continue your route.','Tus próximos descubrimientos encontrarán un hogar aquí. Vuelve al desk para continuar tu ruta.')}</p>}</div>
-            {!isDemo&&world?.season&&<div className="land-season" aria-label={isSpanish()?world.season.name.es:world.season.name.en}><span className="land-eyebrow">{t('SEASON','TEMPORADA')}</span><h4>{isSpanish()?world.season.name.es:world.season.name.en}<small>{world.season.earned} / {world.season.total}</small></h4><p>{isSpanish()?world.season.rule.es:world.season.rule.en}</p>{world.season.complete?<p className="land-season-next"><Check size={12}/>{t('Season complete.','Temporada completa.')}</p>:world.season.next&&items.get(world.season.next)&&<p className="land-season-next"><Sprout size={12}/>{t('Next piece','Siguiente pieza')}: {itemName(items.get(world.season.next)!)}</p>}</div>}
-            <div className="land-collection-footer">{isDemo?<><span><Compass size={16}/>{t('Your practice island','Tu isla de práctica')}</span><p>{t('Try every piece. This layout stays in this browser, separate from your earned collection.','Prueba todas las piezas. Este diseño se guarda en este navegador, separado de tu colección ganada.')}</p><button className="land-text-link" disabled={busy} onClick={()=>{void (wallet?ensureSession():open()).catch((err:unknown)=>setError(err instanceof Error?err.message:String(err)));}}>{t('Open my earned island','Abrir mi isla ganada')} <ArrowLeft size={14} style={{transform:'rotate(180deg)'}}/></button></>:<><span><Sparkles size={16}/>{t('Built with discipline','Construida con disciplina')}</span><p>{t('Keep learning and reviewing your decisions to grow your collection.','Sigue aprendiendo y revisando tus decisiones para hacer crecer tu colección.')}</p><Link className="land-text-link" to="/desk">{t('Continue my discovery route','Continuar mi ruta de descubrimiento')}</Link></>}</div>
+            })}{!visibleInventory.length&&<p className="land-empty">{t('No pieces yet. Explore the desk to earn them.','Aún no hay piezas. Explora el desk para conseguirlas.')}</p>}</div>
+            {!isDemo&&world?.season&&<details className="land-season" aria-label={isSpanish()?world.season.name.es:world.season.name.en}><summary>{t('Season progress','Progreso de temporada')}</summary><h4>{isSpanish()?world.season.name.es:world.season.name.en}<small>{world.season.earned} / {world.season.total}</small></h4><p>{isSpanish()?world.season.rule.es:world.season.rule.en}</p>{world.season.complete?<p className="land-season-next"><Check size={12}/>{t('Season complete.','Temporada completa.')}</p>:world.season.next&&items.get(world.season.next)&&<p className="land-season-next"><Sprout size={12}/>{t('Next piece','Siguiente pieza')}: {itemName(items.get(world.season.next)!)}</p>}</details>}
+            <div className="land-collection-footer">{isDemo?<button className="land-text-link" disabled={busy} onClick={()=>{void (wallet?ensureSession():open()).catch((err:unknown)=>setError(err instanceof Error?err.message:String(err)));}}>{t('Sign in to save your earned island','Inicia sesión para guardar tu isla ganada')}</button>:<Link className="land-text-link" to="/desk">{t('Back to desk','Volver al desk')}</Link>}</div>
           </div>}
           {libraryOpen && selectedItem && selected && <div className="land-selected-detail"><div><span className="land-eyebrow">{selectedPlacement?t('ON YOUR ISLAND','EN TU ISLA'):selected.state==='seed'?t('SEED','SEMILLA'):t('BLUEPRINT','PLANO')}</span><h3>{itemName(selectedItem)}</h3><p>{footprint(selectedItem,draft?.orientation).cols} × {footprint(selectedItem,draft?.orientation).rows} {t('tiles','casillas')}</p>{selected.state==='seed'&&selected.review&&<p className="land-thesis">{seedLine(selected.review)}</p>}{selected.state==='seed'&&!selected.review&&<p>{t('This seed blooms when you review its thesis.','Esta semilla florece cuando revisas su tesis.')}</p>}{selectedPlacement&&!canMove&&<p>{t('Moving saved pieces is coming soon.','Mover piezas sincronizadas estará disponible pronto.')}</p>}</div><div className="land-selected-actions">{selected.state==='seed'?<button className="land-primary" disabled={editingBlocked||Boolean(draft)||!canClose||!selected.review?.ready} onClick={()=>void closeThesis(selected)}>{busy?<LoaderCircle size={17} className="animate-spin"/>:<Sprout size={17}/>} {selected.review?.ready?t('Review thesis','Revisar tesis'):t('Growing','Creciendo')}</button>:<button className="land-primary" disabled={editingBlocked||Boolean(draft)||Boolean(selectedPlacement&&!canMove)} onClick={()=>startDraft(selected)}>{selectedPlacement?<Move size={17}/>:<Plus size={17}/>} {selectedPlacement?t('Move','Mover'):t('Build','Construir')}</button>}{selectedPlacement&&!draft&&<button className="land-subtle" disabled={editingBlocked} onClick={()=>void returnPiece()}>{t('Store','Guardar')}</button>}</div></div>}
         </aside>}

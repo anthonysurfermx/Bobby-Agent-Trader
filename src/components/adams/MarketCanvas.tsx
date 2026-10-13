@@ -76,6 +76,8 @@ export function MarketCanvas({
   debate,
   language,
   onSymbolChange,
+  showSymbolSelector = true,
+  compact = false,
   onTimeframeChange,
 }: {
   symbol: string;
@@ -89,6 +91,8 @@ export function MarketCanvas({
   } | null;
   language: 'es' | 'en';
   onSymbolChange: (symbol: string) => void;
+  showSymbolSelector?: boolean;
+  compact?: boolean;
   onTimeframeChange: (tf: Timeframe) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -491,7 +495,7 @@ export function MarketCanvas({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <select
+          {showSymbolSelector && <select
             aria-label="Seleccionar activo"
             value={symbol}
             onChange={(event) => onSymbolChange(event.target.value)}
@@ -510,7 +514,7 @@ export function MarketCanvas({
                 ))}
               </optgroup>
             ))}
-          </select>
+          </select>}
           <div className="flex items-center gap-1">
           {TIMEFRAMES.map((tf) => (
             <button
@@ -529,6 +533,8 @@ export function MarketCanvas({
 
       {/* The reading behind the call: computed from the same candles on screen,
           and from the same function the voice tool runs server-side. */}
+      <details open={compact ? undefined : true} className="border-b border-white/10">
+        {compact && <summary className="cursor-pointer px-4 py-2 font-mono text-[10px] text-white/40">{language === 'es' ? 'Indicadores' : 'Indicators'}</summary>}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-white/10 bg-black/25 px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.08em]">
         {([
           { label: 'Tendencia', value: analysis?.trend, tone: analysis?.trend === 'alcista' ? 'text-green-400' : analysis?.trend === 'bajista' ? 'text-[#ff716a]' : 'text-white/50' },
@@ -547,11 +553,12 @@ export function MarketCanvas({
           </span>
         ))}
       </div>
+      </details>
 
       {/* Legend for the three lines on the chart. Each row names the agent, the
           level it drew and its score — the readable thesis text lives beside
           the chart in VoiceRoom, so it is not repeated here. */}
-      <div className="grid grid-cols-3 gap-1 border-b border-white/10 bg-black/20 px-2 py-2">
+      {!compact && <div className="grid grid-cols-3 gap-1 border-b border-white/10 bg-black/20 px-2 py-2">
         {([
           { key: 'alpha', label: 'ALPHA', score: debate?.alphaConviction, waiting: 'busca el setup' },
           { key: 'red', label: 'RED TEAM', score: debate?.redTeamSeverity, waiting: 'ataca la tesis' },
@@ -584,7 +591,7 @@ export function MarketCanvas({
             </div>
           );
         })}
-      </div>
+      </div>}
 
       <div className="relative min-h-0 flex-1">
         <div ref={containerRef} className="absolute inset-0" />
