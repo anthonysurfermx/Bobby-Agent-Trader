@@ -108,21 +108,19 @@ final class CompanionBuild69UITests: XCTestCase {
     }
     private func dailyNotes(_ language: String) {
         let es=language=="es",app=launch(language,scenario:"companion",seedNotes:true)
-        ask(app,es ? "¿Qué significa invertir?" : "Was bedeutet investieren?"); dailyAnswer(app,es:es)
-        openNotes(app,es:es)
-        XCTAssertTrue(app.staticTexts["companion-note-interest"].waitForExistence(timeout:10))
-        app.buttons["companion-correct-interest"].tap()
-        XCTAssertTrue(app.buttons["companion-correct-option-companies"].waitForExistence(timeout:10)); app.buttons["companion-correct-option-companies"].tap()
-        let toggle=app.switches["companion-memory-toggle"]; toggle.tap()
+        ask(app,es ? "¿Qué significa invertir?" : "Was bedeutet investieren?");dailyAnswer(app,es:es);openNotes(app,es:es)
+        let row=app.buttons["companion-note-row-interest"];reach(row,app,up:true);row.tap()
+        XCTAssertTrue(app.buttons["companion-correct-interest"].waitForExistence(timeout:10));app.buttons["companion-correct-interest"].tap()
+        XCTAssertTrue(app.buttons["companion-correct-option-companies"].waitForExistence(timeout:10));app.buttons["companion-correct-option-companies"].tap()
+        XCTAssertTrue(app.buttons["companion-detail-close"].waitForExistence(timeout:10));app.buttons["companion-detail-close"].tap()
+        let toggle=app.switches["companion-memory-toggle"];reach(toggle,app,up:false);toggle.tap()
         let confirm=app.buttons["companion-delete-confirm"],cancel=app.buttons["companion-delete-cancel"]
-        XCTAssertTrue(confirm.waitForExistence(timeout:10)); visible(confirm,app); visible(cancel,app)
-        XCTAssertEqual(confirm.frame.width,cancel.frame.width,accuracy:1); XCTAssertEqual(confirm.frame.height,cancel.frame.height,accuracy:1)
-        cancel.tap(); XCTAssertTrue(app.staticTexts["companion-note-interest"].exists)
-        reach(app.buttons["companion-delete-interest"],app,up:true); app.buttons["companion-delete-interest"].tap()
-        XCTAssertFalse(app.staticTexts["companion-note-interest"].exists); XCTAssertFalse(confirm.exists)
-        reach(toggle,app,up:false); toggle.tap(); XCTAssertTrue(confirm.waitForExistence(timeout:10)); confirm.tap()
-        XCTAssertEqual(toggle.value as? String,"0")
-        shot(app,"i1-\(language)-profile-correct-delete-memory"); app.terminate()
+        XCTAssertTrue(confirm.waitForExistence(timeout:10));visible(confirm,app);visible(cancel,app)
+        XCTAssertEqual(confirm.frame.width,cancel.frame.width,accuracy:1);XCTAssertEqual(confirm.frame.height,cancel.frame.height,accuracy:1)
+        cancel.tap();reach(row,app,up:true);row.tap();XCTAssertTrue(app.buttons["companion-delete-interest"].waitForExistence(timeout:10));app.buttons["companion-delete-interest"].tap()
+        XCTAssertTrue(row.waitForNonExistence(timeout:10));XCTAssertFalse(confirm.exists);XCTAssertTrue(app.buttons["companion-note-undo"].waitForExistence(timeout:5))
+        reach(toggle,app,up:false);toggle.tap();XCTAssertTrue(confirm.waitForExistence(timeout:10));confirm.tap();XCTAssertEqual(toggle.value as? String,"0")
+        shot(app,"i2-\(language)-detail-correct-delete-memory");app.terminate()
     }
     private func exerciseExplanation(_ language: String) {
         let es = language == "es", app = launch(language, scenario: "companion-exercise")

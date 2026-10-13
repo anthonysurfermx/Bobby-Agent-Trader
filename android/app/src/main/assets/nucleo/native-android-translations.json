@@ -1211,6 +1211,12 @@
     "it": "Come ti parla Bobby",
     "de": "Wie Bobby mit dir spricht"
   },
+  "How Bobby talks to you": {
+    "fr": "Comment Bobby te parle",
+    "pt": "Como o Bobby fala contigo",
+    "it": "Come ti parla Bobby",
+    "de": "Wie Bobby mit dir spricht"
+  },
   "How does {0} look today?": {
     "fr": "Comment se présente {0} aujourd’hui ?",
     "pt": "Como está {0} hoje?",
@@ -1896,6 +1902,12 @@
     "pt": "Colocada",
     "it": "Posizionato",
     "de": "Platziert"
+  },
+  "Plain": {
+    "fr": "Simple",
+    "pt": "Simples",
+    "it": "Semplice",
+    "de": "Einfach"
   },
   "Plans are currently unavailable.": {
     "fr": "Les formules sont actuellement indisponibles.",
@@ -2711,6 +2723,12 @@
     "it": "Toccane uno per chiedere a Bobby.",
     "de": "Tippe auf eins, um Bobby zu fragen."
   },
+  "Technical": {
+    "fr": "Technique",
+    "pt": "Técnico",
+    "it": "Tecnico",
+    "de": "Technisch"
+  },
   "Tell us about an unsafe response": {
     "en": "Tell us about an unsafe response",
     "es": "Cuéntanos sobre una respuesta insegura",
@@ -3230,6 +3248,12 @@
     "pt": "Com Bobby Pro, dentro de uma utilização razoável.",
     "it": "Con Bobby Pro, entro un uso corretto.",
     "de": "Mit Bobby Pro, im Rahmen fairer Nutzung."
+  },
+  "With terms": {
+    "fr": "Avec les termes",
+    "pt": "Com termos",
+    "it": "Con termini",
+    "de": "Mit Begriffen"
   },
   "Write a thesis first.": {
     "fr": "Écris d'abord une thèse.",

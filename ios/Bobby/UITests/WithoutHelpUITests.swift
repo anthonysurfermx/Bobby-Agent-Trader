@@ -574,7 +574,7 @@ final class MemoryInvitationShots: ConversationFixtureCase {
     func test03DialChip() {
         launch("companion",memory:"dial");ask();answered()
         let chip=web.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",copy("bobbyAsks").components(separatedBy:"{question}")[0])).firstMatch
-        XCTAssertFalse(chip.exists);XCTAssertFalse(web.sliders.firstMatch.exists);shot("03-dial-disabled-at-owner-cutoff")
+        ready(chip);XCTAssertFalse(web.sliders.firstMatch.exists);physicalControls([chip]);shot("03-dial-invitation")
     }
 
     func consent(_ size: String?, name: String) {
@@ -694,6 +694,8 @@ final class MemoryNotesShots: ConversationFixtureCase {
     func test03CorrectionChecksCurrentAndStoresConfirmed() {
         notes();detail("interest");app.buttons["companion-correct-interest"].tap();ready(app.buttons["companion-correct-option-crypto"])
         XCTAssertTrue(app.buttons["companion-correct-option-crypto"].isSelected);shot("44-correction-current-choice")
+        let leave=app.buttons["companion-correction-leave"];reach(leave);physicalControls([leave],abovePill:false);shot("65-correction-lower-choices-and-leave")
+        leave.tap();ready(app.buttons["companion-correct-interest"]);app.buttons["companion-correct-interest"].tap()
         reach(app.buttons["companion-correct-option-companies"]);app.buttons["companion-correct-option-companies"].tap()
         ready(app.buttons["companion-correct-interest"]);XCTAssertTrue(app.staticTexts["companion-detail-origin"].label.hasPrefix(copy("detail.confirmed").components(separatedBy:"{date}")[0]));shot("45-correction-confirmed")
     }
@@ -827,27 +829,36 @@ final class StoreReviewerWalk: ConversationFixtureCase {
         shot("12-review-personal-own-words");web.buttons[copy("answerSend")].tap()
         ready(button("aria.closeAnswer"));shot("13-review-understood")
     }
-    func testLegacyNotesCorrectionsDeletionAndMemoryOffHaveNoUnfinishedDetail() {
+    func testNotesDetailConfirmationCorrectionUndoDeletionAndMemoryOff() {
         launch("companion",notes:true);notes();shot("14-review-shipping-notes")
-        XCTAssertFalse(app.buttons["companion-note-row-interest"].exists)
-        XCTAssertFalse(app.staticTexts["companion-detail-value"].exists)
-        let correct=app.buttons["companion-correct-interest"];reach(correct);correct.tap()
-        let choice=app.buttons["companion-correct-option-companies"];reach(choice);choice.tap()
-        ready(app.buttons["companion-correct-interest"]);shot("15-review-corrected-note")
-        app.buttons["companion-delete-interest"].tap();XCTAssertFalse(app.staticTexts["companion-note-interest"].exists)
-        XCTAssertFalse(app.buttons["companion-note-undo"].exists);shot("16-review-deleted-no-unfinished-undo")
-        let all=app.buttons["companion-delete-all"];reach(all);all.tap();ready(app.buttons["companion-delete-confirm"])
-        shot("17-review-delete-all-confirm");app.buttons["companion-delete-confirm"].tap()
-        ready(app.staticTexts[copy("empty")]);shot("18-review-notes-empty")
+        let interest=app.buttons["companion-note-row-interest"],barrier=app.buttons["companion-note-row-barrier"]
+        reach(barrier);barrier.tap();ready(app.buttons["companion-note-confirm"]);shot("48-review-note-inference")
+        app.buttons["companion-note-confirm"].tap();XCTAssertTrue(app.buttons["companion-note-confirm"].waitForNonExistence(timeout:5))
+        shot("49-review-note-confirmed");app.buttons["companion-detail-close"].tap();ready(interest);interest.tap()
+        ready(app.buttons["companion-correct-interest"]);let origin=app.staticTexts["companion-detail-origin"].label
+        XCTAssertFalse(app.buttons["companion-note-confirm"].exists);shot("50-review-note-said-detail")
+        app.buttons["companion-correct-interest"].tap();ready(app.buttons["companion-correct-option-crypto"])
+        XCTAssertTrue(app.buttons["companion-correct-option-crypto"].isSelected);shot("51-review-note-correction-choices")
+        app.buttons["companion-correction-leave"].tap();ready(app.buttons["companion-delete-interest"])
+        app.buttons["companion-delete-interest"].tap();let undo=app.buttons["companion-note-undo"];ready(undo)
+        shot("16-review-note-deleted-undo",delay:0);undo.tap();ready(interest);interest.tap();ready(app.buttons["companion-correct-interest"])
+        XCTAssertEqual(app.staticTexts["companion-detail-origin"].label,origin)
+        app.buttons["companion-correct-interest"].tap();ready(app.buttons["companion-correct-option-companies"])
+        app.buttons["companion-correct-option-companies"].tap();ready(app.buttons["companion-correct-interest"]);shot("15-review-corrected-note")
+        app.buttons["companion-detail-close"].tap();let all=app.buttons["companion-delete-all"];reach(all);all.tap()
+        ready(app.buttons["companion-delete-confirm"]);shot("17-review-delete-all-confirm");app.buttons["companion-delete-confirm"].tap()
+        ready(app.staticTexts["companion-notes-empty"]);shot("18-review-notes-empty")
         let toggle=app.switches["companion-memory-toggle"];reach(toggle);toggle.tap();ready(app.buttons["companion-delete-confirm"])
-        app.buttons["companion-delete-confirm"].tap();XCTAssertEqual(toggle.value as? String,"0");shot("19-review-memory-off")
+        app.buttons["companion-delete-confirm"].tap();ready(app.staticTexts["companion-notes-off"]);shot("19-review-memory-off")
     }
-    func testDialHasNoInvitationOrMemoryDoor() {
+    func testDialInvitationAndProfileDoorReturnSameAnswer() {
         launch("companion",memory:"dial");ask();answered()
         let chip=web.buttons.matching(NSPredicate(format:"label BEGINSWITH %@",copy("bobbyAsks").components(separatedBy:"{question}")[0])).firstMatch
-        XCTAssertFalse(chip.exists);XCTAssertFalse(web.sliders.firstMatch.exists)
-        button("aria.closeAnswer").tap();profile();let memory=app.buttons["account-memory"];reach(memory);memory.tap()
-        XCTAssertFalse(app.buttons["memory-speaking"].exists);shot("20-review-dial-doors-disabled")
+        ready(chip);XCTAssertFalse(web.sliders.firstMatch.exists);chip.tap()
+        ready(web.buttons["Leave as is"]);web.buttons["Leave as is"].tap();ready(button("aria.closeAnswer"))
+        profile();let dial=app.buttons["account-speaking"];reach(dial);dial.tap();ready(web.buttons["Save"])
+        shot("20-review-dial-profile");web.buttons["Leave as is"].tap();ready(button("aria.closeAnswer"))
+        profile();let memory=app.buttons["account-memory"];reach(memory);memory.tap();XCTAssertFalse(app.buttons["memory-speaking"].exists)
     }
     func testBitcoinOfferConfirmReadAndSave() {
         launch();ask("Analyze Bitcoin");ready(button("risk.notNow"));physicalControls([confirmRead,button("risk.notNow")])
@@ -945,8 +956,9 @@ final class StoreAdditionalWalk: ConversationFixtureCase {
         let memory=app.buttons["account-memory"];reach(memory);memory.tap()
         let door=app.buttons["memory-educational-notes"];reach(door);door.tap();ready(app.staticTexts["companion-notes-title"])
         XCTAssertFalse(app.buttons["companion-correct-interest"].exists)
-        let deletion=app.buttons["companion-delete-interest"];reach(deletion);shot("37-review-server-memory-off")
-        deletion.tap();XCTAssertFalse(app.staticTexts["companion-note-interest"].exists);shot("38-review-server-off-delete-works")
+        let row=app.buttons["companion-note-row-interest"];reach(row);shot("37-review-server-memory-off");row.tap()
+        let deletion=app.buttons["companion-delete-interest"];ready(deletion);XCTAssertFalse(app.buttons["companion-correct-interest"].exists)
+        deletion.tap();ready(app.buttons["companion-note-undo"]);XCTAssertFalse(row.exists);shot("38-review-server-off-delete-works",delay:0)
     }
     func testKnownGuestCreditsProDoorAndSignedInLegalRestoreExit() {
         launch("subscription_required");profile()

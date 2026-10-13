@@ -273,7 +273,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #speakingConfirm{position:absolute;top:690px;left:70px;width:250px;min-height:48px;border:1px solid #F2EDE433;border-radius:28px;background:transparent;color:#F2EDE4;font:400 16px var(--sans)}
 #speakingSkip{position:absolute;top:750px;left:95px;width:200px;min-height:44px;border:0;background:none;color:var(--ink2);font:400 14px var(--sans)}
 #speakingError{position:absolute;top:659px;left:30px;width:330px;color:#F2EDE4;font:400 13px var(--sans)}
-.speaking-on #pill *,.speaking-on #chipRow *,.speaking-on #hintS,.speaking-on #micGlow,.speaking-on #greet,.speaking-on #pill,.speaking-on #hint,.speaking-on #chips,.speaking-on #avatar,.speaking-on #lvl{visibility:hidden!important;pointer-events:none!important}
+.speaking-on #conversation-keyboard,.speaking-on #close,.speaking-on #pill *,.speaking-on #chipRow *,.speaking-on #hintS,.speaking-on #micGlow,.speaking-on #greet,.speaking-on #pill,.speaking-on #hint,.speaking-on #chips,.speaking-on #avatar,.speaking-on #lvl{visibility:hidden!important;pointer-events:none!important}
 .speaking-greet #greet .t{white-space:normal;font-size:26px;line-height:32px}
 #speakingRefine{position:absolute;top:790px;left:12px;width:366px;display:none;justify-content:center;gap:6px;z-index:30}
 #speakingRefine.on{display:flex} #speakingRefine button{background:#0B0A09;border:1px solid #F2EDE426;border-radius:20px;color:#F2EDE4;font:400 12px var(--sans);padding:12px 8px;min-height:44px}
@@ -6771,9 +6771,9 @@ var DIAL_WORDS = {
  de: ['Wie soll ich mit dir sprechen?', ['Einfach','Mit Begriffen','Technisch'], ['Der Kurs stieg schnell. Eine nahe Grenze stoppte ihn schon einmal.','Der Kurs stieg schnell (überkauft). Eine Grenze ist nah (Widerstand).','Überkauft auf 1H, unter Widerstand. Bestätigung fehlt.'], 'So passt es','Jetzt starten','Was möchtest du heute verstehen?', ['Einfacher','So passt es','Technischer']]
 };
 var DIAL_EXITS = {"en": ["Save", "Leave as is", "That didn’t save. Try again."], "es": ["Guardar", "Dejar como está", "No se guardó. Inténtalo de nuevo."], "fr": ["Enregistrer", "Laisser tel quel", "Non enregistré. Réessaie."], "pt": ["Guardar", "Deixar como está", "Não foi guardado. Tenta de novo."], "it": ["Salva", "Lascia così", "Non salvato. Riprova."], "de": ["Speichern", "So lassen", "Nicht gespeichert. Versuch es noch einmal."]};
-var dialReturn = null;
+var dialReturn = null, dialReadReturn = false;
 function dialExitWords(){return DIAL_EXITS[LANG]||DIAL_EXITS.en;}
-function dialClose(){dialBusy=false;if(dialReturn){var answer=dialReturn;dialReturn=null;answer.invitation=null;answer.slotBorn=false;go('COMPANION',{reply:answer});}else go('RETURNING');}
+function dialClose(){dialBusy=false;if(dialReturn){var answer=dialReturn;dialReturn=null;answer.invitation=null;answer.slotBorn=false;go('COMPANION',{reply:answer});}else if(dialReadReturn&&READ){dialReadReturn=false;go('HANDBACK',{restored:true});}else{dialReadReturn=false;go('RETURNING');}}
 var dial = D.getElementById('speakingDial'), dialIndex = 0, dialBusy = false, dialOwner = null, dialGreeting = false;
 function dialWords(){ return DIAL_WORDS[LANG] || DIAL_WORDS.en; }
 function dialPaint(index){
@@ -6798,8 +6798,8 @@ function dialSave(index, feedback){
  }, function(){ dialBusy = false; if (gen === OWNER_GEN) D.getElementById('speakingError').textContent = dialExitWords()[2]; });
 }
 STATES.SPEAKING_DIAL = {
- enter: function(){
-  dialReturn = GUIDE || null; dialOwner = SES.speaking.owner; dialBusy = false; chipsHide(); greetOut(); meriOut(); hint('');
+ enter: function(prev){
+  dialReturn = prev==='COMPANION' ? GUIDE : null; dialReadReturn=!!READ && ['HANDBACK','CARDS','FOLLOWUPS'].indexOf(prev)>=0; dialOwner = SES.speaking.owner; dialBusy = false; chipsHide(); greetOut(); meriOut(); hint('');
   stage.classList.add('speaking-on'); dial.classList.add('on'); dial.setAttribute('aria-hidden','false'); D.getElementById('speakingRange').focus();
   S.cy[RM ? 'set' : 'to'](302); S.r[RM ? 'set' : 'to'](112); U.faceOn.to(0); U.presence.to(0); tintHome();
   D.getElementById('speakingError').textContent = ''; dialPaint(Math.max(0, DIAL_VALUES.indexOf(SES.speaking.value)));
@@ -6836,8 +6836,8 @@ function conversationChrome(){
  var name=ST.name,scale=Math.max(.5,fitS||1),k=(SES&&SES.textScale||1)/scale,target=44/scale;
  var statusVisible=['SENDING','RESOLVING'].indexOf(name)>=0;if(!statusVisible&&preparingLine._visible)conversationRetire(preparingLine,'sphere');preparingLine._visible=statusVisible;preparingLine.style.display=statusVisible?'block':'none';preparingLine.textContent=tt('status.preparing');if(preparingLine.style.display==='block'&&preparingLine._born!==ST.t0){preparingLine._born=ST.t0;conversationBorn(preparingLine,'sphere',27);}preparingLine.style.top='512px';preparingLine.style.fontSize=22*k+'px';preparingLine.style.lineHeight=27*k+'px';
  var waiting=['SENDING','RESOLVING','THINK_WAIT'].indexOf(name)>=0,listening=name==='LISTENING',held=name==='HELD_DRAFT',speaking=!!(VOICE.id&&VOICE.started&&!VOICE.ended);
- var rest=name==='IDLE'||name==='WAKE';if(rest){A.closeO.set(0);op(el.close,0);}att(el.close,'aria-hidden',rest||waiting||name==='READ_CONFIRM'?'true':'false');
- keyboardButton.style.display=!waiting&&name!=='BOOT'&&name!=='TYPING'?'grid':'none';keyboardButton.style.width=keyboardButton.style.height=target+'px';keyboardButton.style.left=(105-target/2)+'px';keyboardButton.style.top=(770-target/2)+'px';keyboardButton.setAttribute('aria-label',tt('aria.type'));
+ var rest=name==='IDLE'||name==='WAKE';if(rest){A.closeO.set(0);op(el.close,0);}att(el.close,'aria-hidden',rest||waiting||name==='READ_CONFIRM'||name==='SPEAKING_DIAL'?'true':'false');
+ keyboardButton.style.display=!waiting&&name!=='BOOT'&&name!=='TYPING'&&name!=='SPEAKING_DIAL'?'grid':'none';keyboardButton.style.width=keyboardButton.style.height=target+'px';keyboardButton.style.left=(105-target/2)+'px';keyboardButton.style.top=(770-target/2)+'px';keyboardButton.setAttribute('aria-label',tt('aria.type'));
  fieldMic.style.display=name==='TYPING'&&TALK_MODE==='tap'?'block':'none';fieldMic.setAttribute('aria-label',tt('aria.talk'));
  var send=TALK_MODE==='tap'&&(held||listening&&STATES.LISTENING.live);el.pill.classList.toggle('conversation-send',send);
  if(TALK_MODE==='tap')att(el.pill,'aria-label',tt(waiting?'aria.cancelQuestion':speaking?'aria.pillStop':listening?'aria.sendSpoken':held?'type.send':'aria.talk'));
@@ -7114,7 +7114,7 @@ function wire(){
     /* the last read was spent, or reads came back: the idle row loses or regains its one-tap chips at once */
     if (oneTapOff() !== walled && ST.name === 'IDLE') showIdleSuggestions(); else nudgeSync();
   });
-  BR.on('speaking.open', function(){ if (SES && SES.speaking && SES.riskAccepted && ['IDLE','HANDBACK','CARDS','FOLLOWUPS','THESIS_VIEW','FACES'].indexOf(ST.name) >= 0){ clearRead(); glassHome(); go('SPEAKING_DIAL'); } });
+  BR.on('speaking.open', function(){ if (SES && SES.speaking && SES.riskAccepted && ['IDLE','COMPANION','HANDBACK','CARDS','FOLLOWUPS','THESIS_VIEW','FACES'].indexOf(ST.name) >= 0){ go('SPEAKING_DIAL'); } });
   BR.on('account.changed', function(p){ conversationReset(); dialBusy = false; dialGreeting = false; stage.classList.remove('speaking-greet'); accountChanged(p); });
   BR.on('consent.withdrawn', function(p){conversationReset();consentWithdrawn(p);});
   BR.on('app.state', function(p){ if (p && p.state === 'background'){ conversationSuspend(); } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });

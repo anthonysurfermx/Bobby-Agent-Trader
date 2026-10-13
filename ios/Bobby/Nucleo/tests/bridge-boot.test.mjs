@@ -943,3 +943,20 @@ test('I-2b: the reading notes link opens only native notes and revocation remove
  mark._guideAction();await flush();assert.equal(app.calls.filter(c=>c.method==='companion.notes').length,1);assert.equal(asksOf(app).length,1);
  app.context.nucleoBridge.emit('companion.revoked',{});assert.equal(mark.style.display,'none');assert.deepEqual(app.errors,[]);
 });
+
+test('1.8.1 Profile dial restores the educational answer without replaying narration',async()=>{
+ const app=await idle({speaking:{owner:'a',value:null,offer:false,refine:false}});memoryStrings(app);
+ await companionReply(app,{status:'companion',requestId:'profile-dial',gist:'Learning.',text:'Learning. Explanation.',invitation:null});app.advance(2);await flush();
+ const speeches=app.calls.filter(c=>c.method==='speak'&&c.params.id!=='speaking-dial').length;
+ app.context.nucleoBridge.emit('speaking.open',{});assert.equal(app.context.nucleo.state(),'SPEAKING_DIAL');
+ app.nodes.get('speakingSkip').listeners.click();await flush();assert.equal(app.context.nucleo.state(),'COMPANION');
+ assert.equal(companionPanel(app).children[0].children[0].textContent,'Learning.');
+ assert.equal(app.calls.filter(c=>c.method==='speak'&&c.params.id!=='speaking-dial').length,speeches);assert.equal(asksOf(app).length,1);assert.deepEqual(app.errors,[]);
+});
+
+for(const language of ['en','es','fr','pt','it','de'])test('1.8.1 '+language+': dial exposes only its two exits',async()=>{
+ const app=await idle({language,speaking:{owner:'a',value:null,offer:false,refine:false}});memoryStrings(app);
+ await companionReply(app,{status:'companion',gist:'Learning.',text:'Learning. Explanation.',invitation:null});
+ app.context.nucleoBridge.emit('speaking.open',{});app.advance(1);await flush();
+ assert.equal(keyboardOf(app).style.display,'none');assert.equal(app.nodes.get('close').getAttribute('aria-hidden'),'true');assert.deepEqual(app.errors,[]);
+});

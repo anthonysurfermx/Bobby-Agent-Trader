@@ -75,7 +75,7 @@ protocol NucleoEmitting: AnyObject {
 @MainActor
 final class NucleoSession: ObservableObject {
     // Owner deadline: the unverified I-2b dial has no user-facing entry.
-    private static let invitationDialEnabled = false
+    private static let invitationDialEnabled = true
     static let hintsKey = "nucleo.hints"
     static let hintPattern = #"^[a-z][A-Za-z0-9_.-]{0,31}$"#
     static let suggestionsCacheSeconds: TimeInterval = 300
@@ -347,15 +347,13 @@ final class NucleoSession: ObservableObject {
     var onboarded: Bool { profile.onboarded && companions.companionId != nil }
     var page: NucleoPage { NucleoPage.route(onboarded: profile.onboarded, companionId: companions.companionId, riskAccepted: profile.acceptedRiskNotice) }
 
+    private var speakingHandoff: (generation: UUID?, pending: Bool)?
+    var speakingValueLabel: String { SpeakingDial.label(SpeakingDial(defaults: defaults).value(fixtures ? nil : AccountSession.shared.session?.userId)) }
+
     func openSpeakingDial() {
-        guard Self.invitationDialEnabled else { return }
-        guard profile.acceptedRiskNotice, !desk.isBusy else { return }
+        guard Self.invitationDialEnabled, profile.acceptedRiskNotice, !desk.isBusy, openSheet == .account else { return }
+        speakingHandoff = (accountGeneration, true)
         sheet = nil
-        let generation = accountGeneration
-        after(briefingSheetDelay) { [weak self] in
-            guard let self, self.accountGeneration == generation, self.profile.acceptedRiskNotice else { return }
-            self.emit("speaking.open", [:])
-        }
     }
 
     func emit(_ name: String, _ payload: [String: Any]) {
@@ -1373,6 +1371,11 @@ final class NucleoSession: ObservableObject {
         openSheet = nil
         sheet = nil
         sheetClosed(route)
+        if let handoff = speakingHandoff {
+            speakingHandoff = nil
+            if route == .account, handoff.generation == accountGeneration, profile.acceptedRiskNotice,
+               !tornDown, !desk.isBusy, briefingGate?.appActive() == true { emit("speaking.open", [:]) }
+        }
         if route == .companionConsent, companionAwaitingConsent {
             let accepted = companionConsentAccepted
             companionAwaitingConsent = false; companionConsentAccepted = false
@@ -1630,6 +1633,7 @@ final class NucleoSession: ObservableObject {
     /// not taken yet is dropped, and so is one still waiting for its sheet to go: it never starts
     /// by itself when they come back.
     func appWentBackground() {
+        speakingHandoff = nil
         companionNoteUndo.clear()
         pendingFirstAsk = nil
         readHandoff = nil
@@ -1650,6 +1654,7 @@ final class NucleoSession: ObservableObject {
 
     /// Before the classic app appears: nothing of this session may keep writing.
     func teardown() {
+        speakingHandoff = nil
         companionNoteUndo.clear()
         guard !tornDown else { return }
         heldBriefId = nil

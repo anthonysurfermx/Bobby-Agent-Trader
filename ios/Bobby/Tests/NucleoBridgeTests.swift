@@ -81,6 +81,42 @@ final class NucleoBridgeTests: XCTestCase {
         XCTAssertEqual(presentations,0)
     }
 
+    func testSpeakingChoiceBridgePersistsForTheCurrentReaderWithoutARequest() async {
+        let (session,bridge,_) = make();defer { session.teardown() }
+        let dial = SpeakingDial(defaults:defaults),owner = dial.tag(nil)
+        NucleoFixtures.clearLog()
+        let changed = await result(bridge,"speaking.choose",["owner":owner,"value":"technical"])
+        XCTAssertEqual((changed["speaking"] as? [String:Any])?["value"] as? String,"technical")
+        XCTAssertEqual(SpeakingDial(defaults:defaults).value(nil),"technical")
+        XCTAssertTrue(NucleoFixtures.log.isEmpty,"A preference save never asks the model")
+    }
+    func testSpeakingChoiceBridgeRejectsAStaleReaderAndAnUnknownChoice() async {
+        let (session,bridge,_) = make();defer { session.teardown() }
+        let dial = SpeakingDial(defaults:defaults);dial.choose("plain",owner:nil)
+        let stale = await fault(bridge,"speaking.choose",["owner":"another-reader","value":"technical"])
+        XCTAssertEqual(stale,"invalid_params");XCTAssertEqual(dial.value(nil),"plain")
+        let invalid = await fault(bridge,"speaking.choose",["owner":dial.tag(nil),"value":"unknown"])
+        XCTAssertEqual(invalid,"invalid_params");XCTAssertEqual(dial.value(nil),"plain")
+    }
+    func testProfileSpeakingHandoffWaitsForActualDismissalAndCannotOpenAfterBackground() {
+        let (session,_,recorder)=make();defer { session.teardown() }
+        session.briefingGate?.appActive = { true }
+        XCTAssertTrue(session.openNative(.account));session.openSpeakingDial()
+        XCTAssertFalse(recorder.events.contains { $0.name == "speaking.open" })
+        session.sheetDismissed()
+        XCTAssertEqual(recorder.events.filter { $0.name == "speaking.open" }.count,1)
+        XCTAssertTrue(session.openNative(.account));session.openSpeakingDial()
+        session.briefingGate?.appActive = { false };session.sheetDismissed()
+        XCTAssertEqual(recorder.events.filter { $0.name == "speaking.open" }.count,1)
+    }
+
+    func testProfileDialDoesNotResumeAClosedHandoffAfterBackground() {
+        let (session,_,recorder)=make();defer { session.teardown() }
+        session.briefingGate?.appActive={true}
+        XCTAssertTrue(session.openNative(.account));session.openSpeakingDial();session.appWentBackground();session.sheetDismissed()
+        XCTAssertFalse(recorder.events.contains{$0.name=="speaking.open"})
+    }
+
     // MARK: - Helpers
 
     func testWithdrawingConsentClosesTheSheetOnceAndKeepsProfileAccessible() {

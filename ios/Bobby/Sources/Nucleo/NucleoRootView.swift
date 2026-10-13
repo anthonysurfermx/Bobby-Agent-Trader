@@ -153,7 +153,8 @@ private struct NucleoStage: View {
             AccountSheet(store: session.companions, profile: session.profile, detents: [.large], showsLinks: true, voice: session.voice,
                          onVoiceMutedChange: { session.sessionChanged() },
                          onAIConsentWithdraw: { session.revokeRiskNoticeConsent() },
-                         onOpenRoute: { session.switchSheet(to: $0) }) { session.sheet = nil }
+                         onOpenRoute: { session.switchSheet(to: $0) },
+                         onSpeaking: { session.openSpeakingDial() }, speakingValue: { session.speakingValueLabel }) { session.sheet = nil }
         case .riskNotice:
             // Opened from onboarding before consent: no withdraw (RiskNoticeView shows neutral marks too).
             RiskNoticeView(profile: session.profile, readOnly: true,

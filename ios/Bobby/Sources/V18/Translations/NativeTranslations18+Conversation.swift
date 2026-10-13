@@ -24,6 +24,10 @@ extension NativeTranslations18 {
         result["tomorrow at {t}"] = ["fr": "demain à {t}", "pt": "amanhã às {t}", "it": "domani alle {t}", "de": "morgen um {t} Uhr"]
         result["{weekday} at {t}"] = ["fr": "{weekday} à {t}", "pt": "na {weekday} às {t}", "it": "{weekday} alle {t}", "de": "am {weekday} um {t} Uhr"]
         result["on {d MMM}"] = ["fr": "le {d MMM}", "pt": "a {d} de {MMM}", "it": "il {d MMM}", "de": "am {d}. {MMM}"]
+        result["How Bobby talks to you"] = ["fr": "Comment Bobby te parle", "pt": "Como o Bobby fala contigo", "it": "Come ti parla Bobby", "de": "Wie Bobby mit dir spricht"]
+        result["Plain"] = ["fr": "Simple", "pt": "Simples", "it": "Semplice", "de": "Einfach"]
+        result["With terms"] = ["fr": "Avec les termes", "pt": "Com termos", "it": "Con termini", "de": "Mit Begriffen"]
+        result["Technical"] = ["fr": "Technique", "pt": "Técnico", "it": "Tecnico", "de": "Technisch"]
         return result
     }()
 }
