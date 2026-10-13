@@ -31,9 +31,19 @@ final class SpeakingDialUITests: ConversationFixtureCase {
     }
     private func profileDial(_ capture: String = "66-profile-speaking-row") {
         openProfileFromGlass();let row=app.buttons["account-speaking"]
-        for _ in 0..<8 where !row.isHittable { app.scrollViews.firstMatch.swipeUp() };ready(row)
+        let bottom=app.windows.firstMatch.frame.maxY-44
+        func fullyVisible()->Bool { row.exists && row.isHittable && row.frame.minY>=80 && row.frame.maxY<=bottom }
+        // Hittable can mean a partially exposed row. Capture only its complete viewport.
+        for _ in 0..<8 where !fullyVisible() {
+            if row.exists && row.frame.minY<80 { app.scrollViews.firstMatch.swipeDown() }
+            else { app.scrollViews.firstMatch.swipeUp() }
+        }
+        ready(row)
         XCTAssertTrue(row.label.contains(["en":"How Bobby talks to you","es":"Cómo te habla Bobby","fr":"Comment Bobby te parle","pt":"Como o Bobby fala contigo","it":"Come ti parla Bobby","de":"Wie Bobby mit dir spricht"][language]!))
-        physicalControls([row],abovePill:false);shot(capture);row.tap();ready(web.buttons[dialCopy("save")])
+        physicalControls([row],abovePill:false)
+        XCTAssertGreaterThanOrEqual(row.frame.minY,80,"The full Profile row must be visible")
+        XCTAssertLessThanOrEqual(row.frame.maxY,app.windows.firstMatch.frame.maxY-44,"The Profile row is below the visible viewport")
+        shot(capture);row.tap();ready(web.buttons[dialCopy("save")])
     }
     func testProfilePreferencePersistsAndReturnsTheSameAnswer() {
         launch("companion");ask();answered();profileDial()
