@@ -10,6 +10,7 @@ checks every file here against the server's own schemas.
 | `request.json` | What a client sends. `speech` is the dial's choice. |
 | `request-candidate.json` | The same, with the look-alike the asset search offered for the question (`candidate`). |
 | `request-previous.json` | A question that only makes sense after the last one ("give me an example"), with that exchange (`previous`). |
+| `request-previous-offer.json` | A question about an offer the person has not taken ("did that button already charge me?"), with that offer as `previous`. |
 | `response-explanation.json` | The reply to a question that names no asset. |
 | `response-desk-offer.json` | The reply when the question was about the `candidate` after all: the client asks the person to confirm that asset, as it does today. Only ever sent to a request that carried a `candidate`. |
 | `response-error.json` | A failure the client may retry. Nothing was counted. |
@@ -63,6 +64,10 @@ Rules a client can rely on:
 - **`previous`** (optional): `{ question, reply }`, the one exchange still on the person's screen (at most 600
   and 700 characters). It lets "give me an example" refer to something. It is one exchange, never a history,
   and the server stores none of it. Send it only while that answer is on screen.
+  After a `desk_offer` the person has not taken, the exchange on screen is their question and the offer: send
+  `{ question, reply, offered }`, where `reply` is the offer's own sentence (`reply.text` of that response) and
+  `offered` is the symbol it offered to look at. Bobby then knows that nothing was looked at, bought or charged,
+  and can say so ("did that button already cost me something?"). A server that does not know `offered` ignores it.
 - `nextAction` is null in an `explanation`.
 - A tapped `followUp` goes straight back to this endpoint, without the asset search: it is a learning question,
   and a word such as "bitcoin" in it must not open a market read the person did not ask for.

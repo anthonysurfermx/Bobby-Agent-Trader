@@ -201,7 +201,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const turn = await runCompanionTurn(question, language, { locale, speech, candidate, previous, usage, model, picture });
     // The person's notes shaped the answer: there were some, and the model's own reply is the one served.
     const personalized = picture !== null && turn.source === 'model' && !turn.aboutCandidate;
-    console.error(JSON.stringify({ route: 'companion-turn', event: 'turn', source: turn.source, rejected: turn.rejected, judge: turn.judge, offer: turn.aboutCandidate, followUp: turn.followUp !== null, language, speech: speech ?? 'plain', model, ...(context ? { personalized } : {}), ms: Date.now() - started }));
+    console.error(JSON.stringify({ route: 'companion-turn', event: 'turn', source: turn.source, rejected: turn.rejected, ...(turn.repaired ? { repaired: turn.repaired } : {}), judge: turn.judge, offer: turn.aboutCandidate, followUp: turn.followUp !== null, language, speech: speech ?? 'plain', model, ...(context ? { personalized } : {}), ms: Date.now() - started }));
     if (turn.aboutCandidate && candidate) {
       // The question was about an asset after all: the client asks the person to confirm it. The model call was
       // paid, so the address, the network and the day keep their slots; the person's allowance is for explanations.

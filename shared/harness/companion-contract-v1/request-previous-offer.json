@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "requestId": "5d0c9a52-7e1b-4c7a-8a0e-3b1f6d2e9a71",
+  "question": "¿Al salir ese botón ya me cobraron o todavía no?",
+  "language": "es",
+  "locale": "es-MX",
+  "speech": "plain",
+  "previous": {
+    "question": "Échale un ojo a Avalanche, ¿trae movimiento o puro ruido?",
+    "reply": "Parece que la pregunta es sobre AVAX.",
+    "offered": "AVAX"
+  }
+}
