@@ -86,7 +86,9 @@ ok(refStdev(refChanges(zigzag)) > 10.2 && Math.abs(metrics(bars(BTC))!.move! - r
 const analysisOf = async (symbols: string[], windowDays: 30 | 60) => (await readAssets({ symbols, windowDays }, tools)).analysis!;
 const fig = (analysis: Analysis, id: string) => analysis.figures.find((figure) => figure.id === id)!;
 const crypto = await analysisOf(['BTC', 'ETH'], 30);
-const btc30 = BTC.slice(-30), eth30 = ETH.slice(-30);
+// The thirty closes of the window and the close right before it: every day of the window has its change, and the change
+// of the window and its largest fall count the same days as the worst day, the best day and the average move.
+const btc30 = BTC.slice(-31), eth30 = ETH.slice(-31);
 near(fig(crypto, 'return_BTC').value, refReturn(btc30), 'the window is the last thirty calendar days of completed bars');
 near(fig(crypto, 'drawdown_ETH').value, refDrawdown(eth30), 'the largest fall, checked by brute force');
 // Every day of the window has its own change: the first one from the close right before the window (BTC has 60 closes, the window the last 30).
@@ -95,19 +97,23 @@ near(fig(crypto, 'move_BTC').value, refMove(refOwnChanges(BTC, 30)), 'movement o
 {
   const own = refOwnChanges(BTC, 30), lowest = Math.min(...own), highest = Math.max(...own), dayAt = (i: number) => dayOf(Date.parse(`${LAST}T00:00:00Z`) - (29 - i) * DAY);
   near(fig(crypto, 'worst_BTC').value, lowest, 'the worst day is chosen among every day of the window'); near(fig(crypto, 'best_BTC').value, highest, 'and the best day too');
-  eq([fig(crypto, 'worst_BTC').day, fig(crypto, 'best_BTC').day, fig(crypto, 'move_BTC').days, fig(crypto, 'worst_BTC').days, fig(crypto, 'return_BTC').days], [dayAt(own.indexOf(lowest)), dayAt(own.indexOf(highest)), 30, 30, 29], 'each on its own date; the daily figures rest on thirty changes, the change of the whole window on the twenty-nine between its closes');
+  eq([fig(crypto, 'worst_BTC').day, fig(crypto, 'best_BTC').day, fig(crypto, 'move_BTC').days, fig(crypto, 'worst_BTC').days, fig(crypto, 'return_BTC').days], [dayAt(own.indexOf(lowest)), dayAt(own.indexOf(highest)), 30, 30, 30], 'each on its own date; every figure of the window rests on the same thirty changes');
   ok(/first day's from the close right before the window/.test(fig(crypto, 'move_BTC').basis) && /every day of the window/.test(fig(crypto, 'best_BTC').basis), 'and the basis says which changes were counted');
   // A window whose first day IS the best day: told as the best (sixth blind set: +3.6% on the first day, +1.7% told).
   const jump = [...Array.from({ length: 31 }, (_, i) => 100 + i * 0.1)]; jump[1] = 104;
   const withLead = metrics(bars(jump.slice(1)), { ...bars(jump)[0], day: '2026-08-31' })!, without = metrics(bars(jump.slice(1)))!;
   eq(metrics(bars(jump.slice(1)), bars(jump)[0])!.led, false, 'a "close before" that is not dated before the run is not one');
   eq([withLead.led, withLead.best!.day === bars(jump.slice(1))[0].day, Math.round(withLead.best!.pct * 10) / 10, without.led, without.changes.length, withLead.changes.length], [true, true, 4, false, 29, 30], 'with the close before the run, the first day\'s jump is the best day; without it that day has no change, as before');
-  near(withLead.totalReturn, without.totalReturn, 'the change of the whole run is the same either way: between its own closes');
+  near(withLead.totalReturn, 100 * (jump.at(-1)! / jump[0] - 1), 'with the close before the run, the change of the whole run counts the first day too: last close over that close');
+  near(without.totalReturn, 100 * (jump.at(-1)! / jump[1] - 1), '…and without it, it is between the run\'s own closes, as before');
+  const dive = [100, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106];
+  const dived = metrics(bars(dive.slice(1)), { ...bars(dive)[0], day: '2026-08-31' })!;
+  eq([Math.round(dived.worst!.pct), Math.round(dived.maxDrawdown), Math.round(metrics(bars(dive.slice(1)))!.maxDrawdown)], [-10, -10, 0], 'a fall on the first day is in the largest fall as it is in the worst day: one cannot be larger than the other');
 }
 ok(/average size of the daily changes/.test(fig(crypto, 'move_BTC').basis), 'and the figure says what it is');
 eq([fig(crypto, 'return_BTC').unit, fig(crypto, 'close_BTC').unit, fig(crypto, 'close_BTC').currency, fig(crypto, 'return_BTC').currency, fig(crypto, 'corr_BTC_ETH').unit], ['percent', 'price', 'USDT', null, 'ratio'], 'every figure says its unit; a price says its currency; a percent has none');
-eq([fig(crypto, 'return_BTC').from, fig(crypto, 'return_BTC').to, fig(crypto, 'return_BTC').days], ['2026-09-09', LAST, 29], 'a figure says the days it covers and how many changes it rests on');
-ok(/UTC days from 2026-09-09 to 2026-10-08 \(29 daily changes, close to close\); last close over first close/.test(fig(crypto, 'return_BTC').basis), 'and how it was computed, in words');
+eq([fig(crypto, 'return_BTC').from, fig(crypto, 'return_BTC').to, fig(crypto, 'return_BTC').days], ['2026-09-09', LAST, 30], 'a figure says the days it covers and how many changes it rests on');
+ok(/UTC days from 2026-09-09 to 2026-10-08 \(30 daily changes, close to close\); last close over the close right before the window/.test(fig(crypto, 'return_BTC').basis) && /the close right before the window counting as the first one/.test(fig(crypto, 'drawdown_BTC').basis), 'and how it was computed, in words');
 eq(crypto.evidence.map((item) => [item.id, item.source, item.instrument, item.asOf, item.unit, item.scale, item.currency, item.quality, item.retrievedAt]), [['ev_BTC', 'okx', 'BTC-USDT spot', LAST, 'price', 1, 'USDT', 'valid', new Date(NOW).toISOString()], ['ev_ETH', 'okx', 'ETH-USDT spot', LAST, 'price', 1, 'USDT', 'valid', new Date(NOW).toISOString()]], 'evidence names its source, instrument, reference date, retrieval time, unit, scale, currency and quality');
 ok(crypto.evidence.every((item) => item.url!.startsWith('https://www.okx.com/api/v5/market/candles?instId=')), 'and the request that can be repeated to check it');
 eq(crypto.limitations, ['past_window_only'], 'two instruments of one calendar: the only limit is that a past window says nothing of what comes next');
@@ -330,7 +336,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   script = [() => answer({ kind: 'explanation', gist: 'No puedo establecer aquí la concentración.', text: 'No puedo establecer aquí la concentración. Lo que sí muestran las cifras es que sus cambios diarios se parecieron: {{f:corr_BTC_ETH}} en estos {{days}} días.', limitations: ['No tengo datos de composición.'] })];
   const honest = await ask(deps, 'ana', '¿Y cuál está más concentrado?', 'r4b', true);
   eq([taskResult(honest)!.presentation.kind, taskResult(honest)!.presentation.composedByCode, taskResult(honest)!.presentation.figures, taskResult(honest)!.presentation.limitations.at(-1), taskResult(honest)!.presentation.references.length], ['analysis', false, ['corr_BTC_ETH'], 'No tengo datos de composición.', 2], 'a text that cites a figure is an analysis whatever the model called it, and is served with its evidence');
-  eq(readerSaw, ['No puedo establecer aquí la concentración. Lo que sí muestran las cifras es que sus cambios diarios se parecieron: ⟦figure⟧ en estos 30 días. No tengo datos de composición.'], 'the second reader of an analysis reads the model\'s own words: every number of code\'s is a mark, so a quantity it finds is the model\'s');
+  eq(readerSaw, ['No puedo establecer aquí la concentración. Lo que sí muestran las cifras es que sus cambios diarios se parecieron: ⟦figure: correlation of their daily changes, Bitcoin and Ethereum⟧ en estos 30 días. No tengo datos de composición.'], 'the second reader of an analysis reads the model\'s own words: every number of code\'s is a mark that says what was measured and for which asset, so a quantity it finds is the model\'s and a figure put on another asset can be seen');
 
   // 4.4 Coming back: the result is read, nobody is called, nothing is used.
   const callsBefore = calls.length, readsBefore = store.readsTaken(), committed = await store.committed('agent');
@@ -565,7 +571,9 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   const loud = await analysisOf(['SPY', 'QQQ'], 30);
   eq([loud.evidence[0].quality, loud.evidence[0].currency, JSON.stringify(loud).includes('Ignore')], ['missing', null, false], 'a currency that is not a currency is a source\'s free text: the series is not understood and none of that text travels');
   world.series.SPY = () => yahoo('SPY', SPY);
-  eq(['Invesco QQQ (Nasdaq-100) ETF', 'QQQ (Invesco QQQ (Nasdaq-100) ETF)', 'SPDR S&P 500 ETF', '$BTC', "l'Ethereum", 'Bitcoin ETF', 'Bitcoin (ETH)'].map((mention) => resolveMention(mention)?.symbol ?? null), ['QQQ', null, 'SPY', 'BTC', 'ETH', null, null], 'the engine\'s own names resolve; "Bitcoin ETF" is not the coin; two names that disagree are nobody');
+  eq(['Invesco QQQ (Nasdaq-100) ETF', 'QQQ (Invesco QQQ (Nasdaq-100) ETF)', 'SPDR S&P 500 ETF', '$BTC', "l'Ethereum", 'Bitcoin ETF', 'Bitcoin (ETH)'].map((mention) => resolveMention(mention)?.symbol ?? null), ['QQQ', 'QQQ', 'SPY', 'BTC', 'ETH', null, null], 'the engine\'s own names resolve, with their ticker too; "Bitcoin ETF" is not the coin; two names that disagree are nobody');
+  eq(['Solana SOL', 'nvidia nvda', 'Ethereum (ETH)?', 'Tesla-Aktie', 'Apple Aktien', "l'action Apple", 'actions Tesla', 'azioni Tesla', 'ações da Apple', "Apple's", 'coin base', 'Solana ETH', 'Tesla Apple'].map((mention) => resolveMention(mention)?.symbol ?? null),
+    ['SOL', 'NVDA', 'ETH', 'TSLA', 'AAPL', 'AAPL', 'TSLA', 'TSLA', 'AAPL', 'AAPL', 'COIN', null, null], 'a name said with its ticker, and the plain "X stock" of each language, are that instrument; two instruments said together are nobody');
 
   // The store: a cancel wins, completes, and gives back a read that bought nothing.
   const scope = { action: 'read_assets' as const, assets: ['BTC', 'ETH'], windowDays: 30, depth: 'standard' as const, consumption: { reads: 1 } };
@@ -794,11 +802,11 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   readerSaw.length = 0;
   script = [() => answer({ kind: 'explanation', gist: 'La volatilidad es cuánto se mueve un precio.', text: 'La volatilidad es cuánto se mueve un precio.', limitations: ['La caída de Ethereum fue de {{f:drawdown_ETH}}.'], next: '¿Por qué Ethereum cayó {{f:drawdown_ETH}}?' })];
   const cited = taskResult(await ask(deps, 'ana', '¿Qué es la volatilidad?', 'w2', true))!.presentation;
-  eq([cited.kind, cited.figures, cited.references.map((r) => r.evidence), readerSaw[0].includes('⟦figure⟧'), /\d/.test(readerSaw[0])], ['analysis', ['drawdown_ETH'], ['ev_ETH'], true, false], 'a figure cited only in a limitation or the next question is still listed, referenced, and a mark for the reader');
+  eq([cited.kind, cited.figures, cited.references.map((r) => r.evidence), readerSaw[0].includes('⟦figure: '), /\d/.test(readerSaw[0])], ['analysis', ['drawdown_ETH'], ['ev_ETH'], true, false], 'a figure cited only in a limitation or the next question is still listed, referenced, and a mark for the reader');
   // After its own read, a text the model calls a clarification is an analysis: the read is never spent on nothing.
   for (const verdict of ['unchecked', 'advice'] as const) {
     verdicts = [verdict];
-    script = [read, () => answer({ kind: 'clarification', gist: '¿Quieres que mire también Solana?', text: '¿Quieres que mire también Solana?' })];
+    script = [read, () => answer({ kind: 'clarification', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}}. ¿Quieres que mire también Solana?' })];
     const t = await begin('Compara', `cl-${verdict}`); await runTask(deps, 'ana', t.id); await yes(t.id); await runTask(deps, 'ana', t.id);
     const r = taskResult((await store.get('ana', t.id))!);
     ok(r?.presentation.kind === 'analysis' && r.presentation.composedByCode && r.presentation.figures.length === 6 && r.presentation.references.length === 2, `a "clarification" after the read whose words cannot be shown (${verdict}) is told by code from the figures`);
@@ -1147,13 +1155,15 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   // In the loop: such an analysis is told by code from its figures, the record says which rule, and the reader is not asked.
   const store = new MemoryAgentStore(6), deps = depsFor(store);
   script = [() => turn([use('read_assets', { assets: ['Bitcoin', 'Ethereum'], windowDays: 30 })]),
+    () => answer({ kind: 'analysis', gist: 'Los dos se movieron cada día, y no igual.', text: 'Los dos se movieron cada día, y no igual. Bitcoin {{f:move_BTC}} y Ethereum {{f:move_ETH}}.' }),
     () => answer({ kind: 'analysis', gist: 'Los dos se movieron cada día, y no igual.', text: 'Los dos se movieron cada día, y no igual. Bitcoin {{f:move_BTC}} y Ethereum {{f:move_ETH}}.' })];
   const offered = await ask(deps, 'pia', '¿Cuál se movió más, Bitcoin o Ethereum?', 'p1');
   await store.approve('pia', offered.id, waitingApproval(offered)!.digest, clock);
   const before = readerSaw.length;
   await runTask(deps, 'pia', offered.id);
   const done = (await store.get('pia', offered.id))!, shown = taskResult(done)!.presentation, step = done.steps.find((s) => s.kind === 'answer')!;
-  eq([shown.composedByCode, /cada d[ií]a/i.test(shown.text), step.data.rule, step.data.reader, readerSaw.length - before], [true, false, 'every_day', 'not_read', 0], 'an average told as "every day": code tells the figures, the step names the rule, the reader is not asked');
+  eq([shown.composedByCode, /cada d[ií]a/i.test(shown.text), step.data.rule, step.data.reader, readerSaw.length - before], [true, false, 'every_day', 'not_read', 0], 'an average told as "every day", twice: code tells the figures, the step names the rule, the reader is not asked');
+  eq(done.steps.filter((s) => s.kind === 'tool_refused').map((s) => s.data.reason), ['every_day'], '…after the model was told why once, like any other draft that cannot be shown');
   ok([fig(crypto, 'move_BTC'), fig(crypto, 'move_ETH')].every((figure) => shown.text.includes(formatFigure(figure, 'es'))), '…and code\'s text still answers the question: how much each moved on an average day');
 
   // The same words in an explanation are nobody's figure: prices do change every day.
@@ -1324,6 +1334,82 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
 
   const prompt = agentPrompt('en', 'en-US');
   for (const [needle, why] of [['never say how likely a future result is', 'a future result is not given a likelihood, in numbers or in words'], ['Never give a correlation as a number alone', 'a correlation is said with what it means'], ['answer what that first question asked about', 'an errand taken up again after a no is the same errand'], ['They rule a substitute out themselves', 'what a person ruled out is not offered again'], ['you do not do sums with a person\'s money', 'a sum with their money is not done and not offered'], ['Tracking error is how much the gap', 'tracking error is the variability of the gap, not the gap'], ['two different things, and a read gives the date of a worst day', 'a worst day and a fall from a high are told apart'], ['how a word is said in another language', 'something tiny and everyday is settled in a few words'], ['When the app answers ambiguous_name', 'a word left open is asked about, not named']] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);
+}
+
+// ---------- 7l. what the adversarial review of 2026-10-13 found (five reviewers, each finding reproduced by a second one) ----------
+{
+  const said = (over: Record<string, unknown>, question = 'Compara Bitcoin y Ethereum', language: 'es' | 'en' | 'fr' | 'pt' | 'it' | 'de' = 'es') => { const r = present(draft(over), crypto, question, language); return 'refusal' in r ? r.refusal.code : 'shown'; };
+  // A figure of a 30-day read stated for another period was shown whenever the person had written the other number.
+  eq([said({ gist: 'En los últimos 7 días, Bitcoin cambió {{f:return_BTC}}.', text: 'En los últimos 7 días, Bitcoin cambió {{f:return_BTC}}.' }, '¿Y en los últimos 7 días?'),
+    said({ gist: 'En 90 días Bitcoin cambió {{f:return_BTC}}.', text: 'En 90 días Bitcoin cambió {{f:return_BTC}}.' }, '¿Cómo le fue en 90 días?'),
+    said({ gist: 'In 3 months Bitcoin changed {{f:return_BTC}}.', text: 'In 3 months Bitcoin changed {{f:return_BTC}}.' }, 'How did it do in 3 months?', 'en'),
+    said({ gist: 'In 2 Wochen hat sich Bitcoin um {{f:return_BTC}} verändert.', text: 'In 2 Wochen hat sich Bitcoin um {{f:return_BTC}} verändert.' }, 'Und in 2 Wochen?', 'de'),
+    said({ gist: 'En {{days}} días Bitcoin cambió {{f:return_BTC}}.', text: 'En {{days}} días Bitcoin cambió {{f:return_BTC}}.', limitations: ['No leí 90 días: leo 30 o 60 días.'] }, '¿Cómo le fue en 90 días?')],
+  ['typed_number', 'typed_number', 'typed_number', 'typed_number', 'shown'], 'the figures of the window are stated for the window: any other count of days, weeks, months or years in the answer is refused, whoever wrote the number; another period may be named only to say it was not read');
+
+  // A figure put on another asset or another measure: the reader could not tell, because it was handed the same string.
+  const honest = present(draft({ gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}. El peor día de Bitcoin fue el {{d:worst_BTC}}.' }), crypto, 'q', 'es') as any;
+  const swapped = present(draft({ gist: 'Bitcoin cambió {{f:return_ETH}}.', text: 'Bitcoin cambió {{f:return_ETH}} y Ethereum {{f:return_BTC}}. El peor día de Bitcoin fue el {{d:best_ETH}}.' }), crypto, 'q', 'es') as any;
+  eq([honest.own.text === swapped.own.text, honest.own.forReader.text === swapped.own.forReader.text, swapped.own.forReader.text], [true, false, 'Bitcoin cambió ⟦figure: change over the whole window, Ethereum⟧ y Ethereum ⟦figure: change over the whole window, Bitcoin⟧. El peor día de Bitcoin fue el ⟦date: the day of the change on its best single day, Ethereum⟧.'],
+    'code\'s own rules read bare marks; the second reader is handed marks that say what was measured and for which asset, so a figure put on another asset, measure or day is there to be seen');
+
+  // Every figure of an instrument counts the same days (the dive test above), and says so.
+  ok(fig(crypto, 'return_BTC').days === fig(crypto, 'worst_BTC').days && fig(crypto, 'drawdown_BTC').days === fig(crypto, 'move_BTC').days, 'the change of the window and its largest fall rest on the same daily changes as the worst day and the average move');
+
+  // In the loop.
+  const store = new MemoryAgentStore(20), deps = depsFor(store);
+  const read = () => turn([use('read_assets', { assets: ['BTC', 'ETH'], windowDays: 30 }, `u_cmp_${Math.random().toString(36).slice(2, 7)}`)]);
+  const run = async (owner: string, key: string, turns: typeof script, question = 'Compara Bitcoin y Ethereum') => {
+    script = [read, ...turns];
+    const begun = await createTask(deps, { owner, session: 'sess-1', requestId: key, question, language: 'es', locale: 'es-MX', model: 'claude-test' }) as any;
+    await runTask(deps, owner, begun.task.id);
+    await store.approve(owner, begun.task.id, waitingApproval((await store.get(owner, begun.task.id))!)!.digest, clock);
+    await runTask(deps, owner, begun.task.id);
+    return (await store.get(owner, begun.task.id))!;
+  };
+  // After a paid read that brought figures, an answer that tells none of them is not what the read was for.
+  const back = () => answer({ kind: 'clarification', gist: '¿Quieres que mire también Solana?', text: '¿Quieres que mire también Solana?' });
+  const twice = await run('nf', 'nf1', [back, back]);
+  eq([twice.steps.filter((s) => s.kind === 'tool_refused').map((s) => [s.data.tool, s.data.reason]), taskResult(twice)?.presentation.composedByCode, taskResult(twice)?.presentation.figures.length, taskUsage(twice).reads, script.length], [[['answer', 'no_figure_told']], true, 6, 1, 0], 'a question back after a read that brought figures is sent back once, then code tells the figures');
+  const once = await run('nf', 'nf2', [back, () => answer({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}.' })]);
+  eq([taskResult(once)?.presentation.composedByCode, taskResult(once)?.presentation.figures], [false, ['return_BTC', 'return_ETH']], '…and when the model corrects it, its own words are served');
+
+  // A follow-up about the figures on the table that the model calls an analysis is one, placeholder or not.
+  await run('fu', 'fu1', [() => answer({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}.' })]);
+  const loose = () => answer({ kind: 'analysis', gist: 'Bitcoin cayó más desde su máximo que Ethereum.', text: 'Bitcoin cayó más desde su máximo que Ethereum. Además se movió más todos los días.', asked: ['drawdown'] });
+  script = [loose, loose];
+  const follow = await ask(deps, 'fu', '¿Cuál cayó más desde su máximo?', 'fu2', true);
+  const told = taskResult(follow)!.presentation;
+  eq([told.kind, told.composedByCode, told.figures.join(), /todos los d[ií]as/.test(told.text), follow.steps.filter((s) => s.kind === 'tool_refused').length], ['analysis', true, 'drawdown_BTC,drawdown_ETH', false, 1], 'with figures on the table, an answer the model calls an analysis is held to them even when it cites none: sent back once, then code tells the fall that was asked about');
+
+  // Figures read more than a day ago are not "the last 30 days": they are not handed to a follow-up.
+  const sawEarlier: string[] = [];
+  script = [(request) => { sawEarlier.push(String(request.messages[0].content)); return answer({ kind: 'explanation', gist: 'Esa lectura es de un día anterior.', text: 'Esa lectura es de un día anterior. Si quieres la leo de nuevo.' }); }];
+  const later = clock; clock += 26 * 3_600_000;
+  const stale = await ask(deps, 'fu', '¿Y cuál cayó más?', 'fu3', true);
+  clock = later;
+  const input = JSON.parse(sawEarlier[0]);
+  eq([Object.keys(input).sort(), input.earlier?.read, 'figures' in (input.previous ?? {}), taskResult(stale)!.analysis], [['earlier', 'previous', 'question'], { assets: ['BTC', 'ETH'], windowDays: 30 }, false, null], 'a follow-up sent a day later is told what was read and when, and is given none of its figures: nothing old can be told as "the last 30 days"');
+
+  // The owner's zero is zero.
+  const keep = process.env.BOBBY_AGENT_DAILY_USD;
+  const cap = (value: string | undefined) => { if (value === undefined) delete process.env.BOBBY_AGENT_DAILY_USD; else process.env.BOBBY_AGENT_DAILY_USD = value; return engineDeps(new MemoryAgentStore(6)).budget.capUsd; };
+  eq([cap('0'), cap('0.00'), cap('-1'), cap('12.5'), cap(undefined), cap(''), cap('$20')], [0, 0, 0, 12.5, 5, 5, 5], 'a daily ceiling of zero is zero (it used to become five dollars); absent or unreadable, the default');
+  if (keep === undefined) delete process.env.BOBBY_AGENT_DAILY_USD; else process.env.BOBBY_AGENT_DAILY_USD = keep;
+
+  // An errand nobody is running says so: a client that only looks is told to send the same request again.
+  const idle = await createTask(deps, { owner: 'idle', session: 'rv', requestId: 'idle1', question: '¿Qué es un ETF?', language: 'es', model: 'claude-test' }) as any;
+  eq([taskView(idle.task, clock, null).resume, taskView(twice, clock, null).resume, taskView(twice, clock, null).state], [true, false, 'completed'], 'an errand that is neither over nor being run is marked: it goes on when the same request is sent again');
+
+  // Code's own sentences agree with what code writes after them.
+  const day = (iso: string) => ({ ...fig(alone, 'worst_BTC'), day: iso });
+  const dated = (iso: string, language: 'it' | 'fr') => present({ kind: 'analysis', gist: language === 'it' ? 'Il giorno peggiore è stato il {{d:worst_BTC}}.' : 'Le pire jour a été le {{d:worst_BTC}}.', text: language === 'it' ? 'Il giorno peggiore è stato il {{d:worst_BTC}}.' : 'Le pire jour a été le {{d:worst_BTC}}.', limitations: [], next: '', claims: [] }, { ...alone, figures: alone.figures.map((figure) => (figure.id === 'worst_BTC' ? day(iso) : figure)) }, 'q', language) as any;
+  eq([dated('2026-10-08', 'it').presentation.text, dated('2026-09-11', 'it').presentation.text, dated('2026-10-01', 'it').presentation.text, dated('2026-10-05', 'it').presentation.text, dated('2026-10-01', 'fr').presentation.text],
+    ['Il giorno peggiore è stato l’8 ottobre.', 'Il giorno peggiore è stato l’11 settembre.', 'Il giorno peggiore è stato il 1º ottobre.', 'Il giorno peggiore è stato il 5 ottobre.', 'Le pire jour a été le 1er octobre.'],
+    'Italian elides its article before a number said with a vowel, in the model\'s text as in code\'s; the first of a month is an ordinal in Italian and in French');
+  const three = await analysisOf(['BTC', 'ETH', 'SPY'], 30);
+  ok(/pair by pair/.test(limitationsInWords(three, 'en').join(' ')) && /both traded/.test(limitationsInWords(mixed, 'en').join(' ')) && /Paar für Paar/.test(limitationsInWords(three, 'de').join(' ')), '"both" is said of two; of three, the likeness is measured pair by pair');
+  ok(/bewegte sich Bitcoin um/.test(composeByCode(alone, 'de').text) && /il prezzo di Bitcoin è variato/.test(composeByCode(alone, 'it').text) && !/ em Bitcoin| em Ethereum/.test(composeByCode(crypto, 'pt').text), 'code\'s sentences are written so that no word has to agree with a name: no "er", no "è variato" on a company, no "em Apple"');
 }
 
 console.log(`agent-engine: ${checks} checks passed`);

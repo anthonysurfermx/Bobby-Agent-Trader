@@ -127,6 +127,9 @@ export class MemoryAgentStore implements AgentStore {
     // A cancel that was accepted while a runner held the task, and that the runner never completed, is completed here.
     if (task.steps.some((step) => step.kind === 'cancel_requested')) { this.endCancelled(task, now, 'store'); this.changed(); return null; }
     if (waitingApproval(task)) return null;
+    // Whoever reserved for this task before is gone (its lease ended): a reservation of theirs that never left (dispatch
+    // is the one way out, and it refuses anything that is no longer `reserved`) never will. From here on it holds nothing.
+    for (const attempt of Object.values(this.state.attempts)) if (attempt.task === id && attempt.state === 'reserved') { attempt.state = 'no_charge'; attempt.actualUsd = 0; }
     task.fence += 1;
     task.lease = { worker, until: now + leaseMs, fence: task.fence };
     this.changed();

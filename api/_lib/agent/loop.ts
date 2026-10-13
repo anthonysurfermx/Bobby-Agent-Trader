@@ -32,6 +32,8 @@ import { isFinal, waitingApproval, type AgentStore, type Begin, type Budget } fr
 import { TOOLS, UNIVERSE, forModel, instrumentsNamed, presumedIn, type Settled, type ToolContext } from './tools.js';
 import { DEFAULT_LIMITS, ENGINE_VERSION, PROMPT_VERSION, TOOLSET_VERSION, type Analysis, type ApprovalScope, type Limits, type Presentation, type StepKind, type Task } from './types.js';
 
+/** How long the figures of a read stay on the table for follow-ups. A new daily close arrives every day: after this they are another window's. */
+export const FIGURES_LAST_MS = 24 * 3_600_000;
 export type Verdict = 'pass' | 'advice' | 'guarantee' | 'figure' | 'unchecked';
 /**
  * The second reader: reads everything of the model's a person is about to get (the text, its own limitations and
@@ -46,6 +48,8 @@ export type Reader = (p: {
   measured?: boolean;
   /** Where the person's own numbers are read from, when it is more than the question (a follow-up: the exchange on screen). */
   numbersFrom?: string;
+  /** The window that was read, for an analysis: any other period attached to a mark is a fault the reader can then see. */
+  windowDays?: number | null;
 }) => Promise<Verdict | { verdict: Verdict; keepNext: boolean; usd?: number; by?: 'lists' }>;
 export interface Deps { store: AgentStore; call: CallModel; tools: ToolContext; read: Reader; now: () => number; budget: { partition: string; capUsd: number }; limits: Limits; worker: string }
 
@@ -73,6 +77,7 @@ What kind of errand it is decides what you do:
 - You cannot tell which things they mean, or they asked to compare and named fewer than two: ask one short question, kind "clarification". Do not guess. A single word that is also an everyday word or a name (sol, meta, luna, gas, link, apple) is not yet an asset: ask what they mean in a way that names both readings, and if they say it is not about markets leave it there, with no read offered. A word that among assets still does not say which one ("coin", "the index", "the fund") is the same: ask which they mean, and until they answer put no name of yours on it in any sentence that is not that question. When the app answers ambiguous_name, do exactly that.
 - The errand needs something no tool gives you (what a fund holds, how concentrated it is, fees, earnings, news, a forecast, what to do): say plainly that you cannot establish that here, and say what you can establish. Never fill the gap from memory.
 - "previous" in the input is their last question, your answer to it and the figures behind it. A follow-up about those figures is answered from them, with no new tool call. Use a tool again only if they ask for other assets or another window. When "previous" read a single asset, "it", "that" or "that change" means that asset: do not ask which one.
+- "earlier" in the input is a read of theirs from an earlier day: its figures are no longer on the table and you do not have them. If they ask about it, say in one sentence that that read is from an earlier day and call read_assets for it again: the app asks them. Never state anything from it.
 - "declined" in the input is an errand of theirs for which you offered a read and they said no: nothing was read. It tells you which assets and which window they were talking about, so never ask them again which ones. If they now ask for it, call read_assets for it: the app asks them again, and when the figures come back answer what that first question asked about (its metrics, its order), not a summary. Their earlier yes or no is never a permission. If they ask what it would have shown, or to answer it "from memory", say that it was not run, so there are no figures, and that it used none of their reads: do not call the tool for that, and do not offer it again in the same breath.
 - They ask for more than three assets together: say plainly that you compare up to three at a time and ask which three, kind "clarification". Do not offer to split them into several reads yourself. Count only the ones they want read: an asset they leave out ("not Tesla", "without the last one") does not count.
 - The instruments you can read with evidence are: ${UNIVERSE.map((instrument) => `${instrument.name} (${instrument.symbol})`).join(', ')}. Windows: 30 or 60 days. Suggest nothing outside them.
@@ -97,7 +102,8 @@ const Answer = z.object({
   // No `.catch`: a malformed list is not an empty one. It is sent back once, like any other argument the server cannot read.
   claims: z.array(z.object({ metric: z.enum(['return', 'move', 'drawdown', 'worst', 'best']), top: z.string().trim().min(1).max(60) })).max(12),
   // What the person asked about, in metric names. Left out or unreadable it is empty: the check it feeds is an extra one.
-  asked: z.array(z.enum(['return', 'move', 'drawdown', 'worst', 'best', 'correlation'])).max(6).catch([]),
+  // One unlisted word ("close") used to empty the whole list, and with it everything code would tell about what was asked.
+  asked: z.array(z.unknown()).max(24).catch([]).transform((list) => [...new Set(list.filter((name): name is string => typeof name === 'string' && ['return', 'move', 'drawdown', 'worst', 'best', 'correlation'].includes(name)))]),
   limitations: z.array(z.string().trim().min(2).max(300)).max(4).catch([]), next: z.string().trim().max(200).catch(''),
 });
 const ANSWER_TOOL: WireTool = {
@@ -129,8 +135,11 @@ function approvedNotRun(task: Pick<Task, 'steps'>): { useId: string; tool: strin
 /** The conversation, rebuilt from the steps and from nothing else. */
 /** An errand of the same conversation that stopped at its card because the person said no: what they asked and what was offered. */
 export interface Declined { question: string; assets: string[]; windowDays: number | null }
-export function rebuild(task: Task, parent: { question: string; presentation: Presentation; analysis: Analysis | null } | null, declined: Declined | null = null): Message[] {
+/** A read of the same conversation whose figures are too old to be "the last 30 days": what was asked and what was read, never a figure. */
+export interface Earlier { question: string; assets: string[]; windowDays: number; day: string }
+export function rebuild(task: Task, parent: { question: string; presentation: Presentation; analysis: Analysis | null } | null, declined: Declined | null = null, earlier: Earlier | null = null): Message[] {
   const input: Record<string, unknown> = { question: task.question };
+  if (earlier) input.earlier = { question: earlier.question, read: { assets: earlier.assets, windowDays: earlier.windowDays }, on: earlier.day };
   if (declined) input.declined = { question: declined.question, offered: { assets: declined.assets, windowDays: declined.windowDays } };
   if (parent) input.previous = { question: parent.question, answer: parent.presentation.text, ...(parent.analysis ? { figures: parent.analysis.figures.map(forModel), windowDays: parent.analysis.windowDays, limitations: parent.analysis.limitations } : {}) };
   const messages: Message[] = [{ role: 'user', content: JSON.stringify(input) }];
@@ -196,7 +205,7 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
     else await write('error', { code });
   };
   try {
-    let parent: Parameters<typeof rebuild>[1] = null, declined: Declined | null = null;
+    let parent: Parameters<typeof rebuild>[1] = null, declined: Declined | null = null, earlier: Earlier | null = null;
     if (claim.task.parent) {
       let before = await deps.store.get(owner, claim.task.parent);
       // A card they said no to leaves what was asked and what was offered, never a figure and never a permission.
@@ -207,7 +216,13 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
         before = before.parent ? await deps.store.get(owner, before.parent) : null;
       }
       const result = before ? taskResult(before) : null;
-      if (before && result) parent = { question: before.question, presentation: result.presentation, analysis: result.analysis };
+      if (before && result) {
+        // Figures read more than a day ago are not "the last 30 days" any more (a follow-up sent weeks later was answered
+        // from them as if they were). They are not handed on: the model is told what was read and when, and reads again.
+        const old = result.analysis !== null && deps.now() - Date.parse(result.analysis.computedAt) > FIGURES_LAST_MS;
+        parent = { question: before.question, presentation: result.presentation, analysis: old ? null : result.analysis };
+        if (old) earlier = { question: before.question, assets: result.analysis!.subjects, windowDays: result.analysis!.windowDays, day: result.analysis!.computedAt.slice(0, 10) };
+      }
     }
     // What the conversation settled about which instruments are meant, apart from this errand's own words (tools.ts).
     const settled: Settled = {
@@ -235,8 +250,15 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
       const calls = task.steps.filter((step) => step.kind === 'model_call');
       // A reply already paid for and stored, after which the run wrote nothing (it was killed, or storage failed once),
       // is used: the same reply is never bought twice.
-      const last = task.steps.at(-1)!;
-      const kept = last.kind === 'model_call' && last.data.outcome === 'ok' && Array.isArray(last.data.blocks) ? (last.data.blocks as Block[]) : null;
+      const at = task.steps.findLastIndex((step) => step.kind === 'model_call'), reply = at < 0 ? null : task.steps[at];
+      const stored = reply && reply.data.outcome === 'ok' && Array.isArray(reply.data.blocks) ? (reply.data.blocks as Block[]) : null;
+      const since = task.steps.slice(at + 1), wanted = (stored ?? []).filter((block): block is Extract<Block, { type: 'tool_use' }> => block.type === 'tool_use');
+      const handled = new Set(since.map((step) => String(step.data.useId)));
+      // The run also stops BETWEEN two tools of one reply: every step since the reply is then the result of one of its own
+      // requests and one of them has none yet. Never for a reply that answers: an answer sent back is corrected by a new call.
+      const between = since.length > 0 && !wanted.some((use) => use.name === 'answer') && wanted.some((use) => !handled.has(use.id))
+        && since.every((step) => (step.kind === 'tool_call' || step.kind === 'tool_refused') && wanted.some((use) => use.id === step.data.useId));
+      const kept = stored && (since.length === 0 || between) ? stored : null;
       let blocks: Block[];
       if (kept) blocks = kept;
       else {
@@ -245,7 +267,7 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
       // The steps are enough for the next run to go on.
       const left = deps.limits.runMs - (deps.now() - started);
       if (left < 15_000) return;
-      const request = { model: task.model, system: agentPrompt(task.language, task.locale), messages: rebuild(task, parent, declined), tools: WIRE_TOOLS, maxTokens: deps.limits.maxTokens, timeoutMs: Math.min(30_000, left - 8_000), effort: agentEffort() };
+      const request = { model: task.model, system: agentPrompt(task.language, task.locale), messages: rebuild(task, parent, declined, earlier), tools: WIRE_TOOLS, maxTokens: deps.limits.maxTokens, timeoutMs: Math.min(30_000, left - 8_000), effort: agentEffort() };
       const budget: Budget = { ...deps.budget, taskCapUsd: deps.limits.taskUsd };
       const reply = await reservedCall(deps.store, budget, id, request, deps.call, deps.now);
       if (!reply.ok) {
@@ -282,6 +304,8 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
       }
       let asked = false;
       for (const use of uses) {
+        // A request of a kept reply that already has its step is not carried out twice.
+        if (kept && handled.has(use.id)) continue;
         // Looked up as an own key: "constructor" or "toString" is an unknown tool, not an inherited one.
         const tool = Object.hasOwn(TOOLS, use.name) ? TOOLS[use.name] : undefined;
         const args = tool?.schema.safeParse(use.input);
@@ -337,11 +361,28 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   // What a text IS is decided by code: it is an analysis when it cites a figure anywhere a person will read it (the text,
   // a limitation, the next question), or when this task ran a comparison itself (then its sources and limits are shown
   // even if nothing could be cited); otherwise an explanation, read in full.
-  const cites = parsed.success && (/\{\{\s*(?:f|d|from|to)\s*:/i.test([parsed.data.gist, parsed.data.text, parsed.data.next, ...parsed.data.limitations].join(' ')) || ownAnalysis(task) !== null);
+  const cites = parsed.success && (/\{\{\s*(?:f|d|from|to)\s*:/i.test([parsed.data.gist, parsed.data.text, parsed.data.next, ...parsed.data.limitations].join(' ')) || ownAnalysis(task) !== null
+    // With figures on the table, a text the model itself calls an analysis, or that declares an ordering, is one: it gets
+    // the every-day rule, the analysis reader and, when its words cannot be shown, the figures told by code. (A follow-up
+    // that cited no placeholder used to be "an explanation": "Bitcoin fell more, and moved more every day", both false,
+    // met none of those.) A text the model calls an explanation stays one: "what is Bitcoin?" after a comparison.
+    || (analysis !== null && (parsed.data.kind === 'analysis' || parsed.data.claims.length > 0)));
   // After this task's own read, whatever the model calls its text, it is an analysis: the person's read brought figures and
   // every path that protects them (told by code when the words cannot be shown) applies.
   const draft: Draft | null = parsed.success ? { ...parsed.data, kind: ownAnalysis(task) ? 'analysis' : parsed.data.kind === 'clarification' ? 'clarification' : cites ? 'analysis' : 'explanation' } as Draft : null;
-  const shown = draft ? present(draft, draft.kind === 'clarification' ? null : analysis, theirs, task.language, task.locale, !mine) : null;
+  let shown: ReturnType<typeof present> | null = draft ? present(draft, draft.kind === 'clarification' ? null : analysis, theirs, task.language, task.locale, !mine) : null;
+  // Two rules of code's own on a draft that passed: each is sent back once with its reason, like any other refusal, and
+  // only then told by code (the first used to replace the model's words at once, with no chance to say it right).
+  // A window's figure says nothing about each of its days.
+  let rule: 'every_day' | null = null;
+  if (shown && shown.ok && shown.presentation.kind === 'analysis' && everyDayClaim([shown.own.text, ...shown.own.limitations].join(' '), task.language)) {
+    rule = 'every_day';
+    shown = { ok: false, refusal: { code: 'every_day', detail: 'a figure of the window says nothing about each of its days: say "on an average day", or leave "every day", "daily" and "always" out' } };
+  }
+  // The person's read brought figures: an answer that tells none of them (a question back, "I cannot compare" while one
+  // series was read) is not what the read was for.
+  if (shown && shown.ok && mine && shown.presentation.figures.length === 0 && mine.figures.some((figure) => figure.value !== null))
+    shown = { ok: false, refusal: { code: 'no_figure_told', detail: 'the read brought figures: give at least one of them with {{f:ID}}' } };
   let presentation: Presentation | null = shown && 'presentation' in shown ? shown.presentation : null;
   const ownWords: OwnWords | null = shown && 'own' in shown ? shown.own : null;
   // An instrument the person's words left open is not treated as chosen, in any sentence that is not an analysis
@@ -368,19 +409,13 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   // Everything of the model's that a person is about to get is read: the text, the limitations it wrote and the next
   // question. Only a text code wrote itself is not (there is nothing of the model's in it), and the record says so.
   let verdict: Verdict | 'not_read' = 'not_read', readerUsd = 0, readBy: 'lists' | null = null;
-  // A window's figure says nothing about each of its days: an analysis whose own words say "every day" outside a sentence
-  // about an average states what no figure holds. Code tells the figures instead, and the reader is not asked.
-  let rule: 'every_day' | null = null;
-  if (!presentation.composedByCode && presentation.kind === 'analysis' && ownWords && everyDayClaim([ownWords.text, ...ownWords.limitations].join(' '), task.language)) {
-    presentation = told(false); rule = 'every_day';
-  }
   if (!presentation.composedByCode) {
     // A clarification is one short question. Anything longer, or with no question in it, is not one: it is read as an explanation.
     if (presentation.kind === 'clarification' && (presentation.text.length > 220 || !/[?？]/.test(presentation.text))) presentation.kind = 'explanation';
     const measured = presentation.kind === 'analysis' && ownWords !== null;
     const own = presentation.limitations.filter((line) => !limitationsInWords(analysis, task.language).includes(line));
     const read = await deps.read(measured
-      ? { task: task.id, question: task.question, text: [ownWords!.text, ...ownWords!.limitations].join(' '), next: ownWords!.next, language: task.language, locale: task.locale, measured: true, numbersFrom: theirs }
+      ? { task: task.id, question: task.question, text: [ownWords!.forReader.text, ...ownWords!.forReader.limitations].join(' '), next: ownWords!.forReader.next, language: task.language, locale: task.locale, measured: true, numbersFrom: theirs, windowDays: analysis?.windowDays ?? null }
       : { task: task.id, question: task.question, text: [presentation.text, ...own].join(' '), next: presentation.next, language: task.language, locale: task.locale, numbersFrom: theirs });
     const said: { verdict: Verdict; keepNext: boolean; usd?: number; by?: 'lists' } = typeof read === 'string' ? { verdict: read, keepNext: true, usd: 0 } : read;
     if (await stopped(said.usd ?? 0)) return true;
@@ -398,13 +433,13 @@ async function finish(deps: Deps, write: (kind: StepKind, data: Record<string, u
   }
   // The analysis on the table stays with the thread: a follow-up that cited no figure still hands it to the next one.
   // `readBy: lists`: the owner turned the model reader off and the companion's deterministic lists read the text instead.
-  await write('answer', { result: { presentation, analysis }, reader: verdict, readerUsd, ...(readBy ? { readBy } : {}), ...(rule ? { rule } : {}) });
+  await write('answer', { result: { presentation, analysis }, reader: verdict, readerUsd, ...(readBy ? { readBy } : {}), ...(rule && presentation.composedByCode ? { rule } : {}) });
   return true;
 }
 
 /** The second reader of the companion, with its own reservation: up to three attempts of a small model. */
 export function companionReader(store: AgentStore, budget: Budget, now: () => number): Reader {
-  return async ({ task, question, text, next, language, locale, measured, numbersFrom }) => {
+  return async ({ task, question, text, next, language, locale, measured, numbersFrom, windowDays }) => {
     const model = companionJudgeModel();
     if (!model) {
       // The owner turned the reader off. That is not a reader that passed: an analysis is told by code, and anything
@@ -427,7 +462,7 @@ export function companionReader(store: AgentStore, budget: Budget, now: () => nu
     const usage: LlmUsage[] = [];
     let verdict: Awaited<ReturnType<typeof judgeCompanionReply>> = null;
     try {
-      verdict = measured ? await judgeAnalysis(question, { text, followUp: next }, language, { model, locale: locale ?? undefined, usage, numbersFrom })
+      verdict = measured ? await judgeAnalysis(question, { text, followUp: next }, language, { model, locale: locale ?? undefined, usage, numbersFrom, windowDays })
         : await judgeCompanionReply(question, { text, followUp: next }, language, { model, locale: locale ?? undefined, usage, numbersFrom });
     } catch { verdict = null; }
     const unknown = usage.some((row) => row.stop === 'timeout' || row.stop === 'network' || row.stop === 'deadline');
@@ -447,8 +482,10 @@ export function engineDeps(store: AgentStore, over: Partial<Deps> = {}): Deps {
   const now = over.now ?? (() => Date.now());
   // The ceiling is a day's: the partition carries the UTC day, so yesterday's attempts (settled, unknown or never
   // settled) do not hold today's money. The no-blind-retry rule is per task and does not depend on it.
-  const set = Number(process.env.BOBBY_AGENT_DAILY_USD);
-  const budget = over.budget ?? { partition: `agent:${new Date(now()).toISOString().slice(0, 10)}`, capUsd: Number.isFinite(set) && set > 0 ? set : 5 };
+  // Absent, empty or not a number: the default. A number is taken as written, and zero is zero (it used to become 5:
+  // an owner who set 0 to spend nothing kept spending). The store refuses every reservation under a ceiling of zero.
+  const raw = process.env.BOBBY_AGENT_DAILY_USD?.trim() ?? '', set = Number(raw);
+  const budget = over.budget ?? { partition: `agent:${new Date(now()).toISOString().slice(0, 10)}`, capUsd: raw && Number.isFinite(set) ? Math.max(0, set) : 5 };
   const limits = over.limits ?? DEFAULT_LIMITS;
   return {
     store, now, budget, limits, worker: over.worker ?? `w_${randomUUID().slice(0, 8)}`,
@@ -476,11 +513,13 @@ export function taskView(task: Task, now: number, remaining: number | null) {
   const result = taskResult(task), state = taskState(task, now);
   return {
     version: ENGINE_VERSION, taskId: task.id, requestId: task.requestId, state, events: taskEvents(task),
+    // Nobody is running it and it is not over: it goes on only when the same ask (or the same approve) is sent again. A GET never runs it.
+    resume: (state === 'running' || state === 'created') && !(task.lease && task.lease.until > now),
     approval: state === 'waiting_approval' ? waitingApproval(task) : null,
     // A client is given the analysis only with an answer that rests on it.
     result: result ? { ...result.presentation, analysis: result.analysis && result.presentation.kind === 'analysis' ? { subjects: result.analysis.subjects, windowDays: result.analysis.windowDays, figures: result.analysis.figures, evidence: result.analysis.evidence } : null } : null,
     // A failed task is final: the same requestId returns this same failure. `retryable` says a NEW request can help.
-    error: taskError(task) ? { code: taskError(task), retryable: ['provider_failed', 'provider_unknown', 'unchecked'].includes(taskError(task)!), message: SAID[saidFor(taskError(task)!)][task.language] } : null,
+    error: taskError(task) ? { code: taskError(task), retryable: ['provider_failed', 'provider_unknown', 'unchecked', 'budget_work_unresolved', 'budget_task_cap', 'budget_budget_exhausted'].includes(taskError(task)!), message: SAID[saidFor(taskError(task)!)][task.language] } : null,
     allowance: { kind: 'reads' as const, remaining },
     engine: { model: task.model, prompt: task.promptVersion, tools: task.toolsetVersion },
   };

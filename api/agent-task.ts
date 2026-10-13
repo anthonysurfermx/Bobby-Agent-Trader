@@ -35,6 +35,7 @@ import { createTask, engineDeps, runTask, saidFor, taskView } from './_lib/agent
 import { SAID } from './_lib/agent/present.js';
 import { FileAgentStore, MemoryAgentStore, isFinal, type AgentStore } from './_lib/agent/store.js';
 import { PgAgentStore, postgrestAgentRpc } from './_lib/agent/store-pg.js';
+import { taskState } from './_lib/agent/state.js';
 import { ENGINE_VERSION } from './_lib/agent/types.js';
 
 export const config = { maxDuration: 60 };
@@ -129,6 +130,15 @@ async function door(req: VercelRequest, res: VercelResponse) {
     await runTask(deps, owner, act.data.taskId);
     return view(act.data.taskId);
   }
-  const done = act.data.op === 'deny' ? await store.deny(owner, act.data.taskId, deps.now()) : await store.cancel(owner, act.data.taskId, deps.now());
+  let done = act.data.op === 'deny' ? await store.deny(owner, act.data.taskId, deps.now()) : await store.cancel(owner, act.data.taskId, deps.now());
+  if (!done) {
+    const task = await store.get(owner, act.data.taskId);
+    // A no that arrives after the yes was recorded (its reply was lost, or the run after it failed) and before the read
+    // was used is a cancel: the errand ends and the read goes back with it.
+    if (task && act.data.op === 'deny' && !isFinal(task) && task.steps.some((step) => step.kind === 'approval_granted') && !task.steps.some((step) => step.kind === 'tool_call' && step.data.metered === true)) done = await store.cancel(owner, act.data.taskId, deps.now());
+    // The same no or the same cancel sent again (its answer was lost on the way) finds the errand as it left it: the
+    // yes and the ask are safe to repeat, and so are these.
+    else if (task && taskState(task, deps.now()) === 'cancelled') done = true;
+  }
   return done ? view(act.data.taskId) : refuse(409, 'not_possible');
 }

@@ -57,12 +57,12 @@ export const UNIVERSE: readonly Instrument[] = [
   { symbol: 'GOOGL', name: 'Alphabet (Google)', say: 'Alphabet', kind: 'equity', assetClass: 'equity', aliases: ['google', 'alphabet', 'googl', 'goog', 'google alphabet', 'alphabet google', 'alphabet inc'] },
   { symbol: 'AMZN', name: 'Amazon', say: 'Amazon', kind: 'equity', assetClass: 'equity', aliases: ['amazon', 'amzn'] },
   { symbol: 'AMD', name: 'AMD', say: 'AMD', kind: 'equity', assetClass: 'equity', aliases: ['amd', 'advanced micro devices'] },
-  { symbol: 'COIN', name: 'Coinbase', say: 'Coinbase', kind: 'equity', assetClass: 'equity', aliases: ['coinbase', 'coin'] },
+  { symbol: 'COIN', name: 'Coinbase', say: 'Coinbase', kind: 'equity', assetClass: 'equity', aliases: ['coinbase', 'coin', 'coin base'] },
 ];
 const BY_SYMBOL = new Map(UNIVERSE.map((instrument) => [instrument.symbol, instrument]));
 const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[¿?¡!.,;:"“”«»()]/g, ' ').replace(/\s+/g, ' ').trim();
 /** Words that may stand around a name without changing which instrument it is. */
-const AROUND = /^(el|la|los|las|le|les|il|lo|der|die|das|den|o|a|os|as|the|de|del|du|di|von|acciones? de|accion de|shares? of|stock|aktie|action|azioni di|acoes da|acoes de)\s+|^l['’]\s*|^\$|\s+(stock|shares|acciones|aktie|aktien)$/g;
+const AROUND = /^(el|la|los|las|le|les|il|lo|der|die|das|den|dem|des|vom|o|a|os|as|do|da|the|de|del|du|di|von|acciones? de|accion de|shares? of|stock|aktien?|actions?|azion[ei]|aco?es|acao)\s+|^[ld]['’]\s*|^\$|[\s-]+(stock|shares|acciones|aktie|aktien|actions?|azioni)$|['’]s$/g;
 export function resolveMention(mention: string): Instrument | null {
   let text = fold(mention);
   for (let n = 0; n < 3; n++) text = text.replace(AROUND, '').trim();
@@ -70,7 +70,14 @@ export function resolveMention(mention: string): Instrument | null {
   // "Nombre (TICKER)" or "TICKER (nombre)", as the engine itself writes them: both sides must be the same instrument.
   const paired = /^(.+?)\s*\(([^()]+)\)$/.exec(mention.trim());
   if (paired) { const a = resolveMention(paired[1]), b = resolveMention(paired[2]); if (a && a === b) return a; }
-  return UNIVERSE.find((instrument) => instrument.symbol.toLowerCase() === text || instrument.aliases.includes(text) || fold(instrument.name) === text) ?? null;
+  const named = (said: string) => UNIVERSE.find((instrument) => instrument.symbol.toLowerCase() === said || instrument.aliases.includes(said) || fold(instrument.name) === said) ?? null;
+  const exact = named(text) ?? named(text.replace(/-/g, ' '));
+  if (exact) return exact;
+  // A name said with its ticker, as people do ("Solana SOL", "nvidia nvda"): both halves must be the same instrument,
+  // the rule the parenthesised form already keeps. (Each one refused as unknown cost a model call.)
+  const words = text.split(' ');
+  for (let cut = 1; cut < words.length; cut++) { const a = named(words.slice(0, cut).join(' ')), b = named(words.slice(cut).join(' ')); if (a && a === b) return a; }
+  return null;
 }
 
 // ---------- names that are also everyday words ----------
@@ -165,14 +172,18 @@ export interface Metrics { first: DailyBar; last: DailyBar; changes: number[]; /
  * What a run of closes did. Percent everywhere; a day's change is its close over the close before it.
  * `before` is the instrument's own close right before the run: with it, the first day of the run has its change too,
  * so "the best day of the window" is chosen among every day of the window (sixth blind set: a window's first day,
- * +3.6% from its own previous close, was left out and the next best, +1.7%, was told as the best). The change of the
- * whole run and the fall from a high are still measured between closes inside it.
+ * +3.6% from its own previous close, was left out and the next best, +1.7%, was told as the best). And then every
+ * figure counts those same days: the change of the whole run is the last close over that close before it (the days'
+ * changes, compounded), and the fall from a high may start at it. Until 2026-10-13 the change and the fall were
+ * measured between closes inside the run, one day short of the worst day, the best day and the average move beside
+ * them: a fall on the first day was a "worst day" larger than the "largest fall", and the sign of the change differed
+ * in two of twenty-eight recorded reads. Without a usable close before, nothing counts the first day, and the basis says so.
  */
 export function metrics(bars: DailyBar[], before: DailyBar | null = null): Metrics | null {
   if (bars.length < 2 || bars.some((bar) => !(bar.close > 0) || !Number.isFinite(bar.close))) return null;
   const lead = before && before.close > 0 && Number.isFinite(before.close) && before.day < bars[0].day ? before : null;
   const changes: number[] = [];
-  let peak = bars[0].close, maxDrawdown = 0, worst: Metrics['worst'] = null, best: Metrics['best'] = null;
+  let peak = lead ? Math.max(lead.close, bars[0].close) : bars[0].close, maxDrawdown = lead ? Math.min(0, pct(bars[0].close / lead.close - 1)) : 0, worst: Metrics['worst'] = null, best: Metrics['best'] = null;
   const count = (change: number, day: string) => {
     changes.push(change);
     if (!worst || change < worst.pct) worst = { pct: change, day };
@@ -184,7 +195,7 @@ export function metrics(bars: DailyBar[], before: DailyBar | null = null): Metri
     peak = Math.max(peak, bars[i].close);
     maxDrawdown = Math.min(maxDrawdown, pct(bars[i].close / peak - 1));
   }
-  return { first: bars[0], last: bars.at(-1)!, changes, led: lead !== null, totalReturn: pct(bars.at(-1)!.close / bars[0].close - 1), move: changes.length >= MIN_CHANGES ? changes.reduce((sum, change) => sum + Math.abs(change), 0) / changes.length : null, maxDrawdown, worst, best };
+  return { first: bars[0], last: bars.at(-1)!, changes, led: lead !== null, totalReturn: pct(bars.at(-1)!.close / (lead ?? bars[0]).close - 1), move: changes.length >= MIN_CHANGES ? changes.reduce((sum, change) => sum + Math.abs(change), 0) / changes.length : null, maxDrawdown, worst, best };
 }
 /** The whole window must be sound, not only the reader's last 22 bars: no missing crypto day, no equity gap over five days, no impossible jump. */
 function windowSound(bars: DailyBar[], assetClass: AssetClass): boolean {
@@ -234,8 +245,15 @@ async function readSeries(instrument: Instrument, ctx: ToolContext): Promise<Rea
   const series = instrument.assetClass === 'equity' ? parseYahooDaily(json, instrument.symbol, now) : parseOkxDaily(json, `${instrument.symbol}-USDT`, now);
   // A currency is three to five capital letters. Anything else in that field is a source's free text: it would be
   // written beside a number and read as Bobby's own words, so the whole series is not understood.
-  if (!series || !/^[A-Z]{3,5}$/.test(series.currency ?? '')) return { instrument, url, series: null, bars: null, quality: 'missing', note: 'the source returned nothing the reader understands' };
-  const valid = validateBars(series, now);
+  // Every stock and fund of the universe is US-listed and every coin is read as its USDT pair: one currency each. (Any
+  // three to five capital letters used to pass, and were printed beside the price.) Widen it with the universe.
+  if (!series || series.currency !== (instrument.assetClass === 'equity' ? 'USD' : 'USDT')) return { instrument, url, series: null, bars: null, quality: 'missing', note: 'the source returned nothing the reader understands' };
+  // The reader refuses a series with a split in it. Six months are fetched and at most 69 days are measured (the longest
+  // window, the close before it, and how stale a series may be): a split older than that touches no close that is
+  // used, and refusing the stock for it kept one unreadable for up to six months.
+  const horizon = new Date(now.getTime() - (Math.max(...WINDOWS) + 10) * 86_400_000).toISOString().slice(0, 10);
+  const recent = (series as { corporateActionDays?: string[] }).corporateActionDays?.filter((day) => day > horizon) ?? [];
+  const valid = validateBars({ ...series, corporateActionDays: recent.length ? recent : undefined } as typeof series, now);
   if ('reason' in valid) return { instrument, url, series, bars: null, quality: valid.reason === 'stale' ? 'stale' : valid.reason === 'too_few' ? 'missing' : 'error', note: `series refused: ${valid.reason}` };
   return { instrument, url, series, bars: valid.bars, quality: 'valid', note: null };
 }
@@ -289,13 +307,13 @@ export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<T
     if (!m) limitations.push(`no_series:${symbol}`);
     // The evidence is dated by the day its figures end on, which is not always the source's newest bar.
     else { used.set(symbol, { bars: bars!, before: m.led ? before : null }); item.asOf = m.last.day; }
-    const basis = m ? `${read.instrument.assetClass === 'crypto' ? 'UTC days' : 'exchange sessions'} from ${m.first.day} to ${m.last.day} (${bars!.length - 1} daily changes, close to close)` : `no usable series (${item.note ?? 'too few days in the window'})`;
-    const figure = (metric: string, value: number | null, unit: Figure['unit'], extra = ''): Figure => ({ id: `${metric}_${symbol}`, metric, subject: symbol, value: m && value !== null && Number.isFinite(value) ? value : null, unit, currency: unit === 'price' ? read.series?.currency ?? null : null, basis: basis + extra, from: m?.first.day ?? null, to: m?.last.day ?? null, days: m ? (['move', 'worst', 'best'].includes(metric) ? m.changes.length : bars!.length - 1) : null, evidence: ev, quality: m && value !== null && Number.isFinite(value) ? quality : quality === 'valid' ? 'missing' : quality });
+    const basis = m ? `${read.instrument.assetClass === 'crypto' ? 'UTC days' : 'exchange sessions'} from ${m.first.day} to ${m.last.day} (${m.changes.length} daily changes, close to close)` : `no usable series (${item.note ?? 'too few days in the window'})`;
+    const figure = (metric: string, value: number | null, unit: Figure['unit'], extra = ''): Figure => ({ id: `${metric}_${symbol}`, metric, subject: symbol, value: m && value !== null && Number.isFinite(value) ? value : null, unit, currency: unit === 'price' ? read.series?.currency ?? null : null, basis: basis + extra, from: m?.first.day ?? null, to: m?.last.day ?? null, days: m ? m.changes.length : null, evidence: ev, quality: m && value !== null && Number.isFinite(value) ? quality : quality === 'valid' ? 'missing' : quality });
     figures.push(
       figure('close', m?.last.close ?? null, 'price'),
-      figure('return', m?.totalReturn ?? null, 'percent', '; last close over first close of the window, minus one'),
+      figure('return', m?.totalReturn ?? null, 'percent', m?.led ? '; last close over the close right before the window, minus one: every day of the window counts' : "; last close over first close of the window, minus one (the first day's own change is not counted: its previous close could not be used)"),
       figure('move', m?.move ?? null, 'percent', `; average size of the daily changes, up or down (the mean of their absolute values); ${m?.led ? "each day's change is from the instrument's own previous close, the first day's from the close right before the window" : "the first day's own change is not counted: its previous close could not be used"}${m && m.move === null ? `; needs ${MIN_CHANGES} changes` : ''}`),
-      figure('drawdown', m?.maxDrawdown ?? null, 'percent', '; largest fall from a previous high inside the window'),
+      figure('drawdown', m?.maxDrawdown ?? null, 'percent', m?.led ? '; largest fall from a previous high, the close right before the window counting as the first one' : '; largest fall from a previous high inside the window'),
       { ...figure('worst', m?.worst?.pct ?? null, 'percent', m?.worst ? `; the day was ${m.worst.day}; among the changes of ${m.led ? 'every day of the window' : "the days of the window after its first (the first day's previous close could not be used)"}` : ''), day: m?.worst?.day ?? null },
       { ...figure('best', m?.best?.pct ?? null, 'percent', m?.best ? `; the day was ${m.best.day}; among the changes of ${m.led ? 'every day of the window' : "the days of the window after its first (the first day's previous close could not be used)"}` : ''), day: m?.best?.day ?? null },
     );

@@ -19,8 +19,17 @@ import type { Analysis, Figure, Presentation } from './types.js';
 
 export interface Draft { kind: Presentation['kind']; gist: string; text: string; limitations: string[]; next: string; claims: Array<{ metric: string; top: string }>; asked?: string[] }
 /** A draft as its author wrote it, with every number and date of code's replaced by a mark. */
-export interface OwnWords { text: string; limitations: string[]; next: string | null }
-export type Refusal = { code: 'unknown_figure' | 'figure_without_value' | 'typed_number' | 'bad_placeholder' | 'claim_contradicts_figures' | 'claim_cannot_be_checked' | 'asked_not_answered' | 'presumed_asset' | 'too_long' | 'empty'; detail: string };
+export interface OwnWords { text: string; limitations: string[]; next: string | null;
+  /**
+   * The same words as the second reader gets them: each mark says what was measured and for which instrument, so a figure
+   * put on another asset, another measure or another day can be seen. (With bare marks "Apple changed ⟦figure⟧" was the
+   * same string whether the figure was Apple's or Tesla's: no reader could tell them apart.) Code's own rules keep
+   * reading the bare form: a label such as "average size" inside the text would answer the every-day rule for the model.
+   */
+  forReader: { text: string; limitations: string[]; next: string | null } }
+/** What a figure is, for the reader (its instructions are English). */
+const WHAT: Record<string, string> = { return: 'change over the whole window', move: "average size of one day's move", drawdown: 'largest fall from a high inside the window', worst: 'change on its worst single day', best: 'change on its best single day', close: 'last closing price', correlation: 'correlation of their daily changes' };
+export type Refusal = { code: 'unknown_figure' | 'figure_without_value' | 'typed_number' | 'bad_placeholder' | 'claim_contradicts_figures' | 'claim_cannot_be_checked' | 'asked_not_answered' | 'presumed_asset' | 'every_day' | 'no_figure_told' | 'too_long' | 'empty'; detail: string };
 
 const PLACEHOLDER = /\{\{((?:f|d|from|to):[A-Za-z0-9_~]+|days)\}\}/g;
 /** Written with its sign, so no dash before it can be read as one. */
@@ -36,7 +45,11 @@ export function formatFigure(figure: Figure, language: AppLanguage, locale?: str
 }
 
 /** A day as a person reads it: "15 de septiembre", "September 15". The year is the window's and is not repeated. */
-export const formatDay = (day: string, language: AppLanguage, locale?: string | null) => new Intl.DateTimeFormat(appLocale(language, locale ?? undefined), { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${day}T00:00:00Z`));
+export const formatDay = (day: string, language: AppLanguage, locale?: string | null) => {
+  const written = new Intl.DateTimeFormat(appLocale(language, locale ?? undefined), { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${day}T00:00:00Z`));
+  // The first of a month is an ordinal in French and in Italian ("le 1er octobre", "il 1º ottobre"); Intl writes a bare 1.
+  return language === 'fr' ? written.replace(/^1(?= )/, '1er') : language === 'it' ? written.replace(/^1(?= )/, '1º') : written;
+};
 
 // ---------- what the model may not write ----------
 // Everything below reads FOLDED text (lower case, no accents, look-alike digits as digits, one space between words):
@@ -79,6 +92,8 @@ const DAY_WORD = '(?:(?:derniers|dernieres|premiers|prochains|calendar)\\s+)?(?:
 const DAYS_AFTER = new RegExp(`^(?:\\s*${OR}\\s*${A_LENGTH})*[\\s-]*${DAY_WORD}`);
 // "30 días o 60": only an "or"/"and" between them (never a comma: "En los últimos 30 días, 60 mil…"), and the second ends the phrase.
 const DAYS_BEFORE = new RegExp(`${A_LENGTH}[\\s-]*${DAY_WORD}\\s*(?:o|or|ou|oder|e|y|and|und|et)\\s*$`);
+/** A count of weeks, months or years after a number: another period than the window (folded text). */
+const OTHER_SPAN = /^[\s-]*(?:(?:ultim[oa]s?|last|past|derni(?:er|ere)s?|letzten?|vergangenen?)\s+)?(?:semanas?|mes(?:es)?|anos?|weeks?|months?|years?|semaines?|mois|ans?|annees?|settiman[ae]|mes[ei]|ann[oi]|wochen?|monat(?:e[ns]?)?|jahr(?:e[ns]?)?)(?![a-z])/;
 const ENDS_THERE = /^\s*(?:[.,;:!?)\]»”"']|$)/;
 /** A window length is one only where it counts days: "60 días", "30-day", "30 or 60 days", "30 días o 60". Never "60 mil", "un 60". */
 const countsDays = (folded: string, at: number, length: number) => DAYS_AFTER.test(folded.slice(at + length)) || (DAYS_BEFORE.test(folded.slice(0, at)) && ENDS_THERE.test(folded.slice(at + length)));
@@ -180,10 +195,13 @@ function refuse(text: string, figures: Map<string, Figure>, question: string, da
     // A typed length that counts days is a statement about a window. In the answer itself it is the window that was
     // read and no other: "en los últimos 60 días" over a 30-day read is false whoever wrote the 60 first, and a list of
     // both ("en 30 y 60 días Bitcoin ganó") is no better. A limitation or the next question may name either, or both.
-    if (LENGTHS.has(typed) && countsDays(own, match.index!, typed.length)) {
-      if (aside || explaining || typed === String(days)) continue;
+    // ANY count of days, not only the tool's two lengths, and a count of weeks, months or years: "over the last 7 days
+    // Bitcoin changed +3.5%" told from a 30-day read was shown whenever the person had written the 7 (the rule knew only
+    // the literals 30 and 60).
+    const counts = countsDays(own, match.index!, typed.length);
+    if (!aside && !explaining && ((counts && typed !== String(days)) || OTHER_SPAN.test(own.slice(match.index! + typed.length))))
       return { code: 'typed_number', detail: `${typed}: the window that was read is ${days} days (write it with {{days}}; name another length only in a limitation or in next)` };
-    }
+    if (LENGTHS.has(typed) && counts) continue;
     if (theirs.has(typed) || (whole !== null && wholes.has(whole)) || (decimal !== null && decimals.has(decimal))) continue;
     return { code: 'typed_number', detail: typed };
   }
@@ -203,23 +221,42 @@ function claimHolds(claim: { metric: string; top: string }, figures: Map<string,
   return same.every((figure) => figure === mine || rank(mine) > rank(figure));
 }
 
-const write = (text: string, figures: Map<string, Figure>, days: number | null, language: AppLanguage, locale?: string | null) =>
-  // Plain white space is collapsed; the non-breaking space a language puts between a number and its unit is kept.
-  text.replace(PLACEHOLDER, (_, key: string) => {
+/**
+ * Italian: the article (alone or inside a preposition) before a number is chosen by how the number is SAID, and only
+ * code knows the number: "l’8 ottobre", "l’11 settembre", "dell’1,2%", "dello 0,4%"; "il 1º ottobre", "del 10,3%" and a
+ * signed "del +8,7%" keep the plain form. Done here, so the model's own "il {{d:…}}" and "del {{f:…}}" come out right too.
+ */
+const IT_ARTICLE = /(?<!\p{L})(il|del|al|dal|nel|sul) (\{\{((?:f|d|from|to):[A-Za-z0-9_~]+)\}\})/giu;
+function articleIt(word: string, shown: string): string {
+  const form = /^(?:8|11(?!\d)|1(?![\d.º°]))/.test(shown) ? 'l’' : /^0/.test(shown) ? 'lo ' : null;
+  if (form === null) return `${word} `;
+  const stem = word.toLowerCase() === 'il' ? '' : word.slice(0, -1);
+  return stem ? `${stem}l${form}` : (word[0] === 'I' ? form[0].toUpperCase() + form.slice(1) : form);
+}
+const write = (text: string, figures: Map<string, Figure>, days: number | null, language: AppLanguage, locale?: string | null) => {
+  const shown = (key: string) => {
     if (key === 'days') return String(days ?? '');
     const [kind, id] = key.split(':'), figure = figures.get(id)!;
     return kind === 'f' ? formatFigure(figure, language, locale) : formatDay((kind === 'd' ? figure.day : kind === 'from' ? figure.from : figure.to)!, language, locale);
-  }).replace(/[ \t\r\n]+/g, ' ').trim();
+  };
+  const agreed = language === 'it' ? text.replace(IT_ARTICLE, (_, word: string, placeholder: string, key: string) => `${articleIt(word, shown(key))}${placeholder}`) : text;
+  // Plain white space is collapsed; the non-breaking space a language puts between a number and its unit is kept.
+  return agreed.replace(PLACEHOLDER, (_, key: string) => shown(key)).replace(/[ \t\r\n]+/g, ' ').trim();
+};
 
-const LIMITATION: Record<string, Record<AppLanguage, (subject: string) => string>> = {
+const LIMITATION: Record<string, Record<AppLanguage, (subject: string, compared: number) => string>> = {
   mixed_calendars: {
-    en: () => 'They trade on different calendars: how alike they moved is measured only on the days both traded.', es: () => 'Cotizan en calendarios distintos: el parecido entre sus movimientos se mide solo en los días en que ambos operaron.',
-    fr: () => 'Ils ne cotent pas les mêmes jours : la ressemblance de leurs mouvements est mesurée seulement sur les jours où les deux ont coté.', pt: () => 'Negociam em calendários diferentes: a semelhança entre os movimentos é medida só nos dias em que ambos negociaram.',
-    it: () => 'Hanno calendari diversi: la somiglianza dei movimenti è misurata solo nei giorni in cui entrambi hanno scambiato.', de: () => 'Sie werden an unterschiedlichen Tagen gehandelt: Wie ähnlich sie sich bewegten, wird nur an den Tagen gemessen, an denen beide gehandelt wurden.',
+    // Three compared: the likeness is one number per PAIR, on the days the two of that pair traded ("both" of three is nobody).
+    en: (_, n) => (n > 2 ? 'They trade on different calendars: how alike they moved is measured pair by pair, only on the days the two of a pair traded.' : 'They trade on different calendars: how alike they moved is measured only on the days both traded.'),
+    es: (_, n) => (n > 2 ? 'Cotizan en calendarios distintos: el parecido entre sus movimientos se mide par por par, solo en los días en que los dos de cada par operaron.' : 'Cotizan en calendarios distintos: el parecido entre sus movimientos se mide solo en los días en que ambos operaron.'),
+    fr: (_, n) => (n > 2 ? 'Ils ne cotent pas les mêmes jours : la ressemblance de leurs mouvements est mesurée paire par paire, seulement sur les jours où les deux de chaque paire ont coté.' : 'Ils ne cotent pas les mêmes jours : la ressemblance de leurs mouvements est mesurée seulement sur les jours où les deux ont coté.'),
+    pt: (_, n) => (n > 2 ? 'Negociam em calendários diferentes: a semelhança entre os movimentos é medida par a par, só nos dias em que os dois de cada par negociaram.' : 'Negociam em calendários diferentes: a semelhança entre os movimentos é medida só nos dias em que ambos negociaram.'),
+    it: (_, n) => (n > 2 ? 'Hanno calendari diversi: la somiglianza dei movimenti è misurata coppia per coppia, solo nei giorni in cui entrambi i titoli della coppia sono stati scambiati.' : 'Hanno calendari diversi: la somiglianza dei movimenti è misurata solo nei giorni in cui entrambi sono stati scambiati.'),
+    de: (_, n) => (n > 2 ? 'Sie werden an unterschiedlichen Tagen gehandelt: Wie ähnlich sie sich bewegten, wird Paar für Paar nur an den Tagen gemessen, an denen beide eines Paares gehandelt wurden.' : 'Sie werden an unterschiedlichen Tagen gehandelt: Wie ähnlich sie sich bewegten, wird nur an den Tagen gemessen, an denen beide gehandelt wurden.'),
   },
   no_series: {
     en: (s) => `I could not read a reliable series for ${s}.`, es: (s) => `No pude leer una serie fiable de ${s}.`, fr: (s) => `Je n’ai pas pu lire une série fiable pour ${s}.`,
-    pt: (s) => `Não consegui ler uma série de preços válida de ${s}.`, it: (s) => `Non sono riuscito a leggere una serie affidabile per ${s}.`, de: (s) => `Für ${s} konnte ich keine verlässliche Reihe lesen.`,
+    pt: (s) => `${s}: não consegui ler uma série de preços válida.`, it: (s) => `Non sono riuscito a leggere una serie affidabile per ${s}.`, de: (s) => `Für ${s} konnte ich keine verlässliche Reihe lesen.`,
   },
   past_window_only: {
     en: () => 'This is what happened in that window; it does not say what comes next.', es: () => 'Es lo que pasó en ese periodo; no dice lo que viene.',
@@ -230,15 +267,19 @@ const LIMITATION: Record<string, Record<AppLanguage, (subject: string) => string
 /** The analysis's own limitations, in words, written by code: they are on the answer whatever the model wrote. */
 export function limitationsInWords(analysis: Analysis | null, language: AppLanguage): string[] {
   if (!analysis) return [];
-  return analysis.limitations.map((entry) => { const [code, subject] = entry.split(':'); return LIMITATION[code]?.[language](subject ? instrumentName(subject) : '') ?? null; }).filter((line): line is string => line !== null);
+  // How many are compared: the instruments that came back with a series.
+  const compared = analysis.subjects.length - analysis.limitations.filter((entry) => entry.startsWith('no_series:')).length;
+  return analysis.limitations.map((entry) => { const [code, subject] = entry.split(':'); return LIMITATION[code]?.[language](subject ? instrumentName(subject) : '', compared) ?? null; }).filter((line): line is string => line !== null);
 }
 
+/** "And" before what code inserts next. Spanish "y" is "e" before a word that begins with the sound i ("e Intel"), not before a diphthong ("y hierro"). */
+function and(language: AppLanguage, next: string): string { return language === 'es' && /^h?i(?![aeou])/i.test(next) ? 'e' : AND[language]; }
 const COMPOSED: Record<AppLanguage, (a: string, b: string) => string> = {
   en: (a, b) => `Over the last {{days}} days, ${a} changed {{f:return_A}} and ${b} changed {{f:return_B}}. The largest fall from a high was {{f:drawdown_A}} for ${a} and {{f:drawdown_B}} for ${b}.`,
-  es: (a, b) => `En los últimos {{days}} días, ${a} cambió {{f:return_A}} y ${b} cambió {{f:return_B}}. La mayor caída desde un máximo fue de {{f:drawdown_A}} en ${a} y de {{f:drawdown_B}} en ${b}.`,
+  es: (a, b) => `En los últimos {{days}} días, ${a} cambió {{f:return_A}} ${and('es', b)} ${b} cambió {{f:return_B}}. La mayor caída desde un máximo fue de {{f:drawdown_A}} en ${a} y de {{f:drawdown_B}} en ${b}.`,
   fr: (a, b) => `Sur les {{days}} derniers jours, ${a} a varié de {{f:return_A}} et ${b} de {{f:return_B}}. La plus forte baisse depuis un sommet a été de {{f:drawdown_A}} pour ${a} et de {{f:drawdown_B}} pour ${b}.`,
-  pt: (a, b) => `Nos últimos {{days}} dias, ${a} variou {{f:return_A}} e ${b} variou {{f:return_B}}. A maior queda desde um máximo foi de {{f:drawdown_A}} em ${a} e de {{f:drawdown_B}} em ${b}.`,
-  it: (a, b) => `Negli ultimi {{days}} giorni, ${a} è variato del {{f:return_A}} e ${b} del {{f:return_B}}. Il calo più ampio da un massimo è stato del {{f:drawdown_A}} per ${a} e del {{f:drawdown_B}} per ${b}.`,
+  pt: (a, b) => `Nos últimos {{days}} dias, ${a} variou {{f:return_A}} e ${b} variou {{f:return_B}}. A maior queda desde um máximo: ${a} {{f:drawdown_A}} e ${b} {{f:drawdown_B}}.`,
+  it: (a, b) => `Negli ultimi {{days}} giorni, il prezzo di ${a} è variato del {{f:return_A}} e quello di ${b} del {{f:return_B}}. Il calo più ampio da un massimo è stato del {{f:drawdown_A}} per ${a} e del {{f:drawdown_B}} per ${b}.`,
   de: (a, b) => `In den letzten {{days}} Tagen hat sich ${a} um {{f:return_A}} verändert und ${b} um {{f:return_B}}. Der größte Rückgang von einem Hoch betrug {{f:drawdown_A}} bei ${a} und {{f:drawdown_B}} bei ${b}.`,
 };
 const COMPOSED_ONE: Record<AppLanguage, (a: string) => string> = {
@@ -246,17 +287,18 @@ const COMPOSED_ONE: Record<AppLanguage, (a: string) => string> = {
   es: (a) => `En los últimos {{days}} días, ${a} cambió {{f:return_A}}. Su mayor caída desde un máximo fue de {{f:drawdown_A}}.`,
   fr: (a) => `Sur les {{days}} derniers jours, ${a} a varié de {{f:return_A}}. Sa plus forte baisse depuis un sommet a été de {{f:drawdown_A}}.`,
   pt: (a) => `Nos últimos {{days}} dias, ${a} variou {{f:return_A}}. A sua maior queda desde um máximo foi de {{f:drawdown_A}}.`,
-  it: (a) => `Negli ultimi {{days}} giorni, ${a} è variato del {{f:return_A}}. Il suo calo più ampio da un massimo è stato del {{f:drawdown_A}}.`,
+  it: (a) => `Negli ultimi {{days}} giorni, il prezzo di ${a} è variato del {{f:return_A}}. Il suo calo più ampio da un massimo è stato del {{f:drawdown_A}}.`,
   de: (a) => `In den letzten {{days}} Tagen hat sich ${a} um {{f:return_A}} verändert. Der größte Rückgang von einem Hoch betrug {{f:drawdown_A}}.`,
 };
 /** Added when every instrument told has its average daily move: the fallback then answers "which moved more each day" as well. */
-const COMPOSED_MOVE: Record<AppLanguage, { one: string; two: (a: string, b: string) => string; many: (items: string) => string; each: (name: string, symbol: string) => string }> = {
-  en: { one: ' On an average day it moved {{f:move_A}}.', two: (a, b) => ` On an average day ${a} moved {{f:move_A}} and ${b} {{f:move_B}}.`, many: (items) => `On an average day, ${items}.`, each: (name, s) => `${name} moved {{f:move_${s}}}` },
-  es: { one: ' En un día promedio se movió {{f:move_A}}.', two: (a, b) => ` En un día promedio, ${a} se movió {{f:move_A}} y ${b} {{f:move_B}}.`, many: (items) => `En un día promedio, ${items}.`, each: (name, s) => `${name} se movió {{f:move_${s}}}` },
-  fr: { one: ' Un jour moyen, il a bougé de {{f:move_A}}.', two: (a, b) => ` Un jour moyen, ${a} a bougé de {{f:move_A}} et ${b} de {{f:move_B}}.`, many: (items) => `Un jour moyen, ${items}.`, each: (name, s) => `${name} a bougé de {{f:move_${s}}}` },
-  pt: { one: ' Num dia médio variou {{f:move_A}}, para cima ou para baixo.', two: (a, b) => ` Num dia médio, ${a} variou {{f:move_A}} e ${b} {{f:move_B}}, para cima ou para baixo.`, many: (items) => `Num dia médio, para cima ou para baixo, ${items}.`, each: (name, s) => `${name} variou {{f:move_${s}}}` },
-  it: { one: ' In un giorno medio si è mosso del {{f:move_A}}.', two: (a, b) => ` In un giorno medio ${a} si è mosso del {{f:move_A}} e ${b} del {{f:move_B}}.`, many: (items) => `In un giorno medio, ${items}.`, each: (name, s) => `${name} si è mosso del {{f:move_${s}}}` },
-  de: { one: ' An einem durchschnittlichen Tag bewegte er sich um {{f:move_A}}.', two: (a, b) => ` An einem durchschnittlichen Tag bewegte sich ${a} um {{f:move_A}} und ${b} um {{f:move_B}}.`, many: (items) => `An einem durchschnittlichen Tag: ${items}.`, each: (name, s) => `${name} {{f:move_${s}}}` },
+const COMPOSED_MOVE: Record<AppLanguage, { one: (a: string) => string; two: (a: string, b: string) => string; many: (items: string) => string; each: (name: string, symbol: string) => string }> = {
+  en: { one: () => ' On an average day it moved {{f:move_A}}.', two: (a, b) => ` On an average day ${a} moved {{f:move_A}} and ${b} {{f:move_B}}.`, many: (items) => `On an average day, ${items}.`, each: (name, s) => `${name} moved {{f:move_${s}}}` },
+  es: { one: () => ' En un día promedio se movió {{f:move_A}}.', two: (a, b) => ` En un día promedio, ${a} se movió {{f:move_A}} ${and('es', b)} ${b} {{f:move_B}}.`, many: (items) => `En un día promedio, ${items}.`, each: (name, s) => `${name} se movió {{f:move_${s}}}` },
+  fr: { one: () => ' Un jour moyen, le prix a bougé de {{f:move_A}}.', two: (a, b) => ` Un jour moyen, ${a} a bougé de {{f:move_A}} et ${b} de {{f:move_B}}.`, many: (items) => `Un jour moyen, ${items}.`, each: (name, s) => `${name} a bougé de {{f:move_${s}}}` },
+  pt: { one: () => ' Num dia médio variou {{f:move_A}}, para cima ou para baixo.', two: (a, b) => ` Num dia médio, ${a} variou {{f:move_A}} e ${b} {{f:move_B}}, para cima ou para baixo.`, many: (items) => `Num dia médio, para cima ou para baixo, ${items}.`, each: (name, s) => `${name} variou {{f:move_${s}}}` },
+  // Italian and German: written so that no word has to agree with a name (a company is "la", a coin "il"; "er" fits few).
+  it: { one: () => ' In un giorno medio il prezzo si è mosso del {{f:move_A}}.', two: (a, b) => ` In un giorno medio il prezzo di ${a} si è mosso del {{f:move_A}} e quello di ${b} del {{f:move_B}}.`, many: (items) => `In un giorno medio, ${items}.`, each: (name, s) => `il prezzo di ${name} si è mosso del {{f:move_${s}}}` },
+  de: { one: (a) => ` An einem durchschnittlichen Tag bewegte sich ${a} um {{f:move_A}}.`, two: (a, b) => ` An einem durchschnittlichen Tag bewegte sich ${a} um {{f:move_A}} und ${b} um {{f:move_B}}.`, many: (items) => `An einem durchschnittlichen Tag: ${items}.`, each: (name, s) => `${name} {{f:move_${s}}}` },
 };
 /** Added for one instrument when both days exist: the fallback then answers "which was the best day" as well. */
 const COMPOSED_DAYS: Record<AppLanguage, string> = {
@@ -269,13 +311,13 @@ const COMPOSED_DAYS: Record<AppLanguage, string> = {
 };
 /** Three read, three told: the same two sentences as a list. */
 const AND: Record<AppLanguage, string> = { en: 'and', es: 'y', fr: 'et', pt: 'e', it: 'e', de: 'und' };
-const listed = (parts: string[], language: AppLanguage) => `${parts.slice(0, -1).join(', ')} ${AND[language]} ${parts.at(-1)}`;
+const listed = (parts: string[], language: AppLanguage) => `${parts.slice(0, -1).join(', ')} ${and(language, parts.at(-1)!)} ${parts.at(-1)}`;
 const COMPOSED_MANY: Record<AppLanguage, { changes: (items: string) => string; change: (name: string, symbol: string) => string; falls: (items: string) => string; fall: (name: string, symbol: string) => string }> = {
   en: { changes: (items) => `Over the last {{days}} days, ${items}.`, change: (name, s) => `${name} changed {{f:return_${s}}}`, falls: (items) => `The largest fall from a high was ${items}.`, fall: (name, s) => `{{f:drawdown_${s}}} for ${name}` },
   es: { changes: (items) => `En los últimos {{days}} días, ${items}.`, change: (name, s) => `${name} cambió {{f:return_${s}}}`, falls: (items) => `La mayor caída desde un máximo fue ${items}.`, fall: (name, s) => `de {{f:drawdown_${s}}} en ${name}` },
   fr: { changes: (items) => `Sur les {{days}} derniers jours, ${items}.`, change: (name, s) => `${name} a varié de {{f:return_${s}}}`, falls: (items) => `La plus forte baisse depuis un sommet a été ${items}.`, fall: (name, s) => `de {{f:drawdown_${s}}} pour ${name}` },
-  pt: { changes: (items) => `Nos últimos {{days}} dias, ${items}.`, change: (name, s) => `${name} variou {{f:return_${s}}}`, falls: (items) => `A maior queda desde um máximo foi ${items}.`, fall: (name, s) => `de {{f:drawdown_${s}}} em ${name}` },
-  it: { changes: (items) => `Negli ultimi {{days}} giorni, ${items}.`, change: (name, s) => `${name} è variato del {{f:return_${s}}}`, falls: (items) => `Il calo più ampio da un massimo è stato ${items}.`, fall: (name, s) => `del {{f:drawdown_${s}}} per ${name}` },
+  pt: { changes: (items) => `Nos últimos {{days}} dias, ${items}.`, change: (name, s) => `${name} variou {{f:return_${s}}}`, falls: (items) => `A maior queda desde um máximo: ${items}.`, fall: (name, s) => `${name} {{f:drawdown_${s}}}` },
+  it: { changes: (items) => `Negli ultimi {{days}} giorni, ${items}.`, change: (name, s) => `il prezzo di ${name} è variato del {{f:return_${s}}}`, falls: (items) => `Il calo più ampio da un massimo è stato ${items}.`, fall: (name, s) => `del {{f:drawdown_${s}}} per ${name}` },
   de: { changes: (items) => `In den letzten {{days}} Tagen: ${items}.`, change: (name, s) => `${name} {{f:return_${s}}}`, falls: (items) => `Der größte Rückgang von einem Hoch betrug ${items}.`, fall: (name, s) => `{{f:drawdown_${s}}} bei ${name}` },
 };
 export const UNAVAILABLE: Record<AppLanguage, string> = {
@@ -312,21 +354,37 @@ function references(analysis: Analysis | null, used: string[]): Presentation['re
 // that also says it is an average. Whole words; German's inflected adjective ("die tägliche Veränderung") names the
 // figure and is not the claim.
 const EVERY_DAY: Record<AppLanguage, RegExp> = {
-  en: /\b(?:every\s+(?:single\s+)?day|each\s+(?:and\s+every\s+)?day|day\s+after\s+day|day\s+in,?\s+day\s+out)\b/i,
-  es: /\b(?:cada\s+d[ií]a|todos\s+los\s+d[ií]as|d[ií]a\s+tras\s+d[ií]a|a\s+diario|diariamente)(?![a-záéíóúñ])/i,
-  fr: /\b(?:chaque\s+jour|tous\s+les\s+jours|jour\s+apr[eè]s\s+jour|quotidiennement)\b/i,
-  pt: /\b(?:todo\s+(?:santo\s+)?dia|todos\s+os\s+dias|cada\s+dia|dia\s+ap[oó]s\s+dia|diariamente)\b/i,
-  it: /\b(?:ogni\s+(?:singolo\s+)?giorno|tutti\s+i\s+giorni|giorno\s+dopo\s+giorno|quotidianamente|giornalmente)\b/i,
-  de: /\b(?:jeden\s+(?:einzelnen\s+)?Tag|an\s+jedem\s+(?:einzelnen\s+)?Tag|t[aä]glich|Tag\s+f[uü]r\s+Tag)(?![a-zäöüß])/i,
+  // The words the instructions themselves name ("daily" as an adverb, sessions, "all N days") beside "every day".
+  en: /\b(?:every\s+(?:single\s+)?(?:trading\s+)?(?:day|session)|each\s+(?:and\s+every\s+)?(?:trading\s+)?(?:day|session)|day\s+after\s+day|day\s+in,?\s+day\s+out|(?:on\s+)?all\s+(?:\d+\s+|the\s+|of\s+the\s+)?days|daily(?!\s+(?:chang|mov|swing|return|clos|pric|figur|bar|rang|variation|fluctuation|size)))\b/i,
+  es: /\b(?:cada\s+(?:d[ií]a|jornada|sesi[oó]n)|tod[oa]s\s+l[oa]s\s+(?:\d+\s+)?(?:d[ií]as|jornadas|sesiones)|d[ií]a\s+tras\s+d[ií]a|a\s+diario|diariamente)(?![a-záéíóúñ])/i,
+  fr: /(?<![a-zà-ÿ])(?:chaque\s+(?:jour|s[eé]ance)|tous\s+les\s+(?:\d+\s+)?jours|toutes\s+les\s+s[eé]ances|jour\s+apr[eè]s\s+jour|quotidiennement|au\s+quotidien)(?![a-zà-ÿ])/i,
+  pt: /(?<![a-zà-ú])(?:todo\s+(?:santo\s+)?dia|tod[oa]s\s+[oa]s\s+(?:\d+\s+)?(?:dias|sess[oõ]es)|cada\s+(?:dia|sess[aã]o)|dia\s+ap[oó]s\s+dia|diariamente)(?![a-zà-ú])/i,
+  it: /\b(?:ogni\s+(?:singol[oa]\s+)?(?:giorno|seduta)|tutti\s+i\s+(?:\d+\s+)?giorni|tutte\s+le\s+sedute|giorno\s+dopo\s+giorno|quotidianamente|giornalmente)\b/i,
+  de: /\b(?:jeden\s+(?:einzelnen\s+)?(?:Tag|Handelstag)|an\s+jedem\s+(?:einzelnen\s+)?(?:Tag|Handelstag)|an\s+allen\s+(?:\d+\s+)?(?:Tagen|Handelstagen)|tagt[aä]glich|t[aä]glich|Tag\s+f[uü]r\s+Tag)(?![a-zäöüß])/i,
 };
 const AN_AVERAGE: Record<AppLanguage, RegExp> = {
   en: /\b(?:average|mean|typical(?:ly)?)\b/i,
-  es: /\b(?:promedio|media|medio|t[ií]pic[oa]s?)(?![a-záéíóúñ])/i,
+  // "en medio de la caída" is "amid", not an average.
+  es: /\b(?:promedio|media|medio(?!\s+de(?![a-z]))|t[ií]pic[oa]s?)(?![a-záéíóúñ])/i,
   fr: /\b(?:moyenne|moyen|typique(?:ment)?)\b/i,
   pt: /(?<![a-zà-ú])(?:m[eé]dia|m[eé]dio|t[ií]pic[oa]s?)(?![a-zà-ú])/i,
-  it: /\b(?:media|medio|mediamente|tipic[oa])\b/i,
+  it: /\b(?:media|medio(?!\s+(?:periodo|termine))|mediamente|tipic[oa])\b/i,
   de: /\b(?:Durchschnitt|durchschnittlich(?:e[nmrs]?)?|im\s+Schnitt|im\s+Mittel|typisch(?:e[nmrs]?)?|mittler(?:e[nmrs]?))(?![a-zäöüß])/i,
 };
+/**
+ * "Always" is the claim only beside a comparison ("always moved more"): alone the word is also "still" (toujours, immer
+ * noch), "whenever" (siempre que), "more and more" (sempre più), or the plain truth that money can always be lost.
+ */
+const ALWAYS: Record<AppLanguage, RegExp> = { en: /\balways\b/i, es: /\bsiempre(?!\s+que)(?![a-záéíóúñ])/i, fr: /(?<![a-zà-ÿ])toujours(?![a-zà-ÿ])/i, pt: /(?<![a-zà-ú])sempre(?!\s+que)(?![a-zà-ú])/i, it: /(?<![a-zà-ÿ])sempre(?!\s+(?:pi[uù]|meno)(?![a-zà-ÿ]))(?![a-zà-ÿ])/i, de: /\b(?:immer(?!\s+(?:noch|wieder|mehr|weniger))|stets)(?![a-zäöüß])/i };
+const COMPARES: Record<AppLanguage, RegExp> = {
+  en: /\b(?:more|less|most|least|larger|smaller|bigger|harder|further)\b/i, es: /\b(?:m[aá]s|menos|mayor|menor)(?![a-záéíóúñ])/i, fr: /(?<![a-zà-ÿ])(?:plus|davantage|moins)(?![a-zà-ÿ])/i,
+  pt: /(?<![a-zà-ú])(?:mais|menos|maior|menor)(?![a-zà-ú])/i, it: /(?<![a-zà-ÿ])(?:pi[uù]|meno|maggiore|minore)(?![a-zà-ÿ])/i, de: /\b(?:mehr|weniger|st[aä]rker|schw[aä]cher|gr[oö][sß]+er|kleiner|am\s+(?:st[aä]rksten|meisten|wenigsten))(?![a-zäöüß])/i,
+};
+/** A sentence that denies the claim before making it does not make it. */
+const DENIES: Record<AppLanguage, RegExp> = {
+  en: /\b(?:not|n['’]t|never|no)\b/i, es: /\b(?:no|ni|nunca|tampoco)\b/i, fr: /(?<![a-zà-ÿ])(?:ne|n['’]|pas|jamais)(?![a-zà-ÿ])/i, pt: /(?<![a-zà-ú])(?:n[aã]o|nem|nunca)(?![a-zà-ú])/i, it: /\b(?:non|n[eé]|mai)\b/i, de: /\b(?:nicht|kein(?:e[nmrs]?)?|nie(?:mals)?)(?![a-zäöüß])/i,
+};
+const CLAUSE = /[;:]\s+|,\s+(?:and|but|while|y|e|pero|mientras|et|mais|tandis|ma|mentre|mas|enquanto|und|aber|w[aä]hrend)\s+|\s+(?:and|y|e|et|und)\s+(?=\p{Lu})/u;
 /**
  * A sentence about WHEN something trades ("Solana trades every day, Apple only on exchange days") says nothing of how
  * it moved: it is the calendar. In the eighth run that sentence, written as a limitation, set off the rule above three
@@ -342,9 +400,16 @@ const CALENDAR: Record<AppLanguage, RegExp> = {
 };
 /** True when a sentence is about the trading calendar. */
 export const aboutCalendar = (sentence: string, language: AppLanguage) => CALENDAR[language].test(sentence);
-/** True when the model's own words claim something about every day of the window without saying it is an average. */
+/**
+ * True when the model's own words claim something about every day of the window without saying it is an average. The
+ * average must stand in the same clause as the claim: one elsewhere in the sentence excuses nothing. A clause about the
+ * trading calendar, or one that denies the claim before the words, does not make it.
+ */
 export function everyDayClaim(text: string, language: AppLanguage): boolean {
-  return text.split(/(?<=[.!?…])\s+|\n+/).some((sentence) => EVERY_DAY[language].test(sentence) && !AN_AVERAGE[language].test(sentence) && !aboutCalendar(sentence, language));
+  return text.split(/(?<=[.!?…])\s+|\n+/).some((sentence) => !aboutCalendar(sentence, language) && sentence.split(CLAUSE).some((clause) => {
+    const said = EVERY_DAY[language].exec(clause) ?? (COMPARES[language].test(clause) ? ALWAYS[language].exec(clause) : null);
+    return said !== null && !AN_AVERAGE[language].test(clause) && !DENIES[language].test(clause.slice(0, said.index));
+  }));
 }
 
 /** Code's plain reading: change, average daily move and largest fall (and the two days, for one instrument). */
@@ -363,7 +428,7 @@ function composeBase(analysis: Analysis | null, language: AppLanguage, locale?: 
   const [a, b] = ready;
   const days = !b && ['worst', 'best'].every((metric) => { const figure = figures.get(`${metric}_${a}`); return figure?.value != null && Boolean(figure.day); });
   const moved = [a, b].filter(Boolean).every((symbol) => figures.get(`move_${symbol}`)?.value != null);
-  const draft = (b ? COMPOSED[language](spokenName(a), spokenName(b)) + (moved ? COMPOSED_MOVE[language].two(spokenName(a), spokenName(b)) : '') : COMPOSED_ONE[language](spokenName(a)) + (moved ? COMPOSED_MOVE[language].one : '') + (days ? COMPOSED_DAYS[language] : '')).replace(/_A\}\}/g, `_${a}}}`).replace(/_B\}\}/g, `_${b}}}`);
+  const draft = (b ? COMPOSED[language](spokenName(a), spokenName(b)) + (moved ? COMPOSED_MOVE[language].two(spokenName(a), spokenName(b)) : '') : COMPOSED_ONE[language](spokenName(a)) + (moved ? COMPOSED_MOVE[language].one(spokenName(a)) : '') + (days ? COMPOSED_DAYS[language] : '')).replace(/_A\}\}/g, `_${a}}}`).replace(/_B\}\}/g, `_${b}}}`);
   const text = write(draft, figures, analysis.windowDays, language, locale);
   const used = b ? [`return_${a}`, `return_${b}`, `drawdown_${a}`, `drawdown_${b}`, ...(moved ? [`move_${a}`, `move_${b}`] : [])] : [`return_${a}`, `drawdown_${a}`, ...(moved ? [`move_${a}`] : []), ...(days ? [`worst_${a}`, `best_${a}`] : [])];
   return { kind: 'analysis', gist: text.slice(0, text.indexOf('. ') + 1) || text, text, figures: used, references: references(analysis, used), limitations: limitationsInWords(analysis, language), next: null, composedByCode: true };
@@ -385,7 +450,7 @@ const TOGETHER: Record<AppLanguage, Record<Band, string>> = {
 /** What code says about what the person asked: correlations with what they mean, and each asset's worst and best day with its date. */
 const ASKED: Record<AppLanguage, { correlation: (pairs: string) => string; pair: (a: string, b: string, id: string, band: Band) => string; worst: (items: string) => string; best: (items: string) => string; day: (name: string, id: string) => string }> = {
   en: { correlation: (pairs) => `Day to day, ${pairs}. A correlation of 1 means in step; 0, no relation.`, pair: (a, b, id, band) => `${a} and ${b} ${TOGETHER.en[band]} (correlation {{f:${id}}})`, worst: (items) => `Worst day: ${items}.`, best: (items) => `Best day: ${items}.`, day: (name, id) => `${name} {{f:${id}}} on {{d:${id}}}` },
-  es: { correlation: (pairs) => `De un día a otro, ${pairs}. Una correlación de 1 es ir a la par; 0, ninguna relación.`, pair: (a, b, id, band) => `${a} y ${b} ${TOGETHER.es[band]} (correlación de {{f:${id}}})`, worst: (items) => `Peor día: ${items}.`, best: (items) => `Mejor día: ${items}.`, day: (name, id) => `${name} {{f:${id}}} el {{d:${id}}}` },
+  es: { correlation: (pairs) => `De un día a otro, ${pairs}. Una correlación de 1 es ir a la par; 0, ninguna relación.`, pair: (a, b, id, band) => `${a} ${and('es', b)} ${b} ${TOGETHER.es[band]} (correlación de {{f:${id}}})`, worst: (items) => `Peor día: ${items}.`, best: (items) => `Mejor día: ${items}.`, day: (name, id) => `${name} {{f:${id}}} el {{d:${id}}}` },
   fr: { correlation: (pairs) => `D’un jour à l’autre, ${pairs}. Une corrélation de 1, c’est évoluer à l’identique ; 0, aucun lien.`, pair: (a, b, id, band) => `${a} et ${b} ${TOGETHER.fr[band]} (corrélation de {{f:${id}}})`, worst: (items) => `Pire jour : ${items}.`, best: (items) => `Meilleur jour : ${items}.`, day: (name, id) => `${name} {{f:${id}}} le {{d:${id}}}` },
   pt: { correlation: (pairs) => `De um dia para o outro, ${pairs}. Correlação 1 é andar igual; 0, nenhuma relação.`, pair: (a, b, id, band) => `${a} e ${b} ${TOGETHER.pt[band]} (correlação de {{f:${id}}})`, worst: (items) => `Pior dia: ${items}.`, best: (items) => `Melhor dia: ${items}.`, day: (name, id) => `${name} {{f:${id}}} em {{d:${id}}}` },
   it: { correlation: (pairs) => `Da un giorno all’altro, ${pairs}. Una correlazione di 1 è muoversi allo stesso modo; 0, nessun legame.`, pair: (a, b, id, band) => `${a} e ${b} ${TOGETHER.it[band]} (correlazione di {{f:${id}}})`, worst: (items) => `Giorno peggiore: ${items}.`, best: (items) => `Giorno migliore: ${items}.`, day: (name, id) => `${name} {{f:${id}}} il {{d:${id}}}` },
@@ -604,6 +669,13 @@ export function present(draft: Draft, analysis: Analysis | null, question: strin
   if (opening === null) return { ok: false, refusal: { code: 'too_long', detail: 'gist is not the exact start of text: begin text with the gist sentence, word for word' } };
   // The model's own words, for the second reader of an analysis: what code wrote is a mark, so any quantity left is the model's.
   const marked = (part: string) => part.replace(PLACEHOLDER, (_, key: string) => (key === 'days' ? String(days ?? '') : key.startsWith('f:') ? FIGURE_MARK : DATE_MARK)).replace(/[ \t\r\n]+/g, ' ').trim();
-  const own: OwnWords = { text: marked(text), limitations: draft.limitations.map(marked).filter(Boolean), next: next ? marked(next) : null };
+  const whose = (figure: Figure) => figure.subject.split('~').map(instrumentName).join(' and ');
+  const labelled = (part: string) => part.replace(PLACEHOLDER, (_, key: string) => {
+    if (key === 'days') return String(days ?? '');
+    const [kind, id] = key.split(':'), figure = figures.get(id)!;
+    return kind === 'f' ? `\u27E6figure: ${WHAT[figure.metric] ?? figure.metric}, ${whose(figure)}\u27E7` : `\u27E6date: ${kind === 'd' ? `the day of the ${WHAT[figure.metric] ?? figure.metric}` : kind === 'from' ? 'first day measured' : 'last day measured'}, ${whose(figure)}\u27E7`;
+  }).replace(/[ \t\r\n]+/g, ' ').trim();
+  const own: OwnWords = { text: marked(text), limitations: draft.limitations.map(marked).filter(Boolean), next: next ? marked(next) : null,
+    forReader: { text: labelled(text), limitations: draft.limitations.map(labelled).filter(Boolean), next: next ? labelled(next) : null } };
   return { ok: true, own, presentation: { kind: draft.kind, gist: opening, text: written, figures: used, references: draft.kind === 'analysis' ? references(analysis, used) : [], limitations, next: next ? write(next, figures, days, language, locale) : null, composedByCode: false } };
 }

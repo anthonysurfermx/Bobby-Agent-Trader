@@ -135,6 +135,9 @@ begin
   -- A cancel accepted while a runner held the task, and never completed by it, is completed here.
   if exists (select 1 from agent_steps where task = p_id and kind = 'cancel_requested') then perform agent_end_cancelled(p_id, p_now, 'store'); return null; end if;
   if agent_waiting_scope(p_id) is not null then return null; end if;
+  -- Whoever reserved for this task before is gone (its lease ended): a reservation of theirs that never left (dispatch is
+  -- the one way out, and it refuses anything no longer `reserved`) never will. From here on it holds nothing.
+  update agent_attempts set state = 'no_charge', actual_usd = 0 where task = p_id and state = 'reserved';
   update agent_tasks set fence = fence + 1, lease_worker = p_worker, lease_until = p_now + make_interval(secs => p_lease_ms / 1000.0) where id = p_id;
   return jsonb_build_object('fence', v.fence + 1, 'task', agent_task_json(p_id));
 end $$;

@@ -37,3 +37,15 @@ Every reply is the task's view:
 | `response-single-instrument.json` | "¿Cómo le fue a Nvidia…?": one instrument, 60 days. |
 
 Errors of the door itself: 404 (off, or a task that is not this owner's), 400 `invalid_request`, 409 (`request_id_reused`, `approval_mismatch`, `not_waiting`, `not_possible`), 429 (`reads_limit`, `too_many_errands`), 503 (`engine_storage_unavailable`, `engine_unavailable`).
+
+## Since 2026-10-13 (the example files predate this; re-record them before a client is written against them)
+
+- **`resume`** (boolean, on every view): true when the errand is neither over nor being run by anyone. It goes on only when the same request is sent again (the ask with its `requestId`, or the same approve). A `GET` never moves an errand, so a client that only looks would wait for ever.
+- **`error.message`**: one plain sentence in the person's language for every errand that ends without an answer. The door's own refusals that a person can meet carry `error.message` too: 400 `empty_question` (nothing was said), 400 `question_too_long` (over 1,200 characters), 429 `too_many_errands`, 429 `reads_limit`, 503 `engine_unavailable`, 503 `engine_storage_unavailable`. The others (`invalid_request`, `not_found`, the 409s) are the app's to handle and carry a code only.
+- **`error.retryable`** is now also true for `budget_work_unresolved`, `budget_task_cap` and `budget_budget_exhausted`: a new request can help once the work in flight is back or the day turns.
+- A **deny** or a **cancel** sent twice answers the same view the second time (200), and a deny that arrives after a yes whose read has not run yet cancels the errand and gives the read back.
+- **`result.next`** may be code's own chip: when more was asked than is said aloud (six figures at most), the text says what else was read and `next` is the question that asks for it. That follow-up costs nothing.
+- **A follow-up has an age.** `follow: true` hands on the figures of the last answer only while they are less than a day old. After that the errand is told what was read and when, has none of the figures, and must read again (a new card).
+- **The figures.** Every figure of an instrument now counts the same days: the change over the window is the last close over the close right before the window (its first day counts, as it does for the worst day, the best day and the average move), and the largest fall may start at that close. `days` is the same on all of them. A correlation is given to the model with what its size means, and code's own words say it too.
+- A word the person's own words leave open (`coin`, a lone `sol`, `meta`, `apple`) gets no card: the read is refused as `ambiguous_name` and the answer is a question that names both readings.
+
