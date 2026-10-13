@@ -324,7 +324,7 @@ globalThis.fetch=(async(input:RequestInfo|URL,init?:RequestInit)=>{
     const w=words[activeLanguage];const isCio=JSON.stringify(payload.system||payload.messages).includes('Your role is CIO:');
     const argument=(guardProse[activeLanguage] as Record<string,string>)[mode]??w[0];
     const reply=isCio?{analysis:w[0],verdict:'wait',direction:'none',synthesis:{headline:w[0],why:w[1],risk:w[2],watch:w[3],watchLevel:0,followUp:w[4]}}:{analysis:argument};
-    if(isCio&&String(payload.system).includes('Also return scenarios'))Object.assign(reply,{scenarios:{confirm:w[1],invalidate:w[2]}});
+    if(isCio&&JSON.stringify(payload.system||'').includes('Also return scenarios'))Object.assign(reply,{scenarios:{confirm:w[1],invalidate:w[2]}});
     const content=mode==='invalid_model'?'{}':JSON.stringify(reply);
     if(url.hostname==='api.anthropic.com')return json({stop_reason:'end_turn',content:[{type:'text',text:content}]});
     return json({choices:[{finish_reason:'stop',message:{content}}]});
