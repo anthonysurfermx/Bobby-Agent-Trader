@@ -117,6 +117,9 @@ eq(new Set(['plain', 'terms', 'technical'].map((s) => companionPrompt('en', unde
     ['told as what people do and never as an order to them', 'what protects from a scam is told as what people do, never as an order'],
     ['their own document defines it', 'a term on a paper Bobby cannot see is what such a term usually means, never what theirs does'],
     ['nothing has been looked at, bought or charged', 'after an offer the person has not taken, Bobby knows nothing was looked at, bought or charged'],
+    ['That first sentence is shown alone on their screen', 'the opening sentence is short because it is shown alone'],
+    ['the candidate is only a look-alike the search found: do not mention it', 'a look-alike the person did not name is not mentioned'],
+    ['a few plain words speak to that before the explanation', 'fear, shame or grief gets a few plain words first'],
   ] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);
   const judge = judgePrompt('en');
   for (const [needle, why] of [
