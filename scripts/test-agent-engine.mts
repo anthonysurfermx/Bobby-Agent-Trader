@@ -1428,6 +1428,12 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   const gapped = await analysisOf(['BTC', 'SPY'], 30);
   world.series.SPY = () => yahoo('SPY', SPY);
   eq([gapped.evidence.find((e) => e.id === 'ev_SPY')!.quality !== 'valid', fig(gapped, 'return_SPY').value, gapped.limitations.includes('no_series:SPY')], [true, null, true], '…and a close missing in the middle of a series is still a series nobody can read');
+  // A session the source dropped from one fund shows when another fund of the same read has it.
+  const dropped = () => { const p = structuredClone(yahoo('QQQ', QQQ)) as any, r = p.chart.result[0], at = QQQ.length - 6; r.timestamp.splice(at, 1); r.tradingPeriods.regular.splice(at, 1); for (const key of Object.keys(r.indicators.quote[0])) r.indicators.quote[0][key].splice(at, 1); return p; };
+  world.series.QQQ = dropped;
+  const lacking = await analysisOf(['SPY', 'QQQ'], 30), aloneToo = await analysisOf(['QQQ'], 30);
+  world.series.QQQ = () => yahoo('QQQ', QQQ);
+  eq([lacking.evidence.find((e) => e.id === 'ev_QQQ')!.quality, fig(lacking, 'return_QQQ').value, fig(lacking, 'return_SPY').value !== null, aloneToo.evidence[0].quality], ['error', null, true, 'valid'], 'a fund that lacks a session another fund of the read has is refused (read alone, a missing session cannot be told from a holiday)');
   const prompt = agentPrompt('en', 'en-US');
   for (const [needle, why] of [['their saying beforehand that they will say no is not a no', 'a read they ask for is offered even when they say they will decline: the card is theirs to answer'], ['a sound check such as "can you hear me"', 'a sound check is answered in a few words'], ['"earlier" in the input is a read of theirs from an earlier day', 'figures from an earlier day are not on the table']] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);
 }

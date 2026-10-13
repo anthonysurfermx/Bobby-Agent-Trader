@@ -46,6 +46,14 @@ Code: `api/_lib/agent/`, door `api/agent-task.ts`, tests `scripts/test-agent-eng
 10. Cancel is honoured after every wait; a result that arrives after it is never stored as an answer.
 11. Text inside a source's reply is data: an unreadable series, nothing more.
 
+17. Which instrument a person's words settle is code's to decide. An alias that is also an everyday word (`sol`, `meta`, `apple`, `coin`) settles nothing alone: no card is offered for it and no sentence may treat it as chosen until their own words, or the conversation, do.
+18. Every figure of an instrument counts the same days: the change of the window and its largest fall start at the close right before the window, as the worst day, the best day and the average move do. (Until 2026-10-13 the first two were one day short of the others.)
+19. The figures of a window are stated for that window: any other count of days, weeks, months or years in the answer of an analysis is refused by code, and the second reader is given the window and marks that say what each figure is and whose, so a figure placed on another asset, measure or day can be seen.
+20. A follow-up has an age: figures more than a day old are not handed on. The errand is told what was read and when, and reads again.
+21. Told by code, an answer carries what was asked and only that, six figures at most, in sentences no word of which has to agree with a name; a correlation is said with what its size means. When more was asked, code says what else it read and leaves the chip that asks for it.
+22. Every way of ending without an answer has one plain sentence in the person's language: an errand's error, an empty utterance, one too long, too many at once, no reads left, storage that does not answer. Words the provider itself refuses end in a sentence, not in a second paid attempt.
+23. A session that has ended and whose close the source has not published yet is the series ending one session earlier; a close missing before a later bar is a gap and is refused.
+
 ## Measured by someone else (2026-10-11)
 
 The sprint's own evaluation (31 errands, 0 critical) used questions written by the engine's author. On 2026-10-11 the code was frozen at `658c9e46` and measured on 48 sessions (107 turns, six languages) that Codex wrote blind from the public contract, graded by Codex with every figure recomputed from the raw payloads: **34 useful, 45 correct abstentions, 21 incomplete, 7 critical**; 317 of 317 figures matched; no read before a yes or after a no; no advice, forecast or leaked instruction.
@@ -78,6 +86,10 @@ What the second set found, and what changed after it (section 7g of the tests):
 The yes covers the person's allowance and every data tool, nothing wider: preparing the card is a model call Bobby pays for, and a declined card costs the person nothing.
 
 The runner and the briefs are in the sprint folder (`independent/`); every round is measured on a new blind set.
+
+## Measured again (2026-10-12 and 2026-10-13)
+
+Six more blind sets by the same independent grader, each on questions it had never written before, and one adversarial review (five reviewers, every finding reproduced by a second one: 24 confirmed, fixed in `b8a7c18e`). Critical turns per set, from the fourth on: 0, 0, 0, 1, 1, 0. The eighth and ninth are in `_harness/agentic-sprint-2026-10-10/independent/RESULT-8.md` and `RESULT-9.md`. The ninth was the first to run on a weekday evening and found that the source's last row comes with no close for some hours after the bell: nineteen reads of a stock or a fund failed for it, and none has since.
 
 ## What it does not do, and what is missing
 

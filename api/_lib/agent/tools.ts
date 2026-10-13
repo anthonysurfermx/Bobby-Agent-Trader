@@ -278,12 +278,17 @@ export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<T
     end = standing.length ? standing.map((read) => read.bars!.at(-1)!.day).sort()[0] : null;
     start = end ? new Date(dayMs(end) - (args.windowDays - 1) * 86_400_000).toISOString().slice(0, 10) : null;
     let changed = false;
+    const sessions = new Set(standing.filter((read) => read.instrument.assetClass === 'equity').flatMap((read) => inWindow(read).map((bar) => bar.day)));
     for (const read of standing) {
       const own = inWindow(read), first = own[0]?.day;
       // A coin trades every day: its first day is the window's first. A fund may open the window on a weekend or a holiday: up to four days later.
       const reaches = first !== undefined && (dayMs(first) - dayMs(start!)) / 86_400_000 <= (read.instrument.assetClass === 'crypto' ? 0 : 4);
       if (!reaches) { refuse(read, 'missing', 'the series does not reach back the whole window'); changed = true; }
       else if (!windowSound(own, read.instrument.assetClass)) { refuse(read, 'error', 'series refused: the window has a gap or an impossible move'); changed = true; }
+      // A session the source dropped from a fund is invisible alone (a gap of up to five days is a long weekend), and
+      // the two-session change beside it would be told as one day's. Every stock and fund here trades on one exchange
+      // calendar, so the funds of a read are each other's: one that lacks a session another has is refused.
+      else if (read.instrument.assetClass === 'equity' && own.length < sessions.size) { refuse(read, 'error', 'series refused: the window lacks a session another instrument of this read has'); changed = true; }
     }
     if (!changed) break;
   }
