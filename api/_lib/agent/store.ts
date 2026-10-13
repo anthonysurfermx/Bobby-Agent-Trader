@@ -49,6 +49,8 @@ export interface AgentStore {
   cancel(owner: string, id: string, now: number): Promise<boolean>;
   refund(id: string): Promise<void>;
   remaining(owner: string, now: number): Promise<number | null>;
+  /** Removes errands nobody has touched for `keepHours`, with their steps and reads; how many went. Only a store that outlives an instance has one. */
+  purge?(now: number, keepHours: number): Promise<number>;
   reserve(budget: Budget, task: string, model: string, reserveUsd: number, now: number): Promise<Reserve>;
   dispatch(attemptId: string): Promise<void>;
   settle(attemptId: string, outcome: Outcome, actualUsd: number | null): Promise<void>;

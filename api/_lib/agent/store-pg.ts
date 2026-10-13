@@ -5,8 +5,8 @@
 //
 // The transport is injected: `rpc(name, args)` calls a function with named arguments and returns its value. In
 // production it is PostgREST with the service role (`postgrestAgentRpc`, below); in the tests it is a
-// node-postgres pool against a LOCAL scratch database. There is no production database for the engine yet: the
-// SQL is a draft and nothing applies it (README, "What is missing"), so that transport answers 404 until it is.
+// node-postgres pool against a LOCAL scratch database. In production the functions exist since the migration
+// 20261013062500_agent_engine.sql.
 // A transport failure throws: the engine's callers treat storage that cannot answer as "do not go on".
 // ============================================================
 import { bobbyRest, bobbyServiceHeaders } from '../bobby-db.js';
@@ -77,4 +77,5 @@ export class PgAgentStore implements AgentStore {
     await this.rpc('agent_settle', { p_attempt: attemptId, p_outcome: outcome, p_actual: actualUsd !== null && Number.isFinite(actualUsd) ? actualUsd : null });
   }
   async committed(partition: string): Promise<number> { return Number(await this.rpc('agent_committed', { p_partition: partition })); }
+  async purge(now: number, keepHours: number): Promise<number> { return Number(await this.rpc('agent_purge', { p_now: at(now), p_keep_hours: Math.round(keepHours), p_limit: 500 })) || 0; }
 }

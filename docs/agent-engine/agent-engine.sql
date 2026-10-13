@@ -1,12 +1,15 @@
--- DRAFT. NOT A MIGRATION. Nothing applies this file to any shared or production database.
--- It is the contract of AgentStore (api/_lib/agent/store.ts) as Postgres: one function per method, each one
--- transaction. scripts/test-agent-engine-pg.mts runs it against a LOCAL scratch database and checks the same
--- invariants as the memory store, with real concurrent transactions. Before it becomes a migration the owner
--- decides: how long a person's question is kept (agent_tasks.question), and the product's own allowance.
+-- The agent engine's storage: the contract of AgentStore (api/_lib/agent/store.ts) as Postgres, one function per
+-- method, each one transaction. Applied to production as the migration
+-- supabase/bobby-protocol/supabase/migrations/20261013062500_agent_engine.sql on 2026-10-13 (same statements: a test
+-- compares the two files). scripts/test-agent-engine-pg.mts runs this file against a LOCAL scratch database and
+-- checks the same invariants as the memory store, with real concurrent transactions.
 -- All tables are for the service role only.
--- Applying it to a database in use: statement by statement, or in a quiet moment. Applied in ONE transaction while
--- errands are being cancelled it can deadlock with them (found on 2026-10-11 with a second session cancelling the whole
--- time: one side is rolled back and can be retried; statement by statement, 400 of 400 cancels went through).
+-- What is kept, and for how long: a person's question, the steps and the answer stay until the errand has been idle
+-- for 24 hours, then agent_purge removes them (with the read they used); the money ledger (agent_attempts: no text,
+-- no owner) stays 90 days.
+-- Applying it AGAIN to a database in use: statement by statement, or in a quiet moment. Applied in ONE transaction
+-- while errands are being cancelled it can deadlock with them (found on 2026-10-11 with a second session cancelling
+-- the whole time: one side is rolled back and can be retried; statement by statement, 400 of 400 cancels went through).
 
 create table if not exists agent_tasks (
   id text primary key,
@@ -23,6 +26,7 @@ create table if not exists agent_tasks (
   unique (owner, request_id)
 );
 create index if not exists agent_tasks_address_day on agent_tasks (address, created_at);
+create index if not exists agent_tasks_created on agent_tasks (created_at);
 create table if not exists agent_steps (
   task text not null references agent_tasks(id) on delete cascade,
   n integer not null, at timestamptz not null,
@@ -268,6 +272,27 @@ begin
   where id = p_attempt and state in ('reserved', 'dispatched');
 end $$;
 
+-- ---------- what is kept ----------
+-- An errand idle for p_keep_hours (finished, or left waiting) goes, with its steps and its read: nothing a person
+-- asked stays longer. Tasks someone is running or has locked are skipped, never waited for. The money ledger holds no
+-- text and no owner: it goes after 90 days. Returns how many errands went.
+create or replace function agent_purge(p_now timestamptz, p_keep_hours integer, p_limit integer) returns integer language plpgsql set search_path = public, pg_temp as $$
+declare v_n integer;
+begin
+  if p_now is null or p_keep_hours is null or p_keep_hours < 1 or p_limit is null or p_limit < 1 then return 0; end if;
+  with gone as (
+    select t.id from agent_tasks t
+    where t.created_at < p_now - make_interval(hours => p_keep_hours)
+      and coalesce((select max(s.at) from agent_steps s where s.task = t.id), t.created_at) < p_now - make_interval(hours => p_keep_hours)
+      and (t.lease_until is null or t.lease_until < p_now)
+    order by t.created_at limit p_limit for update of t skip locked
+  )
+  delete from agent_tasks t using gone where t.id = gone.id;
+  get diagnostics v_n = row_count;
+  delete from agent_attempts where at < p_now - interval '90 days';
+  return v_n;
+end $$;
+
 -- ---------- who may call ----------
 -- Nobody but the service role. Supabase grants EXECUTE and table rights to anon and authenticated by default, so
 -- revoking from PUBLIC alone is not enough (found in the audit of 2026-09-28): each role is named. On a database
@@ -292,6 +317,5 @@ begin
   end if;
 end $$;
 
--- Still to write before this is a migration: a purge of finished tasks after the retention the owner decides, and
--- a job that labels as `unknown` an attempt left `dispatched` by a function that was killed (it already holds its
--- whole reservation and already blocks a second attempt; only its name is wrong).
+-- Still to write: a job that labels as `unknown` an attempt left `dispatched` by a function that was killed (it
+-- already holds its whole reservation and already blocks a second attempt; only its name is wrong).

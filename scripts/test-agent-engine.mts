@@ -1013,7 +1013,58 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
     eq([endless.statusCode, endless.body.error.code, endless.body.error.message], [400, 'question_too_long', 'Eso es demasiado largo para tomarlo de una vez. Dime lo principal en unas pocas frases.'], 'a dictation that ran on past what one errand holds is told so, in one sentence');
     const malformed = await send('POST', { op: 'ask', version: 1 });
     eq([malformed.statusCode, malformed.body.error.code, Object.keys(malformed.body.error)], [400, 'invalid_request', ['code']], '…and a request the app built wrong stays a bare code: that one is not the person\'s to read');
-  } finally { globalThis.fetch = realFetch; __setAgentTestDeps(null); delete process.env.BOBBY_AGENT_ENGINE; delete process.env.BOBBY_AGENT_STORE; }
+    // Open to everyone (2026-10-13): one address asking faster than a person can is told to wait, in its language,
+    // before anything is stored or asked of a provider; looking at an errand is never counted.
+    const { __setAgentHurry, agentReadsPerDay } = await import('../api/agent-task.ts');
+    __setAgentHurry(2);
+    const quick = [];
+    for (const n of [1, 2, 3]) quick.push(await send('POST', askBody({ requestId: `5a5a5a5a-0000-4000-8000-0000000000c${n}`, question: ' ', language: 'fr' })));
+    const look = await send('GET', null, undefined, { id: 'task_' + 'b'.repeat(32) });
+    eq([quick.map((r) => r.statusCode), quick[2].body.error.code, quick[2].headers['retry-after'], typeof quick[2].body.error.message, look.statusCode], [[400, 400, 429], 'too_many_errands', '60', 'string', 404],
+      'the third request of a minute from one address is refused with a sentence and a time to wait; a look at an errand is not counted');
+    __setAgentHurry(Number.MAX_SAFE_INTEGER);
+    eq([agentReadsPerDay({}), agentReadsPerDay({ BOBBY_AGENT_READS_PER_DAY: '3' }), agentReadsPerDay({ BOBBY_AGENT_READS_PER_DAY: '0' }), agentReadsPerDay({ BOBBY_AGENT_READS_PER_DAY: '21' }), agentReadsPerDay({ BOBBY_AGENT_READS_PER_DAY: '2.5' }), agentReadsPerDay({ BOBBY_AGENT_READS_PER_DAY: 'many' })], [6, 3, 6, 6, 6, 6],
+      'a day\'s reads are the owner\'s setting when it is a whole number from 1 to 20, and six otherwise');
+    // The pilot (production since 2026-10-13): the door exists only for the people on the owner's list. Everyone else
+    // gets the very answer of a door that is off, and nothing is stored, called or said about a list.
+    const { agentPilot, agentEngineMode } = await import('../api/agent-task.ts');
+    const { deviceHash } = await import('../api/_lib/access.ts');
+    const hashOf = (device: string) => deviceHash({ headers: { 'x-bobby-device': device } } as never)!;
+    const ME = '0f8fad5b-d9cb-469f-a165-70867728950e';
+    eq([agentEngineMode({}), agentEngineMode({ BOBBY_AGENT_ENGINE: 'pilot' }), agentEngineMode({ BOBBY_AGENT_ENGINE: 'on' }), agentEngineMode({ BOBBY_AGENT_ENGINE: 'ON' }), agentEngineMode({ BOBBY_AGENT_ENGINE: 'true' })], ['off', 'pilot', 'on', 'off', 'off'], 'the door is off unless the setting is exactly "pilot" or "on"');
+    const parsed = agentPilot({ BOBBY_AGENT_PILOT: ` id:${ME.toUpperCase()}, install:${hashOf('device-pilot-0000000001')}\n me@example.com install:short id:not-a-uuid * ` });
+    eq([[...parsed.ids], [...parsed.installs]], [[ME], [hashOf('device-pilot-0000000001')]], 'the list takes accounts and installs in their exact shapes; an email, a wildcard or a typo is nobody');
+    process.env.BOBBY_AGENT_ENGINE = 'pilot'; process.env.BOBBY_AGENT_PILOT = `install:${hashOf('device-pilot-0000000001')} id:${ME}`;
+    fetched = 0;
+    const stranger = await send('POST', askBody({ requestId: '5a5a5a5a-0000-4000-8000-0000000000d1' }));
+    const strangerLooks = await send('GET', null, undefined, { id: 'task_' + 'c'.repeat(32) });
+    eq([stranger.statusCode, stranger.body, strangerLooks.statusCode, fetched], [404, { error: 'Not found' }, 404, 0], 'pilot: a person who is not on the list gets the answer of a door that is off, and nothing is fetched');
+    const member = await send('POST', askBody({ requestId: '5a5a5a5a-0000-4000-8000-0000000000d2', question: ' ' }), 'device-pilot-0000000001');
+    eq([member.statusCode, member.body.error.code], [400, 'empty_question'], 'pilot: an install on the list finds the door');
+    // An account on the list, as the sign-in service vouches for it; a session nobody vouches for is nobody.
+    const withSession = async (device: string) => { const res = response(); await handler({ method: 'POST', query: {}, headers: { origin: 'https://bobbyprotocol.xyz', 'x-forwarded-for': '10.50.0.9', 'x-bobby-device': device, authorization: 'Bearer some.session.token' }, body: askBody({ requestId: '5a5a5a5a-0000-4000-8000-0000000000d3', question: ' ' }) } as never, res as never); return res; };
+    eq((await withSession('device-other-00000000001')).statusCode, 404, 'pilot: a session the sign-in service cannot vouch for is not on the list (it fails closed)');
+    const noNetwork = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/auth/v1/user')) return new Response(JSON.stringify({ id: '7c9e6679-7425-40de-944b-e07fc1f90ae7', email: 'owner@example.com', app_metadata: { provider: 'google' } }), { status: 200, headers: { 'content-type': 'application/json' } });
+      if (url.includes('/bobby_identities')) return new Response(JSON.stringify([{ id: ME, auth_user_id: '7c9e6679-7425-40de-944b-e07fc1f90ae7', wallet_address: null }]), { status: 200, headers: { 'content-type': 'application/json' } });
+      throw new Error(`unexpected ${url}`);
+    }) as typeof fetch;
+    try {
+      const owner = await withSession('device-other-00000000001');
+      eq([owner.statusCode, owner.body.error.code], [400, 'empty_question'], 'pilot: the account on the list finds the door from any install');
+      process.env.BOBBY_AGENT_PILOT = `id:${ME.replace(/.$/, '0')}`;
+      eq((await withSession('device-other-00000000001')).statusCode, 404, 'pilot: another account does not');
+    } finally { globalThis.fetch = noNetwork; }
+    process.env.BOBBY_AGENT_ENGINE = 'on'; delete process.env.BOBBY_AGENT_PILOT;
+  } finally { globalThis.fetch = realFetch; __setAgentTestDeps(null); delete process.env.BOBBY_AGENT_ENGINE; delete process.env.BOBBY_AGENT_STORE; delete process.env.BOBBY_AGENT_PILOT; }
+  // The migration is the contract, statement for statement: what the database tests run is what production got.
+  {
+    const { readFileSync } = await import('node:fs');
+    const body = (file: string) => { const text = readFileSync(new URL(file, import.meta.url), 'utf8'); return text.slice(text.indexOf('create table if not exists agent_tasks (')); };
+    ok(body('../docs/agent-engine/agent-engine.sql') === body('../supabase/bobby-protocol/supabase/migrations/20261013062500_agent_engine.sql') && body('../docs/agent-engine/agent-engine.sql').includes('create or replace function agent_purge('), 'the migration applied to production holds the same statements as the contract the database tests run, the purge among them');
+  }
 }
 
 // ---------- 9. the examples a client builds to are replies of this door ----------
