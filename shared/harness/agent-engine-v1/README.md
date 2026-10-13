@@ -1,6 +1,8 @@
-# Agent engine · door contract v1 (draft)
+# Agent engine · door contract v1 (pilot)
 
-`/api/agent-task`, off unless `BOBBY_AGENT_ENGINE=on`. No app uses it yet. The JSON files here are **real replies** of the engine on 2026-10-11 (`claude-sonnet-5-5`, OKX and Yahoo), kept as examples of the shape; the numbers in them are that day's.
+`/api/agent-task`. In production since 2026-10-13 **for a private pilot**: the door exists only for the people on the owner's list, and answers 404 `{"error":"Not found"}` to everyone else, exactly as when it is off. No app uses it yet.
+
+**How a client knows:** it does not ask. A client that gets 404 from this door hides everything of the errand and does what it did before (the companion and the desk); it must not tell the person that something exists and is closed to them. The answer can differ between two people on the same build, and for one person between two days. The JSON files here are **real replies** of the engine on 2026-10-11 (`claude-sonnet-5-5`, OKX and Yahoo), kept as examples of the shape; the numbers in them are that day's.
 
 They were recorded at `658c9e46`. Since the independent evaluation of 2026-10-11 the day-to-day figure is `move_*` (the average size of the daily changes) and no longer `volatility_*` (a standard deviation), and a coin read beside a stock is measured on its own days: the shape is the same, those ids and values are not. They are recorded again when the fix round has been measured.
 
@@ -36,7 +38,7 @@ Every reply is the task's view:
 | `response-cannot-establish.json` | "¿Y cuál tiene más concentración?": what cannot be established here, said. |
 | `response-single-instrument.json` | "¿Cómo le fue a Nvidia…?": one instrument, 60 days. |
 
-Errors of the door itself: 404 (off, or a task that is not this owner's), 400 `invalid_request`, 409 (`request_id_reused`, `approval_mismatch`, `not_waiting`, `not_possible`), 429 (`reads_limit`, `too_many_errands`), 503 (`engine_storage_unavailable`, `engine_unavailable`).
+Errors of the door itself: 404 (off, not on the pilot's list, or a task that is not this owner's), 400 `invalid_request`, 409 (`request_id_reused`, `approval_mismatch`, `not_waiting`, `not_possible`), 429 (`reads_limit`, `too_many_errands`), 503 (`engine_storage_unavailable`, `engine_unavailable`).
 
 ## Since 2026-10-13 (the example files predate this; re-record them before a client is written against them)
 
