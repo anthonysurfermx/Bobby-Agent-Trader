@@ -14,7 +14,7 @@ delete process.env.RESEND_API_KEY;
 
 const deferred: Promise<unknown>[] = [];
 (globalThis as Record<symbol, unknown>)[Symbol.for('@vercel/request-context')] = { get: () => ({ waitUntil: (p: Promise<unknown>) => { deferred.push(p); } }) };
-const { completeJson, callLlm, streamText, modelCost, modelPrice, MODEL_PRICES, LlmIncompleteError } = await import('../api/_lib/llm.ts');
+const { completeJson, callLlm, streamText, modelCost, modelPrice, MODEL_PRICES, LlmIncompleteError, withRoom } = await import('../api/_lib/llm.ts');
 const { appTextModel } = await import('../api/_lib/app-model.ts');
 
 let checks = 0;
@@ -142,7 +142,17 @@ try {
   usage = [];
   await completeJson(spec, 's', 'u', schema, { endpoint: 'test', usage });
   eq([usage[0].tokensIn, usage[0].tokensCached, usage[0].tokensOut], [100101, 100001, 20], 'cache creation and cache reads retain all billed input');
-  close(usage[0].usd, .00510005, 'structured cache usage selects the high tier');
+  close(usage[0].usd, .0051013, 'structured cache usage selects the high tier, and the ten tokens written to the cache cost a quarter more than plain input');
+  // Prompt caching (2026-10-11): every Anthropic call marks its instructions as reusable, and the ledger prices a write.
+  eq(calls.at(-1)!.body.system, [{ type: 'text', text: 's', cache_control: { type: 'ephemeral' } }], 'a structured request marks its instructions too');
+  close(modelCost('claude-sonnet-5-5', 1000, 0, 0, 1000), .0045, 'a thousand tokens written to the cache cost a quarter more than a thousand sent plainly');
+  close(modelCost('claude-sonnet-5-5', 50, 900, 0), .00019, 'and a thousand read from it cost a twentieth');
+  ok(modelCost('claude-sonnet-5-5', 100, 0, 0, 900) > modelCost('claude-sonnet-5-5', 1000, 0, 0) && modelCost('claude-sonnet-5-5', 100, 900, 0) < modelCost('claude-sonnet-5-5', 1000, 0, 0) / 3, 'so the ledger never under-reports a call that wrote, and shows the saving of one that read');
+  process.env.BOBBY_PROMPT_CACHE = 'off';
+  reset(() => json(claudeData('{"a":1}', 'end_turn', { input_tokens: 90, output_tokens: 20 })));
+  await completeJson(spec, 's', 'u', schema, { endpoint: 'test', usage: [] });
+  eq(calls.at(-1)!.body.system, 's', 'BOBBY_PROMPT_CACHE=off sends the plain instructions again');
+  delete process.env.BOBBY_PROMPT_CACHE;
 
   // Legacy caller aliases cannot defeat the app default. A retried attempt keeps its endpoint.
   reset(() => json({ error: { type: 'api_error' } }, 500), claudeOk('hi'));
@@ -153,7 +163,7 @@ try {
   eq(calls.map(call => call.body.model), ['claude-haiku-5-5', 'claude-haiku-5-5'], 'both attempts select the central Haiku model');
   const request = calls[0];
   eq([request.url, request.headers['x-api-key'], request.headers['anthropic-version']], ['https://api.anthropic.com/v1/messages', 'test-anthropic', '2023-06-01'], 'Anthropic endpoint and headers');
-  eq([request.body.max_tokens, request.body.system, request.body.messages, request.body.output_config], [4096, base.system, [{ role: 'user', content: base.user }], { effort: 'low' }], 'normal text sends the Anthropic system/message contract');
+  eq([request.body.max_tokens, request.body.system, request.body.messages, request.body.output_config], [4096, [{ type: 'text', text: base.system, cache_control: { type: 'ephemeral' } }], [{ role: 'user', content: base.user }], { effort: 'low' }], 'normal text sends the Anthropic system/message contract, the instructions marked as reusable');
   ok(!('temperature' in request.body) && !('top_p' in request.body) && !('stream' in request.body), 'normal text sends no sampling or stream parameters');
   eq(request.body.thinking, { type: 'disabled' }, 'ordinary low-effort text reserves its short cap for the answer');
   reset(claudeOk('legacy Claude caller'));
@@ -314,7 +324,7 @@ try {
   eq(await streamText({ ...streamBase, messages, maxTokens: 1234, onDelta: text => { deltas.push(text); } }), { text: 'héllo world', toolInput: null, provider: 'anthropic', model: 'claude-haiku-5-5' }, 'fragmented UTF-8/CRLF stream is complete');
   eq(deltas, ['héllo ', 'world'], 'only visible text deltas reach the caller');
   rows = await settledLedger();
-  eq([calls[0].body.model, calls[0].body.messages, calls[0].body.system, calls[0].body.max_tokens, calls[0].body.stream, calls[0].body.output_config], ['claude-haiku-5-5', messages, streamBase.system, 1234, true, { effort: 'low' }], 'stream keeps the conversation, system, cap and Anthropic effort');
+  eq([calls[0].body.model, calls[0].body.messages, calls[0].body.system, calls[0].body.max_tokens, calls[0].body.stream, calls[0].body.output_config], ['claude-haiku-5-5', messages, [{ type: 'text', text: streamBase.system, cache_control: { type: 'ephemeral' } }], 1234, true, { effort: 'low' }], 'stream keeps the conversation, system, cap and Anthropic effort');
   ok(!('temperature' in calls[0].body) && !('top_p' in calls[0].body), 'stream sends no sampling parameters');
   eq(calls[0].body.thinking, { type: 'disabled' }, 'ordinary low-effort streaming reserves its cap for visible output');
   eq(rows.map(row => [row.surface, row.tokens_in, row.tokens_cached, row.tokens_out, row.ok, row.stop]), [['openclaw-chat', 107, 5, 3, true, 'end_turn']], 'stream usage combines start/cache and terminal output');
@@ -408,6 +418,12 @@ try {
 
   ok(!JSON.stringify(serviceWrites).includes(privateMarker) && !JSON.stringify(logs).includes(privateMarker), 'usage, health writes and logs omit private prompts, thinking and provider payloads');
   ok(!/test-anthropic|test-openai/.test(JSON.stringify(serviceWrites) + JSON.stringify(logs)), 'observability does not store synthetic provider keys');
+  // A budget is a ceiling on cost, not the length of the answer: the daily cycle died five days in a row on a reply cut at 350 tokens.
+  const rooms: number[] = [];
+  eq([await withRoom(async (room) => { rooms.push(room); return 'whole'; }, 350), rooms.splice(0)], ['whole', [700]], 'a call gets twice its nominal budget');
+  eq([await withRoom(async (room) => { rooms.push(room); if (room < 1400) throw new LlmIncompleteError('cut'); return 'whole'; }, 350), rooms.splice(0)], ['whole', [700, 1400]], 'a reply that is still cut is asked for once more, with twice the room');
+  await rejects(withRoom(async (room) => { rooms.push(room); throw new LlmIncompleteError('cut'); }, 350), 'cut twice is the caller\'s failure: no third call', error => error instanceof LlmIncompleteError && rooms.splice(0).join() === '700,1400');
+  await rejects(withRoom(async (room) => { rooms.push(room); throw new Error('provider down'); }, 350), 'any other failure is not retried here', error => error instanceof Error && error.message === 'provider down' && rooms.splice(0).join() === '700');
   console.log(`llm-ledger: ${checks} checks passed`);
 } finally {
   await settledLedger();

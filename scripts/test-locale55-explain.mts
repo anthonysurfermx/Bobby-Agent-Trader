@@ -62,6 +62,8 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   }
   assert.ok(url === 'https://api.anthropic.com/v1/messages' || url === 'https://api.openai.com/v1/chat/completions', `Unexpected external request: ${url}`);
   const body = JSON.parse(String(init?.body));
+  // The instructions travel as one cached block (prompt caching, llm.ts); these checks read their text.
+  if (body && Array.isArray(body.system)) body.system = body.system.map((block: { text?: string }) => block.text ?? '').join('');
   requests.push({ ...body, _url: url, _signal: init?.signal });
   if (failProvider) return new Response('test-only provider unavailable', { status: 503 });
   if (url === 'https://api.anthropic.com/v1/messages') {

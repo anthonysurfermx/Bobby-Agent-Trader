@@ -70,11 +70,20 @@ function resolutionOf(obj: Record<string, unknown>): Resolution | null {
 /** A whole sentence that only resembles a ticker ("Tengo 1,000 pesos al mes…" → MENGO) is a question, not an asset. */
 export const readsAsAQuestion = (query: string, found: Resolution) => found.needsConfirmation && found.fuzzy && query.trim().split(/\s+/).length >= 4;
 
+/**
+ * The exchange still on the person's screen (contract v1, `previous`): their last question and what Bobby answered,
+ * so that "give me an example" refers to something. `offered` when that answer was an offer to look at an asset
+ * that the person has not taken. One exchange, never a history; it lives in memory and goes with the screen.
+ */
+export interface CompanionExchange { question: string; reply: string; offered?: string }
+
 export type CompanionOutcome =
   | { kind: 'explanation'; text: string; /** The next question the person could ask (the reply's follow-up), or null. */ next: string | null }
-  /** The question was about the look-alike after all: the desk asks the person to confirm it. */
-  | { kind: 'desk' }
-  | { kind: 'limit'; message: string };
+  /** The question was about the look-alike after all: the desk asks the person to confirm it. `text` is the offer's own sentence. */
+  | { kind: 'desk'; text: string | null; symbol: string | null }
+  | { kind: 'limit'; message: string }
+  /** The pilot is on and this turn got no answer: the server's own sentence when it sent one, and whether asking again can help. */
+  | { kind: 'unavailable'; message: string | null; retry: boolean };
 
 // Whether the pilot is on, asked once per page load without sending anything: the endpoint answers 404 to
 // every method while it is off and 405 to a GET once it is on. Off, no question ever leaves for it.
@@ -88,11 +97,11 @@ function companionOn(): Promise<boolean> {
 
 /**
  * The companion's answer to a question that names no asset (POST /api/companion-turn, contract v1 in
- * shared/harness/companion-contract-v1). Null while the pilot is off or when it could not answer: the desk
- * then does what it did before. Only the question, the language, the install id and, when the search offered
- * a look-alike, that guess are sent.
+ * shared/harness/companion-contract-v1). Null while the pilot is off (the desk then does what it did before) or
+ * when the question was withdrawn; "unavailable" when the pilot is on and this turn got no answer. Only the question, the language, the install id, the exchange still on screen
+ * and, when the search offered a look-alike, that guess are sent.
  */
-export async function companionTurn(question: string, signal: AbortSignal, candidate?: { symbol: string; name: string }): Promise<CompanionOutcome | null> {
+export async function companionTurn(question: string, signal: AbortSignal, candidate?: { symbol: string; name: string }, previous?: CompanionExchange | null): Promise<CompanionOutcome | null> {
   try {
     if (!(await companionOn()) || signal.aborted) return null;
     const { language, locale } = marketContext();
@@ -100,16 +109,25 @@ export async function companionTurn(question: string, signal: AbortSignal, candi
     const { 'x-bobby-device': device = '' } = await accessHeaders();
     const { data } = await deskJson<Record<string, any>>('/api/companion-turn', {
       signal, method: 'POST', headers: { 'Content-Type': 'application/json', 'x-bobby-device': device, 'x-bobby-platform': 'web' },
-      body: JSON.stringify({ version: 1, requestId: crypto.randomUUID(), question: question.slice(0, 1200), language, locale, ...(candidate ? { candidate: { symbol: candidate.symbol, name: candidate.name.slice(0, 60) } } : {}) }),
+      body: JSON.stringify({
+        version: 1, requestId: crypto.randomUUID(), question: question.slice(0, 1200), language, locale, ...(candidate ? { candidate: { symbol: candidate.symbol, name: candidate.name.slice(0, 60) } } : {}),
+        ...(previous && previous.question.trim() && previous.reply.trim() ? { previous: { question: previous.question.trim().slice(0, 600), reply: previous.reply.trim().slice(0, 700), ...(previous.offered ? { offered: previous.offered } : {}) } } : {}),
+      }),
     }, 32_000);
     if (data?.kind === 'explanation' && typeof data.reply?.text === 'string' && data.reply.text) {
       const next = data.reply['followUp'];
       return { kind: 'explanation', text: data.reply.text, next: typeof next === 'string' && next ? next : null };
     }
-    if (data?.kind === 'desk_offer') return { kind: 'desk' };
+    if (data?.kind === 'desk_offer') return { kind: 'desk', text: typeof data.reply?.text === 'string' && data.reply.text ? data.reply.text : null, symbol: typeof data.nextAction?.symbol === 'string' ? data.nextAction.symbol : null };
     if (data?.kind === 'error' && data.error?.code === 'orientation_limit' && typeof data.error.message === 'string') return { kind: 'limit', message: data.error.message };
-  } catch { /* off, offline or not JSON */ }
-  return null;
+    if (signal.aborted) return null;
+    // Any other refusal comes with the server's sentence in the person's language; a reply of no known shape has none.
+    const said = data?.kind === 'error' && typeof data.error?.message === 'string' && data.error.message ? data.error.message : null;
+    return { kind: 'unavailable', message: said, retry: said ? data.error.retryable !== false : true };
+  } catch {
+    // Offline, timed out or not JSON, with the pilot on: the person asked something to understand and is told so.
+    return signal.aborted ? null : { kind: 'unavailable', message: null, retry: true };
+  }
 }
 
 export interface Answer {

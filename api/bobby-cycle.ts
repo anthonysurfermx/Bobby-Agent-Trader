@@ -15,7 +15,7 @@ import { externalEffectsAllowed, noteSuppressedEffect } from './_lib/effects.js'
 import { evaluateCommitPolicy, assessCommitReceipt, digestKind } from './_lib/commit-policy.js';
 import { recordAuthHeaders } from './_lib/record-auth.js';
 import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-events.js';
-import { callLlm } from './_lib/llm.js';
+import { callLlm, withRoom } from './_lib/llm.js';
 import { appTextModel, hasAppTextBackend } from './_lib/app-model.js';
 import { internalAuthHeaders, requireInternalAuth, requireOpsAuth } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKeyOptional } from './_lib/bobby-db.js';
@@ -106,16 +106,20 @@ async function sbPatch(table: string, filters: string, data: Record<string, unkn
 // ---- App text helper ----
 
 // Thin adapter over _lib/llm.ts (retry/backoff/abort live there).
+//
+// The budgets at the call sites were set for the model the cycle used until 2026-10-07. The model that replaced it
+// writes longer: its first post was cut at the budget, a cut post is (rightly) no post, and the whole cycle failed on
+// that first call every day from 2026-10-08 to 2026-10-12 (bobby_llm_usage: stop = max_tokens, five of five). The
+// length of a post is the prompt's to set; the budget is only a ceiling on cost: see withRoom in _lib/llm.ts.
 async function callClaude(system: string, userMsg: string, maxTokens: number, timeoutMs = 25000): Promise<string> {
-  const result = await callLlm({
+  return withRoom(async (room) => (await callLlm({
     endpoint: 'bobby-cycle',
     system,
     user: userMsg,
     model: appTextModel(),
-    maxTokens,
+    maxTokens: room,
     timeoutMs,
-  });
-  return result.text;
+  })).text, maxTokens);
 }
 
 // ---- Public output guard ----
@@ -176,19 +180,19 @@ const VERDICT_SCHEMA = {
 };
 
 async function callStructuredVerdict(system: string, userMsg: string, timeoutMs = 30000): Promise<StructuredVerdict> {
-  const result = await callLlm({
+  const result = await withRoom((room) => callLlm({
     endpoint: 'bobby-cycle',
     system,
     user: userMsg,
     model: appTextModel(),
-    maxTokens: 500,
+    maxTokens: room,
     timeoutMs,
     tool: {
       name: 'submit_verdict',
       description: 'Submit your trading verdict. This is MANDATORY — you must call this function.',
       parameters: VERDICT_SCHEMA,
     },
-  });
+  }), 500);
 
   if (!result.toolInput) {
     throw new Error('No tool call in structured verdict response');

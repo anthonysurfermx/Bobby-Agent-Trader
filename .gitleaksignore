@@ -1,3 +1,8 @@
 # Supabase publishable (public, shipped in the web bundle) key once inlined in the paired-eval script; removed in the next commit.
 1dfbc0fa366f9d315e43ae2917918e386dc1994e:scripts/eval/desk-levels-paired.mts:generic-api-key:24
 1dfbc0fa366f9d315e43ae2917918e386dc1994e:scripts/eval/desk-levels-paired.mts:generic-api-key:25
+# The name of a localStorage key ("bobby.trader-land.gate-a.v1"), not a credential: the Trader Land gate harness of
+# 2026-09-02, long since removed. The weekly full-history scan failed on these three from 2026-09-07 to 2026-10-12.
+a6d27dd4764cfa86261d0495f017dac38002649d:src/pages/TraderLandGatePage.tsx:generic-api-key:9
+6a0f44affcca71470cce30ed8447f89af5d819da:src/pages/TraderLandGatePage.tsx:generic-api-key:9
+c237410fd49cb2deec3156acf206f7a6c6782e43:ios/Bobby/Sources/TraderLandGateHarness.swift:generic-api-key:293

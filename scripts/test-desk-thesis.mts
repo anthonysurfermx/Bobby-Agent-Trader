@@ -56,6 +56,8 @@ function mock(reply: Reply) {
     const raw = init?.body ? String(init.body) : '';
     let body: any = null;
     try { body = raw ? JSON.parse(raw) : null; } catch { body = raw; }
+    // The instructions travel as one cached block (prompt caching, llm.ts); these checks read their text.
+    if (body && Array.isArray(body.system)) body.system = body.system.map((block: { text?: string }) => block.text ?? '').join('');
     const call: Call = { url: String(input), raw, body, headers: Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>).map(([k, v]) => [k.toLowerCase(), v])), method: init?.method ?? 'GET' };
     calls.push(call);
     return reply(call);

@@ -1,4 +1,4 @@
-import { bobbyDbUrl, bobbyServiceKeyOptional } from './bobby-db.js';
+import { bobbyDbUrlOptional, bobbyServiceKeyOptional } from './bobby-db.js';
 import { writeFreezeSync } from './control.js';
 // ============================================================
 // Unified Harness Event Logger
@@ -7,9 +7,12 @@ import { writeFreezeSync } from './control.js';
 // powers the Finance Harness Console.
 // ============================================================
 
-const SB_URL = bobbyDbUrl();
-const SB_KEY = bobbyServiceKeyOptional();
-if (!SB_KEY) console.error('[harness-events] service-role key missing — harness events will not be recorded');
+// Read when the module loads, and never thrown from here: 44 functions import this file, and one that cannot load
+// answers nothing at all (FUNCTION_INVOCATION_FAILED on every preview, which has no database settings). Without a
+// key or a URL no event is recorded, and the line below says so.
+const SB_URL = bobbyDbUrlOptional();
+const SB_KEY = SB_URL ? bobbyServiceKeyOptional() : '';
+if (!SB_KEY) console.error('[harness-events] database settings missing — harness events will not be recorded');
 
 // ── Harness Verdict ──
 // Standard decision object for all Bobby flows.

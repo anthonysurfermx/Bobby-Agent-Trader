@@ -459,6 +459,19 @@ try {
     providers: { openai: { lastFailure: { at: '2026-10-01T10:27:00Z', stop: 'http_429', surface: 'desk' } }, anthropic: { lastOk: '2026-10-01T17:30:00Z' } } } }, growth: {}, integrations: {}, searchConsole: {} });
   eq(healedRun.find((i) => i.id === 'desk-failures')?.level, 'critical', 'a successful provider probe does not prove a completed desk response');
 
+  // A surface whose every model call failed in 48 hours is down, whatever its week looks like (the daily cycle, five days unseen).
+  const { foldRecentCalls } = await import('../api/_lib/admin.ts');
+  const folded = foldRecentCalls([
+    { surface: 'bobby-cycle', ok: false, stop: 'max_tokens', created_at: '2026-10-02T12:00:51Z' }, { surface: 'bobby-cycle', ok: false, stop: 'max_tokens', created_at: '2026-10-01T12:00:51Z' },
+    { surface: 'companion', ok: true, stop: 'end_turn', created_at: '2026-10-02T08:00:00Z' }, { surface: 'companion', ok: false, stop: 'http_529', created_at: '2026-10-02T07:00:00Z' },
+    { surface: 'explain', ok: false, stop: 'http_500', created_at: '2026-10-02T06:00:00Z' }, { surface: 'desk', ok: false, stop: 'http_500', created_at: '2026-10-02T05:00:00Z' }, { surface: 'desk', ok: false, stop: 'http_500', created_at: '2026-10-02T04:00:00Z' }]);
+  eq(folded.find((row) => row.surface === 'bobby-cycle'), { surface: 'bobby-cycle', calls: 2, failures: 2, lastOkAt: null, lastFailureAt: '2026-10-02T12:00:51Z', lastStop: 'max_tokens' }, 'the ledger folds by surface: calls, failures, the last of each and why');
+  const down = buildInsights({ days: 7, now: NOW, overview: { llm: { recentBySurface: folded } }, growth: {}, integrations: {}, searchConsole: {} });
+  const cycleDown = down.find((i) => i.id === 'surface-down-bobby-cycle');
+  ok(cycleDown?.level === 'critical' && /El ciclo diario/.test(cycleDown.title) && /2 de 2/.test(cycleDown.title) && /max_tokens/.test(cycleDown.detail) && /límite de tokens/.test(cycleDown.action), 'a job whose every call failed in 48 hours is a critical finding that says what broke and what to do');
+  eq(down.filter((i) => i.id.startsWith('surface-down-')).map((i) => i.id), ['surface-down-bobby-cycle'], 'one answer in the window, a single failed call, or the desk (which has its own rule) raise nothing here');
+  ok(!buildInsights({ days: 7, now: NOW, overview: { llm: {} }, growth: {}, integrations: {}, searchConsole: {} }).some((i) => i.id.startsWith('surface-down-')), 'without the recent figures there is no such finding');
+
   // ---------- dev dashboard fixture follows the same durable acknowledgement ----------
   const { mockAdminFetch } = await import('../src/components/admin/bobby/mock.ts');
   const queryUsers = new URLSearchParams({ view: 'users', limit: '200' });

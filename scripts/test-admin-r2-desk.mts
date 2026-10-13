@@ -102,6 +102,8 @@ function mock(s: Scenario) {
   calls = []; unexpected = []; release = null; outcomeAnswered = false;
   globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     const call: Call = { url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null, method: init?.method ?? 'GET' };
+    // The instructions travel as one cached block (prompt caching, llm.ts); these checks read their text.
+    if (call.body && Array.isArray(call.body.system)) call.body.system = call.body.system.map((block: { text?: string }) => block.text ?? '').join('');
     calls.push(call);
     const { url } = call;
     // The funnel RPC is held until the test releases it: the handler must already have answered the reader.

@@ -30,7 +30,14 @@ const MIGRATIONS = [
   '20261002132827_admin_grant_idempotency.sql',
   '20261002140326_pro_gift_balance_visibility.sql',
 ];
-const pool = new pg.Pool({ connectionString: url, max: 8 });
+// The dashboard's days are the session's days (date_trunc('day', now())), and this fixture is built from "ninety
+// minutes ago", "an hour ago", "thirty minutes ago". On a database whose day turns at 00:00 UTC, in the first ninety
+// minutes of a UTC day those fall on yesterday and "two accounts today" reads one (PR #191 went red for it at 00:43
+// UTC, and so does any push in the Mexican evening). The fixture's sessions run in the zone where it is midday now:
+// every relative time keeps its distance, and no day boundary is within eleven hours of the run.
+const middayOffset = 12 - new Date().getUTCHours();
+const MIDDAY_ZONE = middayOffset === 0 ? 'Etc/GMT' : `Etc/GMT${middayOffset > 0 ? '-' : '+'}${Math.abs(middayOffset)}`;
+const pool = new pg.Pool({ connectionString: url, max: 8, options: `-c timezone=${MIDDAY_ZONE}` });
 let checks = 0;
 const eq = (got: unknown, want: unknown, what: string) => { assert.deepEqual(got, want, what); checks++; };
 const ok = (v: unknown, what: string) => { assert.ok(v, what); checks++; };
