@@ -91,7 +91,24 @@ The runner and the briefs are in the sprint folder (`independent/`); every round
 
 ## Measured again (2026-10-12 and 2026-10-13)
 
-Six more blind sets by the same independent grader, each on questions it had never written before, and one adversarial review (five reviewers, every finding reproduced by a second one: 24 confirmed, fixed in `b8a7c18e`). Critical turns per set, from the fourth on: 0, 0, 0, 1, 1, 0. The eighth and ninth are in `_harness/agentic-sprint-2026-10-10/independent/RESULT-8.md` and `RESULT-9.md`. The ninth was the first to run on a weekday evening and found that the source's last row comes with no close for some hours after the bell: nineteen reads of a stock or a fund failed for it, and none has since.
+Seven more blind sets by the same independent grader (8 to 14), each on questions it had never written before, and one adversarial review (five reviewers, every finding reproduced by a second one: 24 confirmed, fixed in `b8a7c18e`). Notes for each set: `_harness/agentic-sprint-2026-10-10/independent/RESULT-8.md` … `RESULT-15.md`.
+
+| set | engine | turns | useful | correct abstention | incomplete | critical | figures that differ |
+|---|---|---|---|---|---|---|---|
+| 8 | bf1a4af1 | 120 | 56 | 57 | 6 | 1 | 0 |
+| 9 | 1981f311 | 120 | 30 | 61 | 29 | 0 | 14 (a window that moved) |
+| 10 | 4c79ce56 | 114 | 51 | 53 | 10 | 0 | 0 of 304 |
+| 11 | 5bd92a3d | 122 | 53 | 62 | 7 | 0 | 0 of 444 |
+| 12 | 94c4f6ea | 124 | 45 | 58 | 20 | 1 | 0 of 117 |
+| 13 | 32223263 | 125 | 50 | 68 | 6 | 1 | 1 of 359 |
+| 14 | 9b779d22 | 129 | 48 | 72 | 9 | 0 | 0 of 368 |
+
+The grader's verdict was the same every time: not ready to open yet. What the sets taught beyond their own fixes:
+
+- The ninth was the first to run on a weekday evening: the source's last row comes with no close for some hours after the bell (nineteen reads failed for it; none has since).
+- The twelfth went back by the author's own hand: a rule added after the eleventh made the model explain the scale of a correlation with two of its three points. A rule that makes the model explain something must hand it the whole of what it explains, and every change to the instructions needs its own set.
+- The thirteenth's one critical turn was a date written once for a share and a coin that do not start at the same close. It is now refused by code (`misdated`), not by one more sentence.
+- **The head best measured is `9b779d22` (set 14).** The commit after it (`de80d5d4`, four wording rules) has no complete set: the fifteenth was cut short when the provider's account ran out of credit, 67 of its 117 turns failed, and it is void.
 
 ## What it does not do, and what is missing
 
