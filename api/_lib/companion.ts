@@ -165,7 +165,8 @@ const FALLBACK: Record<AppLanguage, readonly [string, string]> = {
   en: ['I can explain how investing works, step by step, without recommending anything. Investing means putting money into something whose value can rise or fall, so money can also be lost.', 'What is a stock?'],
   es: ['Puedo explicarte cómo funciona invertir, paso a paso y sin recomendarte nada. Invertir es poner dinero en algo cuyo valor puede subir o bajar, así que también se puede perder.', '¿Qué es una acción?'],
   fr: ['Je peux t’expliquer comment fonctionne l’investissement, pas à pas et sans rien te recommander. Investir, c’est placer de l’argent dans quelque chose dont la valeur peut monter ou baisser : on peut donc aussi en perdre.', 'Qu’est-ce qu’une action ?'],
-  pt: ['Posso explicar-te como funciona investir, passo a passo e sem recomendar nada. Investir é pôr dinheiro em algo cujo valor pode subir ou descer, por isso também se pode perder.', 'O que é uma ação?'],
+  // Portuguese is said the same way in Brazil and in Portugal here: no "-te", no "você".
+  pt: ['Posso explicar como funciona investir, passo a passo e sem recomendar nada. Investir é pôr dinheiro em algo cujo valor pode subir ou descer, por isso também se pode perder.', 'O que é uma ação?'],
   it: ['Posso spiegarti come funziona investire, passo dopo passo e senza consigliarti nulla. Investire significa mettere denaro in qualcosa il cui valore può salire o scendere, quindi si può anche perdere.', 'Che cos’è un’azione?'],
   de: ['Ich kann dir Schritt für Schritt erklären, wie Investieren funktioniert, ohne etwas zu empfehlen. Investieren heißt, Geld in etwas zu stecken, dessen Wert steigen oder fallen kann: Man kann also auch Geld verlieren.', 'Was ist eine Aktie?'],
 };
