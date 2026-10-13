@@ -488,11 +488,23 @@ export default function NucleoDesk() {
         say(turn.text);
         return;
       }
+      // A turn that brought nothing leaves the exchange where it was: the next try still has something to refer to.
+      if (turn?.kind === 'limit' || turn?.kind === 'unavailable') exchangeRef.current = previous;
       // With a look-alike in hand, a used-up day of explanations still leaves the confirmation the desk always gave.
       if (turn?.kind === 'limit' && !r) {
         setPhase('error');
         setDeskError(turn.message);
         setMessages((m) => [...m, { from: 'bobby', text: turn.message }]);
+        return;
+      }
+      // The companion is on and could not answer this once: say that, in its own words when it sent them, never
+      // "I could not resolve that asset" to a person who named none. The retry keeps it a learning question.
+      if (turn?.kind === 'unavailable' && !r) {
+        const msg = turn.message ?? t('I could not finish the explanation. You can try again.', 'No pude completar la explicación. Puedes intentarlo de nuevo.', 'Não consegui terminar a explicação. Você pode tentar de novo.');
+        setPhase('error');
+        setDeskError(msg);
+        if (turn.retry) setGuideRetry(q);
+        setMessages((m) => [...m, { from: 'bobby', text: msg }]);
         return;
       }
     }
