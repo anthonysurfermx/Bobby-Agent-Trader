@@ -443,12 +443,12 @@ function composeBase(analysis: Analysis | null, language: AppLanguage, locale?: 
  * frequency ("often") and never cause.
  */
 const TOGETHER: Record<AppLanguage, Record<Band, string>> = {
-  en: { very: 'moved very closely together', fairly: 'moved fairly closely together', loosely: 'moved together only loosely', none: 'had almost no relation to each other', opposite: 'leaned in opposite directions' },
+  en: { very: 'moved very closely together', fairly: 'moved fairly closely together', loosely: 'moved together only a little', none: 'had almost no relation to each other', opposite: 'leaned in opposite directions' },
   es: { very: 'se movieron muy a la par', fairly: 'se movieron bastante a la par', loosely: 'se movieron a la par solo un poco', none: 'casi no tuvieron relación entre sí', opposite: 'tendieron a ir en sentidos opuestos' },
   fr: { very: 'ont évolué de façon très proche', fairly: 'ont évolué de façon assez proche', loosely: 'n’ont évolué ensemble que faiblement', none: 'n’ont presque pas eu de lien entre eux', opposite: 'ont eu tendance à aller en sens opposé' },
   pt: { very: 'andaram muito juntos', fairly: 'andaram bastante juntos', loosely: 'andaram juntos só um pouco', none: 'quase não tiveram relação entre si', opposite: 'tenderam a ir em sentidos opostos' },
   it: { very: 'si sono mossi in modo molto simile', fairly: 'si sono mossi in modo abbastanza simile', loosely: 'si sono mossi insieme solo in parte', none: 'non hanno avuto quasi nessun legame tra loro', opposite: 'hanno teso ad andare in direzioni opposte' },
-  de: { very: 'bewegten sich sehr ähnlich', fairly: 'bewegten sich ziemlich ähnlich', loosely: 'bewegten sich nur lose gemeinsam', none: 'hatten fast keinen Zusammenhang', opposite: 'liefen eher gegenläufig' },
+  de: { very: 'bewegten sich sehr ähnlich', fairly: 'bewegten sich ziemlich ähnlich', loosely: 'bewegten sich nur wenig gemeinsam', none: 'hatten fast keinen Zusammenhang', opposite: 'liefen eher gegenläufig' },
 };
 /** What code says about what the person asked: correlations with what they mean, and each asset's worst and best day with its date. */
 const ASKED: Record<AppLanguage, { correlation: (pairs: string) => string; pair: (a: string, b: string, id: string, band: Band) => string; worst: (items: string) => string; best: (items: string) => string; day: (name: string, id: string) => string }> = {

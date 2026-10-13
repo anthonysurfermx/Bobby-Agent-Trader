@@ -345,7 +345,7 @@ export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<T
  */
 export type Band = 'very' | 'fairly' | 'loosely' | 'none' | 'opposite';
 export const correlationBand = (r: number): Band => (r >= 0.8 ? 'very' : r >= 0.5 ? 'fairly' : r >= 0.2 ? 'loosely' : r > -0.2 ? 'none' : 'opposite');
-const BAND_MEANS: Record<Band, string> = { very: 'they moved very closely together', fairly: 'they moved fairly closely together', loosely: 'they moved together only loosely', none: 'almost no relation between their moves', opposite: 'they leaned in opposite directions' };
+const BAND_MEANS: Record<Band, string> = { very: 'their daily changes went together very closely', fairly: 'their daily changes went together fairly closely', loosely: 'their daily changes went together only a little', none: 'their daily changes had hardly anything to do with each other', opposite: 'their daily changes leaned in opposite directions' };
 /** A figure as the model sees it: rounded, so it can reason about more and less; it may only cite the id. A correlation comes with what its size means. */
 export const forModel = (figure: Figure) => ({ ...(figure.day ? { day: figure.day } : {}), ...(figure.metric === 'correlation' && figure.value !== null ? { means: BAND_MEANS[correlationBand(figure.value)] } : {}), id: figure.id, metric: figure.metric, subject: figure.subject, value: figure.value === null ? null : Number(figure.value.toFixed(figure.unit === 'ratio' ? 2 : figure.unit === 'price' ? 2 : 1)), unit: figure.unit, basis: figure.basis, quality: figure.quality });
 
