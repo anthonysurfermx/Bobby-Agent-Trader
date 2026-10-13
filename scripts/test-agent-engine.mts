@@ -316,7 +316,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   eq(taskUsage(done), { modelCalls: 2, toolCalls: 1, usd: 0.008, unknownUsd: 0, reads: 1 }, 'the task says what it used: two model calls, one tool, one read');
   const sentToModel = JSON.parse((calls.at(-1)!.messages.at(-1)!.content as any[])[0].content);
   const seen = sentToModel.figures.find((f: any) => f.id === 'return_BTC');
-  ok(seen.quality === 'valid' && seen.value === Number(refReturn(btc30).toFixed(1)) && !JSON.stringify(calls.at(-1)!.messages).includes('okx.com'), 'the model sees figures by id with rounded values, not the sources\' addresses');
+  ok(seen.quality === 'valid' && seen.value === Number(refReturn(btc30).toFixed(1)) && !/https?:\/\//.test(JSON.stringify(calls.at(-1)!.messages)), 'the model sees figures by id with rounded values, and no address of any source');
 
   // 4.3 A follow-up about the same result: answered from its figures, with no tool and no read.
   script = [(request) => {
