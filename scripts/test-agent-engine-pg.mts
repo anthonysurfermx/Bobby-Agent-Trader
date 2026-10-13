@@ -266,7 +266,7 @@ try {
     const owner = `ky${fresh()}`, id = `task_${owner}_k`;
     await s.begin(newTask(owner, 'k'), {}, T0); const run = await s.claim(id, 'w', 60_000, T0);
     const step = await s.append(id, run!.fence, 'model_call', { outcome: 'ok', blocks: [{ type: 'tool_use', id: 'u', name: 'answer', input: { 'a\u0000b': 1, 'a\ud83d': 2, fine: 'x' } }] }, T0 + 1);
-    return [step?.n, Object.keys(((step?.data.blocks as any[])?.[0].input) ?? {}).length, ((step?.data.blocks as any[])?.[0].input).fine];
+    return [step?.n, Object.keys((step?.data.blocks as any[])?.[0]?.input ?? {}).length, (step?.data.blocks as any[])?.[0]?.input?.fine];
   }, [2, 3, 'x'], 'a key the database cannot hold does not make a paid step unwritable');
   // Money to the last decimal; one id under twelve owners at once; a cost that is not a number.
   const tiny = { partition: 'tiny', capUsd: 0.00001, taskCapUsd: 1 }, fits: boolean[] = [];

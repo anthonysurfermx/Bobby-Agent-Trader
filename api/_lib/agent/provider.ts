@@ -47,7 +47,7 @@ export function agentModel(env: NodeJS.ProcessEnv = process.env): string {
  */
 export function worstCaseUsd(request: Pick<ModelRequest, 'model' | 'system' | 'messages' | 'tools' | 'maxTokens'>): number {
   const all = request.system + JSON.stringify(request.messages) + JSON.stringify(request.tools);
-  const plain = all.replace(/[^\x00-\x7f]/g, '').length;
+  const plain = all.replace(/\P{ASCII}/gu, '').length;
   const tokensIn = Math.ceil(plain / 3) + (Buffer.byteLength(all, 'utf8') - plain) + 400;
   const [pIn, , pOut] = modelPrice(request.model, tokensIn);
   // Input at the price of writing it to the provider's cache, which is the dearest an input token can be.
@@ -106,7 +106,7 @@ export async function reservedCall(store: AgentStore, budget: Budget, task: stri
   let attemptId: string;
   try {
     const reserved = await store.reserve(budget, task, request.model, reserveUsd, now());
-    if (!reserved.ok) return { ok: false, code: reserved.code, detail: null, usd: 0, reservedUsd: 0, outcome: 'none' };
+    if ('code' in reserved) return { ok: false, code: reserved.code, detail: null, usd: 0, reservedUsd: 0, outcome: 'none' };
     attemptId = reserved.attemptId;
   } catch {
     return { ok: false, code: 'storage_unavailable', detail: null, usd: 0, reservedUsd: 0, outcome: 'none' };

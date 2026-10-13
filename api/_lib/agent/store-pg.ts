@@ -15,6 +15,7 @@ import type { Step, StepKind, Task } from './types.js';
 
 export type AgentRpc = (name: string, args: Record<string, unknown>) => Promise<unknown>;
 const at = (ms: number) => new Date(ms).toISOString();
+// eslint-disable-next-line no-control-regex -- U+0000 is exactly what jsonb refuses and this pattern exists to find
 const UNWRITABLE = /\u0000|[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g;
 /**
  * jsonb refuses U+0000 and half a surrogate pair. A question or a model's reply that holds one must not make an
