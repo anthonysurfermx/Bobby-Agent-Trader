@@ -266,7 +266,9 @@ export async function runTask(deps: Deps, owner: string, id: string): Promise<vo
       // A call starts only when this run has the time for it and for the reading after it: otherwise stop here.
       // The steps are enough for the next run to go on.
       const left = deps.limits.runMs - (deps.now() - started);
-      if (left < 15_000) return;
+      // Out of time. An errand whose read already brought figures is told them now, by code: a person who paid a read
+      // is not left looking at "running" until the app happens to send the request again. Anything else waits for it.
+      if (left < 15_000) { if (ownAnalysis(task)?.figures.some((figure) => figure.value !== null)) await end(task, 'out_of_time'); return; }
       const request = { model: task.model, system: agentPrompt(task.language, task.locale), messages: rebuild(task, parent, declined, earlier), tools: WIRE_TOOLS, maxTokens: deps.limits.maxTokens, timeoutMs: Math.min(30_000, left - 8_000), effort: agentEffort() };
       const budget: Budget = { ...deps.budget, taskCapUsd: deps.limits.taskUsd };
       const reply = await reservedCall(deps.store, budget, id, request, deps.call, deps.now);

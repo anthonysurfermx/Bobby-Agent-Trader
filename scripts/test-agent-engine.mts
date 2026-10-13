@@ -1428,6 +1428,27 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   const gapped = await analysisOf(['BTC', 'SPY'], 30);
   world.series.SPY = () => yahoo('SPY', SPY);
   eq([gapped.evidence.find((e) => e.id === 'ev_SPY')!.quality !== 'valid', fig(gapped, 'return_SPY').value, gapped.limitations.includes('no_series:SPY')], [true, null, true], '…and a close missing in the middle of a series is still a series nobody can read');
+  // For some minutes after the bell the source stamps today's row with the time of the last print, a second or more after the close.
+  const lateStamp = (seconds: number) => () => { const p = structuredClone(yahoo('SPY', SPY, '2026-10-08')) as any, r = p.chart.result[0], at = SPY.length - 1; r.timestamp[at] = r.tradingPeriods.regular[at][0].end + seconds; return p; };
+  world.series.SPY = lateStamp(1);
+  const afterBell = await analysisOf(['SPY'], 30);
+  world.series.SPY = lateStamp(3600);
+  const anHourLate = await analysisOf(['SPY'], 30);
+  world.series.SPY = () => yahoo('SPY', SPY);
+  eq([afterBell.evidence[0].quality, fig(afterBell, 'return_SPY').value !== null, anHourLate.evidence[0].quality !== 'valid'], ['valid', true, true], 'a row stamped with the closing print, a second after the bell, is that session\'s; one stamped an hour later is not understood');
+  // A run that is out of time after a paid read tells the figures, by code, instead of leaving the errand "running".
+  {
+    const store = new MemoryAgentStore(6), deps = depsFor(store);
+    script = [() => turn([use('read_assets', { assets: ['Bitcoin', 'Ethereum'], windowDays: 30 })]),
+      () => { clock += 40_000; return answer({ kind: 'analysis', gist: 'Bitcoin subió 12 por ciento.', text: 'Bitcoin subió 12 por ciento.' }); }];
+    const slow = await ask(deps, 'tim', 'Compara Bitcoin y Ethereum', 'slow1');
+    await store.approve('tim', slow.id, waitingApproval(slow)!.digest, clock);
+    const at = clock;
+    await runTask(deps, 'tim', slow.id);
+    clock = at;
+    const ended = (await store.get('tim', slow.id))!, shown = taskResult(ended)?.presentation;
+    eq([taskState(ended, clock), shown?.composedByCode, shown?.figures.length, ended.steps.at(-1)!.data.instead, taskUsage(ended).reads], ['completed', true, 6, 'out_of_time', 1], 'out of time after the read: the person is told its figures at once, not left to wait for a request that may never be sent again');
+  }
   // A session the source dropped from one fund shows when another fund of the same read has it.
   const dropped = () => { const p = structuredClone(yahoo('QQQ', QQQ)) as any, r = p.chart.result[0], at = QQQ.length - 6; r.timestamp.splice(at, 1); r.tradingPeriods.regular.splice(at, 1); for (const key of Object.keys(r.indicators.quote[0])) r.indicators.quote[0][key].splice(at, 1); return p; };
   world.series.QQQ = dropped;

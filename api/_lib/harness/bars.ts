@@ -55,6 +55,8 @@ function historicalSessions(v: unknown): Session[] | null {
   return sessions.every(s => s !== null) ? sessions as Session[] : null;
 }
 
+/** How long after the bell a row may still be stamped and be that session's (the closing auction and its late prints). */
+const CLOSING_PRINTS_MS = 15 * 60_000;
 export function parseYahooDaily(json: unknown, symbol: string, now: Date): BarSeries | null {
   try {
     if (!Number.isFinite(now.getTime()) || !text(symbol)) return null;
@@ -82,7 +84,10 @@ export function parseYahooDaily(json: unknown, symbol: string, now: Date): BarSe
       if (ends.size === 1) {
         // A session whose timetable the payload states (today's, or a listed past one).
         end = matching[0].end;
-        if (ms < matching[0].start || ms > end) return null;
+        // A session's own bar is stamped from its opening to a little after its bell: for some minutes after the close the
+        // source stamps today's row with the time of the last print (the closing auction: 20:00:01 for a 20:00:00 bell,
+        // as `regularMarketTime` showed on 2026-10-12), and a row one second late used to refuse the whole series.
+        if (ms < matching[0].start || ms > end + CLOSING_PRINTS_MS) return null;
       } else if (ends.size === 0 && localClock(ms, tz) === localClock(current.start, tz)) {
         // Yahoo's daily payload has no timetable for past sessions. A past bar stamped at the
         // exchange's regular opening time closed one regular session later. A shortened session
