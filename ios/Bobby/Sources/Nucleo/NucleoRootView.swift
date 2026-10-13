@@ -199,8 +199,10 @@ private struct NucleoStage: View {
             CompanionConsentView(store: session.companionContext, finished: session.companionConsentFinished)
                 .presentationBackground { QuietMemorySurface() }
         case .companionNotes:
-            CompanionNotesView(store: session.companionContext,
+            CompanionNotesView(store: session.companionContext, undo: session.companionNoteUndo,
                 questionsAvailable: { session.companionContext.allows(session.companionPilot.capability) },
+                riskAccepted: { session.profile.acceptedRiskNotice },
+                initialField: session.companionNotesField,
                 onClose: { session.sheet = nil })
                 .presentationDetents([.large]).presentationDragIndicator(.visible).presentationCornerRadius(34).presentationBackground { QuietMemorySurface() }
         case .memoryConsent:

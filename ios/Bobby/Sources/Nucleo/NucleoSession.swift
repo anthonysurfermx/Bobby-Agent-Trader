@@ -84,6 +84,7 @@ final class NucleoSession: ObservableObject {
     let companions: CompanionStore
     let voice: NeuralVoice
     let fixtures: Bool
+    var now: () -> Date
     let telemetry: BobbyTelemetry
     let desk: NucleoDesk
     let speech: NucleoSpeech
@@ -130,11 +131,12 @@ final class NucleoSession: ObservableObject {
     private var suggestionsCache: (at: Date, value: [String: Any])?
     let companionPilot = CompanionPilot()
     let companionContext: CompanionContextStore
-    lazy var companionPacing = CompanionPacing(defaults: defaults)
+    lazy var companionPacing = CompanionPacing(defaults: defaults, clock: { [weak self] in self?.now() ?? .distantPast })
     private var companionAwaitingConsent = false
     private var companionConsentAccepted = false
     private var companionSceneStarted = false
     private var companionAnswerEpoch = 0
+    let companionNoteUndo = CompanionNoteUndo()
     var companionNotesField: String?
     private var companionQuestionId: String?
     private var vocabularyTask: Task<Void, Never>?
@@ -161,7 +163,11 @@ final class NucleoSession: ObservableObject {
          reminderIntent: ReminderIntent? = nil,
          harnessIntent: HarnessIntent? = nil,
          harness: HarnessCenter? = nil,
-         telemetry: BobbyTelemetry = .shared) {
+         telemetry: BobbyTelemetry = .shared,
+         now: (() -> Date)? = nil) {
+        // Offline UI runs have a fixed calendar origin, independent of midnight on this Mac.
+        let sessionClock: () -> Date = now ?? (fixtures ? { Date(timeIntervalSince1970: 1_791_892_860) } : Date.init)
+        self.now = sessionClock
         self.fixtures = fixtures
         self.telemetry = telemetry
         if fixtures || BobbyApp.isUnitTestHost {
@@ -171,7 +177,7 @@ final class NucleoSession: ObservableObject {
                 if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-memory-save-failure") { return false }
 #endif
                 data = $0; return true
-            })
+            }, clock: sessionClock)
         } else {
 #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-qa-companion-live"),
@@ -192,7 +198,7 @@ final class NucleoSession: ObservableObject {
             _ = companionContext.apply(["notes": [["field": "barrier", "value": "words", "source": "inferred"]], "asked": ["barrier"]], for: "barrier")
         }
         if fixtures && (ProcessInfo.processInfo.arguments.contains("-qa-companion-day3") || ProcessInfo.processInfo.arguments.contains("-qa-companion-day4")) {
-            let now = Date()
+            let now = sessionClock()
             let day4 = ProcessInfo.processInfo.arguments.contains("-qa-companion-day4")
             companionContext.choose(true, now: now.addingTimeInterval(Double(day4 ? -3 : -2) * 86400))
             if day4 { companionContext.opened(now: now.addingTimeInterval(-2 * 86400)) }
@@ -240,7 +246,7 @@ final class NucleoSession: ObservableObject {
                     default: before = []
                     }
                     if scene == "fall" {
-                        let now = Date(); companionContext.choose(true, now: now.addingTimeInterval(-2*86400))
+                        let now = sessionClock(); companionContext.choose(true, now: now.addingTimeInterval(-2*86400))
                         companionContext.opened(now: now.addingTimeInterval(-86400)); companionContext.opened(now:now); companionContext.answered()
                     }
                     for id in before { companionContext.answer(id,value:nil) }
@@ -265,6 +271,7 @@ final class NucleoSession: ObservableObject {
         companionContext.changed = { [weak self] in
             guard let self else { return }
             if !self.companionContext.accepted {
+                self.companionNoteUndo.clear()
                 _ = self.desk.cancel(); self.voice.stop(); self.nucleoVoice.stop()
                 self.emit("companion.revoked", [:])
             }
@@ -582,7 +589,8 @@ final class NucleoSession: ObservableObject {
     }
 
     private func exampleIndex() -> Int {
-        let day = Calendar.current.startOfDay(for: Date())
+        if fixtures { return 0 }
+        let day = Calendar.current.startOfDay(for: now())
         let key = "conversation.example.day", indexKey = "conversation.example.index"
         if let prior = defaults.object(forKey: key) as? Date, prior != day {
             defaults.set((defaults.integer(forKey: indexKey) + 1) % 6, forKey: indexKey)
@@ -600,7 +608,7 @@ final class NucleoSession: ObservableObject {
         } ?? NSNull()
         var json: [String: Any] = [
             "v": 1, "page": NucleoDeskIO.orNull(currentPage), "firstRun": !onboarded, "onboarded": onboarded,
-            "language": L.ttsLang, "locale": L.localeIdentifier, "country": L.country ?? NSNull() as Any, "localHour": Calendar.current.component(.hour, from: Date()),
+            "language": L.ttsLang, "locale": L.localeIdentifier, "country": L.country ?? NSNull() as Any, "localHour": Calendar.current.component(.hour, from: now()),
             "companion": companion, "xp": companions.disciplineXP, "level": companions.nucleoLevel,
             "streak": companions.disciplineStreak, "signedIn": signedIn,
             "riskAccepted": profile.acceptedRiskNotice, "riskVersion": RiskNotice.currentVersion,
@@ -703,7 +711,7 @@ final class NucleoSession: ObservableObject {
         let agents = result["agents"] as? [String: Any]
         NudgeCenter.shared.noteRead(NudgeRead(requestId: requestId, symbol: symbol, name: asset["name"] as? String ?? symbol,
                                               isEquity: asset["isEquity"] as? Bool ?? false,
-                                              verdict: agents?["verdict"] as? String ?? "wait", saved: false, at: Date(),
+                                              verdict: agents?["verdict"] as? String ?? "wait", saved: false, at: now(),
                                               memory: MemoryReceipt(json: result["memory"])))
         // 1.8: from the first question, the harness knows what to come back to (on this phone only). A read
         // Bobby started is told apart here: only the person's own question is followed up, and a chip
@@ -1053,7 +1061,7 @@ final class NucleoSession: ObservableObject {
         let quick = Self.quickAccess(DeskMemory(), fallback: BobbyViewModel.defaultQuickAccess, names: names)
         // R11: before consent nothing reaches the network; the local row is all there is.
         guard profile.acceptedRiskNotice else { return ["quickAccess": quick, "movers": [Any]()] }
-        if let cache = suggestionsCache, Date().timeIntervalSince(cache.at) < Self.suggestionsCacheSeconds {
+        if let cache = suggestionsCache, now().timeIntervalSince(cache.at) < Self.suggestionsCacheSeconds {
             var value = cache.value
             value["quickAccess"] = quick
             return value
@@ -1063,7 +1071,7 @@ final class NucleoSession: ObservableObject {
             return ["quickAccess": quick, "movers": [Any]()]
         }
         let value: [String: Any] = ["quickAccess": quick, "movers": movers]
-        suggestionsCache = (Date(), value)
+        suggestionsCache = (now(), value)
         return value
     }
 
@@ -1379,6 +1387,7 @@ final class NucleoSession: ObservableObject {
     }
 
     private func sheetClosed(_ route: NucleoRoute) {
+        if route == .companionNotes { companionNoteUndo.clear() }
         emit("native.sheet", ["route": route.rawValue, "state": "closed"])
         if route == .paywall { finishPaywall() }
         if route == .thesisReview { reminderIntent.markOpen(nil) }
@@ -1621,6 +1630,7 @@ final class NucleoSession: ObservableObject {
     /// not taken yet is dropped, and so is one still waiting for its sheet to go: it never starts
     /// by itself when they come back.
     func appWentBackground() {
+        companionNoteUndo.clear()
         pendingFirstAsk = nil
         readHandoff = nil
         dropReadOffer()
@@ -1640,6 +1650,7 @@ final class NucleoSession: ObservableObject {
 
     /// Before the classic app appears: nothing of this session may keep writing.
     func teardown() {
+        companionNoteUndo.clear()
         guard !tornDown else { return }
         heldBriefId = nil
         dropReadOffer()
@@ -1745,7 +1756,7 @@ final class NucleoSession: ObservableObject {
         accountGeneration = account.generation
         pendingFirstAsk = nil
         accountUserID = account.session?.userId
-        if companionContext.bindOwner(accountUserID, defaults: defaults) { companionPacing.reset(); companionQuestionId = nil; companionAnswerEpoch += 1 }
+        if companionContext.bindOwner(accountUserID, defaults: defaults) { companionNoteUndo.clear(); companionPacing.reset(); companionQuestionId = nil; companionAnswerEpoch += 1 }
         if wasAnonymous, let owner = accountUserID { SpeakingDial(defaults: defaults).inheritGuest(owner) }
         desk.clearConversation()
         desk.invalidatePending(preservingAnonymousSignInRetries: wasAnonymous && accountUserID != nil)

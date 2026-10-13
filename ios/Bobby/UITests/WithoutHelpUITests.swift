@@ -670,10 +670,6 @@ final class MemoryInvitationShots: ConversationFixtureCase {
 }
 
 final class MemoryNotesShots: ConversationFixtureCase {
-    override func setUpWithError() throws {
-        try super.setUpWithError()
-        throw XCTSkip("SPEC 5.8 deferred at the owner deadline; the new detail screen has no route")
-    }
     func copy(_ key:String)->String { (labels["companion"] as! [String:String])[key]! }
     func notes(_ seeded:Bool = true, scenario:String = "companion", ownerReset:Bool = false) {
         launch(scenario,notes:seeded, memory:ownerReset ? "owner-reset" : nil)
@@ -732,6 +728,24 @@ final class MemoryNotesShots: ConversationFixtureCase {
     }
     func test08AccountChangeResetHasNoOldNotes() {
         notes(true,ownerReset:true);ready(app.staticTexts["companion-notes-off"]);XCTAssertFalse(row("interest").exists);XCTAssertFalse(row("barrier").exists);shot("56-account-change-reset")
+    }
+    func test09ClosingNotesCannotBringUndoIntoANewScreen() {
+        notes();detail("interest");app.buttons["companion-delete-interest"].tap();ready(app.buttons["companion-note-undo"])
+        let close=app.buttons["companion-notes-close"]
+        for _ in 0..<6 where !close.isHittable { app.scrollViews.firstMatch.swipeDown() }
+        ready(close);close.tap();ready(button("aria.type"))
+        openProfileFromGlass();let memory=app.buttons["account-memory"]
+        for _ in 0..<6 where !memory.isHittable { app.scrollViews.firstMatch.swipeUp() }
+        ready(memory);memory.tap();ready(app.buttons["memory-educational-notes"]);app.buttons["memory-educational-notes"].tap()
+        ready(app.staticTexts["companion-notes-title"]);XCTAssertFalse(app.buttons["companion-note-undo"].exists);XCTAssertFalse(row("interest").exists)
+        shot("62-closed-notes-reopened-without-undo")
+    }
+    func test10LastDeletedNoteShowsUndoBeforeTheEmptyState() {
+        notes();detail("interest");app.buttons["companion-delete-interest"].tap();ready(app.buttons["companion-note-undo"])
+        detail("barrier");app.buttons["companion-delete-barrier"].tap();let undo=app.buttons["companion-note-undo"];ready(undo)
+        XCTAssertFalse(app.staticTexts["companion-notes-empty"].exists);shot("63-last-note-deleted-with-undo",delay:0)
+        XCTAssertTrue(undo.waitForNonExistence(timeout:7));ready(app.staticTexts["companion-notes-empty"])
+        shot("64-undo-expired-empty-state")
     }
 }
 
