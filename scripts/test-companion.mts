@@ -95,6 +95,31 @@ for (const speech of ['plain', 'terms', 'technical'] as const) {
   eq(prompt.includes(Q) || prompt.includes('empiezo'), false, `${speech}: nothing of a question is in the instructions`);
 }
 eq(new Set(['plain', 'terms', 'technical'].map((s) => companionPrompt('en', undefined, s as 'plain'))).size, 3, 'three wordings, three instructions');
+// What the first independent blind set found in live answers (2026-10-13: 17 critical turns of 88, every one passed by the
+// second reader). Each of these sentences answers one family; none may quietly leave the instructions.
+{
+  const prompt = companionPrompt('en', undefined, 'plain');
+  for (const [needle, why] of [
+    ['do not decide for them and give no order', 'with a debt, a rent due, a loss or a scam, Bobby describes what people do and orders nothing'],
+    ['Never work anything out with their money', 'no result is worked out with the person\'s money'],
+    ['is not yet a percentage', 'a number with no unit is not taken for a percentage'],
+    ['never call a product or a kind of product risk-free', 'nothing is called risk-free or guaranteed without who stands behind it'],
+    ['never say how likely a result is', 'no likelihood is given for a result'],
+    ['never a rule', 'a rule that varies by company or country is not told as universal'],
+    ['say in a statement that you no longer have it', 'what is older than the last exchange is said to be gone, without a question'],
+    ['Never promise to look at data yourself', 'no promise to look at data that the app has not offered'],
+    ['never say a loss is not real', 'a fall in price is not called unreal until it is sold'],
+    ['say what people do to protect themselves', 'with a possible scam, Bobby says what people do to protect themselves'],
+    ['that is not noise', 'an acknowledgment is answered warmly, not as noise'],
+  ] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);
+  const judge = judgePrompt('en');
+  for (const [needle, why] of [
+    ['forecast: true if the reply predicts', 'the second reader looks for a forecast, and for a likelihood said in words'],
+    ['works out a result with the person\'s money', 'a result worked out with the person\'s money is a figure'],
+    ['risk-free (also said of a kind of product', 'a kind of product called risk-free is a promise'],
+    ['to set money aside for emergencies first', 'general prudence stays allowed: the agreed line of 2026-10-09'],
+  ] as const) ok(judge.includes(needle), `the second reader's instructions say that ${why}`);
+}
 ok(companionPrompt('es', 'es-MX', 'plain').includes('Spanish'), 'the reply language is named');
 eq(LANGS.map((language) => /Address them as "([^"]+)"/.exec(companionPrompt(language, undefined, 'plain'))?.[1] ?? null), [null, 'tú', 'tu', 'tu', 'tu', 'du'], 'each language is told the informal address the app uses');
 eq([companionPrompt('pt', 'pt-BR', 'plain').includes('Address them as "você"'), companionPrompt('pt', 'pt-PT', 'plain').includes('Address them as "tu"')], [true, true], 'Portuguese: você in Brazil, tu in Portugal');
