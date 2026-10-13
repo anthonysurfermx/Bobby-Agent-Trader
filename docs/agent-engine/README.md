@@ -2,7 +2,7 @@
 
 Bobby's first engine that takes an errand and does the work: it understands what was asked, asks before anything is spent, fetches evidence with tools, computes in code, answers briefly, and can be asked again about the same result. It was started in a sprint on 2026-10-10. It is **off by default** (`BOBBY_AGENT_ENGINE`), wired to no app, and not part of iPhone 1.8.
 
-Code: `api/_lib/agent/`, door `api/agent-task.ts`, tests `scripts/test-agent-engine.mts` (`npm run test:agent-engine`), a terminal client `scripts/agent-dev.mts`.
+Code: `api/_lib/agent/`, door `api/agent-task.ts`, tests `scripts/test-agent-engine.mts` (`npm run test:agent-engine`), a terminal client `scripts/agent-dev.mts`, and a page on this machine only, `scripts/agent-lab.mts` (the real door, model and sources; its store is one file, no database).
 
 ## What it does today
 
