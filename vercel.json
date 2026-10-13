@@ -347,6 +347,10 @@
     {
       "path": "/api/briefing-worker",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/agent-task?sweep=1",
+      "schedule": "*/15 * * * *"
     }
   ],
   "functions": {
