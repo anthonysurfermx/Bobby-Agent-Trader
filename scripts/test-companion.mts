@@ -120,6 +120,9 @@ eq(new Set(['plain', 'terms', 'technical'].map((s) => companionPrompt('en', unde
     ['That first sentence is shown alone on their screen', 'the opening sentence is short because it is shown alone'],
     ['the candidate is only a look-alike the search found: do not mention it', 'a look-alike the person did not name is not mentioned'],
     ['a few plain words speak to that before the explanation', 'fear, shame or grief gets a few plain words first'],
+    // The fourth set (2026-10-13, on the code then live): four critical turns of 105, all a premise taken as a fact.
+    ['is their account of it, not something you saw', 'what the person tells of a market or of what they hold is spoken of with "if", never as a fact'],
+    ['never say theirs in another form', 'the person\'s number is not restated in another form (a fifth for 0.2)'],
   ] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);
   const judge = judgePrompt('en');
   for (const [needle, why] of [
