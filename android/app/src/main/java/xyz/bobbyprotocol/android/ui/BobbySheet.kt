@@ -193,7 +193,7 @@ fun BobbySheet(
                         }
                     }
                     OutlinedButton(onClick = onRestore, enabled = account != null && billingState.canRestore) { Text(t("Restore purchases", "Restaurar compras")) }
-                    if (billingState.subscriptionProvider == "google" || billingState.subscriptionProvider == "apple") {
+                    if (billingState.subscriptionProvider == "google") {
                         billing.managementUri()?.let { url -> Action(t("Manage subscription", "Administrar suscripción")) { onExternal(url.toString()) } }
                     }
                     Action(t("Help", "Ayuda")) { onExternal(BobbySupportLinks.url(BobbySupportLinks.Page.SUPPORT, session.language, session.locale, repository.country)) }
@@ -236,6 +236,7 @@ fun BobbySheet(
                         }
                         objects(report.optJSONArray("sources")).forEach { source -> Text(source.optString("name"), style = MaterialTheme.typography.bodySmall) }
                         Text(report.optString("dataAsOf"), style = MaterialTheme.typography.bodySmall)
+                        Action(t("Report this answer", "Reportar esta respuesta")) { onOpen("reportContent") }
                         if (report.optJSONArray("narrationSegments")?.length()?.let { it > 0 } == true) {
                             Action(if (narrationStatus in setOf("preparing", "playing")) t("Stop audio", "Detener audio") else t("Listen", "Escuchar"), !session.muted) { if (narrationStatus in setOf("preparing", "playing")) onStopNarration() else onNarrate(report) }
                             if (session.muted) Text(t("Voice is off. Turn it on in your profile.", "La voz está apagada. Actívala en tu perfil."), style = MaterialTheme.typography.bodySmall)
@@ -334,7 +335,7 @@ fun BobbySheet(
                         else -> t("Stop new questions and generated voice on this Android and return to the risk notice? Scheduled briefing analysis and audio have separate account consent. Turn those off in Briefing settings; this action does not change them.", "¿Detener preguntas nuevas y voz generada en este Android y volver al aviso de riesgo? El análisis y audio de informes programados tienen un consentimiento de cuenta separado. Desactívalos en Configuración de informes; esta acción no los modifica.")
                     })
                     if (action == "account" && deletionRequirements?.requiresManualAppleRevocation == true) {
-                        Text(t("Apple sign-in access requires a separate manual step. After Bobby confirms deletion, follow Apple's instructions to stop using Sign in with Apple for Bobby.", "El acceso mediante Apple requiere un paso manual adicional. Cuando Bobby confirme la eliminación, sigue las instrucciones de Apple para dejar de usar Iniciar sesión con Apple para Bobby."))
+                        Text(t("A previous sign-in provider requires a separate manual step. After Bobby confirms deletion, remove Bobby's access in that provider's account settings.", "Un proveedor de acceso anterior requiere un paso manual adicional. Cuando Bobby confirme la eliminación, retira el acceso de Bobby en la configuración de cuenta de ese proveedor."))
                     }
                 }
             },
@@ -370,8 +371,8 @@ fun BobbySheet(
         AlertDialog(
             onDismissRequest = { manualAppleSteps = false; onClose() },
             title = { Text(t("Account deleted", "Cuenta eliminada")) },
-            text = { Text(t("Your Bobby account was deleted. To remove Bobby's access to your Apple account, open Apple's instructions, select Bobby in your Sign in with Apple settings, and stop using Sign in with Apple.", "Tu cuenta Bobby se eliminó. Para retirar el acceso de Bobby a tu cuenta Apple, abre las instrucciones de Apple, selecciona Bobby en la configuración de Iniciar sesión con Apple y deja de usar ese acceso.")) },
-            confirmButton = { TextButton(onClick = { onExternal(AccountDeletionPolicy.APPLE_INSTRUCTIONS_URL) }) { Text(t("Apple instructions", "Instrucciones de Apple")) } },
+            text = { Text(t("Your Bobby account was deleted. Open your previous sign-in provider's instructions, select Bobby in its app access settings, and remove its access.", "Tu cuenta Bobby se eliminó. Abre las instrucciones del proveedor de acceso anterior, selecciona Bobby en su configuración de acceso de apps y retira su acceso.")) },
+            confirmButton = { TextButton(onClick = { onExternal(AccountDeletionPolicy.APPLE_INSTRUCTIONS_URL) }) { Text(t("Provider instructions", "Instrucciones del proveedor")) } },
             dismissButton = { TextButton(onClick = { manualAppleSteps = false; onClose() }) { Text(t("Done", "Listo")) } },
         )
     }

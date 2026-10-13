@@ -158,6 +158,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #meta{left:20px;width:350px;text-align:center;font:400 12px/16px var(--sans);color:var(--ink3);pointer-events:none}
 
 /* cards */
+.report-answer{display:block;min-height:56px;width:100%;font:400 13px/18px var(--sans);color:var(--ink2);cursor:pointer;text-align:left}
 .card{width:330px;height:360px;border-radius:28px;background:linear-gradient(180deg,rgba(34,30,27,.96),rgba(23,21,19,.96));border:.5px solid var(--hair);box-shadow:inset 0 1px 0 rgba(255,255,255,.05);overflow:hidden;transform-origin:165px 180px}
 .card > .p{position:absolute;left:24px;right:24px}
 .card .ch{top:24px;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
@@ -3354,6 +3355,16 @@ function fillCards(m){
     ar.appendChild(d);
     el.card0.inn.appendChild(ar);
   });
+  /* Android reports stay inside the app. Native supplies the six-language label; no answer is attached silently. */
+  if (typeof SES !== 'undefined' && SES && SES.reportContentLabel){
+    var report = mk('button', 'report-answer', SES.reportContentLabel);
+    report.type = 'button';
+    report.id = 'reportAnswer';
+    // Keep this native button out of the stage's captured card-drag gesture so a real tap clicks it.
+    report.onpointerdown = report.ontouchstart = function(e){ e.stopPropagation(); };
+    report.onclick = function(e){ e.stopPropagation(); bcall('openNative', { route:'reportContent' }).catch(noop); };
+    el.card0.inn.appendChild(report);
+  }
   /* a header or a footer that wraps onto a second line takes its room from the scroller; the scroll ends with the
      last line clear above the lower edge, where no fade is left (.scr.dn in renderCards) */
   var sTop = Math.max(62, 24 + (el.card0.ch.offsetHeight || 0) + 21), sH = Math.min(312, 328 - (el.card0.disc.offsetHeight || 16)) - sTop;
@@ -4831,7 +4842,8 @@ function taAutosize(){
 function placeTypeBox(){
   if (!el.typeBox) return;
   var s = fitS || 1, vv = W.visualViewport, bottom = vv ? vv.offsetTop + vv.height : W.innerHeight;
-  var w = 350 * s, left = fitX + 20 * s, fs = Math.max(16, 17 * s);
+  // The IME shrinks the scene's fit scale, but typing needs readable text and send targets.
+  var w = Math.min(W.innerWidth - 32, Math.max(280, 350 * s)), left = (W.innerWidth - w) / 2, fs = Math.max(16, 17 * s);
   var pillTop = fitY + 742 * s, rest = Math.min(pillTop + 56 * s - TB.h, bottom - TB.h - 12);
   var p = A ? clamp(A.type.p.x, 0, 1.2) : 1, y = lerp(pillTop + 8 * s, rest, p);
   st(el.typeBox, 'width', Math.round(w) + 'px'); st(el.typeBox, 'left', Math.round(left) + 'px'); st(el.typeBox, 'top', Math.round(y) + 'px');

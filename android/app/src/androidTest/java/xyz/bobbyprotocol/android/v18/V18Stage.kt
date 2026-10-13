@@ -1,6 +1,8 @@
 package xyz.bobbyprotocol.android.v18
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.ParcelFileDescriptor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -206,6 +208,39 @@ object V18Shots {
         sendAwayNotResponding()
         shell("mkdir -p $FOLDER")
         shell("screencap -p $FOLDER/$name.png")
+    }
+
+    /** Capture the real display directly as 24-bit PNG; no resize, crop, overlay or pixel repaint. */
+    @androidx.annotation.RequiresApi(31)
+    fun saveListing(name: String) {
+        require(Regex("^[a-z0-9][a-z0-9-]{0,100}$").matches(name))
+        sendAwayNotResponding()
+        shell("mkdir -p $FOLDER")
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        // Use the suite's native screencap path after hosted RenderThread crashes
+        // around UiAutomation's hardware-bitmap readback on this display.
+        // Decode the original frame in software; preserve every RGB pixel and size.
+        android.util.Log.i("BobbyLocaleCapture", "native screencap start: $name")
+        shell("mkdir -p $FOLDER/raw")
+        shell("screencap -p $FOLDER/raw/$name.png")
+        val options = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888 }
+        val bitmap = ParcelFileDescriptor.AutoCloseInputStream(
+            automation.executeShellCommand("cat $FOLDER/raw/$name.png")
+        ).use { BitmapFactory.decodeStream(it, null, options) }
+            ?: error("Native screencap PNG could not be decoded")
+        try {
+            bitmap.setHasAlpha(false)
+            // UiAutomation executes argv directly: redirection is not parsed. dd writes stdin to
+            // the capture file without echoing the PNG into a second pipe that could fill up.
+            val pipes = automation.executeShellCommandRw("dd of=$FOLDER/$name.png bs=65536")
+            ParcelFileDescriptor.AutoCloseInputStream(pipes[0]).use { output ->
+                ParcelFileDescriptor.AutoCloseOutputStream(pipes[1]).use { input ->
+                    check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, input)) { "PNG encoding failed" }
+                }
+                output.readBytes() // EOF confirms the shell writer closed the capture file.
+            }
+        } finally { bitmap.recycle() }
+        android.util.Log.i("BobbyLocaleCapture", "native RGB capture complete: $name")
     }
 
     /**

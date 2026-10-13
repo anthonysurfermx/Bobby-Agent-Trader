@@ -24,7 +24,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.junit4.createComposeRule
+import xyz.bobbyprotocol.android.createReleaseComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -74,7 +74,7 @@ import java.io.File
  */
 @RunWith(AndroidJUnit4::class)
 class TraderLandMapInstrumentedTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createReleaseComposeRule()
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Before fun requireEmulator() {

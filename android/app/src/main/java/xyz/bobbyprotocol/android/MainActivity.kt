@@ -214,7 +214,12 @@ class MainActivity : ComponentActivity() {
                     Box(Modifier.fillMaxSize().background(Color(0xFF050505)).safeDrawingPadding().imePadding()) {
                         key(webRevision) { AndroidView(factory = { context ->
                             WebView(context).also { view ->
-                                web = NucleoWebView(view, lifecycleScope, { method, params -> dispatch(method, params) }, { needsRendererRestart = true; platformError = it })
+                                web = NucleoWebView(view, lifecycleScope, { method, params -> dispatch(method, params) }, { message ->
+                                    needsRendererRestart = true
+                                    platformError = if (message == "Update Android System WebView to use Bobby.")
+                                        session.text(message, "Actualiza Android System WebView para usar Bobby.")
+                                    else session.text("Android WebView stopped. Reopen Bobby to restore your session.", "Android WebView se detuvo. Vuelve a abrir Bobby para recuperar tu sesión.")
+                                })
                                 web?.load(session.page)
                             }
                         }, modifier = Modifier.fillMaxSize()) }
@@ -306,9 +311,9 @@ class MainActivity : ComponentActivity() {
         narrator.stop(); narrationStatus = null
         web?.view?.clearFocus()
         WindowInsetsControllerCompat(window, window.decorView).hide(WindowInsetsCompat.Type.ime())
-        route = name
+        route = if (name == "paywall" && !billing.canOfferGoogleBilling) "credits" else name
         session.setRendererForeground(false)
-        web?.emit("native.sheet", JSONObject().put("route", name).put("state", "open"))
+        web?.emit("native.sheet", JSONObject().put("route", route).put("state", "open"))
     }
 
     private fun closeSheet() {

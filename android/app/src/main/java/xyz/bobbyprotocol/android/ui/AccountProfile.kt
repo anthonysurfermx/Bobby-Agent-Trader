@@ -228,7 +228,7 @@ internal fun AccountProfile(
             val pending = snapshot.optInt("pendingAwards")
             val syncText = if (busy) t("Syncing…") else if (pending > 0) "$pending · " + t("Awards waiting to sync")
                 else if (snapshot.isNull("syncedAt")) t("Not synced yet") else t("Synced")
-            ProfileRow(when (account?.provider) { "google" -> t("Signed in with Google"); "apple" -> t("Signed in with Apple"); else -> t("Signed in") }, syncText, ProfileSymbol.SYNC,
+            ProfileRow(when (account?.provider) { "google" -> t("Signed in with Google"); else -> t("Signed in") }, syncText, ProfileSymbol.SYNC,
                 enabled = !busy && session.riskAccepted, tag = "account-sync") { onSync() }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 TextButton(onClick = onSignOut, enabled = !busy, modifier = Modifier.testTag("account-sign-out")) { Text(t("Sign out"), color = ProfilePalette.muted, fontSize = 13.sp) }
@@ -237,8 +237,6 @@ internal fun AccountProfile(
         } else {
             Text(t("Sign in so your XP, streak, gear and island follow you"), Modifier.padding(top = 18.dp, bottom = 12.dp), color = ProfilePalette.muted, fontSize = 13.sp)
             ProfileAuthButton(t("Continue with Google"), repository.isAuthConfigured && !busy) { onSignIn("google") }
-            Spacer(Modifier.height(8.dp))
-            ProfileAuthButton(t("Continue with Apple"), repository.isAuthConfigured && !busy) { onSignIn("apple") }
             if (!repository.isAuthConfigured) Text(t("Sign-in is currently unavailable. Try again later."), Modifier.padding(top = 8.dp), color = ProfilePalette.dim, fontSize = 12.sp)
         }
         FlowRow(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.Center) {

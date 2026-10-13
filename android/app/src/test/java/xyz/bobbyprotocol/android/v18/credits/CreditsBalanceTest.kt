@@ -462,7 +462,7 @@ class CreditsBalanceTest {
 
     // Six languages
 
-    @Test fun everyCreditsLineHasFourTranslationsThatKeepTheirPlaceholders() {
+    @Test fun everyCreditsLineHasFourTranslationsAndOnlyAndroidSignInCopy() {
         val said = listOf(
             "Credits", "Quick", "Deep", "Max", "Quick reads", "Deep reads", "Max reads", "Gifted Quick reads", "Gifted Deep reads", "Gifted Max reads",
             "Unlimited", "Unlimited · fair use", "With Bobby Pro, within fair use.", "{0} of {1} left this week", "{0} of {1} left",
@@ -475,7 +475,7 @@ class CreditsBalanceTest {
             "Invite", "Code", "Checking…", "1 credit = 1 read", "Share Bobby with someone you know.",
             "You get {0} days of Bobby Pro for each friend who joins with your link, up to {1} friends.",
             "{0} days of Bobby Pro for each friend who joins", "Bobby Pro for each friend who joins", "Restore purchases", "Manage subscription",
-            "Try again", "Risk notice", "Details", "Continue with Google", "Continue with Apple",
+            "Try again", "Risk notice", "Details", "Continue with Google", "Provider instructions",
             "Use this if you paid for Bobby Pro with your Google Play account on another phone or after reinstalling. Codes and gifts never need restoring.")
         for (key in said) {
             val translations = V18Catalog.row(key)
@@ -483,17 +483,16 @@ class CreditsBalanceTest {
             for ((language, text) in translations) {
                 assertEquals("$key [$language]", V18Catalog.placeholders(key), V18Catalog.placeholders(text))
                 assertFalse("no exclamation marks: $key [$language]", text.contains("!"))
-                assertFalse("Android never names an iPhone or its store here: $key [$language]", Regex("iPhone|App Store|Apple Account").containsMatchIn(text))
+                assertFalse("Android never names an iPhone or its store here: $key [$language]", Regex("iPhone|App Store|Apple").containsMatchIn(text))
             }
         }
     }
 
-    @Test fun theInviteLineSpeaksToThePersonInformallyInEveryLanguage() {
-        // Bobby says tu, never vous. This row once came from the older catalog, where it was formal in
-        // French and Portuguese; it is the line every Android account reads today under Credits › Details.
+    @Test fun theInviteLineUsesInformalLocalizedCopyIncludingBrazilianPortuguese() {
+        // French uses tu; Brazil uses the everyday voce form. Credits must use the regional catalog row.
         val row = V18Catalog.row("Share Bobby with someone you know.")
         assertEquals("Partage Bobby avec une personne que tu connais.", row["fr"])
-        assertEquals("Partilha o Bobby com alguém que conheces.", row["pt"])
+        assertEquals("Compartilhe o Bobby com alguém que você conhece.", row["pt"])
         assertEquals("Condividi Bobby con qualcuno che conosci.", row["it"])
         assertEquals("Teile Bobby mit jemandem, den du kennst.", row["de"])
         assertFalse(Regex("\\b(vous|votre|vos)\\b", RegexOption.IGNORE_CASE).containsMatchIn(row["fr"] ?: "vous"))

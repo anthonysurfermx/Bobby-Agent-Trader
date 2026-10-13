@@ -14,6 +14,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
+build_type=${BOBBY_TEST_BUILD_TYPE:-Debug}
 out=build/emulator
 # Where a test saves a screenshot (V18Shots in app/src/androidTest): the shell may write there, and
 # it outlives the app, which Gradle removes from the device when the tests end.
@@ -24,20 +25,53 @@ page=xyz.bobbyprotocol.android.v18.FollowUpPageInstrumentedTest
 argument=-Pandroid.testInstrumentationRunnerArguments
 
 mkdir -p "$out/shots"
+rm -f "$out/instrumentation-crash.txt"
+if [ "${BOBBY_TEST_LOCALE:-suite}" != suite ]; then
+  bash tools/set-emulator-locale.sh "$BOBBY_TEST_LOCALE" || {
+    adb logcat -d -v threadtime > "$out/locale-startup.txt" 2>&1 || true
+    exit 1
+  }
+fi
 adb shell mkdir -p "$device_shots"
 # An emulator that draws in software sometimes shows "isn't responding" for its own launcher, over
 # the screen being photographed: the system is asked not to show those windows.
 adb shell settings put global hide_error_dialogs 1 || true
 adb logcat -c || true
+: > "$out/logcat.txt"
 adb logcat -v threadtime > "$out/logcat.txt" 2>&1 &
 logcat=$!
 
+# Even cancellation or a dead instrumentation runner leaves its crash log and native captures.
+collect() {
+  adb pull "$device_shots/." "$out/shots" > /dev/null 2>&1 || true
+  kill "$logcat" 2>/dev/null || true
+}
+trap collect EXIT
+
 status=0
 part() {
+  if [ -f "$out/instrumentation-crash.txt" ]; then return; fi
   name=$1
   shift
   echo "==== Instrumented tests: $name ===="
-  ./gradlew :app:connectedDebugAndroidTest --no-daemon "$@" || status=1
+  # A runner that crashes before JUnit starts can otherwise wait until the whole 90-minute job ends.
+  log_start=$(( $(wc -c < "$out/logcat.txt") + 1 ))
+  timeout --signal=TERM --kill-after=30s 15m ./gradlew :app:connected${build_type}AndroidTest --no-daemon "$@" &
+  test_process=$!
+  (
+    while kill -0 "$test_process" 2>/dev/null; do
+      if tail -c +"$log_start" "$out/logcat.txt" | grep -Fq 'AndroidRuntime: Process: xyz.bobbyprotocol.bobby,'; then
+        echo "Bobby crashed in '$name'; preserving logcat and captures." | tee "$out/instrumentation-crash.txt"
+        kill -TERM "$test_process" 2>/dev/null || true
+        break
+      fi
+      sleep 2
+    done
+  ) &
+  watchdog=$!
+  wait "$test_process" || status=1
+  kill "$watchdog" 2>/dev/null || true
+  wait "$watchdog" 2>/dev/null || true
   mkdir -p "$out/$name"
   cp -R app/build/reports/androidTests/connected "$out/$name/report" 2>/dev/null || true
   cp -R app/build/outputs/androidTest-results/connected "$out/$name/results" 2>/dev/null || true
@@ -52,10 +86,18 @@ part() {
   fi
 }
 
-part screens "$argument.class=$screens" "$@"
-part device "$argument.class=$device" "$@"
-part others "$argument.notClass=$screens,$device,$page" "$@"
-part page "$argument.class=$page" "$@"
+if [ "${BOBBY_TEST_LOCALE:-suite}" != suite ]; then
+  part locale "$argument.class=xyz.bobbyprotocol.android.ReleaseLocaleSmokeInstrumentedTest" "$argument.bobbyLocale=$BOBBY_TEST_LOCALE" "$@"
+  python3 tools/check-locale-captures.py || status=1
+else
+  part screens "$argument.class=$screens" "$@"
+  if [ "$status" -ne 0 ]; then exit "$status"; fi # Preserve the first failure before running dependent stages.
+  part device "$argument.class=$device" "$@"
+  if [ "$status" -ne 0 ]; then exit "$status"; fi
+  part others "$argument.notClass=$screens,$device,$page" "$@"
+  if [ "$status" -ne 0 ]; then exit "$status"; fi
+  part page "$argument.class=$page" "$@"
+fi
 
 kill "$logcat" 2>/dev/null || true
 echo "Screenshots collected: $(find "$out/shots" -name '*.png' | wc -l | tr -d ' ')"

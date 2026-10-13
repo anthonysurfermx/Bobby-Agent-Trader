@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <!-- Shared startup classes live in the target APK, not the independent
+             test APK. Only the target app starts WorkManager; tests need no provider. -->
+        <provider android:name="androidx.startup.InitializationProvider"
+            tools:node="remove" />
+    </application>
+</manifest>

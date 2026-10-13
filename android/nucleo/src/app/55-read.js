@@ -290,6 +290,16 @@ function fillCards(m){
     ar.appendChild(d);
     el.card0.inn.appendChild(ar);
   });
+  /* Android reports stay inside the app. Native supplies the six-language label; no answer is attached silently. */
+  if (typeof SES !== 'undefined' && SES && SES.reportContentLabel){
+    var report = mk('button', 'report-answer', SES.reportContentLabel);
+    report.type = 'button';
+    report.id = 'reportAnswer';
+    // Keep this native button out of the stage's captured card-drag gesture so a real tap clicks it.
+    report.onpointerdown = report.ontouchstart = function(e){ e.stopPropagation(); };
+    report.onclick = function(e){ e.stopPropagation(); bcall('openNative', { route:'reportContent' }).catch(noop); };
+    el.card0.inn.appendChild(report);
+  }
   /* a header or a footer that wraps onto a second line takes its room from the scroller; the scroll ends with the
      last line clear above the lower edge, where no fade is left (.scr.dn in renderCards) */
   var sTop = Math.max(62, 24 + (el.card0.ch.offsetHeight || 0) + 21), sH = Math.min(312, 328 - (el.card0.disc.offsetHeight || 16)) - sTop;

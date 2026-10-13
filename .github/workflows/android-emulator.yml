@@ -2,27 +2,46 @@ name: Android emulator
 
 # Runs the instrumented tests (android/app/src/androidTest) on a real Android system image and keeps
 # what they leave behind: the test report, logcat and every screenshot a test saved. The `Android`
-# workflow only compiles these tests; this one runs them. No secret is used: the debug build as it is.
+# workflow compiles them; this one runs debug and the optimized release. CI signing is ephemeral.
 
 on:
   pull_request:
     # shared/harness holds the golden file every platform's follow-up planner must pass.
-    paths: ['android/**', 'shared/harness/**', '.github/workflows/android-emulator.yml']
+    paths: ['android/**', 'shared/harness/**', '.github/workflows/android-emulator.yml', 'docs/play-store/**']
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-emulator-${{ github.ref }}
+  # Keep an earlier commit's device logs while the next candidate compiles; cancel duplicate runs only.
+  group: android-emulator-${{ github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
   emulator:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { build-type: Debug, api: 34, locale: suite }
+          - { build-type: Debug, api: 35, locale: suite }
+          - { build-type: Release, api: 35, locale: suite }
+          - { build-type: Release, api: 35, locale: en }
+          - { build-type: Release, api: 35, locale: es }
+          - { build-type: Release, api: 35, locale: fr }
+          - { build-type: Release, api: 35, locale: pt }
+          - { build-type: Release, api: 35, locale: it }
+          - { build-type: Release, api: 35, locale: de }
+    env:
+      BOBBY_TEST_BUILD_TYPE: ${{ matrix.build-type }}
+      BOBBY_TEST_LOCALE: ${{ matrix.locale }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
@@ -46,6 +65,16 @@ jobs:
           done
           echo 'Android command-line tools are missing from the hosted SDK.' >&2
           exit 1
+      - name: Load public release client configuration
+        env:
+          BOBBY_SUPABASE_URL: ${{ vars.BOBBY_SUPABASE_URL }}
+          BOBBY_SUPABASE_ANON_KEY: ${{ vars.BOBBY_SUPABASE_ANON_KEY }}
+        run: python3 android/tools/export-public-client-config.py
+      - name: Generate a runner-only test certificate
+        if: matrix.build-type == 'Release'
+        run: |
+          keytool -genkeypair -keystore "$RUNNER_TEMP/ci-test.jks" -storepass android -keypass android -alias ci-test -keyalg RSA -keysize 2048 -validity 2 -dname 'CN=Bobby CI disposable'
+          echo "BOBBY_CI_TEST_KEYSTORE=$RUNNER_TEMP/ci-test.jks" >> "$GITHUB_ENV"
       - name: Let the emulator use hardware acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -54,30 +83,37 @@ jobs:
       # Built before the emulator starts, so it never sits idle through a compile.
       - name: Build the app and its instrumented tests
         working-directory: android
-        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon
+        run: ./gradlew :app:assemble${{ matrix.build-type }} :app:assemble${{ matrix.build-type }}AndroidTest -PbobbyTestBuildType=${{ matrix.build-type == 'Release' && 'release' || 'debug' }} --no-daemon
+      - name: Check both startup manifests
+        working-directory: android
+        run: python3 tools/check-test-startup.py ${{ matrix.build-type }}
       - name: Run the instrumented tests on an emulator
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
-          api-level: 34
+          api-level: ${{ matrix.api }}
           target: google_apis
           arch: x86_64
           profile: pixel_6
           cores: 4
           ram-size: 4096M
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          # Current software backend: swiftshader_indirect was deprecated in emulator36.4.9.
+          # Hosted37.2.12 RenderThread crashes are infrastructure failures, never device coverage.
+          emulator-options: -no-window -gpu software -no-snapshot -noaudio -no-boot-anim -camera-back none
           working-directory: android
-          # A hosted runner has no GPU: the page's WebGL scene is drawn in software, and its cost grows
-          # with every pixel. 720x1600 at 320 dpi is a 360x800 dp phone, the most common Android size.
-          pre-emulator-launch-script: bash tools/emulator-screen.sh 720 1600 320
+          # Native 720x1280 @320dpi keeps the locale journey's 360x640dp layout while reducing
+          # software WebView tile pressure. Valid phone screenshots, below Play's 1080px recommendation.
+          # The broader suite retains its existing 360x800dp diagnostic display.
+          pre-emulator-launch-script: bash tools/emulator-screen.sh ${{ matrix.locale == 'suite' && '720 1600 320' || '720 1280 320' }}
           # What the tests are told about this emulator: it exists for this run only (a test that changes a
           # system setting may use it), and it has no GPU (the suite that drives the WebGL page by script is skipped).
-          script: bash tools/run-emulator-tests.sh -Pandroid.testInstrumentationRunnerArguments.bobbyOwnedEmulator=ci-throwaway -Pandroid.testInstrumentationRunnerArguments.bobbySoftwareGpu=true
+          script: bash tools/run-emulator-tests.sh -PbobbyTestBuildType=${{ matrix.build-type == 'Release' && 'release' || 'debug' }} -Pandroid.testInstrumentationRunnerArguments.bobbyOwnedEmulator=ci-throwaway -Pandroid.testInstrumentationRunnerArguments.bobbySoftwareGpu=true
       - name: Keep the report, the log and the screenshots
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: android-emulator
+          # A rerun keeps the failed attempt's diagnostics and cannot collide with its artifact.
+          name: android-emulator-${{ matrix.build-type }}-api-${{ matrix.api }}-${{ matrix.locale }}-attempt-${{ github.run_attempt }}
           path: android/build/emulator
           if-no-files-found: warn
           retention-days: 14

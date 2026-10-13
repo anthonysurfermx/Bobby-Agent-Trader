@@ -19,7 +19,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.junit4.createComposeRule
+import xyz.bobbyprotocol.android.createReleaseComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -43,7 +43,7 @@ import kotlin.math.roundToInt
 @RunWith(AndroidJUnit4::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class TraderLandSceneInstrumentedTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createReleaseComposeRule()
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Before fun requireEmulator() {

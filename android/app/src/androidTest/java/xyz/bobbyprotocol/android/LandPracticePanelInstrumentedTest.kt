@@ -18,7 +18,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
-import androidx.compose.ui.test.junit4.createComposeRule
+import xyz.bobbyprotocol.android.createReleaseComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -49,7 +49,7 @@ import xyz.bobbyprotocol.android.ui.TraderLandProjection
 /** Bundled guest fixtures in the empty Compose activity; persistence is an in-memory callback. */
 @RunWith(AndroidJUnit4::class)
 class LandPracticePanelInstrumentedTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createReleaseComposeRule()
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Before fun requireEmulator() {
@@ -208,7 +208,7 @@ class LandPracticePanelInstrumentedTest {
             item.getString("id") to item.getJSONObject("name").getString("en")
         }
         assertEquals(27, catalog.size)
-        val raw = context.assets.open("traderland/practice-fixture.json").bufferedReader().use { it.readText() }
+        val raw = context.assets.open("traderland/practice-starter.json").bufferedReader().use { it.readText() }
         return Bundle(catalog, names, requireNotNull(LandPractice.decodeFixture(raw, catalog)))
     }
 }

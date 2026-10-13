@@ -69,7 +69,6 @@ internal object BillingPolicy {
 
     /** Only store management destinations are opened; arbitrary SDK/server links are ignored. */
     fun managementUrl(provider: String?, customerUrl: String?): String? {
-        if (provider == "apple") return "https://apps.apple.com/account/subscriptions"
         if (provider != null && provider != "google") return null
         if (customerUrl != null) {
             val uri = runCatching { java.net.URI(customerUrl) }.getOrNull()

@@ -85,6 +85,14 @@
     "it": "Un regalo di Bobby.",
     "de": "Ein Geschenk von Bobby."
   },
+  "A previous sign-in provider requires a separate manual step. After Bobby confirms deletion, remove Bobby's access in that provider's account settings.": {
+    "en": "A previous sign-in provider requires a separate manual step. After Bobby confirms deletion, remove Bobby's access in that provider's account settings.",
+    "es": "Un proveedor de acceso anterior requiere un paso manual adicional. Cuando Bobby confirme la eliminación, retira el acceso de Bobby en la configuración de cuenta de ese proveedor.",
+    "fr": "Un ancien fournisseur de connexion nécessite une étape manuelle supplémentaire. Après confirmation de la suppression par Bobby, retire son accès dans les paramètres du compte de ce fournisseur.",
+    "pt": "Um provedor de login anterior exige uma etapa manual adicional. Depois que o Bobby confirmar a exclusão, remova o acesso do Bobby nas configurações da conta desse provedor.",
+    "it": "Un precedente provider di accesso richiede un passaggio manuale separato. Dopo che Bobby conferma l’eliminazione, rimuovi il suo accesso nelle impostazioni dell’account del provider.",
+    "de": "Ein früherer Anmeldeanbieter erfordert einen zusätzlichen manuellen Schritt. Nachdem Bobby die Löschung bestätigt hat, entferne Bobbys Zugriff in den Kontoeinstellungen dieses Anbieters."
+  },
   "AI tokens": {
     "fr": "Tokens IA",
     "pt": "Tokens de IA",
@@ -207,23 +215,19 @@
     "it": "Livello di analisi",
     "de": "Analysestufe"
   },
+  "Android WebView stopped. Reopen Bobby to restore your session.": {
+    "en": "Android WebView stopped. Reopen Bobby to restore your session.",
+    "es": "Android WebView se detuvo. Vuelve a abrir Bobby para recuperar tu sesión.",
+    "fr": "Android WebView s’est arrêté. Rouvrez Bobby pour retrouver votre session.",
+    "pt": "O Android WebView parou. Abra o Bobby novamente para recuperar sua sessão.",
+    "it": "Android WebView si è arrestato. Riapri Bobby per ripristinare la sessione.",
+    "de": "Android WebView wurde beendet. Öffne Bobby erneut, um deine Sitzung wiederherzustellen."
+  },
   "Android checks for ready reports in the background. Delivery time depends on your device settings.": {
     "fr": "Android recherche les rapports disponibles en arrière-plan. L'heure de livraison dépend des réglages de ton appareil.",
     "pt": "O Android verifica os relatórios disponíveis em segundo plano. A hora de entrega depende das definições do dispositivo.",
     "it": "Android controlla in background se ci sono rapporti pronti. L'orario di consegna dipende dalle impostazioni del dispositivo.",
     "de": "Android prüft im Hintergrund, ob Berichte bereit sind. Der Zustellzeitpunkt hängt von deinen Geräteeinstellungen ab."
-  },
-  "Apple instructions": {
-    "fr": "Instructions d’Apple",
-    "pt": "Instruções da Apple",
-    "it": "Istruzioni di Apple",
-    "de": "Apples Anleitung"
-  },
-  "Apple sign-in access requires a separate manual step. After Bobby confirms deletion, follow Apple's instructions to stop using Sign in with Apple for Bobby.": {
-    "fr": "L’accès via Apple nécessite une étape manuelle supplémentaire. Une fois la suppression confirmée par Bobby, suis les instructions d’Apple pour ne plus utiliser Se connecter avec Apple pour Bobby.",
-    "pt": "O acesso através da Apple requer um passo manual adicional. Depois de o Bobby confirmar a eliminação, segue as instruções da Apple para deixar de usar Iniciar sessão com Apple para o Bobby.",
-    "it": "L’accesso tramite Apple richiede un passaggio manuale aggiuntivo. Dopo che Bobby conferma l’eliminazione, segui le istruzioni di Apple per smettere di usare Accedi con Apple per Bobby.",
-    "de": "Der Zugriff über Apple erfordert einen zusätzlichen manuellen Schritt. Nachdem Bobby die Löschung bestätigt hat, folge Apples Anleitung, um Mit Apple anmelden für Bobby nicht mehr zu verwenden."
   },
   "Apply": {
     "fr": "Appliquer",
@@ -299,7 +303,7 @@
   },
   "Audio is unavailable. Your report is ready to read.": {
     "fr": "L'audio est indisponible. Tu peux lire ton rapport.",
-    "pt": "O áudio não está disponível. Podes ler o relatório.",
+    "pt": "O áudio não está disponível. Você pode ler o relatório.",
     "it": "L'audio non è disponibile. Puoi leggere il rapporto.",
     "de": "Audio ist nicht verfügbar. Dein Bericht ist zum Lesen bereit."
   },
@@ -375,7 +379,7 @@
   },
   "Blocking hides this creator on this device, even if the island is renamed. You can unblock them here.": {
     "fr": "Le blocage masque ce créateur sur cet appareil, même si l'île change de nom. Tu peux le débloquer ici.",
-    "pt": "Bloquear oculta este criador neste dispositivo, mesmo que o nome da ilha mude. Podes desbloqueá-lo aqui.",
+    "pt": "Bloquear oculta este criador neste dispositivo, mesmo que o nome da ilha mude. Você pode desbloqueá-lo aqui.",
     "it": "Il blocco nasconde questo creatore su questo dispositivo, anche se l'isola cambia nome. Puoi sbloccarlo qui.",
     "de": "Blockieren blendet diesen Ersteller auf diesem Gerät aus, auch wenn die Insel umbenannt wird. Du kannst die Blockierung hier aufheben."
   },
@@ -799,7 +803,7 @@
   },
   "Delete your Bobby account and synced personal data? Public blockchain records and your store subscription may remain. Manage your subscription separately.": {
     "fr": "Supprimer ton compte Bobby et les données personnelles synchronisées ? Les données publiques de la blockchain et ton abonnement peuvent subsister. Gère ton abonnement séparément.",
-    "pt": "Eliminar a tua conta Bobby e os dados pessoais sincronizados? Os registos públicos na blockchain e a subscrição da loja podem permanecer. Gere a subscrição separadamente.",
+    "pt": "Excluir sua conta Bobby e os dados pessoais sincronizados? Os registros públicos na blockchain e a assinatura da loja podem permanecer. Gerencie sua assinatura separadamente.",
     "it": "Eliminare il tuo account Bobby e i dati personali sincronizzati? I dati pubblici sulla blockchain e l'abbonamento dello store possono rimanere. Gestisci l'abbonamento separatamente.",
     "de": "Dein Bobby-Konto und synchronisierte persönliche Daten löschen? Öffentliche Blockchain-Einträge und dein Store-Abonnement können bestehen bleiben. Verwalte dein Abonnement separat."
   },
@@ -1119,7 +1123,7 @@
   },
   "Google Play subscriptions are not available yet.": {
     "fr": "Les abonnements Google Play ne sont pas encore disponibles.",
-    "pt": "As subscrições do Google Play ainda não estão disponíveis.",
+    "pt": "As assinaturas do Google Play ainda não estão disponíveis.",
     "it": "Gli abbonamenti Google Play non sono ancora disponibili.",
     "de": "Google Play-Abonnements sind noch nicht verfügbar."
   },
@@ -1149,7 +1153,7 @@
   },
   "Have a code?": {
     "fr": "Tu as un code ?",
-    "pt": "Tens um código?",
+    "pt": "Tem um código?",
     "it": "Hai un codice?",
     "de": "Hast du einen Code?"
   },
@@ -1460,6 +1464,12 @@
     "pt": "Gerir",
     "it": "Gestisci",
     "de": "Verwalten"
+  },
+  "Manage subscription": {
+    "fr": "Gérer l’abonnement",
+    "pt": "Gerenciar assinatura",
+    "it": "Gestisci abbonamento",
+    "de": "Abonnement verwalten"
   },
   "Managed on the web.": {
     "fr": "Géré sur le web.",
@@ -1883,6 +1893,14 @@
     "it": "Fondamentali del progetto",
     "de": "Fundamentaldaten des Projekts"
   },
+  "Provider instructions": {
+    "en": "Provider instructions",
+    "es": "Instrucciones del proveedor",
+    "fr": "Instructions du fournisseur",
+    "pt": "Instruções do provedor",
+    "it": "Istruzioni del provider",
+    "de": "Anleitung des Anbieters"
+  },
   "Publish": {
     "fr": "Publier",
     "pt": "Publicar",
@@ -1891,7 +1909,7 @@
   },
   "Publishing shares your island name and layout. Your account identity is not included in the public island.": {
     "fr": "La publication partage le nom et la disposition de ton île. Ton identité de compte n'est pas incluse dans l'île publique.",
-    "pt": "Publicar partilha o nome e a disposição da tua ilha. A ilha pública não inclui a identidade da tua conta.",
+    "pt": "Publicar compartilha o nome e o layout da sua ilha. A ilha pública não inclui a identidade da sua conta.",
     "it": "La pubblicazione condivide il nome e la disposizione della tua isola. L'isola pubblica non include l'identità del tuo account.",
     "de": "Die Veröffentlichung teilt den Namen und die Anordnung deiner Insel. Deine Kontoidentität ist nicht Teil der öffentlichen Insel."
   },
@@ -2074,6 +2092,14 @@
     "pt": "Idioma do relatório",
     "it": "Lingua del rapporto",
     "de": "Berichtssprache"
+  },
+  "Report this answer": {
+    "en": "Report this answer",
+    "es": "Reportar esta respuesta",
+    "fr": "Signaler cette réponse",
+    "pt": "Denunciar esta resposta",
+    "it": "Segnala questa risposta",
+    "de": "Diese Antwort melden"
   },
   "Request failed": {
     "fr": "La demande a échoué",
@@ -2301,7 +2327,7 @@
     "en": "Share",
     "es": "Compartir",
     "fr": "Partager",
-    "pt": "Partilhar",
+    "pt": "Compartilhar",
     "it": "Condividi",
     "de": "Teilen"
   },
@@ -2309,13 +2335,13 @@
     "en": "Share Bobby with someone you know",
     "es": "Comparte Bobby con alguien que conoces",
     "fr": "Partage Bobby avec quelqu’un que tu connais",
-    "pt": "Partilha o Bobby com alguém que conheces",
+    "pt": "Compartilhe o Bobby com alguém que você conhece",
     "it": "Condividi Bobby con qualcuno che conosci",
     "de": "Teile Bobby mit jemandem, den du kennst"
   },
   "Share Bobby with someone you know.": {
     "fr": "Partage Bobby avec une personne que tu connais.",
-    "pt": "Partilha o Bobby com alguém que conheces.",
+    "pt": "Compartilhe o Bobby com alguém que você conhece.",
     "it": "Condividi Bobby con qualcuno che conosci.",
     "de": "Teile Bobby mit jemandem, den du kennst."
   },
@@ -2323,13 +2349,13 @@
     "en": "Share a text summary of your companion, level and earned gear",
     "es": "Comparte un resumen de texto de tu compañero, nivel y equipo ganado",
     "fr": "Partage un résumé texte de ton compagnon, de ton niveau et de ton équipement gagné",
-    "pt": "Partilha um resumo em texto do teu companheiro, nível e equipamento ganho",
+    "pt": "Compartilhe um resumo em texto do seu companheiro, nível e equipamento conquistado",
     "it": "Condividi un riepilogo testuale del tuo compagno, del livello e dell’equipaggiamento guadagnato",
     "de": "Teile eine Textübersicht deines Begleiters, deiner Stufe und deiner verdienten Ausrüstung"
   },
   "Share invite": {
     "fr": "Partager l'invitation",
-    "pt": "Partilhar convite",
+    "pt": "Compartilhar convite",
     "it": "Condividi invito",
     "de": "Einladung teilen"
   },
@@ -2337,13 +2363,13 @@
     "en": "Share my avatar",
     "es": "Compartir mi avatar",
     "fr": "Partager mon avatar",
-    "pt": "Partilhar o meu avatar",
+    "pt": "Compartilhar meu avatar",
     "it": "Condividi il mio avatar",
     "de": "Meinen Avatar teilen"
   },
   "Share this name and layout with visitors? You can make it private again here.": {
     "fr": "Partager ce nom et cette disposition avec les visiteurs ? Tu peux la rendre privée ici à tout moment.",
-    "pt": "Partilhar este nome e disposição com visitantes? Podes torná-la privada novamente aqui.",
+    "pt": "Compartilhar este nome e layout com visitantes? Você pode tornar a ilha privada novamente aqui.",
     "it": "Condividere questo nome e questa disposizione con i visitatori? Puoi renderla nuovamente privata qui.",
     "de": "Diesen Namen und diese Anordnung mit Besuchern teilen? Du kannst die Insel hier wieder privat machen."
   },
@@ -2351,13 +2377,13 @@
     "en": "Share your companion, level and earned gear",
     "es": "Comparte tu compañero, nivel y equipo ganado",
     "fr": "Partage ton compagnon, ton niveau et ton équipement gagné",
-    "pt": "Partilha o teu companheiro, nível e equipamento ganho",
+    "pt": "Compartilhe seu companheiro, nível e equipamento conquistado",
     "it": "Condividi il tuo compagno, il livello e l’equipaggiamento guadagnato",
     "de": "Teile deinen Begleiter, deine Stufe und deine verdiente Ausrüstung"
   },
   "Shared island": {
     "fr": "Île partagée",
-    "pt": "Ilha partilhada",
+    "pt": "Ilha compartilhada",
     "it": "Isola condivisa",
     "de": "Geteilte Insel"
   },
@@ -2365,7 +2391,7 @@
     "en": "Sharing is unavailable. Try again.",
     "es": "No se pudo compartir. Intenta de nuevo.",
     "fr": "Le partage est indisponible. Réessaie.",
-    "pt": "Não foi possível partilhar. Tenta novamente.",
+    "pt": "Não foi possível compartilhar. Tente novamente.",
     "it": "La condivisione non è disponibile. Riprova.",
     "de": "Das Teilen ist nicht verfügbar. Versuche es erneut."
   },
@@ -2595,7 +2621,7 @@
   },
   "Subscriptions renew automatically unless cancelled through your store. Access is confirmed by Bobby after purchase.": {
     "fr": "Les abonnements se renouvellent automatiquement sauf annulation dans ta boutique. Bobby confirme l'accès après l'achat.",
-    "pt": "As subscrições renovam-se automaticamente, salvo cancelamento na tua loja. O Bobby confirma o acesso após a compra.",
+    "pt": "As assinaturas são renovadas automaticamente, salvo cancelamento na sua loja. O Bobby confirma o acesso após a compra.",
     "it": "Gli abbonamenti si rinnovano automaticamente salvo annullamento nel tuo store. Bobby conferma l'accesso dopo l'acquisto.",
     "de": "Abonnements verlängern sich automatisch, sofern du sie nicht über deinen Store kündigst. Bobby bestätigt den Zugang nach dem Kauf."
   },
@@ -2629,7 +2655,7 @@
   },
   "Tap one to ask Bobby.": {
     "fr": "Touche-en un pour demander à Bobby.",
-    "pt": "Toca num para perguntar ao Bobby.",
+    "pt": "Toque em um para perguntar ao Bobby.",
     "it": "Toccane uno per chiedere a Bobby.",
     "de": "Tippe auf eins, um Bobby zu fragen."
   },
@@ -2911,6 +2937,14 @@
     "it": "Non viene più usato dopo {0} giorni senza domande.",
     "de": "Wird nach {0} Tagen ohne Frage nicht mehr verwendet."
   },
+  "Update Android System WebView to use Bobby.": {
+    "en": "Update Android System WebView to use Bobby.",
+    "es": "Actualiza Android System WebView para usar Bobby.",
+    "fr": "Mettez à jour Android System WebView pour utiliser Bobby.",
+    "pt": "Atualize o Android System WebView para usar o Bobby.",
+    "it": "Aggiorna Android System WebView per usare Bobby.",
+    "de": "Aktualisiere Android System WebView, um Bobby zu nutzen."
+  },
   "Use a benefit confirmed by your account": {
     "en": "Use a benefit confirmed by your account",
     "es": "Usa un beneficio confirmado por tu cuenta",
@@ -3059,7 +3093,7 @@
   },
   "What you have and how to get more": {
     "fr": "Ce que tu as et comment en obtenir plus",
-    "pt": "O que tens e como obter mais",
+    "pt": "O que você tem e como obter mais",
     "it": "Cosa hai e come averne di più",
     "de": "Was du hast und wie du mehr bekommst"
   },
@@ -3119,19 +3153,19 @@
   },
   "You already have a thesis for {0}.": {
     "fr": "Tu as déjà une thèse sur {0}.",
-    "pt": "Já tens uma tese sobre {0}.",
+    "pt": "Você já tem uma tese sobre {0}.",
     "it": "Hai già una tesi su {0}.",
     "de": "Du hast schon eine These zu {0}."
   },
   "You already have a thesis on {0}.": {
     "fr": "Tu as déjà une thèse sur {0}.",
-    "pt": "Já tens uma tese sobre {0}.",
+    "pt": "Você já tem uma tese sobre {0}.",
     "it": "Hai già una tesi su {0}.",
     "de": "Du hast schon eine These zu {0}."
   },
   "You already have an active subscription.": {
     "fr": "Tu as déjà un abonnement actif.",
-    "pt": "Já tens uma subscrição ativa.",
+    "pt": "Você já tem uma assinatura ativa.",
     "it": "Hai già un abbonamento attivo.",
     "de": "Du hast bereits ein aktives Abonnement."
   },
@@ -3231,11 +3265,13 @@
     "it": "Il tuo Bobby",
     "de": "Dein Bobby"
   },
-  "Your Bobby account was deleted. To remove Bobby's access to your Apple account, open Apple's instructions, select Bobby in your Sign in with Apple settings, and stop using Sign in with Apple.": {
-    "fr": "Ton compte Bobby a été supprimé. Pour retirer l’accès de Bobby à ton compte Apple, ouvre les instructions d’Apple, sélectionne Bobby dans les réglages de Se connecter avec Apple et cesse d’utiliser ce mode de connexion.",
-    "pt": "A tua conta Bobby foi eliminada. Para remover o acesso do Bobby à tua conta Apple, abre as instruções da Apple, seleciona o Bobby nas definições de Iniciar sessão com Apple e deixa de usar esse acesso.",
-    "it": "Il tuo account Bobby è stato eliminato. Per rimuovere l’accesso di Bobby al tuo account Apple, apri le istruzioni di Apple, seleziona Bobby nelle impostazioni di Accedi con Apple e smetti di usare questo accesso.",
-    "de": "Dein Bobby-Konto wurde gelöscht. Um Bobbys Zugriff auf dein Apple-Konto zu entfernen, öffne Apples Anleitung, wähle Bobby in den Einstellungen für Mit Apple anmelden und beende diese Nutzung."
+  "Your Bobby account was deleted. Open your previous sign-in provider's instructions, select Bobby in its app access settings, and remove its access.": {
+    "en": "Your Bobby account was deleted. Open your previous sign-in provider's instructions, select Bobby in its app access settings, and remove its access.",
+    "es": "Tu cuenta Bobby se eliminó. Abre las instrucciones del proveedor de acceso anterior, selecciona Bobby en su configuración de acceso de apps y retira su acceso.",
+    "fr": "Ton compte Bobby a été supprimé. Ouvre les instructions de ton ancien fournisseur de connexion, sélectionne Bobby dans les paramètres d’accès des applications et retire son accès.",
+    "pt": "Sua conta Bobby foi excluída. Abra as instruções do seu provedor de login anterior, selecione o Bobby nas configurações de acesso de aplicativos e remova esse acesso.",
+    "it": "Il tuo account Bobby è stato eliminato. Apri le istruzioni del precedente provider di accesso, seleziona Bobby nelle impostazioni di accesso delle app e rimuovi il suo accesso.",
+    "de": "Dein Bobby-Konto wurde gelöscht. Öffne die Anleitung deines früheren Anmeldeanbieters, wähle Bobby in den Einstellungen für den App-Zugriff und entferne seinen Zugriff."
   },
   "Your Monday briefing is included": {
     "fr": "Ton bilan du lundi est inclus",

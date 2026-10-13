@@ -10,7 +10,7 @@ class LandPracticeTest {
     private val catalog = JSONArray(File("src/main/assets/traderland/practice-catalog.json").readText()).let { rows ->
         (0 until rows.length()).associate { index -> rows.getJSONObject(index).let { it.getString("id") to PracticeFootprint(it.getInt("footprint_w"), it.getInt("footprint_h")) } }
     }
-    private val fixture = LandPractice.decodeFixture(File("src/main/assets/traderland/practice-fixture.json").readText(), catalog)!!
+    private val fixture = LandPractice.decodeFixture(File("src/main/assets/traderland/practice-starter.json").readText(), catalog)!!
     private fun accepted(value: LandPracticeUpdate): LandPracticeState = (value as LandPracticeUpdate.Accepted).state
     private fun rejected(error: LandPracticeError, value: LandPracticeUpdate) { assertEquals(error, (value as LandPracticeUpdate.Rejected).error) }
     private fun empty(focus: Int = 2) = LandPracticeState(emptyList(), focus)
@@ -111,7 +111,7 @@ class LandPracticeTest {
         assertEquals(1, LandPractice.load(saved(focus = -9), catalog, fixture).focusLevel)
     }
     @Test fun corruptBundledFixtureCannotManufacturePractice() {
-        val raw = File("src/main/assets/traderland/practice-fixture.json").readText()
+        val raw = File("src/main/assets/traderland/practice-starter.json").readText()
         assertNull(LandPractice.decodeFixture(raw.replace("\"gridSize\": 8", "\"gridSize\": 12"), catalog))
         assertNull(LandPractice.decodeFixture(raw.replace("\"col\": 3", "\"col\": true"), catalog))
         assertNull(LandPractice.decodeFixture(raw.replace("crypto_bay_context_buoy", "not_bundled"), catalog))

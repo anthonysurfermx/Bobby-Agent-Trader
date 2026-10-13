@@ -65,7 +65,7 @@ class FollowUpPageInstrumentedTest(private val language: String) {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context: Context get() = instrumentation.targetContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private var scenario: ActivityScenario<ComponentActivity>? = null
+    private var scenario: ActivityScenario<xyz.bobbyprotocol.android.MainActivity>? = null
     private var web: NucleoWebView? = null
     private val unavailable = AtomicReference<String?>()
 
@@ -162,8 +162,11 @@ class FollowUpPageInstrumentedTest(private val language: String) {
      */
     private fun open() {
         assumeTrue("This WebView cannot run a script before the page's own", WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT))
-        scenario = ActivityScenario.launch(ComponentActivity::class.java).also { launched ->
+        scenario = ActivityScenario.launch(xyz.bobbyprotocol.android.MainActivity::class.java).also { launched ->
             launched.onActivity { activity ->
+                val oldWeb = xyz.bobbyprotocol.android.MainActivity::class.java.getDeclaredField("web").apply { isAccessible = true }
+                (oldWeb.get(activity) as? NucleoWebView)?.close()
+                oldWeb.set(activity, null)
                 val view = WebView(activity)
                 view.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
                 WebViewCompat.addDocumentStartJavaScript(view, NO_WEBGL, setOf("https://appassets.androidplatform.net"))

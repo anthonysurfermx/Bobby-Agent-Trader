@@ -213,6 +213,7 @@ private fun After(host: V18Host, copy: ThesisCopy, result: ThesisReviewResult, r
         QuietNote(host.text("Evidence lists unavailable.", "Listas de evidencia no disponibles."), Modifier.padding(vertical = 8.dp), tag = "thesis-review-lists-unavailable")
     }
     History(host, copy, r().pastReviews(result.thesis.lastReview))
+    QuietChip(host.text("Report this answer", "Reportar esta respuesta"), "thesis-review-report") { host.switchSheet("reportContent") }
     Spacer(Modifier.height(22.dp))
     QuietPrimary(host.text("Keep thesis", "Mantener tesis"), "thesis-review-keep", onClick = onKeep)
     Text(copy.footer, Modifier.fillMaxWidth().padding(top = 14.dp).testTag("thesis-review-footer"), color = QuietColors.dim, fontSize = 12.sp, textAlign = TextAlign.Center)
@@ -317,6 +318,7 @@ private fun PastRow(host: V18Host, copy: ThesisCopy, revision: ThesisRevision, o
                 Text(name, Modifier.padding(top = 4.dp), color = QuietColors.dim, fontSize = 13.sp)
                 for (item in list.items) Text(item, color = QuietColors.muted, fontSize = 14.sp, lineHeight = 20.sp)
             }
+            QuietChip(host.text("Report this answer", "Reportar esta respuesta"), "thesis-review-past-report-" + revision.id) { host.switchSheet("reportContent") }
         }
     }
 }
@@ -342,9 +344,8 @@ private fun Refused(host: V18Host, copy: ThesisCopy, said: ThesisRefusalCopy, re
 private fun RefusalButton(host: V18Host, copy: ThesisCopy, action: ThesisRefusalCopy.Action, prominent: Boolean, reviewer: ThesisReviewer) {
     when (action) {
         ThesisRefusalCopy.Action.SIGN_IN -> {
-            // The same two doors as the profile. The sheet closes when the account arrives.
+            // Android offers the same Google sign-in as Profile; the sheet closes when the account arrives.
             Choice(host.text("Continue with Google", "Continuar con Google"), prominent, "thesis-review-signin-google") { host.signIn("google") }
-            Choice(host.text("Continue with Apple", "Continuar con Apple"), false, "thesis-review-signin-apple") { host.signIn("apple") }
         }
         ThesisRefusalCopy.Action.PRO -> Choice(host.text("See Bobby Pro", "Ver Bobby Pro"), prominent, "thesis-review-pro") { host.switchSheet("paywall") }
         ThesisRefusalCopy.Action.QUICK -> Choice(host.text("Review with {0}", "Revisar con {0}", copy.levelName(ThesisReviewer.QUICK)), prominent, "thesis-review-quick") {

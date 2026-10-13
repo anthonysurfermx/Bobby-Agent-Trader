@@ -219,6 +219,5 @@ private fun CreditsDetails(host: V18Host, balance: CreditsBalance, invite: Strin
 internal fun QuietSignIn(host: V18Host, tag: String, onSignIn: (String) -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         QuietPrimary(host.text("Continue with Google", "Continuar con Google"), "$tag-google") { onSignIn("google") }
-        QuietChip(host.text("Continue with Apple", "Continuar con Apple"), "$tag-apple", Modifier.fillMaxWidth()) { onSignIn("apple") }
     }
 }

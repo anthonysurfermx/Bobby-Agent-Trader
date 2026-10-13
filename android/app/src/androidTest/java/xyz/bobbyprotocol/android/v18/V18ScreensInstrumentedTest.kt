@@ -14,7 +14,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import xyz.bobbyprotocol.android.createReleaseComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -60,7 +60,7 @@ import kotlin.math.roundToInt
  */
 @RunWith(Parameterized::class)
 class V18ScreensInstrumentedTest(private val language: String) {
-    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    @get:Rule val compose = createReleaseComposeRule()
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private var staged: V18Stage? = null
     /** The system's font size as it was, when a test changed it. */
@@ -220,6 +220,9 @@ class V18ScreensInstrumentedTest(private val language: String) {
         assertShown("thesis-review-keep")
         assertShown("thesis-review-footer")
         shot("review-after")
+        tap("thesis-review-report")
+        compose.waitUntil(20_000) { stage.route == "reportContent" }
+        assertEquals("Reporting must not ask for another AI review", 1, stage.network.calls.count { it.method == "POST" && it.path == DEBATE })
     }
 
     // ---- Memory ----

@@ -17,6 +17,23 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class BillingCoordinatorTest {
+    @Test fun releaseWithoutGoogleBillingNeverInitializesPurchasesOrLaunchesAStore() = runTest {
+        val fixture = fixture(BillingPolicy.usableKey("", false))
+        fixture.coordinator.identify(fixture.accounts.owner())
+        fixture.coordinator.loadOfferings()
+        assertEquals(BillingOutcome.UNAVAILABLE, fixture.coordinator.purchase("monthly") {
+            fail("A billing-disabled release must never open the store")
+            BillingCustomer(true, 2000, null)
+        })
+        assertEquals(BillingOutcome.UNAVAILABLE, fixture.coordinator.restore())
+        runCurrent()
+        assertFalse(fixture.client.configured)
+        assertEquals(0, fixture.client.restoreCalls)
+        assertFalse(fixture.coordinator.state.value.canPurchase)
+        assertEquals(BillingOfferingsStatus.NOT_CONFIGURED, fixture.coordinator.state.value.offeringsStatus)
+        assertTrue(fixture.accounts.requests.isEmpty())
+    }
+
     @Test fun constructionDoesNotConfigureOrReachTheNetwork() = runTest {
         val fixture = fixture()
         runCurrent()

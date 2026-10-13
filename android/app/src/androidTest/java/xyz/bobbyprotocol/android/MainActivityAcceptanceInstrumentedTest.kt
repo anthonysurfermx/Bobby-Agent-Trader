@@ -318,7 +318,7 @@ class MainActivityAcceptanceInstrumentedTest {
         assertEquals(0, (evaluate("window.nucleo.ledger().length") as Number).toInt())
     }
 
-    @Test fun nativeSheetsAndAwaitedSignInPaywallRequestsCancelOnSystemBack() {
+    @Test fun nativeSheetsAndAwaitedSignInOrCreditsRequestsCancelOnSystemBack() {
         enterGuestApp()
         listOf("account", "riskNotice", "squad", "locker", "memory", "briefings", "reportContent").forEach { route ->
             bridge("openNative", JSONObject().put("route", route))
@@ -327,7 +327,9 @@ class MainActivityAcceptanceInstrumentedTest {
             waitForNativeDismissal()
             assertFalse("Closing a sheet must preserve the Activity", activity.isFinishing)
         }
-        listOf("signIn" to "account", "paywall" to "paywall").forEach { (method, route) ->
+        // The candidate has no billing key; a configured build retains its genuine paywall.
+        val billingRoute = if (BuildConfig.REVENUECAT_ANDROID_API_KEY.isBlank()) "credits" else "paywall"
+        listOf("signIn" to "account", "paywall" to billingRoute).forEach { (method, route) ->
             startPromise("window.nucleoBridge.call(${JSONObject.quote(method)}, {})")
             waitForNativeSheet(route)
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
