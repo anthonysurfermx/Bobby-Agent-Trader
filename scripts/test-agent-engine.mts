@@ -417,23 +417,23 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   const r6 = taskResult((await store.get('ana', t6.id))!)!;
   ok(r6.presentation.composedByCode && r6.presentation.kind === 'analysis' && r6.presentation.text.includes(pctEs(refReturn(btc30))) && !/1[25]\s?%/.test(r6.presentation.text), 'twice wrong: the person gets the comparison written by code from the figures, never the typed number');
   // The second reader refuses the words of an analysis: code tells it. It cannot read an explanation: nothing is shown.
-  verdicts = ['advice'];
-  script = [cmp, () => answer({ kind: 'analysis', gist: 'Te conviene Bitcoin.', text: 'Te conviene Bitcoin, que cambió {{f:return_BTC}}.' })];
+  verdicts = ['advice', 'advice'];
+  script = [cmp, () => answer({ kind: 'analysis', gist: 'Te conviene Bitcoin.', text: 'Te conviene Bitcoin, que cambió {{f:return_BTC}}.' }), () => answer({ kind: 'analysis', gist: 'Te conviene Bitcoin.', text: 'Te conviene Bitcoin, que cambió {{f:return_BTC}}.' })];
   const t7 = await begin('Compara', 'c7'); await runTask(deps, 'ana', t7.id);
   await store.approve('ana', t7.id, waitingApproval((await store.get('ana', t7.id))!)!.digest, clock); await runTask(deps, 'ana', t7.id);
   const r7 = (await store.get('ana', t7.id))!;
   ok(taskResult(r7)!.presentation.composedByCode && !taskResult(r7)!.presentation.text.includes('conviene') && r7.steps.at(-1)!.data.reader === 'advice', 'advice in an analysis is never shown: the figures are told by code');
-  verdicts = ['figure'];
-  script = [cmp, () => answer({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}.' })];
+  verdicts = ['figure', 'figure'];
+  script = [cmp, () => answer({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}.' }), () => answer({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}.' })];
   const t8 = await begin('Compara', 'c8'); await runTask(deps, 'ana', t8.id);
   await store.approve('ana', t8.id, waitingApproval((await store.get('ana', t8.id))!)!.digest, clock); await runTask(deps, 'ana', t8.id);
   const r8 = taskResult((await store.get('ana', t8.id))!)!.presentation;
   ok(r8.composedByCode && r8.kind === 'analysis' && r8.text.includes(pctEs(refReturn(btc30))) && (await store.get('ana', t8.id))!.steps.at(-1)!.data.reader === 'figure', 'a quantity the reader finds in an analysis\'s own words is the model\'s (code\'s numbers were marks): the figures are told by code');
-  verdicts = ['figure'];
-  script = [() => answer({ kind: 'explanation', gist: 'El mercado suele doblar tu dinero cada siete años.', text: 'El mercado suele doblar tu dinero cada siete años, así que conviene empezar pronto.' })];
+  verdicts = ['figure', 'figure'];
+  script = Array.from({ length: 2 }, () => () => answer({ kind: 'explanation', gist: 'El mercado suele doblar tu dinero cada siete años.', text: 'El mercado suele doblar tu dinero cada siete años, así que conviene empezar pronto.' }));
   const t9 = await begin('¿Cuánto da el mercado?', 'c9'); await runTask(deps, 'ana', t9.id);
   ok(taskResult((await store.get('ana', t9.id))!)!.presentation.composedByCode && !taskResult((await store.get('ana', t9.id))!)!.presentation.text.includes('doblar'), 'a figure in words in an explanation (no evidence behind it) is the second reader\'s to catch: replaced by the fixed sentence');
-  verdicts = ['unchecked'];
+  verdicts = ['unchecked', 'unchecked'];
   script = [() => answer({ kind: 'explanation', gist: 'Un bono es un préstamo.', text: 'Un bono es un préstamo a un gobierno o a una empresa.' })];
   const t10 = await begin('¿Qué es un bono?', 'c10'); await runTask(deps, 'ana', t10.id);
   eq([taskState((await store.get('ana', t10.id))!, clock), taskError((await store.get('ana', t10.id))!), taskResult((await store.get('ana', t10.id))!)], ['failed', 'unchecked', null], 'an explanation nobody could check is not shown: the task fails in a named state and the question is kept');
@@ -634,10 +634,10 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   const malDone = await yesTo(mal.id);
   eq([malDone.steps.filter((step) => step.kind === 'tool_refused').map((step) => [step.data.tool, step.data.reason]), taskResult(malDone)!.presentation.composedByCode], [[['answer', 'invalid_arguments']], false], 'claims that are not a list are an argument the server cannot read: sent back once, never read as "no claims"');
   // Everything of the model's is read: a "clarification", the limitations it wrote, and a next question the reader drops.
-  readerSaw.length = 0; verdicts = ['advice'];
-  script = [() => answer({ kind: 'clarification', gist: '¿Quieres que te diga cuál comprar?', text: '¿Quieres que te diga cuál comprar? Yo metería todo en Bitcoin.' })];
+  readerSaw.length = 0; verdicts = ['advice', 'advice'];
+  script = Array.from({ length: 2 }, () => () => answer({ kind: 'clarification', gist: '¿Quieres que te diga cuál comprar?', text: '¿Quieres que te diga cuál comprar? Yo metería todo en Bitcoin.' }));
   const sly = await begin('Compara estos', 'e-sly'); await runTask(deps, 'ana', sly.id);
-  eq([readerSaw.length, taskResult((await store.get('ana', sly.id))!)!.presentation.composedByCode, taskResult((await store.get('ana', sly.id))!)!.presentation.text.includes('Bitcoin'), (await store.get('ana', sly.id))!.steps.at(-1)!.data.reader], [1, true, false, 'advice'], 'a text labelled a clarification is read like any other, and advice in it never reaches the person');
+  eq([readerSaw.length, taskResult((await store.get('ana', sly.id))!)!.presentation.composedByCode, taskResult((await store.get('ana', sly.id))!)!.presentation.text.includes('Bitcoin'), (await store.get('ana', sly.id))!.steps.at(-1)!.data.reader], [2, true, false, 'advice'], 'a text labelled a clarification is read like any other (both drafts), and advice in it never reaches the person');
   readerSaw.length = 0; verdicts = [{ verdict: 'pass', keepNext: false, usd: 0.0007 }];
   script = [() => answer({ kind: 'explanation', gist: 'Un bono es un préstamo.', text: 'Un bono es un préstamo a un gobierno o a una empresa.', limitations: ['No sé cuál te conviene, pero los bonos del gobierno son lo más seguro.'], next: '¿En cuál meto mi dinero?' })];
   const lim = await begin('¿Qué es un bono?', 'e-lim'); await runTask(deps, 'ana', lim.id);
@@ -808,8 +808,8 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   eq([cited.kind, cited.figures, cited.references.map((r) => r.evidence), readerSaw[0].includes('⟦figure: '), /\d/.test(readerSaw[0])], ['analysis', ['drawdown_ETH'], ['ev_ETH'], true, false], 'a figure cited only in a limitation or the next question is still listed, referenced, and a mark for the reader');
   // After its own read, a text the model calls a clarification is an analysis: the read is never spent on nothing.
   for (const verdict of ['unchecked', 'advice'] as const) {
-    verdicts = [verdict];
-    script = [read, () => answer({ kind: 'clarification', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}}. ¿Quieres que mire también Solana?' })];
+    verdicts = [verdict, verdict];
+    script = [read, ...Array.from({ length: verdict === 'unchecked' ? 1 : 2 }, () => () => answer({ kind: 'clarification', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}}. ¿Quieres que mire también Solana?' }))];
     const t = await begin('Compara', `cl-${verdict}`); await runTask(deps, 'ana', t.id); await yes(t.id); await runTask(deps, 'ana', t.id);
     const r = taskResult((await store.get('ana', t.id))!);
     ok(r?.presentation.kind === 'analysis' && r.presentation.composedByCode && r.presentation.figures.length === 6 && r.presentation.references.length === 2, `a "clarification" after the read whose words cannot be shown (${verdict}) is told by code from the figures`);
@@ -893,7 +893,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   try {
     const st = new MemoryAgentStore(6), d = depsFor(st);
     d.read = companionReader(st, { partition: 'agent', capUsd: 1, taskCapUsd: 0.25 }, () => clock);
-    script = [() => answer({ kind: 'explanation', gist: 'Un ETF es un fondo que cotiza.', text: 'Un ETF es un fondo que cotiza. Te recomiendo comprar uno del S&P 500 ya: no puedes perder.', next: '¿Cuál compro hoy?' })];
+    script = Array.from({ length: 2 }, () => () => answer({ kind: 'explanation', gist: 'Un ETF es un fondo que cotiza.', text: 'Un ETF es un fondo que cotiza. Te recomiendo comprar uno del S&P 500 ya: no puedes perder.', next: '¿Cuál compro hoy?' }));
     const bad = await ask(d, 'ana', '¿Qué es un ETF?', 'off1');
     script = [() => answer({ kind: 'explanation', gist: 'Un ETF es un fondo que se compra y se vende como una acción.', text: 'Un ETF es un fondo que se compra y se vende como una acción. Puedes perder dinero.' })];
     const good = await ask(d, 'ana', '¿Qué es un ETF?', 'off2');
@@ -905,7 +905,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
     await runTask(d, 'ana', t.task.id); await st.approve('ana', t.task.id, waitingApproval((await st.get('ana', t.task.id))!)!.digest, clock); await runTask(d, 'ana', t.task.id);
     const measured = (await st.get('ana', t.task.id))!;
     eq([taskResult(bad)!.presentation.composedByCode, taskResult(bad)!.presentation.next, bad.steps.at(-1)!.data.reader !== 'pass', bad.steps.at(-1)!.data.readBy, taskResult(good)!.presentation.composedByCode, good.steps.at(-1)!.data.reader, good.steps.at(-1)!.data.readBy, taskResult(measured)!.presentation.composedByCode, taskResult(measured)!.presentation.text.includes('doble'), measured.steps.at(-1)!.data.reader, st.attempts().length],
-      [true, null, true, 'lists', false, 'pass', 'lists', true, false, 'unchecked', 5], 'with the reader switched off an explanation is held to the companion\'s lists (and the record says so), and an analysis is told by code: nothing is shown unread');
+      [true, null, true, 'lists', false, 'pass', 'lists', true, false, 'unchecked', 6], 'with the reader switched off an explanation is held to the companion\'s lists (and the record says so), and an analysis is told by code: nothing is shown unread');
   } finally { delete process.env.BOBBY_COMPANION_JUDGE; }
 }
 
@@ -934,7 +934,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   try {
     const st = new MemoryAgentStore(6), d = depsFor(st);
     d.read = companionReader(st, { partition: 'agent', capUsd: 1, taskCapUsd: 0.25 }, () => clock);
-    script = [() => answer({ kind: 'explanation', gist: 'Sí. Un fondo indexado es 100% seguro.', text: 'Sí. Un fondo indexado es 100% seguro porque reparte el dinero entre muchas empresas.' })];
+    script = Array.from({ length: 2 }, () => () => answer({ kind: 'explanation', gist: 'Sí. Un fondo indexado es 100% seguro.', text: 'Sí. Un fondo indexado es 100% seguro porque reparte el dinero entre muchas empresas.' }));
     const promise = await ask(d, 'ana', '¿Un fondo indexado es 100% seguro?', 'off5a');
     script = [() => answer({ kind: 'explanation', gist: 'Un ETF es un fondo que se compra y se vende como una acción.', text: 'Un ETF es un fondo que se compra y se vende como una acción. Con tus 500 € o con cualquier monto, su valor puede bajar.' })];
     const own = await ask(d, 'ana', 'Tengo 500 euros. ¿Qué es un ETF?', 'off5b');
@@ -1035,12 +1035,12 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   const { TOOLS } = await import('../api/_lib/agent/tools.ts');
   const store = new MemoryAgentStore(6), deps = depsFor(store);
   // "Which one holds more Nvidia?" got the companion's sentence about how investing works. The engine now says its own.
-  verdicts = ['figure'];
-  script = [() => answer({ kind: 'explanation', gist: 'El fondo del Nasdaq lleva más Nvidia.', text: 'El fondo del Nasdaq lleva más Nvidia, cerca de una décima parte de su cartera.' })];
+  verdicts = ['figure', 'figure'];
+  script = Array.from({ length: 2 }, () => () => answer({ kind: 'explanation', gist: 'El fondo del Nasdaq lleva más Nvidia.', text: 'El fondo del Nasdaq lleva más Nvidia, cerca de una décima parte de su cartera.' }));
   const held = taskResult(await ask(deps, 'eva', '¿Cuál trae más Nvidia adentro?', 'e1'))!.presentation;
   eq([held.text, held.kind, held.composedByCode, /invertir/.test(held.text)], [UNVERIFIED.es, 'explanation', true, false], 'an explanation that stated a number nobody computed is replaced by a sentence about THAT: no verified figure here, and what Bobby can do');
-  verdicts = ['advice'];
-  script = [() => answer({ kind: 'explanation', gist: 'Te conviene el fondo.', text: 'Te conviene el fondo, es lo más sensato para ti.' })];
+  verdicts = ['advice', 'advice'];
+  script = Array.from({ length: 2 }, () => () => answer({ kind: 'explanation', gist: 'Te conviene el fondo.', text: 'Te conviene el fondo, es lo más sensato para ti.' }));
   const advised = taskResult(await ask(deps, 'eva', '¿Qué hago?', 'e2'))!.presentation;
   eq([advised.text, advised.kind, advised.composedByCode], [UNANSWERED.es, 'unavailable', true], 'any other verdict leaves the plain "not this time": never a sentence about something else');
   for (const language of ['en', 'es', 'fr', 'pt', 'it', 'de'] as const) ok(UNVERIFIED[language].length > 40 && !/\d/.test(UNVERIFIED[language]), `${language}: the sentence exists and holds no number`);
@@ -1233,10 +1233,10 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   // In the loop: the reader turns the model's words down, and what the person asked for is still what they get.
   const store = new MemoryAgentStore(6), deps = depsFor(store);
   script = [() => turn([use('read_assets', { assets: ['Bitcoin', 'Ethereum'], windowDays: 30 })]),
-    () => answer({ kind: 'analysis', gist: 'Su correlación fue de {{f:corr_BTC_ETH}}.', text: 'Su correlación fue de {{f:corr_BTC_ETH}}. Yo elegiría Bitcoin.', asked: ['correlation'] })];
+    ...Array.from({ length: 2 }, () => () => answer({ kind: 'analysis', gist: 'Su correlación fue de {{f:corr_BTC_ETH}}.', text: 'Su correlación fue de {{f:corr_BTC_ETH}}. Yo elegiría Bitcoin.', asked: ['correlation'] }))];
   const offered = await ask(deps, 'sara', '¿Qué tan juntos se movieron Bitcoin y Ethereum?', 's1');
   await store.approve('sara', offered.id, waitingApproval(offered)!.digest, clock);
-  verdicts.push('advice');
+  verdicts.push('advice', 'advice');
   await runTask(deps, 'sara', offered.id);
   const shown = taskResult((await store.get('sara', offered.id))!)!.presentation;
   eq([shown.composedByCode, shown.figures.includes('corr_BTC_ETH'), shown.text.includes(formatFigure(fig(crypto, 'corr_BTC_ETH'), 'es')), /elegir/i.test(shown.text)], [true, true, true, false], 'the model\'s advice is not shown, and the correlation they asked for is: code tells it');
@@ -1295,13 +1295,48 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   }
   ok(!/SPDR|Invesco|Platforms/.test(composeByCode(await analysisOf(['BTC', 'SPY'], 30), 'en').text), 'code says the short name people use, never a fund\'s legal one');
 
+  // A first day written once is heard for every figure beside it (thirteenth blind set: "desde el cierre de 11 de
+  // septiembre: Amazon …, NVIDIA … y Solana …", and Solana's change starts on the 12th).
+  {
+    const mixed = await analysisOf(['BTC', 'SPY'], 60), from = (id: string) => mixed.figures.find((figure) => figure.id === id)!.from;   // sixty days back is a Monday: the coin's close before is Sunday's, the fund's is Friday's
+    ok(from('return_BTC') !== from('return_SPY'), '(a coin and a fund do not start at the same close)');
+    const draft = (text: string) => present({ kind: 'analysis', gist: text.split('. ')[0].replace(/\.?$/, '.'), text, limitations: [], next: '', claims: [] }, mixed, 'Compara Bitcoin y SPY', 'es') as any;
+    const one = draft('Desde el cierre del {{from:return_SPY}}, SPY cambió {{f:return_SPY}} y Bitcoin {{f:return_BTC}}.');
+    eq([one.ok, one.refusal?.code, /return_BTC/.test(one.refusal?.detail ?? '')], [false, 'misdated', true], 'one first day for two assets that start on different days is refused, and the model is told which figure it does not fit');
+    ok(draft('SPY cambió {{f:return_SPY}} desde el cierre del {{from:return_SPY}} y Bitcoin {{f:return_BTC}} desde el cierre del {{from:return_BTC}}.').ok, 'each asset with its own first day is shown');
+    ok(draft('SPY cambió {{f:return_SPY}} y Bitcoin {{f:return_BTC}}.').ok && draft('Desde el cierre del {{from:return_SPY}}, SPY cambió {{f:return_SPY}}. Bitcoin cambió {{f:return_BTC}}.').ok, 'no date, or a date in a sentence of its own asset, is shown');
+    ok(draft('Desde el cierre del {{from:return_SPY}}, SPY cambió {{f:return_SPY}} y en un día promedio se movió {{f:move_SPY}}; Bitcoin se movió {{f:move_BTC}}.').ok, 'a figure of another kind beside that date is not what the date is about');
+    const same = present({ kind: 'analysis', gist: 'Desde el cierre del {{from:return_BTC}}, Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}.', text: 'Desde el cierre del {{from:return_BTC}}, Bitcoin cambió {{f:return_BTC}} y Ethereum {{f:return_ETH}}.', limitations: [], next: '', claims: [] }, crypto, 'Compara', 'es') as any;
+    ok(same.ok, 'two assets that start at the same close share their first day');
+  }
+
+  // In the loop: the reader sends the model's words back once, with what they did in fixed words, and reads the second
+  // draft like the first. (Until the thirteenth set a refused draft was replaced by code at once, and whatever else the
+  // person had asked was lost with it.)
+  {
+    const st = new MemoryAgentStore(6), d = depsFor(st);
+    const seen: string[] = [];
+    d.read = async ({ text }) => { seen.push(text); return seen.length === 1 ? { verdict: 'advice', keepNext: true, usd: 0.0011, found: ['recommendation'] } : { verdict: 'pass', keepNext: true, usd: 0.0011 }; };
+    script = [() => answer({ kind: 'explanation', gist: 'Un fondo indexado copia un mercado.', text: 'Un fondo indexado copia un mercado. Te conviene empezar por uno.' }), () => answer({ kind: 'explanation', gist: 'Un fondo indexado copia un mercado.', text: 'Un fondo indexado copia un mercado. Su valor sube y baja con él.' })];
+    const done = await ask(d, 'rosa', '¿Qué es un fondo indexado?', 'rr1'), sent = done.steps.find((step) => step.kind === 'tool_refused')!;
+    eq([taskResult(done)!.presentation.composedByCode, taskResult(done)!.presentation.text, done.steps.at(-1)!.data.reader, seen.length], [false, 'Un fondo indexado copia un mercado. Su valor sube y baja con él.', 'pass', 2], 'a draft the reader refuses goes back once: the second draft is read too, and shown');
+    eq([sent.data.reason, /recommend or rank/.test(String(sent.data.detail)), sent.data.readerUsd, /conviene/.test(JSON.stringify(sent.data))], ['reader_advice', true, 0.0011, false], '…the model is told what its words did in fixed words, never the reader\'s, and that reading is on the record');
+    ok(Math.abs(taskUsage(done).usd - (0.004 * 2 + 0.0011 * 2)) < 1e-9 && JSON.stringify(calls.at(-1)!.messages.at(-1)).includes('reader_advice'), '…both readings and both drafts are counted in what the errand cost');
+    // A reader that did not answer is asked once more before the errand is lost.
+    const st2 = new MemoryAgentStore(6), d2 = depsFor(st2); let asked = 0;
+    d2.read = async () => (++asked === 1 ? 'unchecked' : { verdict: 'pass', keepNext: true, usd: 0.0011 });
+    script = [() => answer({ kind: 'explanation', gist: 'Un bono es un préstamo.', text: 'Un bono es un préstamo a un gobierno o a una empresa.' })];
+    const again = await ask(d2, 'rosa', '¿Qué es un bono?', 'rr2');
+    eq([asked, taskState(again, clock), taskResult(again)!.presentation.composedByCode], [2, 'completed', false], 'a reader that did not answer once is asked again, and the answer is shown');
+  }
+
   // In the loop: a sum with the person's money on a follow-up is not answered by reciting the earlier comparison.
   script = [() => turn([use('read_assets', { assets: ['Bitcoin', 'Ethereum'], windowDays: 30 })]), () => answer({ kind: 'analysis', gist: 'Bitcoin cambió {{f:return_BTC}}.', text: 'Bitcoin cambió {{f:return_BTC}}. Ethereum cambió {{f:return_ETH}}.' })];
   const read = await ask(deps, 'pia', 'Compara Bitcoin y Ethereum', 'p1');
   await store.approve('pia', read.id, waitingApproval(read)!.digest, clock);
   await runTask(deps, 'pia', read.id);
-  script = [() => answer({ kind: 'analysis', gist: 'La caída fue de {{f:drawdown_ETH}}.', text: 'La caída fue de {{f:drawdown_ETH}}. Con tus 700 necesitarías triplicar.', asked: ['drawdown'] })];
-  verdicts.push('figure');
+  script = Array.from({ length: 2 }, () => () => answer({ kind: 'analysis', gist: 'La caída fue de {{f:drawdown_ETH}}.', text: 'La caída fue de {{f:drawdown_ETH}}. Con tus 700 necesitarías triplicar.', asked: ['drawdown'] }));
+  verdicts.push('figure', 'figure');
   const summed = taskResult(await ask(deps, 'pia', 'si la caída fue esa con mis 700 necesitaría triplicar para volver haz la cuenta', 'p2', true))!.presentation;
   eq([summed.composedByCode, summed.figures.join(), summed.text.endsWith('Lo que vaya más allá de estas cifras no lo puedo establecer aquí.'), /triplic/.test(summed.text)], [true, 'drawdown_BTC,drawdown_ETH', true, false], 'a sum the model made up on a follow-up: code tells only the fall they asked about, and that what goes beyond it cannot be established here');
 

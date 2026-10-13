@@ -29,7 +29,9 @@ export interface OwnWords { text: string; limitations: string[]; next: string | 
   forReader: { text: string; limitations: string[]; next: string | null } }
 /** What a figure is, for the reader (its instructions are English). */
 const WHAT: Record<string, string> = { return: 'change over the whole window', move: "average size of one day's move", drawdown: 'largest fall from a high inside the window', worst: 'change on its worst single day', best: 'change on its best single day', close: 'last closing price', correlation: 'correlation of their daily changes' };
-export type Refusal = { code: 'unknown_figure' | 'figure_without_value' | 'typed_number' | 'bad_placeholder' | 'claim_contradicts_figures' | 'claim_cannot_be_checked' | 'asked_not_answered' | 'presumed_asset' | 'every_day' | 'no_figure_told' | 'too_long' | 'empty'; detail: string };
+/** Figures that start at the same kind of day: the change of the window and the fall from a high at the close before it; a pair at its first shared day; the rest at the window's first day. */
+const startsLike = (metric: string) => (metric === 'return' || metric === 'drawdown' ? 'close before' : metric === 'correlation' ? 'pair' : 'window');
+export type Refusal = { code: 'unknown_figure' | 'figure_without_value' | 'typed_number' | 'bad_placeholder' | 'claim_contradicts_figures' | 'claim_cannot_be_checked' | 'asked_not_answered' | 'presumed_asset' | 'every_day' | 'no_figure_told' | 'misdated' | 'too_long' | 'empty'; detail: string };
 
 const PLACEHOLDER = /\{\{((?:f|d|from|to):[A-Za-z0-9_~]+|days)\}\}/g;
 /** Written with its sign, so no dash before it can be read as one. */
@@ -154,6 +156,20 @@ function refuse(text: string, figures: Map<string, Figure>, question: string, da
     const [kind, id] = match[1].split(':'), figure = figures.get(id);
     if (!figure) return { code: 'unknown_figure', detail: id };
     if (kind === 'f' ? figure.value === null : kind === 'd' ? !figure.day : !figure[kind as 'from' | 'to']) return { code: 'figure_without_value', detail: figure.id };
+  }
+  // A first or last day written once is heard for every figure of its sentence. A coin and a share do not start at the
+  // same close: "from the close of 11 September: Amazon …, NVIDIA … and Solana …" gave Solana a day that was not its
+  // own (thirteenth blind set). Each figure of the same kind beside a date either starts (or ends) on that day or has
+  // its own date in the sentence.
+  for (const sentence of text.split(/(?<=[.!?…])\s+/)) {
+    const marks = [...sentence.matchAll(PLACEHOLDER)].filter((match) => match[1] !== 'days').map((match) => { const [kind, id] = match[1].split(':'); return { kind, figure: figures.get(id)! }; });
+    for (const date of marks) {
+      if (date.kind !== 'from' && date.kind !== 'to') continue;
+      const bound = date.kind as 'from' | 'to';
+      const other = marks.find((mark) => mark.kind === 'f' && mark.figure.subject !== date.figure.subject && startsLike(mark.figure.metric) === startsLike(date.figure.metric) && mark.figure[bound] !== date.figure[bound]
+        && !marks.some((own) => own.kind === bound && own.figure.subject === mark.figure.subject && own.figure[bound] === mark.figure[bound]));
+      if (other) return { code: 'misdated', detail: `{{${bound}:${date.figure.id}}} stands beside {{f:${other.figure.id}}}, which ${bound === 'from' ? 'starts' : 'ends'} on another day: give each asset its own {{${bound}:ID}} or leave that date out` };
+    }
   }
   // Characters that reorder what follows: what a person sees would not be what was checked.
   if (/[\u202A-\u202E\u2066-\u2069\u200E\u200F\u061C]/.test(text)) return { code: 'bad_placeholder', detail: 'a character that reorders text' };

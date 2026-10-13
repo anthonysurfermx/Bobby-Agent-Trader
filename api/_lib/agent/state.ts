@@ -41,7 +41,8 @@ export function taskUsage(task: Pick<Task, 'steps'>): { modelCalls: number; tool
   // `reads` is what the person ended up using: a read given back (no evidence came) is not counted.
   let modelCalls = 0, toolCalls = 0, usd = 0, unknownUsd = 0, reads = 0, given = 0;
   for (const step of task.steps) {
-    if (step.kind === 'answer' || step.kind === 'error' || step.kind === 'cancelled') usd += Number(step.data.readerUsd ?? 0);
+    // The reader is paid for each draft it read: the one that ended the task, and one it sent back.
+    if (step.kind === 'answer' || step.kind === 'error' || step.kind === 'cancelled' || step.kind === 'tool_refused') usd += Number(step.data.readerUsd ?? 0);
     if (step.kind === 'model_call') { modelCalls++; if (step.data.outcome === 'unknown') unknownUsd += Number(step.data.reservedUsd ?? 0); else usd += Number(step.data.usd ?? 0); }
     else if (step.kind === 'tool_call') { toolCalls++; if (step.data.refunded === true) reads -= given; }
     else if (step.kind === 'cancelled' && step.data.readGivenBack === true) reads -= given;

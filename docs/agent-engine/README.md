@@ -53,6 +53,8 @@ Code: `api/_lib/agent/`, door `api/agent-task.ts`, tests `scripts/test-agent-eng
 21. Told by code, an answer carries what was asked and only that, six figures at most, in sentences no word of which has to agree with a name; a correlation is said with what its size means. When more was asked, code says what else it read and leaves the chip that asks for it.
 22. Every way of ending without an answer has one plain sentence in the person's language: an errand's error, an empty utterance, one too long, too many at once, no reads left, storage that does not answer. Words the provider itself refuses end in a sentence, not in a second paid attempt.
 23. A session that has ended and whose close the source has not published yet is the series ending one session earlier; a close missing before a later bar is a gap and is refused.
+24. The change of the window and its largest fall say the day they run from: the close right before the window. A first or last day written once beside figures of assets that start on another day (a coin and a share) is refused: each asset gets its own date, or none.
+25. A draft the reader refuses goes back to the model once, with what its words did in fixed words (never the reader's own), and the second draft is read like the first; only a second refusal is told by code. A reader that did not answer is asked once more before an errand is lost to it. Every reading is on the record with what it cost.
 
 ## Measured by someone else (2026-10-11)
 
