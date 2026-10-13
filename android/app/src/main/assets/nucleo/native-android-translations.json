@@ -1253,6 +1253,18 @@
     "it": "Per ora non posso spiegare altro. Riprova più tardi.",
     "de": "Im Moment kann ich nichts mehr erklären. Versuch es später noch einmal."
   },
+  "I can’t explain more right now; I’ll be back {0}": {
+    "fr": "Je ne peux rien expliquer de plus pour l’instant; je reviens {0}",
+    "pt": "Por agora não posso explicar mais; volto {0}",
+    "it": "Per ora non posso spiegare altro; torno {0}",
+    "de": "Im Moment kann ich nichts mehr erklären; ich bin {0} wieder da"
+  },
+  "I can’t explain more right now; try again later.": {
+    "fr": "Je ne peux rien expliquer de plus pour l’instant; réessaie plus tard.",
+    "pt": "Por agora não posso explicar mais; tenta mais tarde.",
+    "it": "Per ora non posso spiegare altro; riprova più tardi.",
+    "de": "Im Moment kann ich nichts mehr erklären; versuch es später noch einmal."
+  },
   "Include questions from this phone": {
     "fr": "Inclure les questions de ce téléphone",
     "pt": "Incluir perguntas deste telefone",

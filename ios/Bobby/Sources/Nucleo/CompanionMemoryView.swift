@@ -64,6 +64,7 @@ struct CompanionNotesView: View {
     @State private var detail: String?
     @State private var openedInitialField = false
     @State private var pendingDeletion: NotesDeletion?
+    @Environment(\.dynamicTypeSize) private var typeSize
     private var canRemember: Bool { riskAccepted() && questionsAvailable() }
     private var lavender: Color { Color(red:185/255,green:173/255,blue:235/255) }
     var body: some View {
@@ -75,14 +76,17 @@ struct CompanionNotesView: View {
                     Spacer(minLength: 8)
                     QuietGlyphButton(systemImage: "xmark", label: CompanionCopy.text("closeNotes"), id: "companion-notes-close", minimumTarget: 48) { forgetUndo(); onClose() }
                 }
-                HStack(spacing: 12) {
-                    Text(CompanionCopy.text("memory")).quietFont(16).quietWraps()
-                    Spacer(minLength: 8)
-                    Text(CompanionCopy.text(store.accepted ? "on" : "off")).quietFont(13).foregroundStyle(Theme.warmMuted).quietWraps()
-                    Toggle(CompanionCopy.text("memory"), isOn: Binding(get: { store.accepted }, set: { yes in
-                        forgetUndo(); if yes { showingConsent = true } else { pendingDeletion = .memoryOff }
-                    })).labelsHidden().frame(minWidth:51,minHeight:48).contentShape(Rectangle()).tint(Theme.orbViolet).disabled(!canRemember).accessibilityIdentifier("companion-memory-toggle")
-                }.frame(minHeight: 50)
+                if typeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(CompanionCopy.text("memory")).quietFont(16).quietWraps().frame(maxWidth: .infinity, alignment: .leading)
+                        HStack(spacing: 12) { Spacer(); memoryState; memoryToggle }
+                    }
+                } else {
+                    HStack(spacing: 12) {
+                        Text(CompanionCopy.text("memory")).quietFont(16).quietWraps()
+                        Spacer(minLength: 8); memoryState; memoryToggle
+                    }.frame(minHeight: 50)
+                }
                 if !canRemember { meta(CompanionCopy.text(riskAccepted() ? "memoryOff" : "needsAI")) }
                 meta(CompanionCopy.text("retention"))
                 meta(CompanionCopy.text("travel"))
@@ -118,6 +122,9 @@ struct CompanionNotesView: View {
                 openedInitialField = true
                 if let initialField, store.state.notes.contains(where: { $0.field == initialField }) { detail = initialField }
             }
+            .onChange(of: store.state.notes) { _, notes in
+                if let field = detail, !notes.contains(where: { $0.field == field }) { detail = nil }
+            }
             .onChange(of: store.state.ownerTag) { _, _ in forgetUndo() }
             .onChange(of: store.accepted) { _, accepted in if !accepted { forgetUndo() } }
             .sheet(isPresented: $showingConsent) {
@@ -143,6 +150,15 @@ struct CompanionNotesView: View {
                         }).presentationDetents([.large]).presentationDragIndicator(.visible).presentationCornerRadius(34).presentationBackground { QuietMemorySurface() }
                 }
             }
+    }
+    private var memoryState: some View {
+        Text(CompanionCopy.text(store.accepted ? "on" : "off")).quietFont(13).foregroundStyle(Theme.warmMuted).quietWraps()
+    }
+    private var memoryToggle: some View {
+        Toggle(CompanionCopy.text("memory"), isOn: Binding(get: { store.accepted }, set: { yes in
+            forgetUndo(); if yes { showingConsent = true } else { pendingDeletion = .memoryOff }
+        })).labelsHidden().frame(minWidth:51,minHeight:48).contentShape(Rectangle()).tint(Theme.orbViolet)
+            .disabled(!canRemember).accessibilityIdentifier("companion-memory-toggle")
     }
     private var visibleRows: [CompanionContextStore.Note] {
         var rows = store.state.notes

@@ -79,7 +79,7 @@ final class CompanionPilotTests: XCTestCase {
         let long = await p.answer(questionId: "interest", text: String(repeating: "🙂", count: 201))
         XCTAssertNotNil(long["message"]); XCTAssertEqual(posts, 0)
         let refused = await p.answer(questionId: "interest", text: "crypto")
-        XCTAssertEqual(refused["message"] as? String, "Pick an option."); XCTAssertEqual(posts, 1)
+        XCTAssertEqual(refused["message"] as? String, CompanionCopy.text("answerFailed")); XCTAssertEqual(posts, 1)
         p.context = { nil }
         _ = await p.answer(questionId: "interest", text: "crypto")
         XCTAssertEqual(posts, 1, "no answer travels without consented context")
@@ -102,15 +102,15 @@ final class CompanionPilotTests: XCTestCase {
     }
 
     func testFailedProbeIsNotCachedAndAskWaitsForRateLimit() async {
-        let p=CompanionPilot(); var calls=0
+        let p=CompanionPilot(); var calls=0,elapsed:Double=0;var waits:[Double]=[]
+        p.probeNow={elapsed};p.probeSleep={seconds in waits.append(seconds);elapsed += seconds}
         p.transport = { _, method, _ in
             if method == "GET" { calls += 1; return (nil,calls == 1 ? 503 : 405) }
             return (["version":1,"kind":"explanation","reply":["text":"Learning.","gist":"Learning.","followUp":NSNull()]],200)
         }
         let first=await p.probe(); XCTAssertFalse(first.known)
-        let started=Date()
         let answer=await p.turn(question:"What is investing?",requestId:UUID().uuidString,candidate:nil,speech:nil)
-        XCTAssertEqual(calls,2); XCTAssertGreaterThanOrEqual(Date().timeIntervalSince(started),4.8)
+        XCTAssertEqual(calls,2); XCTAssertEqual(waits,[5])
         XCTAssertEqual(answer?["status"] as? String,"companion"); XCTAssertEqual(answer?["gist"] as? String,"Learning.")
         _ = await p.probe(); XCTAssertEqual(calls,2)
         p.invalidateProbe(); _ = await p.probe(); XCTAssertEqual(calls,3)
@@ -155,6 +155,92 @@ final class CompanionPilotTests: XCTestCase {
         current=start.addingTimeInterval(3600)
         XCTAssertEqual(pilot.limitSnapshot()?["requestId"] as? String,"kept-limit")
         XCTAssertTrue((pilot.limitSnapshot()?["line"] as? String)?.contains("hoy") == true)
+    }
+
+    func testHTTPFailuresCannotBecomeConfirmedMarketOffers() async {
+        let candidate=NucleoAsset(symbol:"ETH",name:"Ethereum",isEquity:false,assetClass:"crypto")
+        for status in [500,429] {
+            let p=CompanionPilot();p.transport={_,method,_ in
+                if method=="GET" {return (nil,405)}
+                return (["version":1,"kind":"desk_offer","nextAction":["symbol":"ETH","requiresConfirmation":true]],status)
+            }
+            let reply=await p.turn(question:"What is Ethereum?",requestId:"failed-offer",candidate:candidate,speech:nil)
+            XCTAssertEqual(reply?["status"] as? String,"companion_error","HTTP \(status) is not an offer")
+        }
+    }
+    func testServerAnswerErrorsUseThePersonsLanguageAndNeverRawServerText() async {
+        let old=UserDefaults.standard.string(forKey:L.preferenceKey);defer{if let old{UserDefaults.standard.set(old,forKey:L.preferenceKey)}else{UserDefaults.standard.removeObject(forKey:L.preferenceKey)}}
+        for language in ["en","es","fr","pt","it","de"] {UserDefaults.standard.set(language,forKey:L.preferenceKey)
+            for status in [500,429] {
+                let p=CompanionPilot();p.context={["version":1]};p.transport={_,method,_ in
+                    if method=="GET" {return (["companion":["context":true]],405)}
+                    return (["version":1,"kind":"error","error":["message":"Internal Server Error"]],status)
+                }
+                let reply=await p.answer(questionId:"interest",text:"crypto")
+                XCTAssertEqual(reply["message"] as? String,CompanionCopy.text("answerFailed"),language+" \(status)");XCTAssertNil(reply["patch"])
+            }
+        }
+    }
+    func testProbeBackoffIsAtMostFiveSecondsIfItsInjectedClockMovesBack() async {
+        var now:Double=100;var waits:[Double]=[];var gets=0
+        let p=CompanionPilot();p.probeNow={now};p.probeSleep={seconds in waits.append(seconds);now += seconds}
+        p.transport={_,_,_ in gets += 1;return (nil,gets==1 ? 500 : 405)}
+        _=await p.probe();now -= 3600;let recovered=await p.probe()
+        XCTAssertTrue(recovered.enabled);XCTAssertEqual(gets,2);XCTAssertEqual(waits,[5])
+    }
+    func testProbeDefaultUsesElapsedTimeRatherThanTheDeviceDate() {
+        let p=CompanionPilot();XCTAssertEqual(p.probeNow(),ProcessInfo.processInfo.systemUptime,accuracy:0.1)
+    }
+    func testTypedAnswerHasABoundedDeadlineAndDiscardsAnUncooperativeLatePatch() async {
+        let p=CompanionPilot();p.answerTimeoutSeconds=0.03;p.context={["version":1]}
+        var pending:CheckedContinuation<(Any?,Int),Never>?
+        let started=expectation(description:"held answer"),finished=expectation(description:"bounded answer")
+        p.transport={_,method,_ in if method=="GET"{return (["companion":["context":true]],405)}
+            return await withCheckedContinuation{pending=$0;started.fulfill()}}
+        var result:[String:Any]=[:]
+        let task=Task{@MainActor in result=await p.answer(questionId:"interest",text:"crypto");finished.fulfill()}
+        await fulfillment(of:[started],timeout:1);await fulfillment(of:[finished],timeout:0.2)
+        pending?.resume(returning:(["version":1,"kind":"noted","patch":["notes":[],"asked":[]]],200));await task.value
+        XCTAssertNil(result["patch"]);XCTAssertEqual(result["message"] as? String,CompanionCopy.text("answerFailed"))
+    }
+
+    func testRevocationDuringCapabilityProbeSendsNoOldPersonalAnswer() async {
+        let p=CompanionPilot();var revision=UUID();p.revision={revision};p.context={["version":1]}
+        var pending:CheckedContinuation<(Any?,Int),Never>?;var posts=0;let started=expectation(description:"held capability for answer")
+        p.transport={_,method,_ in if method=="GET"{return await withCheckedContinuation{pending=$0;started.fulfill()}}
+            posts += 1;return (["version":1,"kind":"noted","patch":["notes":[],"asked":[]]],200)}
+        let task=Task{@MainActor in await p.answer(questionId:"interest",text:"old private words")}
+        await fulfillment(of:[started],timeout:1);revision=UUID();pending?.resume(returning:(["companion":["context":true]],405))
+        let reply=await task.value;XCTAssertEqual(posts,0);XCTAssertEqual(reply["status"] as? String,"cancelled")
+    }
+    func testRevocationDuringCapabilityProbeSendsNoOldQuestionOrContext() async {
+        let p=CompanionPilot();var revision=UUID();p.revision={revision};p.context={["version":1]}
+        var pending:CheckedContinuation<(Any?,Int),Never>?;var posts=0;let started=expectation(description:"held capability for question")
+        p.transport={_,method,_ in if method=="GET"{return await withCheckedContinuation{pending=$0;started.fulfill()}}
+            posts += 1;return (["version":1,"kind":"explanation","reply":["text":"Old reply"]],200)}
+        let task=Task{@MainActor in await p.turn(question:"What is investing?",requestId:"revoked-probe",candidate:nil,speech:nil)}
+        await fulfillment(of:[started],timeout:1);revision=UUID();pending?.resume(returning:(["companion":["context":true]],405))
+        let reply=await task.value;XCTAssertEqual(posts,0);XCTAssertEqual(reply?["status"] as? String,"cancelled")
+    }
+
+    func testMidnightContextNormalizationDoesNotDiscardAFreshExplanation() async {
+        var now=Date(timeIntervalSince1970:1_792_000_000)
+        let store=CompanionContextStore(read:{nil},write:{_ in true},clock:{now});store.choose(true);store.answer("interest",value:"crypto")
+        let p=CompanionPilot();p.revision={store.revision};p.context={store.wire(capability:p.capability)}
+        var sent:[String:Any]?
+        p.transport={_,method,body in if method=="GET"{return (["companion":["context":true,"catalog":1,"notices":["memory-1"]]],405)}
+            sent=body;return (["version":1,"kind":"explanation","reply":["text":"Fresh explanation"]],200)}
+        now += 31*86400
+        let reply=await p.turn(question:"What is investing?",requestId:"midnight-snapshot",candidate:nil,speech:nil)
+        XCTAssertEqual(reply?["status"] as? String,"companion");XCTAssertEqual((sent?["context"] as? [String:Any])?["day"] as? Int,2)
+        XCTAssertTrue(((sent?["context"] as? [String:Any])?["notes"] as? [[String:Any]])?.isEmpty == true)
+    }
+
+    func testImmediateLimitAndReactivatedLimitUseTheSameFixedClock() async {
+        let p=CompanionPilot();p.limitNow={Date(timeIntervalSince1970:1_792_000_000)};p.responseHeaders=["Retry-After":"1800"]
+        p.transport={_,method,_ in if method=="GET"{return (nil,405)};return (["version":1,"kind":"error","error":["code":"orientation_limit"]],429)}
+        let reply=await p.turn(question:"What is investing?",requestId:"fixed-limit",candidate:nil,speech:nil)
+        XCTAssertEqual(reply?["limitLine"] as? String,p.limitSnapshot()?["line"] as? String)
     }
 
 }

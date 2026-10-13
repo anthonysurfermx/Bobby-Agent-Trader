@@ -414,5 +414,41 @@ final class AvatarVoiceTests: XCTestCase {
     @MainActor func testStopDuringRetryDelaySendsNoSecondRequest() async throws {
         try await verifyNoRetryAfterInvalidation(withdraw: false)
     }
+    @MainActor func testIncomingCallCancelsPendingNarrationAndIgnoresLateAudio() async throws {
+        let request=expectation(description:"pending narration");var pending:AvatarVoiceProtocol?
+        AvatarVoiceProtocol.handler={stub in pending=stub;request.fulfill()}
+        let voice=NeuralVoice(session:session,defaults:defaults),bridge=NucleoVoice(voice:voice);defer{bridge.teardown()}
+        var ends:[String]=[];bridge.emit={event,payload in if event=="voice.end"{ends.append(payload["reason"] as? String ?? "")}}
+        XCTAssertEqual(bridge.speak(id:"call-pending",text:"Learning.",voiceId:"ash",persona:"ash",vibe:nil),.queued)
+        await fulfillment(of:[request],timeout:3)
+        NotificationCenter.default.post(name:AVAudioSession.interruptionNotification,object:AVAudioSession.sharedInstance(),userInfo:[AVAudioSessionInterruptionTypeKey:AVAudioSession.InterruptionType.began.rawValue])
+        try await Task.sleep(for:.milliseconds(80))
+        XCTAssertFalse(bridge.isActive);XCTAssertEqual(ends,["interrupted"])
+        try XCTUnwrap(pending).respond(clip());try await Task.sleep(for:.milliseconds(100))
+        XCTAssertFalse(voice.speaking);XCTAssertEqual(ends,["interrupted"])
+        NotificationCenter.default.post(name:AVAudioSession.interruptionNotification,object:AVAudioSession.sharedInstance(),userInfo:[AVAudioSessionInterruptionTypeKey:AVAudioSession.InterruptionType.ended.rawValue])
+        try await Task.sleep(for:.milliseconds(80));XCTAssertFalse(bridge.isActive);XCTAssertFalse(voice.speaking)
+    }
+    @MainActor func testHeadphoneRemovalStopsPlayingNarrationExactlyOnce() async throws {
+        let data=try clip();AvatarVoiceProtocol.handler={$0.respond(data)}
+        let voice=NeuralVoice(session:session,defaults:defaults),bridge=NucleoVoice(voice:voice);defer{bridge.teardown()}
+        var ends:[String]=[];bridge.emit={event,payload in if event=="voice.end"{ends.append(payload["reason"] as? String ?? "")}}
+        _=bridge.speak(id:"headphones-playing",text:"Learning.",voiceId:"ash",persona:"ash",vibe:nil)
+        try await waitUntil { voice.speaking && voice.level > 0.06 }
+        NotificationCenter.default.post(name:AVAudioSession.routeChangeNotification,object:AVAudioSession.sharedInstance(),userInfo:[AVAudioSessionRouteChangeReasonKey:AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue])
+        try await Task.sleep(for:.milliseconds(80));XCTAssertFalse(voice.speaking);XCTAssertFalse(bridge.isActive);XCTAssertEqual(ends,["interrupted"])
+    }
+    @MainActor func testHeadphoneInsertionCancelsPendingNarrationButCategoryChangeDoesNot() async throws {
+        let request=expectation(description:"pending route narration")
+        AvatarVoiceProtocol.handler={_ in request.fulfill()}
+        let voice=NeuralVoice(session:session,defaults:defaults),bridge=NucleoVoice(voice:voice);defer{bridge.teardown()}
+        var ends:[String]=[];bridge.emit={event,payload in if event=="voice.end"{ends.append(payload["reason"] as? String ?? "")}}
+        _=bridge.speak(id:"headphones-pending",text:"Learning.",voiceId:"ash",persona:"ash",vibe:nil)
+        await fulfillment(of:[request],timeout:3)
+        NotificationCenter.default.post(name:AVAudioSession.routeChangeNotification,object:AVAudioSession.sharedInstance(),userInfo:[AVAudioSessionRouteChangeReasonKey:AVAudioSession.RouteChangeReason.categoryChange.rawValue])
+        try await Task.sleep(for:.milliseconds(80));XCTAssertTrue(bridge.isActive);XCTAssertTrue(ends.isEmpty)
+        NotificationCenter.default.post(name:AVAudioSession.routeChangeNotification,object:AVAudioSession.sharedInstance(),userInfo:[AVAudioSessionRouteChangeReasonKey:AVAudioSession.RouteChangeReason.newDeviceAvailable.rawValue])
+        try await Task.sleep(for:.milliseconds(80));XCTAssertFalse(bridge.isActive);XCTAssertFalse(voice.speaking);XCTAssertEqual(ends,["interrupted"])
+    }
 
 }

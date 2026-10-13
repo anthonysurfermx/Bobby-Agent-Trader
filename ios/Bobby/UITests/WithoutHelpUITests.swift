@@ -20,7 +20,7 @@ class ConversationFixtureCase: XCTestCase {
 
     override func setUp() { continueAfterFailure = false }
     override func tearDown() { app?.terminate(); super.tearDown() }
-    func launch(_ scenario: String = "companion-plain", speech: String = "words", voice: Bool = false, permission: String = "granted", notes: Bool = false, voiceFails: Bool = false, level: String = "rapido", home: String = "fresh", memory: String? = nil, contentSize: String? = nil, memoryFailure: Bool = false) {
+    func launch(_ scenario: String = "companion-plain", speech: String = "words", voice: Bool = false, permission: String = "granted", notes: Bool = false, voiceFails: Bool = false, level: String = "rapido", home: String = "fresh", memory: String? = nil, contentSize: String? = nil, memoryFailure: Bool = false, expiringNotes: Bool = false) {
         app = XCUIApplication()
         app.launchArguments = ["-nucleo-fixtures", scenario, "-nucleo-page", "app", "-qa-companion", "-qa-speech-fixture", speech, "-qa-speech-permission", permission,
             "-AppleLanguages", "(\(language))", "-app.language", language, "-AppleLocale", ["es":"es_MX", "de":"de_DE", "pt":"pt_PT", "it":"it_IT", "en":"en_US", "fr":"fr_FR"][language]!,
@@ -35,6 +35,7 @@ class ConversationFixtureCase: XCTestCase {
         if let memory { app.launchArguments += ["-qa-memory-fixture",memory] }
         if let contentSize { app.launchArguments += ["-UIPreferredContentSizeCategoryName",contentSize] }
         if memoryFailure { app.launchArguments += ["-qa-memory-save-failure"] }
+        if expiringNotes { app.launchArguments += ["-qa-note-expiry"] }
         app.launch(); ready(button("aria.type"))
     }
     func ready(_ element: XCUIElement, timeout: Double = 25) {

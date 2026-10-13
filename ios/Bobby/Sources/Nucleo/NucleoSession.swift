@@ -135,7 +135,8 @@ final class NucleoSession: ObservableObject {
     private var companionAwaitingConsent = false
     private var companionConsentAccepted = false
     private var companionSceneStarted = false
-    private var companionAnswerEpoch = 0
+    private var companionRequestRevision = UUID()
+    private var companionAnswerEpoch = 0 { didSet { companionRequestRevision = UUID() } }
     let companionNoteUndo = CompanionNoteUndo()
     var companionNotesField: String?
     private var companionQuestionId: String?
@@ -166,7 +167,9 @@ final class NucleoSession: ObservableObject {
          telemetry: BobbyTelemetry = .shared,
          now: (() -> Date)? = nil) {
         // Offline UI runs have a fixed calendar origin, independent of midnight on this Mac.
-        let sessionClock: () -> Date = now ?? (fixtures ? { Date(timeIntervalSince1970: 1_791_892_860) } : Date.init)
+        let fixtureOrigin = Date(timeIntervalSince1970: 1_791_892_860), fixtureStarted = ProcessInfo.processInfo.systemUptime
+        let expiringFixture = fixtures && ProcessInfo.processInfo.arguments.contains("-qa-note-expiry")
+        let sessionClock: () -> Date = now ?? (fixtures ? { fixtureOrigin.addingTimeInterval(expiringFixture ? ProcessInfo.processInfo.systemUptime - fixtureStarted : 0) } : Date.init)
         self.now = sessionClock
         self.fixtures = fixtures
         self.telemetry = telemetry
@@ -190,13 +193,6 @@ final class NucleoSession: ObservableObject {
         }
 #if DEBUG
         // Deterministic screenshot state, only when the offline fixture transport is active.
-        if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-redesign-notes") {
-            companionContext.choose(true)
-            companionContext.answered()
-            for id in ["interest", "barrier", "when", "cushion"] { companionContext.answer(id, value: nil) }
-            companionContext.answer("interest", value: "crypto")
-            _ = companionContext.apply(["notes": [["field": "barrier", "value": "words", "source": "inferred"]], "asked": ["barrier"]], for: "barrier")
-        }
         if fixtures && (ProcessInfo.processInfo.arguments.contains("-qa-companion-day3") || ProcessInfo.processInfo.arguments.contains("-qa-companion-day4")) {
             let now = sessionClock()
             let day4 = ProcessInfo.processInfo.arguments.contains("-qa-companion-day4")
@@ -208,6 +204,14 @@ final class NucleoSession: ObservableObject {
             for id in ["interest", "barrier", "when", "cushion", "hurry"] { companionContext.answer(id, value: nil) }
             if ProcessInfo.processInfo.arguments.contains("-qa-companion-day4") { companionContext.answer("fall", value: nil) }
         }
+        if fixtures && ProcessInfo.processInfo.arguments.contains("-qa-redesign-notes") {
+            companionContext.choose(true)
+            companionContext.answered()
+            for id in ["interest", "barrier", "when", "cushion"] { companionContext.answer(id, value: nil) }
+            companionContext.answer("interest", value: "crypto")
+            _ = companionContext.apply(["notes": [["field": "barrier", "value": "words", "source": "inferred"]], "asked": ["barrier"]], for: "barrier")
+        }
+
 #endif
         companionContext.opened()
         self.briefingIntent = briefingIntent ?? .shared
@@ -237,17 +241,16 @@ final class NucleoSession: ObservableObject {
                 _ = companionPacing.delivered()
                 if scene == "dial" { companionContext.choose(false); companionPacing.declined() }
                 else if scene != "remember" {
-                    companionContext.choose(true); companionContext.answered()
+                    let now = sessionClock()
+                    companionContext.choose(true, now: scene == "fall" ? now.addingTimeInterval(-2 * 86400) : now)
+                    if scene == "fall" { companionContext.opened(now: now.addingTimeInterval(-86400)); companionContext.opened(now: now) }
+                    companionContext.answered()
                     let before: [String]
                     switch scene {
                     case "barrier": before = ["interest"]
                     case "money": before = ["interest", "barrier"]
                     case "fall": before = ["interest", "barrier", "when", "cushion", "hurry"]
                     default: before = []
-                    }
-                    if scene == "fall" {
-                        let now = sessionClock(); companionContext.choose(true, now: now.addingTimeInterval(-2*86400))
-                        companionContext.opened(now: now.addingTimeInterval(-86400)); companionContext.opened(now:now); companionContext.answered()
                     }
                     for id in before { companionContext.answer(id,value:nil) }
                     if scene == "owner-reset" { companionContext.bindOwner("fixture-a", defaults: defaults); companionContext.bindOwner("fixture-b", defaults: defaults) }
@@ -262,7 +265,8 @@ final class NucleoSession: ObservableObject {
             companionPilot?.responseHeaders = response.headers
             return (response.json, response.status)
         }
-        companionPilot.revision = { [weak self] in self?.companionContext.revision ?? UUID() }
+        companionPilot.limitNow = { [weak self] in self?.now() ?? .distantPast }
+        companionPilot.revision = { [weak self] in self?.companionRequestRevision ?? UUID() }
         companionPilot.context = { [weak self] in
             guard let self else { return nil }
             return self.companionContext.wire(capability: self.companionPilot.capability)
@@ -270,6 +274,7 @@ final class NucleoSession: ObservableObject {
         desk.decorateAnswer = { [weak self] result in self?.companionDelivered(result) ?? result }
         companionContext.changed = { [weak self] in
             guard let self else { return }
+            self.companionRequestRevision = UUID()
             if !self.companionContext.accepted {
                 self.companionNoteUndo.clear()
                 _ = self.desk.cancel(); self.voice.stop(); self.nucleoVoice.stop()
@@ -416,7 +421,8 @@ final class NucleoSession: ObservableObject {
             } else if let id = try p.string("questionId", required: false, maxLength: 32),
                       let question = CompanionCatalog.question(id), companionContext.accepted {
                 if try p.bool("opened", required: false) == true {
-                    if !companionSceneStarted { companionPacing.scene(question); companionSceneStarted = true }
+                    companionContext.opened()
+            if !companionSceneStarted { companionPacing.scene(question); companionSceneStarted = true }
                 } else {
                     companionQuestionId = id; companionSceneStarted = false; companionPacing.shown(question)
                 }
@@ -590,10 +596,12 @@ final class NucleoSession: ObservableObject {
         if fixtures { return 0 }
         let day = Calendar.current.startOfDay(for: now())
         let key = "conversation.example.day", indexKey = "conversation.example.index"
-        if let prior = defaults.object(forKey: key) as? Date, prior != day {
-            defaults.set((defaults.integer(forKey: indexKey) + 1) % 6, forKey: indexKey)
-        }
-        defaults.set(day, forKey: key)
+        if let prior = defaults.object(forKey: key) as? Date {
+            if day > Calendar.current.startOfDay(for: prior) {
+                defaults.set((defaults.integer(forKey: indexKey) + 1) % 6, forKey: indexKey)
+                defaults.set(day, forKey: key)
+            }
+        } else { defaults.set(day, forKey: key) }
         return defaults.integer(forKey: indexKey) % 6
     }
 
@@ -1359,6 +1367,15 @@ final class NucleoSession: ObservableObject {
             DispatchQueue.main.async { [weak self] in self?.onRoute?(next) }
             return true
         }
+#if DEBUG
+        if fixtures, route == .companionNotes, ProcessInfo.processInfo.arguments.contains("-qa-note-expiry"),
+           let note = companionContext.state.notes.first(where: { $0.field == "barrier" }) {
+            _ = companionContext.delete(note.field)
+            _ = companionContext.restore(.init(field: note.field, value: note.value, source: note.source,
+                createdAt: note.createdAt, expiresAt: now().addingTimeInterval(8)))
+            companionNotesField = note.field
+        }
+#endif
         openSheet = route
         sheet = route
         emit("native.sheet", ["route": route.rawValue, "state": "open"])
@@ -1756,12 +1773,18 @@ final class NucleoSession: ObservableObject {
     private func synchronizeAccountState() {
         guard !fixtures, !tornDown else { return }
         let account = AccountSession.shared
-        guard accountGeneration != account.generation else { return }
+        readerChanged(owner: account.session?.userId, generation: account.generation)
+    }
+
+    /// The same identity boundary is replayable without signing in or making a live request.
+    func readerChanged(owner: String?, generation: UUID) {
+        guard !tornDown, accountGeneration != generation else { return }
         let wasAnonymous = accountUserID == nil
-        accountGeneration = account.generation
+        accountGeneration = generation
         pendingFirstAsk = nil
-        accountUserID = account.session?.userId
-        if companionContext.bindOwner(accountUserID, defaults: defaults) { companionNoteUndo.clear(); companionPacing.reset(); companionQuestionId = nil; companionAnswerEpoch += 1 }
+        accountUserID = owner
+        if companionContext.bindOwner(accountUserID, defaults: defaults) { companionNoteUndo.clear(); companionPacing.reset() }
+        companionQuestionId = nil; companionAnswerEpoch += 1
         if wasAnonymous, let owner = accountUserID { SpeakingDial(defaults: defaults).inheritGuest(owner) }
         desk.clearConversation()
         desk.invalidatePending(preservingAnonymousSignInRetries: wasAnonymous && accountUserID != nil)
@@ -1772,8 +1795,10 @@ final class NucleoSession: ObservableObject {
         DeskMemory.setOwner(accountUserID, defaults: defaults)
         suggestionsCache = nil
         bootSynced = false
-        NucleoLevelCenter.shared.accountChanged()
-        BobbyAccessCenter.shared.accountChanged()
+        if !fixtures {
+            NucleoLevelCenter.shared.accountChanged()
+            BobbyAccessCenter.shared.accountChanged()
+        }
         NudgeCenter.shared.owner = accountUserID
         NudgeCenter.shared.forgetMoment()
         V18Focus.clear()

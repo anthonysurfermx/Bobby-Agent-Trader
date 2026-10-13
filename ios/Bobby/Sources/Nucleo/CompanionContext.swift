@@ -106,12 +106,18 @@ final class CompanionContextStore: ObservableObject {
     private let write: (Data) -> Bool
     private let remove: () -> Bool
     let clock: () -> Date
+    private let elapsed: () -> TimeInterval
+    private var expiryAnchor: Date
+    private var expiryAnchorElapsed: TimeInterval
+    private var expiryTask: Task<Void, Never>?
+    private var expiryGeneration = UUID()
     private var installDefaults: UserDefaults?
     private(set) var undecodableRecord: Data?
     private var declineForLaunch = false
     private var ownerBlocked = false
-    init(account: String = "companion-context-device-v1", read: (() -> Data?)? = nil, write: ((Data) -> Bool)? = nil, remove: (() -> Bool)? = nil, clock: @escaping () -> Date = Date.init) {
-        self.clock = clock
+    init(account: String = "companion-context-device-v1", read: (() -> Data?)? = nil, write: ((Data) -> Bool)? = nil, remove: (() -> Bool)? = nil, clock: @escaping () -> Date = Date.init, elapsed: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
+        self.clock = clock; self.elapsed = elapsed
+        self.expiryAnchor = clock(); self.expiryAnchorElapsed = elapsed()
         self.account = account
         self.read = read ?? { Self.readKeychain(account) }
         self.write = write ?? { Self.writeKeychain(account, $0) }
@@ -119,6 +125,39 @@ final class CompanionContextStore: ObservableObject {
         if let data = self.read() {
             if let saved = try? JSONDecoder().decode(State.self, from: data) { state = saved }
             else { undecodableRecord = data; storageError = true }
+        }
+        if let last = state.lastOpen, last > expiryAnchor { expiryAnchor = last }
+        expireDueNotes()
+    }
+    deinit { expiryTask?.cancel() }
+
+    /// Expiry keeps advancing while this store is alive, even if the device date moves back.
+    /// Creation dates stay the caller's date; reading never renews a note.
+    private func expiryNow(observing date: Date? = nil) -> Date {
+        let tick = elapsed()
+        let progressed = expiryAnchor.addingTimeInterval(max(0, tick - expiryAnchorElapsed))
+        let observed = date ?? clock()
+        if observed > progressed { expiryAnchor = observed; expiryAnchorElapsed = tick; return observed }
+        return progressed
+    }
+    private func scheduleExpiry() {
+        expiryTask?.cancel(); expiryTask = nil; expiryGeneration = UUID()
+        guard accepted, let due = state.notes.map(\.expiresAt).min() else { return }
+        let delay = max(0.01, due.timeIntervalSince(expiryNow())), token = expiryGeneration
+        expiryTask = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+            guard let self, !Task.isCancelled, self.expiryGeneration == token else { return }
+            self.expireDueNotes()
+        }
+    }
+    func expireDueNotes(now: Date? = nil) {
+        let now = expiryNow(observing: now); var next = state
+        let expired = next.notes.filter { $0.expiresAt <= now }.map(\.field)
+        guard !expired.isEmpty else { scheduleExpiry(); return }
+        next.notes.removeAll { expired.contains($0.field) }; next.asked.removeAll { expired.contains($0) }
+        if !save(next) {
+            // A failed disk write must not keep expired personal data visible or sendable in RAM.
+            state = next; revision = UUID(); changed(); scheduleExpiry()
         }
     }
     /// The install marker is deliberately outside Keychain, so reinstalling drops an old device record.
@@ -132,7 +171,7 @@ final class CompanionContextStore: ObservableObject {
     @discardableResult func reset() -> Bool {
         let removed = remove()
         if !removed { installDefaults?.removeObject(forKey: "companion.context.install.v1") }
-        state = State(); declineForLaunch = false; ownerBlocked = false; storageError = !removed; revision = UUID(); changed()
+        state = State(); declineForLaunch = false; ownerBlocked = false; storageError = !removed; revision = UUID(); changed(); scheduleExpiry()
         return removed
     }
     private static func removeKeychain(_ account: String) -> Bool {
@@ -147,7 +186,7 @@ final class CompanionContextStore: ObservableObject {
     @discardableResult private func save(_ proposed: State) -> Bool {
         guard undecodableRecord == nil || installDefaults?.data(forKey: "companion.context.undecodable.v1") == undecodableRecord,
               let data = try? JSONEncoder().encode(proposed), write(data) else { storageError = true; return false }
-        state = proposed; storageError = false; revision = UUID(); changed(); return true
+        state = proposed; storageError = false; revision = UUID(); changed(); scheduleExpiry(); return true
     }
     func choose(_ yes: Bool, now: Date? = nil, calendar: Calendar = .current) {
         let now = now ?? clock()
@@ -162,15 +201,12 @@ final class CompanionContextStore: ObservableObject {
     func opened(now: Date? = nil, calendar: Calendar = .current) {
         let now = now ?? clock()
         guard accepted else { return }
+        expireDueNotes(now: now)
         var next = state
         let today = calendar.startOfDay(for: now)
-        if let last = next.lastOpen, !calendar.isDate(last, inSameDayAs: today) {
-            next.day = min(60, next.day + 1)
-        }
-        next.lastOpen = today
-        let expired = next.notes.filter { $0.expiresAt <= now }.map(\.field)
-        next.notes.removeAll { $0.expiresAt <= now }
-        next.asked.removeAll { expired.contains($0) }
+        if let last = next.lastOpen {
+            if today > calendar.startOfDay(for: last) { next.day = min(60, next.day + 1); next.lastOpen = today }
+        } else { next.lastOpen = today }
         if next != state { _ = save(next) }
     }
     func answered(now: Date? = nil, calendar: Calendar = .current) {
@@ -242,11 +278,12 @@ final class CompanionContextStore: ObservableObject {
         var next = state; next.notes.removeAll { $0.field == id }; return save(next)
     }
     @discardableResult func restore(_ note: Note, at index: Int? = nil) -> Bool {
-        guard accepted, !state.notes.contains(where: { $0.field == note.field }),
+        guard accepted, note.expiresAt > expiryNow(), !state.notes.contains(where: { $0.field == note.field }),
               let question = CompanionCatalog.question(note.field), question.accepts(note.value) else { return false }
         var next = state; next.notes.insert(note, at: min(max(0, index ?? next.notes.count), next.notes.count)); return save(next)
     }
     @discardableResult func confirm(_ id: String) -> Bool {
+        expireDueNotes()
         guard accepted, let old = state.notes.first(where: { $0.field == id }), old.source == "inferred" else { return false }
         var next = state
         next.notes.removeAll { $0.field == id }
@@ -255,6 +292,7 @@ final class CompanionContextStore: ObservableObject {
     }
     @discardableResult func correct(_ id: String, value: String, now: Date? = nil) -> Bool {
         let now = now ?? clock()
+        expireDueNotes(now: now)
         guard accepted, state.notes.contains(where: { $0.field == id }),
               let question = CompanionCatalog.question(id), question.accepts(value) else { return false }
         var next = state; next.notes.removeAll { $0.field == id }
@@ -281,7 +319,7 @@ final class CompanionContextStore: ObservableObject {
         guard accepted, allows(capability) else { return nil }
         opened(now: now)
         return ["version": 1, "consent": ["notice": Self.notice, "memory": true, "money": true],
-                "day": state.day, "asked": state.asked, "notes": state.notes.filter { $0.expiresAt > now }.map(\.json)]
+                "day": state.day, "asked": state.asked, "notes": state.notes.filter { $0.expiresAt > expiryNow(observing: now) }.map(\.json)]
     }
     private static func query(_ account: String) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "xyz.bobbyprotocol.bobby.companion.context",
@@ -333,7 +371,7 @@ final class CompanionPacing {
     func reset(retired: Bool = false) { state = State(); state.retired = retired; save() }
     private func today(_ now: Date, _ calendar: Calendar) {
         let day = calendar.startOfDay(for: now)
-        if state.day != day { state.day = day; state.chipsUntapped = 0; state.scenes = 0; state.moneyShown = false }
+        if state.day.map({ day > $0 }) ?? true { state.day = day; state.chipsUntapped = 0; state.scenes = 0; state.moneyShown = false }
     }
     func delivered(now: Date? = nil, calendar: Calendar = .current) -> Bool {
         let now = now ?? clock()
