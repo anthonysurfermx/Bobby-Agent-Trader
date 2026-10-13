@@ -369,7 +369,27 @@ for (const line of ['I could not finish the explanation. You can try again.', 'T
     eq(offer, { kind: 'desk', text: 'Parece que la pregunta es sobre AVAX.', symbol: 'AVAX' }, 'web: an offer comes back with its sentence and its asset');
     await page.companionTurn('¿ya me cobraron?', signal, undefined, { question: 'échale un ojo a Avalanche', reply: offer.text, offered: offer.symbol });
     eq(sent.at(-1).previous, { question: 'échale un ojo a Avalanche', reply: 'Parece que la pregunta es sobre AVAX.', offered: 'AVAX' }, 'web: an offer not taken travels as the exchange on screen');
+    // The pilot is on and a turn brings nothing: the desk is told so, with the server's own sentence when there is one.
+    answer = { kind: 'error', error: { code: 'companion_unavailable', message: 'No pude responder esta vez. Inténtalo de nuevo.', retryable: true } };
+    eq(await page.companionTurn('¿qué es un fondo?', signal), { kind: 'unavailable', message: 'No pude responder esta vez. Inténtalo de nuevo.', retry: true }, 'web: a turn the server could not answer is "unavailable", with its sentence');
+    answer = { kind: 'error', error: { code: 'companion_paused', message: 'Bobby descansa por hoy.', retryable: false } };
+    eq(await page.companionTurn('¿qué es un fondo?', signal), { kind: 'unavailable', message: 'Bobby descansa por hoy.', retry: false }, 'web: …and no retry is offered when the server says it cannot help');
+    answer = { kind: 'error', error: { code: 'orientation_limit', message: 'Mañana seguimos.', retryable: false } };
+    eq(await page.companionTurn('¿qué es un fondo?', signal), { kind: 'limit', message: 'Mañana seguimos.' }, 'web: the day\'s limit is still the limit');
+    answer = { error: 'Not found' };
+    eq(await page.companionTurn('¿qué es un fondo?', signal), { kind: 'unavailable', message: null, retry: true }, 'web: a reply of no known shape is "unavailable" with no sentence');
+    (globalThis as any).__deskTest = async () => { throw new TypeError('Failed to fetch'); };
+    eq(await page.companionTurn('¿qué es un fondo?', signal), { kind: 'unavailable', message: null, retry: true }, 'web: a request that never arrived is "unavailable", never "no such asset"');
+    const gone = new AbortController(); gone.abort();
+    eq(await page.companionTurn('¿qué es un fondo?', gone.signal), null, 'web: a question the person withdrew says nothing');
+    // Off: nothing leaves and the desk does what it did before.
+    globalThis.fetch = (async () => new Response('{}', { status: 404 })) as typeof fetch;
+    const off = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text + '\n// off').toString('base64'));
+    let left = 0; (globalThis as any).__deskTest = async () => { left++; return { ok: true, data: {} }; };
+    eq([await off.companionTurn('¿qué es un fondo?', signal), left], [null, 0], 'web: with the pilot off nothing leaves and the answer is null');
   } finally { globalThis.fetch = real; delete (globalThis as any).__deskTest; }
+  ok(desk.includes("if (turn?.kind === 'limit' || turn?.kind === 'unavailable') exchangeRef.current = previous;") && /turn\?\.kind === 'unavailable' && !r\) \{[\s\S]{0,420}if \(turn\.retry\) setGuideRetry\(q\);/.test(desk),
+    'web: a turn that brought nothing keeps the exchange on screen, shows the sentence and offers the retry as a learning question');
   // The desk keeps that exchange in memory only, hands it to the next question once, and drops it when the screen changes.
   ok(/const previous = exchangeRef\.current;\s+exchangeRef\.current = null;/.test(desk) && desk.includes('exchangeRef.current = { question: q, reply: turn.text };') && desk.includes("exchangeRef.current = { question: q, reply: turn.text, offered: turn.symbol };") && (desk.match(/exchangeRef\.current = null;/g) ?? []).length >= 4,
     'web: the desk hands the exchange on screen to the next question once, and drops it when a read starts or the screen is cleared');
