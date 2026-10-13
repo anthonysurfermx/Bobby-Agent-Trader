@@ -54,7 +54,7 @@ try {
   // 0. Nobody but the service role: not the API's anonymous role, not a signed-in one, whatever the defaults grant.
   const open = (await pool.query(`select count(*) filter (where has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute')) as open, count(*) filter (where has_function_privilege('service_role', p.oid, 'execute')) as service, count(*) as fns, count(*) filter (where p.proconfig is null or not p.proconfig::text like '%search_path=public, pg_temp%') as loose from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'agent\\_%'`)).rows[0];
   const tables = (await pool.query(`select count(*) as n from unnest(array['agent_tasks','agent_steps','agent_reads','agent_attempts']) t, unnest(array['anon','authenticated']) r, unnest(array['select','insert','update','delete']) p where has_table_privilege(r, t, p)`)).rows[0];
-  eq([Number(open.fns), Number(open.open), Number(open.service), Number(open.loose), Number(tables.n)], [20, 0, 20, 0, 0], 'twenty functions, each with a fixed search path, callable by the service role and by neither API role; the tables are closed to both');
+  eq([Number(open.fns), Number(open.open), Number(open.service), Number(open.loose), Number(tables.n)], [21, 0, 21, 0, 0], 'twenty-one functions, each with a fixed search path, callable by the service role and by neither API role; the tables are closed to both');
   eq(Number((await pool.query("select count(*) as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'agent_end_cancelled'")).rows[0].n), 1, 'applied over an earlier version of itself, no function is left in two shapes');
   // Tried as the roles themselves, not only asked of the catalog: the service role can really run a function (it needs the
   // tables too), and the one object a table brings with it, its sequence, is closed to both API roles.
@@ -278,6 +278,25 @@ try {
     await s.dispatch(a.attemptId); await s.settle(a.attemptId, 'settled', NaN);
     return [await s.committed(b.partition), (await s.reserve(b, `${b.partition}-u`, 'm', 0.9, T0)).ok, await s.reserve({ ...b, capUsd: Infinity }, `${b.partition}-v`, 'm', 0.1, T0)];
   }, [0.3, false, { ok: false, code: 'not_configured' }], 'a cost that is not a number keeps the reservation; a cap that is not a number is no cap');
+  // What is kept (the privacy page's number): an errand nobody has touched for 24 hours goes, with its steps and its
+  // read; one touched since, and one a runner holds, stay. The money ledger, which holds no text, goes after 90 days.
+  {
+    const P0 = Date.parse('2026-11-01T12:00:00Z'), H = 3_600_000, keeper = new PgAgentStore(rpc, 6, 50);
+    await keeper.begin(newTask('pur', 'old'), { question: 'what I asked' }, P0 - 30 * H);
+    await keeper.begin(newTask('pur', 'touched'), { question: 'q' }, P0 - 30 * H);
+    const run = (await keeper.claim('task_pur_touched', 'w', 1000, P0 - 2 * H))!;
+    await keeper.append('task_pur_touched', run.fence, 'tool_call', { tool: 'x' }, P0 - 2 * H); await keeper.release('task_pur_touched', run.fence);
+    await keeper.begin(newTask('pur', 'held'), { question: 'q' }, P0 - 30 * H);
+    await keeper.claim('task_pur_held', 'w', 31 * H, P0 - 30 * H);
+    await keeper.begin(newTask('pur', 'new'), { question: 'q' }, P0 - H);
+    await pool.query("insert into agent_reads (task, owner, day, units) values ('task_pur_old', 'pur', '2026-10-31', 1)");
+    await pool.query("insert into agent_attempts (id, task, partition, model, reserve_usd, at) values ('att_ancient', 't', 'p', 'm', 0.1, $1), ('att_recent', 't', 'p', 'm', 0.1, $2)", [new Date(P0 - 91 * DAY), new Date(P0 - DAY)]);
+    const before = await count('agent_tasks');
+    const went = await keeper.purge(P0, 24);
+    eq([went, before - await count('agent_tasks'), await count('agent_tasks', "id = 'task_pur_old'"), await count('agent_steps', "task = 'task_pur_old'"), await count('agent_reads', "task = 'task_pur_old'")], [went, went, 0, 0, 0], 'an errand idle for a day is gone, with its steps and its read');
+    eq([await count('agent_tasks', "id in ('task_pur_touched', 'task_pur_held', 'task_pur_new')"), await count('agent_attempts', "id = 'att_ancient'"), await count('agent_attempts', "id = 'att_recent'"), await keeper.purge(P0, 24)], [3, 0, 1, 0], 'one touched since, one a runner holds and a new one stay; the money ledger keeps ninety days; a second purge finds nothing');
+    eq([await rpc('agent_purge', { p_now: new Date(P0).toISOString(), p_keep_hours: 0, p_limit: 500 }), await rpc('agent_purge', { p_now: new Date(P0).toISOString(), p_keep_hours: 24, p_limit: 0 }), await count('agent_tasks', "id = 'task_pur_new'")], [0, 0, 1], 'a purge asked to keep nothing, or to remove none, removes none');
+  }
   console.log(`agent-engine-pg: ${checks} checks passed`);
 } finally {
   await pool.end();
