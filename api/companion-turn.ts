@@ -48,6 +48,7 @@ import { COMPANION_SURFACE, companionSpend, forgetCompanionSpend, tooFast } from
 import { giveBack, slotsHeld, slotsResetInS, sweepSlots, takeSharedSlot, takeSlot } from './_lib/companion-slots.js';
 import { deviceHash } from './_lib/access.js';
 import { DESK_QUESTION_MAX } from './_lib/desk-debate.js';
+import { LlmHttpError } from './_lib/llm.js';
 import { llmCaps, llmSpend, logLlmUsage } from './_lib/llm-usage.js';
 import type { LlmUsage } from './_lib/llm.js';
 import { COMPANION_VERSION, CompanionRequest, CompanionUnchecked, companionAllowance, companionDailyCeiling, companionDailyUsd, companionEnabled, companionGist, companionModel, runCompanionTurn } from './_lib/companion.js';
@@ -225,8 +226,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // failing provider is not an unlimited number of calls. A call that timed out may have been billed, and a
     // reply its second reader could not check was: both keep their place in the day as well.
     const timedOut = usage.some((row) => row.stop === 'timeout' || row.stop === 'deadline'), unchecked = error instanceof CompanionUnchecked;
+    // The provider's account has no credit left (2026-10-13, for some hours): asking again cannot help until the owner
+    // adds some, so an explanation is said to be paused, not "try again". The owner is told by llm.ts.
+    const noCredit = error instanceof LlmHttpError && (error.providerCode === 'insufficient_quota' || error.providerCode === 'billing_hard_limit_reached');
     await giveBack(timedOut || unchecked ? [mine, around] : [mine, around, shared], token);
-    console.error(JSON.stringify({ route: 'companion-turn', event: 'failed', ...(answer ? { noting: true } : {}), timedOut, unchecked, language, model: answer ? reader : model, ms: Date.now() - started }));
+    console.error(JSON.stringify({ route: 'companion-turn', event: 'failed', ...(answer ? { noting: true } : {}), timedOut, unchecked, ...(noCredit ? { noCredit } : {}), language, model: answer ? reader : model, ms: Date.now() - started }));
+    if (noCredit && !answer) return refuse(503, 'companion_paused', COPY.paused[language], false, before);
     return refuse(503, 'companion_unavailable', sorry, true, before);
   } finally {
     if (usage.length) waitUntil(logLlmUsage(usage, { surface: COMPANION_SURFACE, level: null }).then(forgetCompanionSpend));
