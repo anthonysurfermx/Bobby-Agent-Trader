@@ -71,6 +71,7 @@ export function parseYahooDaily(json: unknown, symbol: string, now: Date): BarSe
     const quote = Array.isArray(indicators?.quote) && indicators.quote.length === 1 ? record(indicators.quote[0]) : null;
     if (!Array.isArray(timestamps) || !quote || !['open', 'high', 'low', 'close'].every(k => Array.isArray(quote[k]) && quote[k].length === timestamps.length) || (quote.volume !== undefined && (!Array.isArray(quote.volume) || quote.volume.length !== timestamps.length))) return null;
     const bars: DailyBar[] = [];
+    let unpublished = 0;
     for (let i = 0; i < timestamps.length; i++) {
       const ts = timestamps[i];
       if (!finite(ts) || !Number.isSafeInteger(ts)) return null;
@@ -93,7 +94,12 @@ export function parseYahooDaily(json: unknown, symbol: string, now: Date): BarSe
       }
       if (now.getTime() <= end) continue;
       const values = ['open', 'high', 'low', 'close'].map(k => (quote[k] as unknown[])[i]);
-      if (!values.every(finite)) return null;
+      // A session that has ended and whose close the source has not published yet: for some hours after the bell (seen
+      // on 2026-10-13 around 00:00 UTC, four hours after New York closed) the last row comes with `close: null`. That is
+      // the series ending one session earlier, not a series nobody can read: refusing all 126 sound closes for it made
+      // every stock and fund unreadable that night. Only at the END: a hole followed by a bar is a gap, and is refused.
+      if (!values.every(finite)) { if (values[3] === null || values[3] === undefined) { unpublished++; continue; } return null; }
+      if (unpublished > 0) return null;
       const volume = Array.isArray(quote.volume) ? quote.volume[i] : null;
       if (volume !== null && (!finite(volume) || volume < 0)) return null;
       bars.push({ day, open: values[0] as number, high: values[1] as number, low: values[2] as number, close: values[3] as number, volume, closedAt: new Date(end).toISOString() });

@@ -1333,7 +1333,7 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   eq(['Google Alphabet', 'alphabet google', 'GOOG'].map((mention) => resolveMention(mention)?.symbol ?? null), ['GOOGL', 'GOOGL', 'GOOGL'], 'the two names of one company said together are that company');
 
   const prompt = agentPrompt('en', 'en-US');
-  for (const [needle, why] of [['never say how likely a future result is', 'a future result is not given a likelihood, in numbers or in words'], ['Never give a correlation as a number alone', 'a correlation is said with what it means'], ['answer what that first question asked about', 'an errand taken up again after a no is the same errand'], ['They rule a substitute out themselves', 'what a person ruled out is not offered again'], ['you do not do sums with a person\'s money', 'a sum with their money is not done and not offered'], ['Tracking error is how much the gap', 'tracking error is the variability of the gap, not the gap'], ['two different things, and a read gives the date of a worst day', 'a worst day and a fall from a high are told apart'], ['how a word is said in another language', 'something tiny and everyday is settled in a few words'], ['When the app answers ambiguous_name', 'a word left open is asked about, not named']] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);
+  for (const [needle, why] of [['never say how likely a future result is', 'a future result is not given a likelihood, in numbers or in words'], ['Never give a correlation as a number alone', 'a correlation is said with what it means'], ['answer what that first question asked about', 'an errand taken up again after a no is the same errand'], ['They rule a substitute out themselves', 'what a person ruled out is not offered again'], ['you do not do sums with a person\'s money', 'a sum with their money is not done and not offered'], ['Tracking error is how much the gap', 'tracking error is the variability of the gap, not the gap'], ['two different things, and a read gives the date of a worst day', 'a worst day and a fall from a high are told apart'], ['how it is said in another language', 'something tiny and everyday is settled in a few words'], ['When the app answers ambiguous_name', 'a word left open is asked about, not named']] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);
 }
 
 // ---------- 7l. what the adversarial review of 2026-10-13 found (five reviewers, each finding reproduced by a second one) ----------
@@ -1410,6 +1410,26 @@ const ask = async (deps: Deps, owner: string, question: string, requestId: strin
   const three = await analysisOf(['BTC', 'ETH', 'SPY'], 30);
   ok(/pair by pair/.test(limitationsInWords(three, 'en').join(' ')) && /both traded/.test(limitationsInWords(mixed, 'en').join(' ')) && /Paar für Paar/.test(limitationsInWords(three, 'de').join(' ')), '"both" is said of two; of three, the likeness is measured pair by pair');
   ok(/bewegte sich Bitcoin um/.test(composeByCode(alone, 'de').text) && /il prezzo di Bitcoin è variato/.test(composeByCode(alone, 'it').text) && !/ em Bitcoin| em Ethereum/.test(composeByCode(crypto, 'pt').text), 'code\'s sentences are written so that no word has to agree with a name: no "er", no "è variato" on a company, no "em Apple"');
+}
+
+// ---------- 7m. what the ninth independent evaluation found (2026-10-13, 120 turns, no critical turn) ----------
+{
+  // Nineteen reads of a stock or a fund failed that night for one reason: four hours after New York closed, the source's
+  // last row still came with `close: null`, and the reader refused all 126 sound closes with it.
+  const unpublished = () => { const p = structuredClone(yahoo('SPY', SPY)) as any; p.chart.result[0].indicators.quote[0].close[SPY.length - 1] = null; return p; };
+  const hole = () => { const p = structuredClone(yahoo('SPY', SPY)) as any; p.chart.result[0].indicators.quote[0].close[SPY.length - 4] = null; return p; };
+  world.series.SPY = unpublished;
+  const late = await analysisOf(['BTC', 'SPY'], 30);
+  world.series.SPY = () => yahoo('SPY', SPY);
+  const whole = await analysisOf(['BTC', 'SPY'], 30);
+  eq([late.evidence.find((e) => e.id === 'ev_SPY')!.quality, fig(late, 'return_SPY').value !== null, fig(late, 'return_SPY').to! < fig(whole, 'return_SPY').to!, late.limitations.includes('no_series:SPY')], ['valid', true, true, false],
+    'a last session whose close the source has not published yet is the series ending one session earlier: the fund is read, to the close before');
+  world.series.SPY = hole;
+  const gapped = await analysisOf(['BTC', 'SPY'], 30);
+  world.series.SPY = () => yahoo('SPY', SPY);
+  eq([gapped.evidence.find((e) => e.id === 'ev_SPY')!.quality !== 'valid', fig(gapped, 'return_SPY').value, gapped.limitations.includes('no_series:SPY')], [true, null, true], '…and a close missing in the middle of a series is still a series nobody can read');
+  const prompt = agentPrompt('en', 'en-US');
+  for (const [needle, why] of [['their saying beforehand that they will say no is not a no', 'a read they ask for is offered even when they say they will decline: the card is theirs to answer'], ['a sound check such as "can you hear me"', 'a sound check is answered in a few words'], ['"earlier" in the input is a read of theirs from an earlier day', 'figures from an earlier day are not on the table']] as const) ok(prompt.includes(needle), `the instructions say that ${why}`);
 }
 
 console.log(`agent-engine: ${checks} checks passed`);
