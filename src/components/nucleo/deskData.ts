@@ -81,7 +81,9 @@ export type CompanionOutcome =
   | { kind: 'explanation'; text: string; /** The next question the person could ask (the reply's follow-up), or null. */ next: string | null }
   /** The question was about the look-alike after all: the desk asks the person to confirm it. `text` is the offer's own sentence. */
   | { kind: 'desk'; text: string | null; symbol: string | null }
-  | { kind: 'limit'; message: string };
+  | { kind: 'limit'; message: string }
+  /** The pilot is on and this turn got no answer: the server's own sentence when it sent one, and whether asking again can help. */
+  | { kind: 'unavailable'; message: string | null; retry: boolean };
 
 // Whether the pilot is on, asked once per page load without sending anything: the endpoint answers 404 to
 // every method while it is off and 405 to a GET once it is on. Off, no question ever leaves for it.
@@ -95,8 +97,8 @@ function companionOn(): Promise<boolean> {
 
 /**
  * The companion's answer to a question that names no asset (POST /api/companion-turn, contract v1 in
- * shared/harness/companion-contract-v1). Null while the pilot is off or when it could not answer: the desk
- * then does what it did before. Only the question, the language, the install id, the exchange still on screen
+ * shared/harness/companion-contract-v1). Null while the pilot is off (the desk then does what it did before) or
+ * when the question was withdrawn; "unavailable" when the pilot is on and this turn got no answer. Only the question, the language, the install id, the exchange still on screen
  * and, when the search offered a look-alike, that guess are sent.
  */
 export async function companionTurn(question: string, signal: AbortSignal, candidate?: { symbol: string; name: string }, previous?: CompanionExchange | null): Promise<CompanionOutcome | null> {
@@ -118,8 +120,14 @@ export async function companionTurn(question: string, signal: AbortSignal, candi
     }
     if (data?.kind === 'desk_offer') return { kind: 'desk', text: typeof data.reply?.text === 'string' && data.reply.text ? data.reply.text : null, symbol: typeof data.nextAction?.symbol === 'string' ? data.nextAction.symbol : null };
     if (data?.kind === 'error' && data.error?.code === 'orientation_limit' && typeof data.error.message === 'string') return { kind: 'limit', message: data.error.message };
-  } catch { /* off, offline or not JSON */ }
-  return null;
+    if (signal.aborted) return null;
+    // Any other refusal comes with the server's sentence in the person's language; a reply of no known shape has none.
+    const said = data?.kind === 'error' && typeof data.error?.message === 'string' && data.error.message ? data.error.message : null;
+    return { kind: 'unavailable', message: said, retry: said ? data.error.retryable !== false : true };
+  } catch {
+    // Offline, timed out or not JSON, with the pilot on: the person asked something to understand and is told so.
+    return signal.aborted ? null : { kind: 'unavailable', message: null, retry: true };
+  }
 }
 
 export interface Answer {
