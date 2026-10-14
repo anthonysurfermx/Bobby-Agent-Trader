@@ -1,0 +1,10 @@
+
+> vite_react_shadcn_ts@0.0.0 build
+> node scripts/prod-source-guard.mjs && npm run check:api && npm run check:admin && node scripts/build-client-telemetry.mjs && vite build --manifest && node scripts/prerender-app.mjs
+
+[prod-source-guard] ok (local)
+
+> vite_react_shadcn_ts@0.0.0 check:api
+> tsc -p tsconfig.api.json && node scripts/ci/check-api-esm-imports.mjs
+
+sh: tsc: command not found
