@@ -266,6 +266,7 @@ func levelTone(_ level: Int) -> String {
 
 final class CompanionStore: ObservableObject {
     private let defaults: UserDefaults
+    private let clock: () -> Date
     private enum Key {
         static let companion = "companion.id"
         static let xp = "companion.disciplineXP"
@@ -346,7 +347,8 @@ final class CompanionStore: ObservableObject {
         max(0, disciplineXP - pendingAwards.reduce(0) { $0 + ($1.kind == "no_trade_respected" ? 20 : 10) })
     }
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, clock: @escaping () -> Date = Date.init) {
+        self.clock = clock
         self.defaults = defaults
         companionId = defaults.string(forKey: Key.selected + "." + (defaults.string(forKey: Key.owner) ?? "local"))
             ?? defaults.string(forKey: Key.companion)
@@ -475,14 +477,15 @@ final class CompanionStore: ObservableObject {
     /// Returns the points actually awarded — 0 when the daily cap already
     /// rejected the award. The UI must show THIS number, never the intent.
     @discardableResult
-    func awardDiscipline(_ points: Int, kind: String = "read_complete", thesis: AwardThesis? = nil, now: Date = Date()) -> Int {
+    func awardDiscipline(_ points: Int, kind: String = "read_complete", thesis: AwardThesis? = nil, now: Date? = nil) -> Int {
         awardDisciplineEvent(points, kind: kind, thesis: thesis, now: now).points
     }
 
     /// Same award, also returning the queued event id so the desk can follow
     /// the Trader Land piece the server plants for it.
     @discardableResult
-    func awardDisciplineEvent(_ points: Int, kind: String = "read_complete", thesis: AwardThesis? = nil, now: Date = Date()) -> DisciplineAward {
+    func awardDisciplineEvent(_ points: Int, kind: String = "read_complete", thesis: AwardThesis? = nil, now: Date? = nil) -> DisciplineAward {
+        let now = now ?? clock()
         let cal = Calendar.current
 
         // Daily cap

@@ -110,7 +110,7 @@ if(TALK_MODE==='hold'){
 STATES.HELD_DRAFT={enter:function(){chromeUp();greetOut();chipsHide();meriOut();dissolveThink();glassHome();moveSphere(300,98);draftPanel.style.display='block';draftPanel.style.top='438px';draftPhrase.textContent=HELD;A.closeO.set(1);hint(HELD_CAP?tt(HELD_CAP):'');pillMode(idleMode());},exit:function(){draftPanel.style.display='none';},down:function(h,p){if(h==='pill')return pillDown(p,false);if(h==='close')return tapG(function(){HELD='';SPEECH.draft='';CONV_BASE='';CONV_PARTIAL='';conversationReturn();});if(h==='avatar')return avatarG();return null;}};
 var oldTypingCancel=STATES.TYPING.cancel,oldTypingSend=STATES.TYPING.send;
 STATES.TYPING.cancel=function(){if(!this.d.conversation)return oldTypingCancel.call(this);var q=el.ta.value.trim();if(q)holdDraft(q,'',false,q===HELD?HELD_PARAMS:null);else conversationReturn();};
-STATES.TYPING.send=function(){if(!this.d.conversation)return oldTypingSend.call(this);if(TB.composing)return;var q=el.ta.value.replace(/\s+/g,' ').trim();if(q)convSend(q,false);else this.cancel();};
+STATES.TYPING.send=function(){if(!this.d.conversation)return oldTypingSend.call(this);if(TB.composing)return;var q=el.ta.value.trim();if(q)convSend(q,false);else this.cancel();};
 var oldOpenTyping=openTyping;
 openTyping=function(d){d=d||{};if(!d.followUpOf)d.conversation=true;oldOpenTyping(d);};
 var oldPermEnter=STATES.PRE_PERMISSION.enter;

@@ -20,6 +20,7 @@ final class NucleoBridgeTests: XCTestCase {
     private var suiteName = ""
     private var defaults: UserDefaults!
     private var saved: [String: Any] = [:]
+    private let bridgeTestNow = Date(timeIntervalSince1970: 1_791_892_860)
     private var generation = UUID()
 
     override func setUp() async throws {
@@ -43,16 +44,17 @@ final class NucleoBridgeTests: XCTestCase {
     }
 
     private func make(riskAccepted: Bool = true, telemetry: BobbyTelemetry = .shared) -> (NucleoSession, NucleoBridge, Recorder) {
+        let fixtureNow = bridgeTestNow
         let profile = AgentProfile()
         profile.riskNoticeVersion = riskAccepted ? RiskNotice.currentVersion : 0
-        let session = NucleoSession(fixtures: true, profile: profile, companions: CompanionStore(defaults: defaults),
+        let session = NucleoSession(fixtures: true, profile: profile, companions: CompanionStore(defaults: defaults, clock: { fixtureNow }),
                                     ledger: NucleoLedger(defaults: defaults), defaults: defaults, telemetry: telemetry)
         // These recorded bridge contracts are Quick reads. Do not inherit the simulator's
         // selected premium level; premium ordering and refusals have their own injected tests.
         session.desk.currentLevel = { .rapido }
         session.desk.setLevel = { _ in }
-        session.desk.clock = NucleoDesk.Clock(now: { NucleoFixtures.recordedAt(symbol: $0, kind: "candles") ?? Date() },
-                                              receivedAt: { NucleoFixtures.recordedAt(symbol: $0, kind: "debate") ?? Date() })
+        session.desk.clock = NucleoDesk.Clock(now: { NucleoFixtures.recordedAt(symbol: $0, kind: "candles") ?? fixtureNow },
+                                              receivedAt: { NucleoFixtures.recordedAt(symbol: $0, kind: "debate") ?? fixtureNow })
         session.desk.generation = { [unowned self] in self.generation }
         session.desk.recordQuery = { _, _ in }
         let recorder = Recorder()
@@ -79,6 +81,89 @@ final class NucleoBridgeTests: XCTestCase {
         var presentations = 0; session.speechDenialPresenter = { _ in presentations += 1 }
         XCTAssertThrowsError(try session.speechPermissionReply(.init(state:"denied",onDevice:true), params:.init(["denialHint":42])))
         XCTAssertEqual(presentations,0)
+    }
+
+    func testSpeakingChoiceBridgePersistsForTheCurrentReaderWithoutARequest() async {
+        let (session,bridge,_) = make();defer { session.teardown() }
+        let dial = SpeakingDial(defaults:defaults),owner = dial.tag(nil)
+        NucleoFixtures.clearLog()
+        let changed = await result(bridge,"speaking.choose",["owner":owner,"value":"technical"])
+        XCTAssertEqual((changed["speaking"] as? [String:Any])?["value"] as? String,"technical")
+        XCTAssertEqual(SpeakingDial(defaults:defaults).value(nil),"technical")
+        XCTAssertTrue(NucleoFixtures.log.isEmpty,"A preference save never asks the model")
+    }
+    func testSpeakingChoiceBridgeRejectsAStaleReaderAndAnUnknownChoice() async {
+        let (session,bridge,_) = make();defer { session.teardown() }
+        let dial = SpeakingDial(defaults:defaults);dial.choose("plain",owner:nil)
+        let stale = await fault(bridge,"speaking.choose",["owner":"another-reader","value":"technical"])
+        XCTAssertEqual(stale,"invalid_params");XCTAssertEqual(dial.value(nil),"plain")
+        let invalid = await fault(bridge,"speaking.choose",["owner":dial.tag(nil),"value":"unknown"])
+        XCTAssertEqual(invalid,"invalid_params");XCTAssertEqual(dial.value(nil),"plain")
+    }
+    func testProfileSpeakingHandoffWaitsForActualDismissalAndCannotOpenAfterBackground() {
+        let (session,_,recorder)=make();defer { session.teardown() }
+        session.briefingGate?.appActive = { true }
+        XCTAssertTrue(session.openNative(.account));session.openSpeakingDial()
+        XCTAssertFalse(recorder.events.contains { $0.name == "speaking.open" })
+        session.sheetDismissed()
+        XCTAssertEqual(recorder.events.filter { $0.name == "speaking.open" }.count,1)
+        XCTAssertTrue(session.openNative(.account));session.openSpeakingDial()
+        session.briefingGate?.appActive = { false };session.sheetDismissed()
+        XCTAssertEqual(recorder.events.filter { $0.name == "speaking.open" }.count,1)
+    }
+
+    func testProfileDialDoesNotResumeAClosedHandoffAfterBackground() {
+        let (session,_,recorder)=make();defer { session.teardown() }
+        session.briefingGate?.appActive={true}
+        XCTAssertTrue(session.openNative(.account));session.openSpeakingDial();session.appWentBackground();session.sheetDismissed()
+        XCTAssertFalse(recorder.events.contains{$0.name=="speaking.open"})
+    }
+
+    func testOrientationDeadlineReturnsTheLocalizedFailureAndRetainsItsRetryIdentity() async {
+        let (session,bridge,_)=make();defer{session.teardown()};session.desk.orientationTimeoutSeconds=0.03
+        var pending:CheckedContinuation<(Any?,Int),Never>?
+        let started=expectation(description:"held explanation"),finished=expectation(description:"bounded orientation")
+        session.companionPilot.transport={_,method,_ in if method=="GET"{return (nil,405)}
+            return await withCheckedContinuation{pending=$0;started.fulfill()}}
+        var reply:[String:Any]=[:]
+        let task=Task{@MainActor in reply=await result(bridge,"ask",["question":"What is investing?","companion":true]);finished.fulfill()}
+        await fulfillment(of:[started],timeout:1);await fulfillment(of:[finished],timeout:0.2)
+        pending?.resume(returning:(["version":1,"kind":"explanation","reply":["text":"Late answer"]],200));await task.value
+        XCTAssertEqual(reply["status"] as? String,"companion_error");XCTAssertFalse(session.desk.isBusy)
+        guard let id=reply["requestId"] as? String else{return XCTFail("Retain retry identity")}
+        var posted:[String:Any]?
+        session.companionPilot.transport={_,method,body in if method=="GET"{return (nil,405)};posted=body
+            return (["version":1,"kind":"explanation","reply":["text":"Learning."]],200)}
+        let retry=await result(bridge,"ask",["retry":id]);XCTAssertEqual(retry["status"] as? String,"companion");XCTAssertEqual(posted?["requestId"] as? String,id)
+    }
+
+    func testSignOutDuringCapabilityProbeKeepsNotesButSendsNoOldAnswer() async {
+        let (session,_,_)=make();defer{session.teardown()};session.readerChanged(owner:"fixture-a",generation:UUID())
+        session.companionContext.choose(true);session.companionContext.answer("interest",value:"crypto")
+        let notes=session.companionContext.state.notes
+        var pending:CheckedContinuation<(Any?,Int),Never>?;var posts=0;let started=expectation(description:"signed-in capability pending")
+        session.companionPilot.transport={_,method,_ in if method=="GET"{return await withCheckedContinuation{pending=$0;started.fulfill()}}
+            posts += 1;return (["version":1,"kind":"noted","patch":["notes":[],"asked":[]]],200)}
+        let task=Task{@MainActor in await session.companionPilot.answer(questionId:"barrier",text:"old private words")}
+        await fulfillment(of:[started],timeout:1);session.readerChanged(owner:nil,generation:UUID())
+        XCTAssertEqual(session.companionContext.state.notes,notes)
+        pending?.resume(returning:(["companion":["context":true,"catalog":1,"notices":["memory-1"]]],405))
+        let reply=await task.value;XCTAssertEqual(posts,0);XCTAssertEqual(reply["status"] as? String,"cancelled")
+    }
+    func testDifferentReaderDeletesNotesWhileSameReaderAndSignOutKeepThem() {
+        let (session,_,_)=make();defer{session.teardown()};session.readerChanged(owner:"fixture-a",generation:UUID())
+        session.companionContext.choose(true);session.companionContext.answer("interest",value:"crypto")
+        let notes=session.companionContext.state.notes;session.readerChanged(owner:nil,generation:UUID());XCTAssertEqual(session.companionContext.state.notes,notes)
+        session.readerChanged(owner:"fixture-a",generation:UUID());XCTAssertEqual(session.companionContext.state.notes,notes)
+        session.readerChanged(owner:"fixture-b",generation:UUID());XCTAssertTrue(session.companionContext.state.notes.isEmpty);XCTAssertFalse(session.companionContext.accepted)
+    }
+    func testExamplesAdvanceAtMidnightButNeverAdvanceWhenTheDeviceDateMovesBack() {
+        let profile=AgentProfile();profile.riskNoticeVersion=0
+        var now=Calendar.current.startOfDay(for:Date(timeIntervalSince1970:1_792_000_000)).addingTimeInterval(86399)
+        let session=NucleoSession(fixtures:false,profile:profile,companions:CompanionStore(defaults:defaults),ledger:NucleoLedger(defaults:defaults),defaults:defaults,now:{now});defer{session.teardown()}
+        func index()->Int{session.sessionJSON()["exampleIndex"] as! Int}
+        XCTAssertEqual(index(),0);now += 2;XCTAssertEqual(index(),1)
+        now -= 86400;XCTAssertEqual(index(),1);now += 86400;XCTAssertEqual(index(),1)
     }
 
     // MARK: - Helpers
@@ -524,7 +609,7 @@ final class NucleoBridgeTests: XCTestCase {
 
     func testSaveThesisAtTheDailyCapStillKeepsTheThesis() async throws {
         defaults.set(3, forKey: "companion.dailyAwards")
-        defaults.set(Date(), forKey: "companion.dailyAwardsDay")
+        defaults.set(bridgeTestNow, forKey: "companion.dailyAwardsDay")
         let (_, bridge, _) = make()
         let read = await result(bridge, "ask", ["question": "Is now a good time for Bitcoin?"])
         let saved = await result(bridge, "saveThesis", ["requestId": try XCTUnwrap(read["requestId"] as? String)])
@@ -975,7 +1060,7 @@ final class NucleoBridgeTests: XCTestCase {
 
     func testExpiredConversationConfirmationStartsOnlyWhenItsShownCostStillMatches() async {
         NucleoFixtures.setScenario("companion-plain")
-        let (session,bridge,_)=make(); var now=Date(); session.desk.tokenNow={now}
+        let (session,bridge,_)=make(); var now=bridgeTestNow; session.desk.tokenNow={now}
         let confirm=await result(bridge,"ask",["question":"Bitcoin","confirm":true])
         now=now.addingTimeInterval(601)
         let read=await result(bridge,"ask",["token":confirm["token"]!])
@@ -983,7 +1068,7 @@ final class NucleoBridgeTests: XCTestCase {
     }
     func testExpiredConversationConfirmationShowsChangedAllowanceBeforeSpending() async {
         NucleoFixtures.setScenario("companion-plain")
-        let (session,bridge,_)=make(); var now=Date(); session.desk.tokenNow={now}
+        let (session,bridge,_)=make(); var now=bridgeTestNow; session.desk.tokenNow={now}
         let confirm=await result(bridge,"ask",["question":"Bitcoin","confirm":true])
         now=now.addingTimeInterval(601)
         session.desk.readAccess={BobbyReadAccess(tier:"free",used:6,limit:10,remaining:4,resetsAt:nil,paywall:false)}
@@ -995,7 +1080,7 @@ final class NucleoBridgeTests: XCTestCase {
     }
     func testExpiredReadOfferAlwaysReturnsAConfirmationBeforeSpending() async {
         NucleoFixtures.setScenario("companion-plain")
-        let (session,bridge,_)=make(); var now=Date(); session.desk.tokenNow={now}
+        let (session,bridge,_)=make(); var now=bridgeTestNow; session.desk.tokenNow={now}
         let explanation=await result(bridge,"ask",["question":"What is Bitcoin?","confirm":true])
         guard let offer=explanation["readOffer"] as? [String:Any], let token=offer["token"] as? String else { XCTFail("exact candidate must carry a read offer"); session.teardown(); return }
         now=now.addingTimeInterval(601)

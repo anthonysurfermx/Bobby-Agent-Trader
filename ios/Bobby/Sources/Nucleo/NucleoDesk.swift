@@ -438,6 +438,11 @@ enum NucleoDeskIO {
 }
 
 enum NucleoAsync {
+    struct JSONReply: @unchecked Sendable {
+        // The race carries immutable decoded JSON; it never carries a view or mutable store.
+        let value: [String: Any]
+    }
+
     /// A deadline returns immediately even when the operation awaits an external task
     /// that ignores cancellation. The losing task is cancelled without joining it.
     static func withTimeout<T: Sendable>(_ seconds: Double, _ operation: @escaping @Sendable () async -> T) async -> T? {
@@ -555,6 +560,7 @@ final class NucleoDesk {
     let ledger: NucleoLedger
     let fixtures: Bool
     var clock = Clock()
+    var orientationTimeoutSeconds: Double = 45
     var pilot: CompanionPilot?
     var generation: () -> UUID = { AccountSession.shared.generation }
     var isSignedIn: () -> Bool = { AccountSession.shared.isSignedIn }
@@ -882,7 +888,13 @@ final class NucleoDesk {
         return await withCheckedContinuation { (continuation: CheckedContinuation<[String: Any], Never>) in
             let task = Task { [weak self] in
                 guard let self else { return }
-                let result = await self.run(job)
+                let result: [String: Any]
+                if job.confirm || job.companion {
+                    let reply = await NucleoAsync.withTimeout(self.orientationTimeoutSeconds) { @MainActor in
+                        NucleoAsync.JSONReply(value: await self.run(job))
+                    }
+                    result = reply?.value ?? Self.questionFailure("unavailable")
+                } else { result = await self.run(job) }
                 self.complete(requestId, result)
             }
             inflight = Inflight(requestId: requestId, task: task, continuation: continuation)

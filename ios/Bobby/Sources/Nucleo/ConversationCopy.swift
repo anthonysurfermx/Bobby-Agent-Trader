@@ -16,8 +16,8 @@ import Foundation
     static func k7(_ p0: String) -> String { L.t("Uses 1 {0} and 1 read", "Usa 1 {0} y 1 lectura").replacingOccurrences(of: "{0}", with: p0) }
     static func k8(_ p0: String, _ p1: String) -> String { L.t("Uses 1 of your {1} {0} with Bobby Pro", "Usa 1 de tus {1} {0} con Bobby Pro").replacingOccurrences(of: "{0}", with: p0).replacingOccurrences(of: "{1}", with: p1) }
     static func k9(_ p0: String) -> String { L.t("Uses 1 {0} with Bobby Pro", "Usa 1 {0} con Bobby Pro").replacingOccurrences(of: "{0}", with: p0) }
-    static func limitKnown(_ p0: String) -> String { L.t("I can’t explain more right now. I’ll be back {0}", "Por ahora no puedo explicar más. Vuelvo {0}").replacingOccurrences(of: "{0}", with: p0) }
-    static func limitUnknown() -> String { L.t("I can’t explain more right now. Try again later.", "Por ahora no puedo explicar más. Inténtalo más tarde.") }
+    static func limitKnown(_ p0: String) -> String { L.t("I can’t explain more right now; I’ll be back {0}", "Por ahora no puedo explicar más; vuelvo {0}").replacingOccurrences(of: "{0}", with: p0) }
+    static func limitUnknown() -> String { L.t("I can’t explain more right now; try again later.", "Por ahora no puedo explicar más; inténtalo más tarde.") }
     static func limit(headers: [String: String], now: Date = Date(), calendar: Calendar = .current, locale: Locale = L.locale) -> String {
         guard let raw = headers.first(where: { $0.key.lowercased() == "retry-after" })?.value,
               let seconds = Double(raw), seconds.isFinite, seconds >= 0 else { return limitUnknown() }

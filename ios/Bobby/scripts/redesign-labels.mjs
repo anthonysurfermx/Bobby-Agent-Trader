@@ -19,6 +19,7 @@ const nativeText = file => fs.readFileSync(path.join(ios, file),'utf8');
 const copyNative = nativeText('Sources/Nucleo/ConversationCopy.swift');
 const levelNative = nativeText('Sources/Nucleo/NucleoLevels.swift');
 const pairs = {
+  limitKnown: copyNative.match(/static func limitKnown[^\n]+L\.t\("([^"\n]+)", "([^"\n]+)"/).slice(1,3),
   ready: copyNative.match(/static func ready[^\n]+L\.t\("([^"]+)", "([^"]+)"/).slice(1,3),
   read: copyNative.match(/static func readLabel[^\n]+L\.t\("([^"]+)", "([^"]+)"/).slice(1,3),
   deep: levelNative.match(/case \.profundo: return L\.t\("([^"\n]+)", "([^"\n]+)"/).slice(1,3),
@@ -36,10 +37,12 @@ function nativeLabels(lang) {
     return [key,row[lang]];
   }));
 }
+const fixtureText = JSON.parse('{'+nativeText('Sources/Nucleo/NucleoFixtures.swift').match(/var text: \[String: String\] = \[([\s\S]*?)\]\n/)[1]+'}');
 const labels = Object.fromEntries(['en','es','fr','pt','it','de'].map(lang => [lang, {
-  app: app[lang], onboarding: onboarding[lang], native: nativeLabels(lang),
+  fixtureGist: fixtureText[lang].slice(0,fixtureText[lang].indexOf('.')+1),
+  app: app[lang], onboarding: onboarding[lang], native: nativeLabels(lang), consent: copy.consent[lang],
   companion: Object.fromEntries(Object.entries(copy.texts).map(([key, row]) => [key, row[lang]])),
-  catalog: Object.fromEntries(catalog.map(q=>[q.id,{text:q.text[lang],why:q.why?.[lang],options:Object.fromEntries(q.options.map(o=>[o.id,o.label[lang]]))}])),
+  catalog: Object.fromEntries(catalog.map(q=>[q.id,{text:q.text[lang],why:q.why?.[lang],options:Object.fromEntries(q.options.map(o=>[o.id,o.label[lang]])),orderedOptions:q.options.map(o=>({id:o.id,label:o.label[lang]}))}])),
   interest: interest.text[lang], crypto: interest.options.find(o => o.id === 'crypto').label[lang]
 }]));
 const target = path.join(ios, 'UITests/RedesignLabels.json');

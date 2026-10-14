@@ -273,7 +273,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #speakingConfirm{position:absolute;top:690px;left:70px;width:250px;min-height:48px;border:1px solid #F2EDE433;border-radius:28px;background:transparent;color:#F2EDE4;font:400 16px var(--sans)}
 #speakingSkip{position:absolute;top:750px;left:95px;width:200px;min-height:44px;border:0;background:none;color:var(--ink2);font:400 14px var(--sans)}
 #speakingError{position:absolute;top:659px;left:30px;width:330px;color:#F2EDE4;font:400 13px var(--sans)}
-.speaking-on #pill *,.speaking-on #chipRow *,.speaking-on #hintS,.speaking-on #micGlow,.speaking-on #greet,.speaking-on #pill,.speaking-on #hint,.speaking-on #chips,.speaking-on #avatar,.speaking-on #lvl{visibility:hidden!important;pointer-events:none!important}
+.speaking-on #conversation-keyboard,.speaking-on #close,.speaking-on #pill *,.speaking-on #chipRow *,.speaking-on #hintS,.speaking-on #micGlow,.speaking-on #greet,.speaking-on #pill,.speaking-on #hint,.speaking-on #chips,.speaking-on #avatar,.speaking-on #lvl{visibility:hidden!important;pointer-events:none!important}
 .speaking-greet #greet .t{white-space:normal;font-size:26px;line-height:32px}
 #speakingRefine{position:absolute;top:790px;left:12px;width:366px;display:none;justify-content:center;gap:6px;z-index:30}
 #speakingRefine.on{display:flex} #speakingRefine button{background:#0B0A09;border:1px solid #F2EDE426;border-radius:20px;color:#F2EDE4;font:400 12px var(--sans);padding:12px 8px;min-height:44px}
@@ -286,7 +286,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 .quiet-chip{background:rgba(242,237,228,.04);border:1px solid rgba(242,237,228,.14);border-radius:28px;text-align:left;width:100%;padding:14px 18px;font-weight:500;white-space:normal}
 .quiet-link,.quiet-level{border:0;background:transparent;padding:8px;color:#A39C91!important}
 .quiet-glyph{position:absolute;z-index:21;left:83px;top:748px;width:44px;height:44px;display:grid;place-items:center;background:rgba(242,237,228,.04);border:1px solid rgba(242,237,228,.14);border-radius:50%;color:#A39C91}
-.conversation-phrase{font-family:var(--serif);font-weight:300;letter-spacing:-.035em;text-align:center;text-wrap:balance;margin:0;white-space:pre-wrap;color:#FFF8EC}
+.conversation-phrase{font-family:var(--serif);font-weight:300;letter-spacing:-.035em;text-align:center;text-wrap:balance;overflow-wrap:anywhere;hyphens:auto;margin:0;white-space:pre-wrap;color:#FFF8EC}
 .conversation-body{font-family:var(--sans);white-space:pre-wrap;margin:14px 0 0;color:#F2EDE4}
 .conversation-reading{overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-mask-image:linear-gradient(to bottom,transparent,#000 var(--fade-top,0px),#000 calc(100% - var(--fade-bottom,0px)),transparent)}
 .conversation-slot{position:absolute;left:20px;width:350px;z-index:19;pointer-events:auto}
@@ -2728,11 +2728,11 @@ var STR = /*STRINGS-BEGIN*/{
     "cap.voiceUnavailable": "Voice unavailable · here is the text",
     "status.preparing": "Preparing your answer…",
     "answer.readAll": "Read it all",
-    "fail.answer": "I couldn’t answer. Your question is still here.",
+    "fail.answer": "I couldn’t answer; your question is still here.",
     "fail.retry": "Try again",
-    "fail.cantExplain": "I can’t explain right now. Your question is still here.",
-    "fail.offline": "No connection. Your question is still here.",
-    "fail.paused": "I’m pausing explanations for a while. Your question is still here.",
+    "fail.cantExplain": "I can’t explain right now; your question is still here.",
+    "fail.offline": "No connection; your question is still here.",
+    "fail.paused": "I’m pausing explanations for a while; your question is still here.",
     "aria.talk": "Talk",
     "aria.type": "Type",
     "aria.sendSpoken": "Send what I said",
@@ -2807,11 +2807,11 @@ var STR = /*STRINGS-BEGIN*/{
     "cap.voiceUnavailable": "Voz no disponible · aquí está el texto",
     "status.preparing": "Preparando tu respuesta…",
     "answer.readAll": "Leer completa",
-    "fail.answer": "No pude responder. Tu pregunta sigue aquí.",
+    "fail.answer": "No pude responder; tu pregunta sigue aquí.",
     "fail.retry": "Reintentar",
-    "fail.cantExplain": "Ahora no puedo explicar. Tu pregunta sigue aquí.",
-    "fail.offline": "Sin conexión. Tu pregunta sigue aquí.",
-    "fail.paused": "Estoy pausando las explicaciones un rato. Tu pregunta sigue aquí.",
+    "fail.cantExplain": "Ahora no puedo explicar; tu pregunta sigue aquí.",
+    "fail.offline": "Sin conexión; tu pregunta sigue aquí.",
+    "fail.paused": "Estoy pausando las explicaciones un rato; tu pregunta sigue aquí.",
     "aria.talk": "Hablar",
     "aria.type": "Escribir",
     "aria.sendSpoken": "Enviar lo que dije",
@@ -2887,11 +2887,11 @@ var STR = /*STRINGS-BEGIN*/{
     "cap.voiceUnavailable": "Voix indisponible · voici le texte",
     "status.preparing": "Je prépare ta réponse…",
     "answer.readAll": "Tout lire",
-    "fail.answer": "Je n’ai pas pu répondre. Ta question est toujours là.",
+    "fail.answer": "Je n’ai pas pu répondre; ta question est toujours là.",
     "fail.retry": "Réessayer",
-    "fail.cantExplain": "Je ne peux pas expliquer pour l’instant. Ta question est toujours là.",
-    "fail.offline": "Pas de connexion. Ta question est toujours là.",
-    "fail.paused": "Je mets les explications en pause un moment. Ta question est toujours là.",
+    "fail.cantExplain": "Je ne peux pas expliquer pour l’instant; ta question est toujours là.",
+    "fail.offline": "Pas de connexion; ta question est toujours là.",
+    "fail.paused": "Je mets les explications en pause un moment; ta question est toujours là.",
     "aria.talk": "Parler",
     "aria.type": "Écrire",
     "aria.sendSpoken": "Envoyer ce que j’ai dit",
@@ -3006,11 +3006,11 @@ var STR = /*STRINGS-BEGIN*/{
     "cap.voiceUnavailable": "Voz indisponível · aqui está o texto",
     "status.preparing": "A preparar a tua resposta…",
     "answer.readAll": "Ler tudo",
-    "fail.answer": "Não consegui responder. A tua pergunta continua aqui.",
+    "fail.answer": "Não consegui responder; a tua pergunta continua aqui.",
     "fail.retry": "Tentar novamente",
-    "fail.cantExplain": "Agora não consigo explicar. A tua pergunta continua aqui.",
-    "fail.offline": "Sem ligação. A tua pergunta continua aqui.",
-    "fail.paused": "Estou a pausar as explicações por um bocado. A tua pergunta continua aqui.",
+    "fail.cantExplain": "Agora não consigo explicar; a tua pergunta continua aqui.",
+    "fail.offline": "Sem ligação; a tua pergunta continua aqui.",
+    "fail.paused": "Estou a pausar as explicações por um bocado; a tua pergunta continua aqui.",
     "aria.talk": "Falar",
     "aria.type": "Escrever",
     "aria.sendSpoken": "Enviar o que eu disse",
@@ -3126,11 +3126,11 @@ var STR = /*STRINGS-BEGIN*/{
     "cap.voiceUnavailable": "Voce non disponibile · ecco il testo",
     "status.preparing": "Preparo la tua risposta…",
     "answer.readAll": "Leggi tutto",
-    "fail.answer": "Non sono riuscito a rispondere. La tua domanda è ancora qui.",
+    "fail.answer": "Non sono riuscito a rispondere; la tua domanda è ancora qui.",
     "fail.retry": "Riprova",
-    "fail.cantExplain": "Ora non riesco a spiegare. La tua domanda è ancora qui.",
-    "fail.offline": "Nessuna connessione. La tua domanda è ancora qui.",
-    "fail.paused": "Metto in pausa le spiegazioni per un po’. La tua domanda è ancora qui.",
+    "fail.cantExplain": "Ora non riesco a spiegare; la tua domanda è ancora qui.",
+    "fail.offline": "Nessuna connessione; la tua domanda è ancora qui.",
+    "fail.paused": "Metto in pausa le spiegazioni per un po’; la tua domanda è ancora qui.",
     "aria.talk": "Parla",
     "aria.type": "Scrivi",
     "aria.sendSpoken": "Invia quello che ho detto",
@@ -3245,11 +3245,11 @@ var STR = /*STRINGS-BEGIN*/{
     "cap.voiceUnavailable": "Stimme nicht verfügbar · hier ist der Text",
     "status.preparing": "Ich bereite deine Antwort vor…",
     "answer.readAll": "Alles lesen",
-    "fail.answer": "Ich konnte nicht antworten. Deine Frage ist noch da.",
+    "fail.answer": "Ich konnte nicht antworten; deine Frage ist noch da.",
     "fail.retry": "Erneut versuchen",
-    "fail.cantExplain": "Ich kann gerade nichts erklären. Deine Frage ist noch da.",
-    "fail.offline": "Keine Verbindung. Deine Frage ist noch da.",
-    "fail.paused": "Ich pausiere die Erklärungen für eine Weile. Deine Frage ist noch da.",
+    "fail.cantExplain": "Ich kann gerade nichts erklären; deine Frage ist noch da.",
+    "fail.offline": "Keine Verbindung; deine Frage ist noch da.",
+    "fail.paused": "Ich pausiere die Erklärungen für eine Weile; deine Frage ist noch da.",
     "aria.talk": "Sprechen",
     "aria.type": "Schreiben",
     "aria.sendSpoken": "Senden, was ich gesagt habe",
@@ -5654,7 +5654,7 @@ if(TALK_MODE==='hold'){
 STATES.HELD_DRAFT={enter:function(){chromeUp();greetOut();chipsHide();meriOut();dissolveThink();glassHome();moveSphere(300,98);draftPanel.style.display='block';draftPanel.style.top='438px';draftPhrase.textContent=HELD;A.closeO.set(1);hint(HELD_CAP?tt(HELD_CAP):'');pillMode(idleMode());},exit:function(){draftPanel.style.display='none';},down:function(h,p){if(h==='pill')return pillDown(p,false);if(h==='close')return tapG(function(){HELD='';SPEECH.draft='';CONV_BASE='';CONV_PARTIAL='';conversationReturn();});if(h==='avatar')return avatarG();return null;}};
 var oldTypingCancel=STATES.TYPING.cancel,oldTypingSend=STATES.TYPING.send;
 STATES.TYPING.cancel=function(){if(!this.d.conversation)return oldTypingCancel.call(this);var q=el.ta.value.trim();if(q)holdDraft(q,'',false,q===HELD?HELD_PARAMS:null);else conversationReturn();};
-STATES.TYPING.send=function(){if(!this.d.conversation)return oldTypingSend.call(this);if(TB.composing)return;var q=el.ta.value.replace(/\s+/g,' ').trim();if(q)convSend(q,false);else this.cancel();};
+STATES.TYPING.send=function(){if(!this.d.conversation)return oldTypingSend.call(this);if(TB.composing)return;var q=el.ta.value.trim();if(q)convSend(q,false);else this.cancel();};
 var oldOpenTyping=openTyping;
 openTyping=function(d){d=d||{};if(!d.followUpOf)d.conversation=true;oldOpenTyping(d);};
 var oldPermEnter=STATES.PRE_PERMISSION.enter;
@@ -6771,9 +6771,9 @@ var DIAL_WORDS = {
  de: ['Wie soll ich mit dir sprechen?', ['Einfach','Mit Begriffen','Technisch'], ['Der Kurs stieg schnell. Eine nahe Grenze stoppte ihn schon einmal.','Der Kurs stieg schnell (überkauft). Eine Grenze ist nah (Widerstand).','Überkauft auf 1H, unter Widerstand. Bestätigung fehlt.'], 'So passt es','Jetzt starten','Was möchtest du heute verstehen?', ['Einfacher','So passt es','Technischer']]
 };
 var DIAL_EXITS = {"en": ["Save", "Leave as is", "That didn’t save. Try again."], "es": ["Guardar", "Dejar como está", "No se guardó. Inténtalo de nuevo."], "fr": ["Enregistrer", "Laisser tel quel", "Non enregistré. Réessaie."], "pt": ["Guardar", "Deixar como está", "Não foi guardado. Tenta de novo."], "it": ["Salva", "Lascia così", "Non salvato. Riprova."], "de": ["Speichern", "So lassen", "Nicht gespeichert. Versuch es noch einmal."]};
-var dialReturn = null;
+var dialReturn = null, dialReadReturn = false;
 function dialExitWords(){return DIAL_EXITS[LANG]||DIAL_EXITS.en;}
-function dialClose(){dialBusy=false;if(dialReturn){var answer=dialReturn;dialReturn=null;answer.invitation=null;answer.slotBorn=false;go('COMPANION',{reply:answer});}else go('RETURNING');}
+function dialClose(){dialBusy=false;if(dialReturn){var answer=dialReturn;dialReturn=null;answer.invitation=null;answer.slotBorn=false;go('COMPANION',{reply:answer});}else if(dialReadReturn&&READ){dialReadReturn=false;go('HANDBACK',{restored:true});}else{dialReadReturn=false;go('RETURNING');}}
 var dial = D.getElementById('speakingDial'), dialIndex = 0, dialBusy = false, dialOwner = null, dialGreeting = false;
 function dialWords(){ return DIAL_WORDS[LANG] || DIAL_WORDS.en; }
 function dialPaint(index){
@@ -6798,8 +6798,8 @@ function dialSave(index, feedback){
  }, function(){ dialBusy = false; if (gen === OWNER_GEN) D.getElementById('speakingError').textContent = dialExitWords()[2]; });
 }
 STATES.SPEAKING_DIAL = {
- enter: function(){
-  dialReturn = GUIDE || null; dialOwner = SES.speaking.owner; dialBusy = false; chipsHide(); greetOut(); meriOut(); hint('');
+ enter: function(prev){
+  dialReturn = prev==='COMPANION' ? GUIDE : null; dialReadReturn=!!READ && ['HANDBACK','CARDS','FOLLOWUPS'].indexOf(prev)>=0; dialOwner = SES.speaking.owner; dialBusy = false; chipsHide(); greetOut(); meriOut(); hint('');
   stage.classList.add('speaking-on'); dial.classList.add('on'); dial.setAttribute('aria-hidden','false'); D.getElementById('speakingRange').focus();
   S.cy[RM ? 'set' : 'to'](302); S.r[RM ? 'set' : 'to'](112); U.faceOn.to(0); U.presence.to(0); tintHome();
   D.getElementById('speakingError').textContent = ''; dialPaint(Math.max(0, DIAL_VALUES.indexOf(SES.speaking.value)));
@@ -6836,8 +6836,8 @@ function conversationChrome(){
  var name=ST.name,scale=Math.max(.5,fitS||1),k=(SES&&SES.textScale||1)/scale,target=44/scale;
  var statusVisible=['SENDING','RESOLVING'].indexOf(name)>=0;if(!statusVisible&&preparingLine._visible)conversationRetire(preparingLine,'sphere');preparingLine._visible=statusVisible;preparingLine.style.display=statusVisible?'block':'none';preparingLine.textContent=tt('status.preparing');if(preparingLine.style.display==='block'&&preparingLine._born!==ST.t0){preparingLine._born=ST.t0;conversationBorn(preparingLine,'sphere',27);}preparingLine.style.top='512px';preparingLine.style.fontSize=22*k+'px';preparingLine.style.lineHeight=27*k+'px';
  var waiting=['SENDING','RESOLVING','THINK_WAIT'].indexOf(name)>=0,listening=name==='LISTENING',held=name==='HELD_DRAFT',speaking=!!(VOICE.id&&VOICE.started&&!VOICE.ended);
- var rest=name==='IDLE'||name==='WAKE';if(rest){A.closeO.set(0);op(el.close,0);}att(el.close,'aria-hidden',rest||waiting||name==='READ_CONFIRM'?'true':'false');
- keyboardButton.style.display=!waiting&&name!=='BOOT'&&name!=='TYPING'?'grid':'none';keyboardButton.style.width=keyboardButton.style.height=target+'px';keyboardButton.style.left=(105-target/2)+'px';keyboardButton.style.top=(770-target/2)+'px';keyboardButton.setAttribute('aria-label',tt('aria.type'));
+ var rest=name==='IDLE'||name==='WAKE';if(rest){A.closeO.set(0);op(el.close,0);}att(el.close,'aria-hidden',rest||waiting||name==='READ_CONFIRM'||name==='SPEAKING_DIAL'?'true':'false');
+ keyboardButton.style.display=!waiting&&name!=='BOOT'&&name!=='TYPING'&&name!=='SPEAKING_DIAL'?'grid':'none';keyboardButton.style.width=keyboardButton.style.height=target+'px';keyboardButton.style.left=(105-target/2)+'px';keyboardButton.style.top=(770-target/2)+'px';keyboardButton.setAttribute('aria-label',tt('aria.type'));
  fieldMic.style.display=name==='TYPING'&&TALK_MODE==='tap'?'block':'none';fieldMic.setAttribute('aria-label',tt('aria.talk'));
  var send=TALK_MODE==='tap'&&(held||listening&&STATES.LISTENING.live);el.pill.classList.toggle('conversation-send',send);
  if(TALK_MODE==='tap')att(el.pill,'aria-label',tt(waiting?'aria.cancelQuestion':speaking?'aria.pillStop':listening?'aria.sendSpoken':held?'type.send':'aria.talk'));
@@ -7114,7 +7114,7 @@ function wire(){
     /* the last read was spent, or reads came back: the idle row loses or regains its one-tap chips at once */
     if (oneTapOff() !== walled && ST.name === 'IDLE') showIdleSuggestions(); else nudgeSync();
   });
-  BR.on('speaking.open', function(){ if (SES && SES.speaking && SES.riskAccepted && ['IDLE','HANDBACK','CARDS','FOLLOWUPS','THESIS_VIEW','FACES'].indexOf(ST.name) >= 0){ clearRead(); glassHome(); go('SPEAKING_DIAL'); } });
+  BR.on('speaking.open', function(){ if (SES && SES.speaking && SES.riskAccepted && ['IDLE','COMPANION','HANDBACK','CARDS','FOLLOWUPS','THESIS_VIEW','FACES'].indexOf(ST.name) >= 0){ go('SPEAKING_DIAL'); } });
   BR.on('account.changed', function(p){ conversationReset(); dialBusy = false; dialGreeting = false; stage.classList.remove('speaking-greet'); accountChanged(p); });
   BR.on('consent.withdrawn', function(p){conversationReset();consentWithdrawn(p);});
   BR.on('app.state', function(p){ if (p && p.state === 'background'){ conversationSuspend(); } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
