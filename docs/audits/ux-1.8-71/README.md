@@ -179,7 +179,7 @@ The supplemental audit probes are local evidence artifacts, not added product te
 
 **Real audio, live purchases/restore, Apple sign-in, and a physical device were not tested.** No live accounts were created/deleted. Also unverified: Simulator/native Debug build, TCC denial→Cancel/Settings→return, actual largest iOS Dynamic Type value/rendering, native VoiceOver, native 44pt hit areas, StoreKit config lifecycle, native Profile/paywall/notes rendering, real Keychain failures, remote companion capability, live model/data freshness and App Review/TestFlight/publication status. None is counted as passing. The existing `ProReviewShots` uses a live RevenueCat Test Store offering and was excluded under this brief's StoreKit-only constraint.
 
-Temporary source/dependencies/cache/build outputs were removed; no simulator or DerivedData was created. Disk had approximately **21GiB free** at audit closure, above the required 15GB archive reserve. Only this audit folder is intended for commit.
+Temporary source/dependencies/cache/build outputs were removed; no simulator or DerivedData was created. Disk had approximately **21GiB free** after the isolated build cleanup and **19GiB free** at final publication, above the required 15GB archive reserve. Only this audit folder is intended for commit.
 
 Publication method: the sandbox denied creation of the worktree's `index.lock`, so the documentation-only commit and audit branch are published through GitHub's Git Data API. Local Git metadata remains at the audited base; the local audit folder is present as uncommitted files. No main ref is updated.
 
