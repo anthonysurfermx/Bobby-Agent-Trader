@@ -55,8 +55,10 @@ final class AccountIsolationTests: XCTestCase {
     }
 
     private func account(_ user: String = "a", expired: Bool = false) -> AccountSession {
-        AccountSession(initialSession: stored(user, expired: expired), usesKeychain: false,
+        let account = AccountSession(initialSession: stored(user, expired: expired), usesKeychain: false,
                        authTransport: transport(), defaults: defaults)
+        account.eraseCompanionNotes = {}
+        return account
     }
 
     private func tokenReply(_ user: String, token: String = "late-token") -> String {
@@ -72,7 +74,10 @@ final class AccountIsolationTests: XCTestCase {
             request.respond(200, request.request.httpMethod == "GET"
                 ? #"{"appleAuthorizationRequired":false}"# : #"{"ok":true}"#)
         }
+        var erasedNotes = 0
+        account.eraseCompanionNotes = { erasedNotes += 1 }
         let result = await account.deleteAccount()
+        XCTAssertEqual(erasedNotes, 1)
         XCTAssertEqual(result, .deleted)
         XCTAssertNil(defaults.data(forKey: NucleoLedger.key(owner: "a")))
         XCTAssertEqual(defaults.data(forKey: NucleoLedger.key(owner: "b")), Data("b".utf8))
@@ -95,7 +100,10 @@ final class AccountIsolationTests: XCTestCase {
                                       ? #"{"error":"UNTRUSTED ENGLISH PROVIDER ERROR"}"#
                                       : #"{"appleAuthorizationRequired":false}"#)
                 }
+                var erasedNotes = false
+                account.eraseCompanionNotes = { erasedNotes = true }
                 let result = await account.deleteAccount()
+                XCTAssertFalse(erasedNotes)
                 XCTAssertEqual(result, .failed)
                 XCTAssertEqual(account.lastError, L.t("Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo"))
                 XCTAssertFalse(account.lastError?.contains("UNTRUSTED") == true)

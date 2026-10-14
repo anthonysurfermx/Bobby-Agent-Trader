@@ -116,6 +116,9 @@
       if (e.length) throw new Error(e.join('\n'));
     });
   });
+  test('I-2 memory doors are bridge methods, never generic routes', function () {
+    if (B.METHODS.indexOf('companion.invite') < 0 || B.METHODS.indexOf('companion.notes') < 0) throw new Error('missing memory doors');
+  });
   test('roster(): 18 companions, orb<->bobby, ids unique', function () {
     return B.api.roster().then(function (r) {
       var c = r.companions;

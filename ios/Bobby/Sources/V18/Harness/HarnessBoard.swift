@@ -104,7 +104,9 @@ struct HarnessBoardSheet: View {
         Group {
             if let board {
                 // A row asks Bobby, which is a read: rows are only buttons when the next read is answered.
-                HarnessBoardContent(board: board, asks: HarnessCenter.shared.readsOpen, onClose: onClose) { row in
+                HarnessBoardContent(board: board, asks: HarnessCenter.shared.readsOpen, onClose: onClose,
+                                    onMemory: { session.switchSheet(to: .memory) },
+                                    onCredits: { session.switchSheet(to: .credits) }) { row in
                     Self.ask(row, session: session)
                 }
             } else {
@@ -146,6 +148,8 @@ struct HarnessBoardContent: View {
     /// False when the next read would be refused: the board is the same, and no row invites a read.
     var asks = true
     let onClose: () -> Void
+    var onMemory: (() -> Void)? = nil
+    var onCredits: (() -> Void)? = nil
     let onPick: (HarnessBoard.Row) -> Void
 
     /// V18-DESIGN.md: a title, what the numbers are, rows of state. One tap per row.
@@ -156,7 +160,11 @@ struct HarnessBoardContent: View {
                     Text(HarnessCopy.boardEmpty).quietFont(16).foregroundStyle(Theme.cream).quietWraps()
                         .padding(.top, 8)
                         .accessibilityIdentifier("follow-empty")
+                    QuietNote(text: HarnessCopy.boardEmptyNext, id: "follow-empty-next").padding(.top, 10)
                 } else {
+                    if board.kind == .week {
+                        QuietNote(text: HarnessCopy.boardContext, id: "follow-context").padding(.bottom, 12)
+                    }
                     ForEach(Array(board.rows.enumerated()), id: \.element.id) { index, row in
                         let change = row.change.map(HarnessCopy.signed)
                         QuietRow(label: row.symbol, value: change, note: row.name == row.symbol ? nil : row.name, chevron: asks,
@@ -164,7 +172,21 @@ struct HarnessBoardContent: View {
                                  spoken: HarnessCopy.rowSpoken(symbol: row.symbol, name: row.name, change: change),
                                  id: "follow-row-\(row.symbol)", action: asks ? { onPick(row) } : nil)
                     }
-                    if asks { QuietNote(text: HarnessCopy.boardFoot, id: "follow-foot").padding(.top, 14) }
+                    if asks, let first = board.rows.first {
+                        QuietNote(text: HarnessCopy.boardNewRead, id: "follow-read-kind").padding(.top, 16)
+                        QuietPrimary(title: HarnessCopy.resumeButton(symbol: first.symbol), id: "follow-resume") {
+                            onPick(first)
+                        }
+                        .padding(.top, 8)
+                    } else if let onCredits {
+                        QuietNote(text: HarnessCopy.boardCheckReads, id: "follow-check-reads").padding(.top, 16)
+                        QuietLink(title: L.t("See credits", "Ver créditos"), id: "follow-credits", action: onCredits)
+                            .padding(.top, 6)
+                    }
+                }
+                if let onMemory {
+                    QuietLink(title: L.t("See memory", "Ver memoria"), id: "follow-memory", action: onMemory)
+                        .padding(.top, 18)
                 }
             }
             .padding(.top, 12)

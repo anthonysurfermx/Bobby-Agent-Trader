@@ -4,7 +4,7 @@ import Foundation
 /// lands without touching the others. `NativeTranslations.rows` merges them (an older row wins),
 /// and Tests/LocalizationCatalogAudit.py reads every `result["…"] = […]` line in this folder.
 enum NativeTranslations18 {
-    static var all: [[String: [String: String]]] { [shared, credits, memory, theses, reminders, invite, harness] }
+    static var all: [[String: [String: String]]] { [conversation, shared, credits, memory, theses, reminders, invite, harness] }
 
     /// Rows more than one feature uses.
     static let shared: [String: [String: String]] = {

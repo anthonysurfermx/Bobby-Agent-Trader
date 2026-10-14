@@ -652,10 +652,10 @@ final class HarnessReviewTests: XCTestCase {
     /// one sentence and the row "On this iPhone", as for an account and as on Android.
     func testSignedOutTheMemoryScreenIsOneSentenceAndOneRow() {
         XCTAssertEqual(MemoryView.foldedFace(note: MemoryError.signedOut.message),
-                       ["Memory", "Sign in with Apple so Bobby can remember your assets and preferences.", "On this iPhone"])
+                       ["What I remember", "Sign in with Apple so Bobby can remember your assets and preferences.", "On this iPhone"])
         L.select("es")
         XCTAssertEqual(MemoryView.foldedFace(note: MemoryError.signedOut.message),
-                       ["Memoria", "Inicia sesión con Apple para que Bobby recuerde tus activos y preferencias.", "En este iPhone"])
+                       ["Lo que recuerdo", "Inicia sesión con Apple para que Bobby recuerde tus activos y preferencias.", "En este iPhone"])
         for language in Self.languages {
             L.select(language)
             for note in [MemoryError.signedOut.message, MemoryView.riskRequired] {

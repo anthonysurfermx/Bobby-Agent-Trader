@@ -6,11 +6,14 @@ extension NativeTranslations18 {
     /// `NucleoNudge.textLimit` with a symbol of up to eight characters (Memory18NudgeTests measures them).
     static let memory: [String: [String: String]] = {
         var result: [String: [String: String]] = [:]
+        result["How Bobby speaks"] = ["fr": "Comment Bobby te parle", "pt": "Como o Bobby fala contigo", "it": "Come ti parla Bobby", "de": "Wie Bobby mit dir spricht"]
         // The consent sheet
         // What reaches the AI provider, as api/_lib/user-memory.ts (readerContext) sends it
         result["Not now"] = ["fr": "Pas maintenant", "pt": "Agora não", "it": "Non ora", "de": "Nicht jetzt"]
         result["Remember"] = ["fr": "Retenir", "pt": "Lembrar", "it": "Ricorda", "de": "Merken"]
         // The memory screen
+        result["What I remember"] = ["fr": "Ce que je retiens", "pt": "O que recordo", "it": "Quello che ricordo", "de": "Was ich mir merke"]
+        result["About you"] = ["fr": "À propos de toi", "pt": "Sobre ti", "it": "Su di te", "de": "Über dich"]
         result["Turn on"] = ["fr": "Activer", "pt": "Ativar", "it": "Attiva", "de": "Einschalten"]
         result["Opens the full explanation before anything is turned on."] = ["fr": "Ouvre l'explication complète avant toute activation.", "pt": "Abre a explicação completa antes de ativar seja o que for.", "it": "Apre la spiegazione completa prima di attivare qualsiasi cosa.", "de": "Öffnet die vollständige Erklärung, bevor etwas eingeschaltet wird."]
         result["Bobby keeps these on this iPhone, not on its servers. The text of a thesis is sent, with that question, only when you start a review: to Bobby and to the AI providers that write the answer."] = ["fr": "Bobby garde ces éléments sur cet iPhone, pas sur ses serveurs. Le texte d'une thèse est envoyé, avec cette question, seulement quand tu lances une révision : à Bobby et aux fournisseurs d'IA qui rédigent la réponse.", "pt": "O Bobby guarda isto neste iPhone, não nos seus servidores. O texto de uma tese é enviado, com essa pergunta, apenas quando inicias uma revisão: ao Bobby e aos fornecedores de IA que escrevem a resposta.", "it": "Bobby conserva questi dati su questo iPhone, non sui suoi server. Il testo di una tesi viene inviato, con quella domanda, solo quando avvii una revisione: a Bobby e ai fornitori di IA che scrivono la risposta.", "de": "Bobby speichert das auf diesem iPhone, nicht auf seinen Servern. Der Text einer These wird nur gesendet, wenn du eine Überprüfung startest, zusammen mit dieser Frage: an Bobby und an die KI-Anbieter, die die Antwort schreiben."]

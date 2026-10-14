@@ -45,6 +45,7 @@ function startRead(params, question){
   var prev = READ, origin = ASK_ORIGIN || ((params.token || params.followUpOf) && prev && prev.origin) || 'person';
   var r = { id: ++READ_SEQ, params: params, question: question, stageId: null, accepted: false, asset: null, market: null, reply: null, model: null,
             requestId: null, askT: clk, save: null, cancelling: false, origin: origin };
+  r.questionSpoken=!!(params.spoken||params.token&&prev&&(prev.questionSpoken||prev.reply&&prev.reply.questionSpoken));
   READ = r;
   bcall('ask', params).then(function(res){ onAskReply(r, res); },
     function(err){ onAskReply(r, { v: 1, status: 'error', code: 'bad_response', message: null, fault: err && err.code }); });
@@ -54,6 +55,8 @@ function onAskReply(r, res){
   if (r !== READ) return;
   if (!res || typeof res.status !== 'string') res = { v: 1, status: 'error', code: 'bad_response', message: null };
   r.reply = res;
+  if (res.companionCheckIn) CHECKIN = res.companionCheckIn;
+  if (!paramsCompanion(r.params)) GUIDE_RETRIES = 0;
   if (res.status === 'ok'){
     try { r.model = RMOD.build(res, { lang: LANG, locale: LOCALE, signedIn: !!(SES && SES.signedIn), origin: r.origin }); r.requestId = res.requestId; }
     catch (e){ logErr('model', e); r.model = null; r.reply = { v: 1, status: 'error', code: 'bad_response', message: null }; }
@@ -69,6 +72,7 @@ function onStage(p){
 /* Acknowledgment after two real animation frames with a settled, visible result card.
    Native retains the signed receipt; this trusted page only names the current request UUID. */
 function observePresentedRead(){
+  if (ST.name === 'THESIS_VIEW' || A.viewOnly) return;
   var r = READ;
   if (!r || !r.model || !r.reply || r.reply.status !== 'ok' || !r.requestId || r.presented || !canRun()) return;
   var visible = false;
@@ -360,9 +364,9 @@ function fillThesisCard(th, o){
   el.saveSw.style.setProperty('--sc', css(vc.c, 0.95));
   el.tpill.textContent = th.pill; el.tpill.style.background = css(mixC(C.cardBg, vc.c, 0.2), 0.86); el.tpill.style.border = '.5px solid ' + css(vc.c, 0.5); el.tpill.style.color = vc.css;
   A.saved.set(o.readOnly ? 1 : 0); A.savePress.set(1); A.sweepT = -9; A.xp.set(0); A.xpO.set(0);
-  saveRoll.set(o.readOnly ? th.savedLabel : th.saveLabel, true);
+  saveRoll.set(o.readOnly ? tt('read.saved') : tt('read.save'), true);
   A.saveC = vk;
-  st(el.save, 'display', 'block');
+  st(el.save, 'display', o.readOnly ? 'none' : 'block');
 }
 function setHorizon(hrs){
   HZ = hrs;
@@ -381,17 +385,15 @@ function showIdleSuggestions(){
   if (ST.name !== 'IDLE') return;
   /* A starter chip reads as the company; its action keeps the exchange symbol the server resolves
      (src/lib/regional-stocks.ts). A symbol without an entry shows as itself. */
-  var CHIP_NAMES = { 'NVDA':'NVIDIA', 'MC.PA':'LVMH', 'OR.PA':'L’Oréal', 'EDP.LS':'EDP', 'GALP.LS':'Galp',
-    'PETR4.SA':'Petrobras', 'VALE3.SA':'Vale', 'ISP.MI':'Intesa Sanpaolo', 'ENEL.MI':'Enel', 'SAP.DE':'SAP', 'SIE.DE':'Siemens' };
   var list = [], seen = {};
   /* Bobby never invites someone into a wall: when native says the next read would be refused (`oneTap: false` in the
      session) the home offers no chip that asks by itself. The pill still takes their own question. */
   ((oneTapOff() ? [] : (SUGG && SUGG.quickAccess)) || []).forEach(function(item){
-    var sym = String(item && item.symbol || '').toUpperCase();
-    if (list.length >= 3 || seen[sym] || !/^[A-Z0-9.^=-]{1,20}$/.test(sym)) return;
+    var sym = String(item && item.symbol || '').toUpperCase(),name=String(item&&item.name||sym);
+    if (!name || list.length >= 3 || seen[sym] || !/^[A-Z0-9.^=-]{1,20}$/.test(sym)) return;
     seen[sym] = 1;
-    var question = RMOD.t(LANG, 'follow.how', { symbol:sym });
-    list.push({ label:CHIP_NAMES.hasOwnProperty(sym) ? CHIP_NAMES[sym] : sym, ariaLabel:question, action:{ question:question, symbol:sym, starter:true } });
+    var question = RMOD.t(LANG, 'follow.how', { symbol:name });
+    list.push({ label:name, ariaLabel:question, action:{ question:question, symbol:sym, starter:true } });
   });
   list = withNudge(list);
   if (list.length) chipsShow(list, nudgeEyebrow()); else chipsHide();
@@ -561,3 +563,5 @@ function txSet(text, final, stagger){
   ws.forEach(function(w){ w.hide.to(w.nt < cut ? 0 : 1, 'soft'); });
   A.tx.final = !!final;
 }
+
+function paramsCompanion(params){ return !!(params && params.companion); }

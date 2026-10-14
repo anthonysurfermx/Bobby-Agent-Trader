@@ -137,4 +137,22 @@ final class ReleaseAuditTests: XCTestCase {
         XCTAssertTrue(request.addsPunctuation)
         XCTAssertEqual(request.contextualStrings, ["NVDA", "Bitcoin"])
     }
+
+    func testTalkModePairsPurposeAndPrimerInAllSixLanguages() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let config = try JSONSerialization.jsonObject(with: Data(contentsOf: root.appendingPathComponent("Nucleo/talk-mode.json"))) as! [String: Any]
+        let copy = try JSONSerialization.jsonObject(with: Data(contentsOf: root.appendingPathComponent("Nucleo/talk-copy.json"))) as! [String: [String: [String: String]]]
+        let mode = try XCTUnwrap(config["TALK_MODE"] as? String)
+        XCTAssertEqual(NucleoTalkMode.tap, mode == "tap")
+        XCTAssertEqual(Bundle.main.infoDictionary?["NSMicrophoneUsageDescription"] as? String, copy["purpose"]?["en"]?[mode])
+        for language in ["en", "es", "fr", "pt", "it", "de"] {
+            let purpose = try String(contentsOf: root.appendingPathComponent("Sources/\(language).lproj/InfoPlist.strings"), encoding: .utf8)
+            XCTAssertTrue(purpose.contains(try XCTUnwrap(copy["purpose"]?[language]?[mode])), language)
+            let primer = try XCTUnwrap(copy["primer"]?[language]?[mode])
+            for page in ["app", "onboarding"] {
+                let source = try String(contentsOf: root.appendingPathComponent("Nucleo/src/\(page)/40-strings.js"), encoding: .utf8)
+                XCTAssertTrue(source.contains(primer), "\(language)/\(page)")
+            }
+        }
+    }
 }

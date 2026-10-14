@@ -1,3 +1,3 @@
-"NSMicrophoneUsageDescription" = "O Bobby escuta apenas enquanto manténs o botão premido, para ouvir a tua pergunta.";
-"NSSpeechRecognitionUsageDescription" = "O Bobby transforma a tua pergunta falada em texto: neste iPhone se o idioma estiver instalado; caso contrário, através do serviço de reconhecimento de voz da Apple. O Bobby não guarda o áudio.";
+"NSMicrophoneUsageDescription" = "O Bobby escuta só depois que você toca no microfone e para quando você envia, cancela ou fica em silêncio, para ouvir sua pergunta ou o que você responde ao Bobby.";
+"NSSpeechRecognitionUsageDescription" = "O Bobby transforma sua pergunta ou resposta falada em texto: neste iPhone quando o idioma está instalado, ou pelo serviço de voz da Apple. O Bobby não guarda o áudio.";
 "NSPhotoLibraryAddUsageDescription" = "O Bobby guarda o cartão do teu avatar nas Fotografias apenas quando tocas em Guardar imagem.";

@@ -95,7 +95,8 @@ final class NextQuestionTests: XCTestCase {
         let row = NucleoSession.quickAccess(memory, fallback: ["BTC", "NVDA", "SOL"])
         XCTAssertEqual(row.map { $0["symbol"] as? String }, ["SOL", "BTC", "NVDA"])
         XCTAssertEqual(row.map { $0["own"] as? Bool }, [true, false, false])
-        XCTAssertTrue(row.allSatisfy { Set($0.keys) == ["symbol", "own"] })
+        XCTAssertEqual(row.first?["name"] as? String, "Solana", "the page receives the full name from native")
+        XCTAssertTrue(row.allSatisfy { Set($0.keys) == ["symbol", "name", "own"] })
     }
 
     // MARK: The tap

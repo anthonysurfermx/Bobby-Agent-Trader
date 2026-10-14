@@ -27,6 +27,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     enum Engine: Equatable { case neural, device }
     @Published private(set) var engine: Engine = .neural
     /// Position and length of the network voice's audio; nil for the device voice and when idle.
+    var obeysSilentSwitch = false
     @Published private(set) var playback: (time: TimeInterval, duration: TimeInterval)?
     /// A prepared request is paused: `speaking` stays true (the line is not over, so nothing reads the pause
     /// as an end), `level` drops to 0 and the position is kept.
@@ -279,7 +280,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
               !text.isEmpty,
               let selectedVoice = Self.deviceVoice(language: language, gender: voiceGender.deviceGender) else { return false }
         stop()
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+        try? AVAudioSession.sharedInstance().setCategory(obeysSilentSwitch ? .ambient : .playback, mode: obeysSilentSwitch ? .default : .spokenAudio)
         try? AVAudioSession.sharedInstance().setActive(true)
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = selectedVoice
@@ -322,7 +323,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
 
     @discardableResult
     private func play(_ data: Data, playbackRate: Float) -> Bool {
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+        try? AVAudioSession.sharedInstance().setCategory(obeysSilentSwitch ? .ambient : .playback, mode: obeysSilentSwitch ? .default : .spokenAudio)
         try? AVAudioSession.sharedInstance().setActive(true)
         guard let p = try? AVAudioPlayer(data: data) else { return false }
         p.delegate = self

@@ -27,6 +27,19 @@ final class NucleoHost: ObservableObject {
     static let voiceMuteResetKey = "nucleo.voiceMuteReset.v1"
 
     init(options: NucleoLaunchOptions) {
+#if DEBUG
+        // A simulator-only review reset. Production never has this entry point.
+        if options.fixtures != nil && ProcessInfo.processInfo.arguments.contains("-qa-speaking-reset") {
+            let defaults = UserDefaults.standard
+            for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("bobby.speaking.") { defaults.removeObject(forKey: key) }
+            defaults.set(true, forKey: "bobby.speaking.fresh")
+        }
+#endif
+#if DEBUG
+        if options.fixtures != nil && ProcessInfo.processInfo.arguments.contains("-qa-nucleo-signed-in") {
+            AccountSession.shared.acceptQAFixture(userId: "offline-review-owner", appleUserId: "offline-review-apple")
+        }
+#endif
         session = NucleoSession(fixtures: options.fixtures != nil)
         let defaults = UserDefaults.standard
         if !defaults.bool(forKey: Self.voiceMuteResetKey) {
@@ -101,6 +114,7 @@ private struct NucleoStage: View {
             .onReceive(NotificationCenter.default.publisher(for: L.didChange)) { _ in
                 session.voice.stop()
                 session.speech.cancel()
+                session.desk.clearConversation()
                 _ = session.desk.cancel()
                 _ = session.sessionChanged()
                 if session.profile.acceptedRiskNotice, AccountSession.shared.isSignedIn {
@@ -181,6 +195,14 @@ private struct NucleoStage: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
+        case .companionConsent:
+            CompanionConsentView(store: session.companionContext, finished: session.companionConsentFinished)
+                .presentationBackground { QuietMemorySurface() }
+        case .companionNotes:
+            CompanionNotesView(store: session.companionContext,
+                questionsAvailable: { session.companionContext.allows(session.companionPilot.capability) },
+                onClose: { session.sheet = nil })
+                .presentationDetents([.large]).presentationDragIndicator(.visible).presentationCornerRadius(34).presentationBackground { QuietMemorySurface() }
         case .memoryConsent:
             MemoryConsentSheet { session.sheet = nil }
                 .presentationDetents([.medium, .large])
@@ -198,7 +220,7 @@ private struct NucleoStage: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
         case .memory:
-            MemoryView(riskAccepted: session.profile.acceptedRiskNotice) { session.sheet = nil }
+            MemoryView(riskAccepted: session.profile.acceptedRiskNotice, onEducationalNotes: { session.companionNotesField = nil; session.switchSheet(to: .companionNotes) }, onSpeaking: nil, onClose: { session.sheet = nil })
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)

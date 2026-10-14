@@ -103,6 +103,7 @@ interface V18Host {
     // ---- The glass and the sheets ----
 
     /** Opens a native sheet over the glass. False when a sheet or a system prompt is already up. */
+    fun openSpeakingDial() {}
     fun present(route: String): Boolean
     /** Closes the open sheet, then opens `route` once the first is really gone. Never two at once. With nothing open it opens at once. */
     fun switchSheet(route: String)

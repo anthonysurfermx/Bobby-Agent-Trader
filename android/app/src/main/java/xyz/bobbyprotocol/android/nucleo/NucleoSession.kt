@@ -45,6 +45,7 @@ class NucleoSession(
     private val onNative: (String) -> Unit,
 ) {
     private val store = NucleoStateStore(context)
+    private val speaking = SpeakingDial(context)
     private val rosterCatalog = asset("roster.json").getJSONArray("companions")
     private val levelCatalog = asset("levels.json").getJSONArray("levels")
     private val riskCatalog = asset("risk-notice.json")
@@ -123,6 +124,7 @@ class NucleoSession(
             issueToken(json("symbol" to symbol, "name" to name, "isEquity" to isEquity, "assetClass" to if (isEquity) "equity" else "crypto", "currency" to null, "exchange" to null),
                 question, start.level, origin = start.origin)
         }
+        override fun openSpeakingDial() = this@NucleoSession.openSpeakingDial()
         override fun tokenWaiting(token: String): Boolean = tokens.waiting(token, this@NucleoSession.accountEpoch, consentEpoch)
         override fun deskBody(symbol: String, question: String, isEquity: Boolean, level: String): JSONObject =
             this@NucleoSession.deskBody(symbol, question, if (isEquity) "equity" else "crypto", level)
@@ -145,6 +147,7 @@ class NucleoSession(
     init {
         store.bindOwner(owner)
         recoverCompletedOnboarding()
+        speaking.prepare(store.onboarded)
         repository.language = language
         repository.locale = locale
         // The nudge centre is the process's: this host claims it, and the sources a previous activity registered go with that activity.
@@ -207,7 +210,7 @@ class NucleoSession(
             "syncedAt" to if (identityCurrent) store.syncedAt(owner) else null, "voicePreference" to voicePreference.value,
             "signedIn" to signedIn, "riskAccepted" to riskAccepted, "riskVersion" to riskCatalog.getInt("version"), "muted" to muted,
             "reducedMotion" to reducedMotion, "mic" to json("state" to speechState, "onDevice" to onDevice), "hints" to store.hints(),
-            "pendingRead" to if (riskAccepted) pending else null, "fixtures" to false, "platform" to "android", "appVersion" to appVersion(), "analysisLevel" to analysisLevelJSON(),
+            "pendingRead" to if (riskAccepted) pending else null, "fixtures" to false, "platform" to "android", "appVersion" to appVersion(), "analysisLevel" to analysisLevelJSON(), "speaking" to speaking.json(owner),
             // 1.8: one native-written line and one button, or null. Every session carries it (the page keeps the whole object).
             "nudge" to v18.nudgeJson()).also { session ->
             // Bobby never invites someone into a wall: when the phone KNOWS the next read is refused, the home
@@ -243,6 +246,12 @@ class NucleoSession(
     }
     fun setAnalysisLevel(value: String) { if (value !in ANALYSIS_LEVELS) throw NucleoFault("invalid_params", "invalid level"); store.analysisLevel = value; emit("analysis.level", analysisLevelJSON()); emit("session.changed", snapshot()) }
     fun setLanguage(value: String) { if (value != "system" && value !in SUPPORTED_LANGUAGES) throw NucleoFault("invalid_params", "invalid language"); cancel(); reads.clear(); tokens.clear(); store.language = value; repository.language = language; repository.locale = locale; v18.languageChanged(); emit("session.changed", snapshot()); onPageChanged?.invoke(page) }
+    fun openSpeakingDial() {
+        if (!riskAccepted || activeAsk != null) return
+        v18.closeSheet()
+        val epoch = accountEpoch
+        scope.launch { kotlinx.coroutines.delay(450); if (epoch == accountEpoch && identityCurrent && riskAccepted) emit("speaking.open", json()) }
+    }
     fun selectLanguage(value: String) = setLanguage(value)
     fun selectAnalysisLevel(value: String) = setAnalysisLevel(value)
 
@@ -252,6 +261,13 @@ class NucleoSession(
             "session" -> { pageReady = true; if (riskAccepted && signedIn) scope.launch { syncProgress() }; v18.pageReady(); snapshot() }
             "roster" -> roster()
             "suggestions" -> suggestions()
+            "speaking.choose" -> {
+                if (!riskAccepted || params.optString("owner") != speaking.tag(owner)) throw NucleoFault("invalid_params", "stale reader")
+                val value = params.requiredString("value", 16)
+                if (value !in SpeakingDial.VALUES) throw NucleoFault("invalid_params", "invalid speech")
+                speaking.choose(value, owner, params.optBoolean("feedback"))
+                emit("session.changed", snapshot()); snapshot()
+            }
             "ask" -> ask(params)
             "cancel" -> json("cancelled" to cancel())
             "read.rendered" -> readRendered(params)
@@ -302,6 +318,7 @@ class NucleoSession(
         cancel(); reads.clear(); syncReceipts.clear()
         owner = newOwner; accountEpoch = newEpoch
         store.bindOwner(newOwner, inheritGuest = oldOwner == null && newOwner != null)
+        if (oldOwner == null && newOwner != null) speaking.inheritGuest(newOwner)
         recoverCompletedOnboarding()
         // 1.8: before anything below suspends, showings, taps and reads belong to the new reader.
         v18.accountChanged()
@@ -450,9 +467,11 @@ class NucleoSession(
                 reads.add(Read(result, epoch, consent, System.currentTimeMillis(), origin)); while (reads.size > 5) reads.removeAt(0)
                 // 1.8: what a line on the glass may talk about (symbol and verdict, never the question), and who
                 // started the read: only the person's own question is followed up.
+                speaking.delivered(result.getString("requestId"), owner)
                 v18.readDelivered(result, origin)
                 // The asset leads the quick-access row and is one of the reader's own from now on (QuickAccess.asked).
                 store.noteAsked(owner, symbol)
+                emit("session.changed", snapshot())
                 return result
             } finally { marketTask.cancel() }
         } catch (cancelled: CancellationException) { throw cancelled }
@@ -489,7 +508,7 @@ class NucleoSession(
 
     /** The body of a desk read. A 1.8 thesis review sends the same one, plus the thesis (`BobbyRepository.streamDebate`). */
     private fun deskBody(symbol: String, question: String, assetClass: String, level: String): JSONObject =
-        json("symbol" to symbol, "question" to question, "language" to language, "locale" to locale, "country" to Locale.getDefault().country.takeIf { it.matches(Regex("[A-Z]{2}")) }, "assetType" to assetClass, "level" to level)
+        json("symbol" to symbol, "question" to question, "language" to language, "locale" to locale, "country" to Locale.getDefault().country.takeIf { it.matches(Regex("[A-Z]{2}")) }, "assetType" to assetClass, "level" to level).also { body -> speaking.value(owner)?.let { body.put("speech", it) } }
 
     private suspend fun saveThesis(params: JSONObject): JSONObject {
         val id = params.requiredString("requestId", 64)

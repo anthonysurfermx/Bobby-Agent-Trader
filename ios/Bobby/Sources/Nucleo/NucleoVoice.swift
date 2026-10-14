@@ -29,6 +29,7 @@ final class NucleoVoice {
 
     private var current: Line?
     private var watchdog: Task<Void, Never>?
+    private var fixtureTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
     /// Device voice: the last word onset, driving a syllable envelope for voice.level
     /// (AVSpeechSynthesizer exposes no meter).
@@ -53,10 +54,26 @@ final class NucleoVoice {
     enum Status: String { case queued, muted, tooLong = "too_long" }
 
     /// `speak{id,text}`: a new line stops the previous one (`voice.end{stopped}`).
-    func speak(id: String, text: String, voiceId: String, persona: String?, vibe: String?) -> Status {
+    func speak(id: String, text: String, voiceId: String, persona: String?, vibe: String?, spoken: Bool = true) -> Status {
         guard text.count <= Self.maxLength else { return .tooLong }
         guard !voice.isMuted else { return .muted }
         begin(id: id, text: text)
+#if DEBUG
+        if NucleoFixtures.isActive && ProcessInfo.processInfo.arguments.contains("-qa-voice-fixture") {
+            fixtureTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                guard !Task.isCancelled, let self, var line = self.current, line.id == id else { return }
+                if BobbyApp.argument(after: "-qa-voice-fixture") == "failure" { self.finish(reason: "failed"); return }
+                line.started = true; self.current = line
+                self.emit("voice.start", ["id": id, "durationSec": 10, "engine": "fixture"])
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
+                guard !Task.isCancelled, self.current?.id == id else { return }
+                self.finish(reason: "finished")
+            }
+            return .queued
+        }
+#endif
+        voice.obeysSilentSwitch = !spoken
         voice.speak(text, voiceId: voiceId, persona: persona, vibe: vibe, essential: true)
         return .queued
     }
@@ -99,6 +116,7 @@ final class NucleoVoice {
     }
 
     private func finish(reason: String) {
+        fixtureTask?.cancel(); fixtureTask = nil
         watchdog?.cancel()
         watchdog = nil
         envelopeTimer?.invalidate()

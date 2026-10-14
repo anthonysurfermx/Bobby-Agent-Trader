@@ -148,7 +148,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
 #chipsBox{left:0;top:0;width:390px;height:844px;opacity:1}
 #eyebrow{position:absolute;left:20px;top:613px;color:var(--ink3);opacity:0}
 #chips{position:absolute;left:0;top:640px;width:390px;height:40px;
-  -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 24px),transparent)}
+  -webkit-mask-image:none;mask-image:none}
 .chip{position:absolute;left:0;top:0;height:40px;padding:0 16px;border-radius:20px;background:rgba(242,237,228,.04);border:.5px solid var(--line);
   font:500 15px/39px var(--sans);color:var(--ink2);white-space:nowrap;opacity:0;pointer-events:none}
 .chip.on{pointer-events:auto}
@@ -380,7 +380,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
   <div id="pauseTag" class="a"></div>
   <div id="live" class="sr" aria-live="polite"></div>
 </div>
-<div id="typeBox" role="group"><textarea id="typeIn" rows="1" enterkeyhint="send" autocomplete="off" autocorrect="on" spellcheck="true"></textarea><button id="typeSend" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13 V3 M3.5 7.5 L8 3 L12.5 7.5" fill="none" stroke="#141210" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+<div id="typeBox" role="group"><textarea id="typeIn" rows="1" enterkeyhint="send" autocomplete="off" autocorrect="on" spellcheck="true"></textarea><button id="typeSend" type="button" class="quiet-primary"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13 V3 M3.5 7.5 L8 3 L12.5 7.5" fill="none" stroke="#141210" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
 <script id="companions" type="application/json">__COMPANIONS_JSON__</script>
 <!--NUCLEO:FIXTURES-->
 <!--NUCLEO:SHARED-->

@@ -14,7 +14,7 @@ final class BobbyTelemetryTests: XCTestCase {
 
     func testSchemaUsesExistingIdentityHeadersAndOnlyAllowedScalarFields() async {
         var packets: [BobbyTelemetry.Payload] = []
-        let client = BobbyTelemetry(owner: { UUID(uuidString: "00000000-0000-4000-8000-000000000001")! }, automaticHeartbeat: false,
+        let client = BobbyTelemetry(owner: { UUID(uuidString: "00000000-0000-4000-8000-000000000001")! }, riskAccepted: { true }, automaticHeartbeat: false,
                                     version: "1.6", build: "54", transport: { body, _ in packets.append(body); return 202 })
         client.becameActive(); await drain(client)
         let packet = packets[0]
@@ -27,6 +27,24 @@ final class BobbyTelemetryTests: XCTestCase {
         XCTAssertEqual(BobbyAccessAPI.headers(bearer: nil)["x-bobby-device"], BobbyDevice.id)
         XCTAssertEqual(BobbyAccessAPI.headers(bearer: "test")["x-bobby-platform"], "ios")
         client.wentBackground(); await drain(client)
+    }
+
+    func testWithdrawalDropsQueuedPacketsAndCancelsReadRetry() async throws {
+        var accepted = true, readAttempts = 0
+        let client = BobbyTelemetry(owner: { UUID(uuidString: "00000000-0000-4000-8000-000000000001")! },
+                                    riskAccepted: { accepted }, automaticHeartbeat: false, transport: { p, _ in
+            if p.event == .readStarted { readAttempts += 1; return 503 }
+            return 200
+        })
+        client.becameActive(); await drain(client)
+        client.readStarted(UUID().uuidString)
+        for _ in 0..<100 where readAttempts == 0 { try await Task.sleep(nanoseconds: 1_000_000) }
+        XCTAssertEqual(readAttempts, 1)
+        client.heartbeat(); accepted = false; client.consentChanged()
+        XCTAssertEqual(client.pendingCount, 0); XCTAssertNil(client.sessionId)
+        try await Task.sleep(nanoseconds: 350_000_000)
+        XCTAssertEqual(readAttempts, 1, "a revoked receipt is never retried")
+        client.wentBackground()
     }
 
     func testReceiptRequiresMatchingRequestAndBoundedOpaqueToken() {
@@ -45,7 +63,7 @@ final class BobbyTelemetryTests: XCTestCase {
     func testEpochsHaveDistinctSessionsAndMonotonicCapturedTimeAndSequence() async {
         let owner = UUID(); let clock = Date(timeIntervalSince1970: 1_800_000_000)
         var packets: [BobbyTelemetry.Payload] = []
-        let client = BobbyTelemetry(owner: { owner }, now: { clock }, automaticHeartbeat: false, transport: { p, _ in packets.append(p); return 200 })
+        let client = BobbyTelemetry(owner: { owner }, riskAccepted: { true }, now: { clock }, automaticHeartbeat: false, transport: { p, _ in packets.append(p); return 200 })
         client.becameActive(); client.heartbeat(); await drain(client)
         client.wentBackground(); await drain(client)
         client.becameActive(); await drain(client)
@@ -61,7 +79,7 @@ final class BobbyTelemetryTests: XCTestCase {
 
     func testInactiveDoesNotInventBackgroundAndPausesHeartbeats() async {
         let owner = UUID(); var packets: [BobbyTelemetry.Payload] = []
-        let client = BobbyTelemetry(owner: { owner }, automaticHeartbeat: false, transport: { p, _ in packets.append(p); return 200 })
+        let client = BobbyTelemetry(owner: { owner }, riskAccepted: { true }, automaticHeartbeat: false, transport: { p, _ in packets.append(p); return 200 })
         client.becameActive(); await drain(client)
         let session = client.sessionId
         client.becameInactive(); client.heartbeat(); await drain(client)
@@ -76,7 +94,7 @@ final class BobbyTelemetryTests: XCTestCase {
 
     func testDecodeNeverClaimsPresentationAndRenderNeedsCurrentReceiptOnce() async throws {
         let owner = UUID(), id = UUID().uuidString.lowercased(); var packets: [BobbyTelemetry.Payload] = []
-        let client = BobbyTelemetry(owner: { owner }, automaticHeartbeat: false, transport: { p, _ in packets.append(p); return 200 })
+        let client = BobbyTelemetry(owner: { owner }, riskAccepted: { true }, automaticHeartbeat: false, transport: { p, _ in packets.append(p); return 200 })
         client.becameActive(); client.readStarted(id); await drain(client)
         XCTAssertFalse(client.readRendered(id), "no authenticated server receipt")
         let receipt = try XCTUnwrap(BobbyTelemetryReceipt(json: ["requestId": id, "receipt": "signed"], expectedRequestId: id))
@@ -95,7 +113,7 @@ final class BobbyTelemetryTests: XCTestCase {
     func testAccountChangeCancelsAndForgetsOldOwnerEvenWhenSameAccountSignsBackIn() async throws {
         var owner = UUID(); var packets: [(BobbyTelemetry.Payload, UUID)] = []
         let oldOwner = owner, id = UUID().uuidString.lowercased()
-        let client = BobbyTelemetry(owner: { owner }, automaticHeartbeat: false, transport: { p, o in packets.append((p,o)); return 200 })
+        let client = BobbyTelemetry(owner: { owner }, riskAccepted: { true }, automaticHeartbeat: false, transport: { p, o in packets.append((p,o)); return 200 })
         client.becameActive(); client.readStarted(id); await drain(client)
         let oldSession = client.sessionId
         owner = UUID(); client.accountChanged(); await drain(client)
@@ -109,7 +127,7 @@ final class BobbyTelemetryTests: XCTestCase {
 
     func testReadRetriesKeepSameIdTimestampAndSequenceButLifecycleNeverRetries() async throws {
         let owner = UUID(), id = UUID().uuidString.lowercased(); var attempts: [BobbyTelemetry.Payload] = []
-        let client = BobbyTelemetry(owner: { owner }, automaticHeartbeat: false, transport: { p, _ in attempts.append(p); return 503 })
+        let client = BobbyTelemetry(owner: { owner }, riskAccepted: { true }, automaticHeartbeat: false, transport: { p, _ in attempts.append(p); return 503 })
         client.becameActive(); client.readStarted(id)
         try await Task.sleep(nanoseconds: 350_000_000)
         XCTAssertEqual(attempts.filter { $0.event == .foreground }.count, 1)
@@ -125,7 +143,7 @@ final class BobbyTelemetryTests: XCTestCase {
     func testBackgroundAndAccountChangeStopInFlightRetries() async throws {
         for accountChange in [false, true] {
             var owner = UUID(); var attempted: [BobbyTelemetry.Payload] = []
-            let client = BobbyTelemetry(owner: { owner }, automaticHeartbeat: false, transport: { p, _ in
+            let client = BobbyTelemetry(owner: { owner }, riskAccepted: { true }, automaticHeartbeat: false, transport: { p, _ in
                 attempted.append(p)
                 try await Task.sleep(nanoseconds: 100_000_000)
                 return 503
@@ -142,7 +160,7 @@ final class BobbyTelemetryTests: XCTestCase {
 
     func testQueueIsBoundedAndDisabledFixturesNeverSend() async throws {
         let owner = UUID(); var sends = 0
-        let client = BobbyTelemetry(owner: { owner }, automaticHeartbeat: false, transport: { _, _ in
+        let client = BobbyTelemetry(owner: { owner }, riskAccepted: { true }, automaticHeartbeat: false, transport: { _, _ in
             sends += 1; try await Task.sleep(nanoseconds: 1_000_000_000); return 200
         })
         client.becameActive()
@@ -150,7 +168,7 @@ final class BobbyTelemetryTests: XCTestCase {
         XCTAssertLessThanOrEqual(client.pendingCount, BobbyTelemetry.queueLimit)
         client.becameInactive(); try await Task.sleep(nanoseconds: 20_000_000)
         XCTAssertEqual(client.pendingCount, 0)
-        let disabled = BobbyTelemetry(owner: { owner }, enabled: { false }, automaticHeartbeat: false, transport: { _, _ in sends += 1; return 200 })
+        let disabled = BobbyTelemetry(owner: { owner }, riskAccepted: { true }, enabled: { false }, automaticHeartbeat: false, transport: { _, _ in sends += 1; return 200 })
         let previous = sends
         disabled.becameActive(); disabled.heartbeat(); disabled.webviewTerminated(); disabled.readStarted(UUID().uuidString)
         await drain(disabled)
@@ -159,7 +177,7 @@ final class BobbyTelemetryTests: XCTestCase {
 
     func testExpiredQueuedHeartbeatDoesNotRevivePresence() async throws {
         let owner = UUID(); var clock = Date(); var sent: [BobbyTelemetry.Payload] = []
-        let client = BobbyTelemetry(owner: { owner }, now: { clock }, automaticHeartbeat: false, transport: { p, _ in sent.append(p); return 200 })
+        let client = BobbyTelemetry(owner: { owner }, riskAccepted: { true }, now: { clock }, automaticHeartbeat: false, transport: { p, _ in sent.append(p); return 200 })
         client.becameActive(); client.heartbeat(); clock = clock.addingTimeInterval(6)
         await drain(client)
         XCTAssertTrue(sent.isEmpty)
@@ -169,7 +187,7 @@ final class BobbyTelemetryTests: XCTestCase {
 
     func testWebKitTerminationHasItsOwnEventAndNeverInventsCrash() async {
         let owner = UUID(); var sent: [BobbyTelemetry.Payload] = []
-        let client = BobbyTelemetry(owner: { owner }, automaticHeartbeat: false, transport: { p, _ in sent.append(p); return 200 })
+        let client = BobbyTelemetry(owner: { owner }, riskAccepted: { true }, automaticHeartbeat: false, transport: { p, _ in sent.append(p); return 200 })
         client.becameActive(); client.webviewTerminated(); await drain(client)
         XCTAssertEqual(sent.last?.event.rawValue, "webview_terminated")
         XCTAssertFalse(sent.contains { $0.json.values.contains { ($0 as? String) == "crash" } })

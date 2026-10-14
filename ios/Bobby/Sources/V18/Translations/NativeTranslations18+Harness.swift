@@ -32,6 +32,11 @@ extension NativeTranslations18 {
         result["Last 24 hours"] = ["fr": "Dernières 24 heures", "pt": "Últimas 24 horas", "it": "Ultime 24 ore", "de": "Letzte 24 Stunden"]
         result["Nothing to show yet."] = ["fr": "Rien à montrer pour l’instant.", "pt": "Ainda nada para mostrar.", "it": "Ancora niente da mostrare.", "de": "Noch nichts zu zeigen."]
         result["Tap one to ask Bobby."] = ["fr": "Touche-en un pour demander à Bobby.", "pt": "Toca num para perguntar ao Bobby.", "it": "Toccane uno per chiedere a Bobby.", "de": "Tippe auf eins, um Bobby zu fragen."]
+        result["These assets appeared in your reads."] = ["fr": "Ces actifs figuraient dans tes analyses.", "pt": "Estes ativos apareceram nas tuas análises.", "it": "Questi asset erano nelle tue analisi.", "de": "Diese Werte kamen in deinen Analysen vor."]
+        result["Ask about an asset to find it here."] = ["fr": "Pose une question sur un actif pour le retrouver ici.", "pt": "Pergunta sobre um ativo para o retomares aqui.", "it": "Chiedi di un asset per ritrovarlo qui.", "de": "Frage nach einem Wert, um ihn hier wieder aufzugreifen."]
+        result["New analysis · Quick read"] = ["fr": "Nouvelle analyse · Lecture rapide", "pt": "Nova análise · Leitura rápida", "it": "Nuova analisi · Lettura rapida", "de": "Neue Analyse · Schnelle Lesung"]
+        result["Check your available reads before a new analysis."] = ["fr": "Vérifie tes analyses disponibles avant une nouvelle analyse.", "pt": "Confirma as análises disponíveis antes de uma nova análise.", "it": "Controlla le letture disponibili prima di una nuova analisi.", "de": "Prüfe deine verfügbaren Lesungen vor einer neuen Analyse."]
+        result["Revisit {0}"] = ["fr": "Revoir {0}", "pt": "Retomar {0}", "it": "Riprendi {0}", "de": "{0} erneut ansehen"]
         // The switch.
         result["Follow-ups"] = ["fr": "Suivis", "pt": "Seguimento", "it": "Aggiornamenti", "de": "Follow-ups"]
         result["Bobby comes back to what you asked."] = ["fr": "Bobby revient sur ce que tu as demandé.", "pt": "O Bobby volta ao que perguntaste.", "it": "Bobby torna su ciò che hai chiesto.", "de": "Bobby kommt auf deine Fragen zurück."]

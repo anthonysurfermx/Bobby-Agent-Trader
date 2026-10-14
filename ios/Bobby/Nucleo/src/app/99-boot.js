@@ -23,6 +23,7 @@ function applySession(s, first){
   if (s.analysisLevel) lvlApply(s.analysisLevel);
   var prevId = SES && SES.companion ? SES.companion.id : null;
   SES = s;
+  if (typeof guideLayout === 'function') guideLayout();
   SES.mic = SES.mic || { state: 'undetermined', onDevice: true };
   var oldLang = LANG, oldLocale = LOCALE;
   LANG = NucleoLocale.language(s.language); LOCALE = NucleoLocale.locale(LANG, s.locale || s.speechLocale || s.localeRegion);
@@ -92,15 +93,21 @@ function wire(){
   if (!BR) return;
   BR.on('session.changed', function(s){
     var walled = oneTapOff();
+    if(s&&NucleoLocale.language(s.language)!==LANG)conversationReset();
     applySession(s, false);
+    var limit=s&&s.companionPilot&&s.companionPilot.limit;
+    if(GUIDE&&GUIDE.code==='limit'&&limit&&limit.requestId===GUIDE.requestId){GUIDE.limitLine=limit.line;if(ST.name==='COMPANION')guideRender();}
     if (ST.name === 'IDLE') pillMode(idleMode());
     /* the last read was spent, or reads came back: the idle row loses or regains its one-tap chips at once */
     if (oneTapOff() !== walled && ST.name === 'IDLE') showIdleSuggestions(); else nudgeSync();
   });
-  BR.on('account.changed', accountChanged);
-  BR.on('consent.withdrawn', consentWithdrawn);
-  BR.on('app.state', function(p){ if (p && p.state === 'background'){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
+  BR.on('speaking.open', function(){ if (SES && SES.speaking && SES.riskAccepted && ['IDLE','HANDBACK','CARDS','FOLLOWUPS','THESIS_VIEW','FACES'].indexOf(ST.name) >= 0){ clearRead(); glassHome(); go('SPEAKING_DIAL'); } });
+  BR.on('account.changed', function(p){ conversationReset(); dialBusy = false; dialGreeting = false; stage.classList.remove('speaking-greet'); accountChanged(p); });
+  BR.on('consent.withdrawn', function(p){conversationReset();consentWithdrawn(p);});
+  BR.on('app.state', function(p){ if (p && p.state === 'background'){ conversationSuspend(); } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
+  BR.on('companion.checkIn', companionCheckIn);
+  BR.on('companion.revoked', function(){ var hadScene=!!MEMORY_SCENE;MEMORY_AUTO=null;MEMORY_SEND_EPOCH++;MEMORY_SCENE=null;MEMORY_NOTES=[];MEMORY_BUSY=false;memoryPanel.style.display='none';GUIDE_INPUT_CHECKIN=false;CHECKIN=null;if(GUIDE){GUIDE.personalized=false;GUIDE.invitation=null;GUIDE.notes=[];if(hadScene){el.ta.value='';SPEECH.draft='';HELD='';}if(ST.name!=='COMPANION'&&(hadScene||ST.name!=='TYPING'))go('COMPANION',{reply:GUIDE});else guideRender();} });
   /* the read native starts is not the person's own question: startRead() notes it while askStart runs (§3.5) */
   BR.on('ask.start', function(p){ ASK_ORIGIN = 'followUp'; try { askStart(p); } finally { ASK_ORIGIN = null; } });
   BR.on('analysis.level', lvlApply);
@@ -112,6 +119,7 @@ function wire(){
   BR.on('voice.start', function(p){
     if (!p || p.id !== VOICE.id) return;
     VOICE.started = true; VOICE.engine = p.engine || null;
+    if(ST.name==='COMPANION'){K.on=false;fsmEvent('voice.start',p);return;}
     VOICE.lat = clamp(lerp(VOICE.lat, clk - VOICE.reqT, 0.6), 0.15, 5);   /* a slow voice is requested earlier, under the choreography */
     K.on = true; K.t = 0; K.mode = 'read';
     if (fin(p.durationSec) && p.durationSec > 0) kRetime(p.durationSec);
@@ -145,6 +153,18 @@ function boot(){
     buildState();
     var gen = OWNER_GEN;
     var started = false;
+    var pendingAsk = SES && SES.pendingAsk;
+    if (pendingAsk && typeof pendingAsk.question === 'string' && pendingAsk.question.trim()){
+      started = true; buildFaces();
+      // The native snapshot is already showing the question; the first daily frame is waiting.
+      A.dim.set(1); A.hdr.set(1); A.pillY.set(0); A.pillO.set(1);
+      S.r.set(98); S.cy.set(300); U.glow.set(1); U.energy.set(0.35); U.irid.set(1); U.wflow.set(0.18); tintHome();
+      var params = {question:pendingAsk.question};
+      ['chip','companion','spoken'].forEach(function(key){ if(typeof pendingAsk[key] === 'boolean') params[key] = pendingAsk[key]; });
+      if(!params.companion) params.confirm = true;
+      SES.pendingAsk = null;
+      go('SENDING', {question:params.question,params:params,origin:'handover',handover:true});
+    }
     function start(){
       if (started) return; started = true;
       buildFaces();

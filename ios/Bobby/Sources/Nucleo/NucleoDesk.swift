@@ -204,15 +204,18 @@ enum NucleoDeskIO {
 
     // MARK: Asset search
 
-    static func search(_ question: String) async -> Search {
+    static func search(_ question: String, pilot: CompanionPilot? = nil) async -> Search {
         guard let obj = await BobbyAPI.assetSearch(question) else { return .failed }
-        return parseSearch(obj)
+        let includesCandidates = await pilot?.probe().enabled == true
+        return parseSearch(obj, includesCandidates: includesCandidates)
     }
 
     /// `BobbyAPI.resolution(from:)`, keeping `resolved.assetClass`.
-    static func parseSearch(_ obj: [String: Any]) -> Search {
-        guard let resolution = obj["resolution"] as? [String: Any],
-              let resolved = obj["resolved"] as? [String: Any],
+    static func parseSearch(_ obj: [String: Any], includesCandidates: Bool = false) -> Search {
+        guard includesCandidates || obj["resolution"] is [String: Any] else { return .unresolved }
+        let resolution = obj["resolution"] as? [String: Any] ?? [:]
+        let exact = obj["resolved"] as? [String: Any]
+        guard let resolved = exact ?? (includesCandidates ? (obj["results"] as? [[String: Any]])?.first : nil),
               let symbol = (resolved["baseSymbol"] as? String) ?? (resolved["symbol"] as? String), !symbol.isEmpty
         else { return .unresolved }
         let assetClass = (resolved["assetClass"] as? String) ?? "crypto"
@@ -220,7 +223,7 @@ enum NucleoDeskIO {
         let name = BobbyAPI.prettyName(aliases.first(where: { $0 != symbol }) ?? symbol, symbol: symbol)
         return .resolved(NucleoAsset(symbol: symbol, name: name, isEquity: assetClass == "equity", assetClass: assetClass,
                                      currency: resolved["currency"] as? String, exchange: resolved["exchange"] as? String),
-                         needsConfirmation: (resolution["needsConfirmation"] as? Bool) ?? false,
+                         needsConfirmation: (resolution["needsConfirmation"] as? Bool) == true || exact == nil,
                          matchKind: resolution["matchKind"] as? String,
                          proxyNote: resolution["proxyNote"] as? String)
     }
@@ -333,12 +336,13 @@ enum NucleoDeskIO {
     /// Exactly `BobbyAPI.debate`'s request: POST api/desk-debate, Origin header, 100 s timeout.
     /// Uses the same account-scoped retry as other private requests.
     static func debate(symbol: String, question: String, isEquity: Bool, level: NucleoAnalysisLevel = .rapido,
-                       auth: BobbyMeterAuth = .account, requestId: String? = nil, thesis: ThesisContext? = nil,
+                       auth: BobbyMeterAuth = .account, speech: String? = nil, requestId: String? = nil, thesis: ThesisContext? = nil,
                        onEvent: (@Sendable ([String: Any]) -> Void)? = nil) async -> DebateOutcome {
         do {
             var body: [String: Any] = ["symbol": symbol, "question": question, "language": L.ttsLang,
                                        "locale": L.localeIdentifier, "country": L.country ?? NSNull() as Any,
                                        "assetType": isEquity ? "equity" : "crypto", "level": level.rawValue]
+            if let speech, SpeakingDial.values.contains(speech) { body["speech"] = speech }
             if let requestId { body["requestId"] = requestId }
             // 1.8: a review the person started carries their thesis; a plain question never has this key.
             if let thesis { body["thesis"] = thesis.json }
@@ -551,12 +555,15 @@ final class NucleoDesk {
     let ledger: NucleoLedger
     let fixtures: Bool
     var clock = Clock()
+    var pilot: CompanionPilot?
     var generation: () -> UUID = { AccountSession.shared.generation }
     var isSignedIn: () -> Bool = { AccountSession.shared.isSignedIn }
     var userID: () -> String? = { AccountSession.shared.session?.userId }
+    var speakingLevel: () -> String? = { SpeakingDial().value(AccountSession.shared.session?.userId) }
     var emit: (String, [String: Any]) -> Void = { _, _ in }
     var debateStarted: (NucleoAnalysisLevel) -> Void = { _ in }
     var askFinished: ([String: Any]) -> Void = { _ in }
+    var decorateAnswer: ([String: Any]) -> [String: Any] = { $0 }
     var debateEvent: ([String: Any]) -> Void = { _ in }
     var sessionChanged: () -> Void = {}
     /// The person tapped the question Bobby's CIO wrote for a read (the symbol of that read; never the words).
@@ -578,6 +585,7 @@ final class NucleoDesk {
     /// Every access object the server sends lands here (the account sheet reads it).
     var accessChanged: (BobbyReadAccess) -> Void = { BobbyAccessCenter.shared.record($0) }
     /// The analysis level the user picked (the level sheet), and the way a fallback chip changes it.
+    var tokenNow: () -> Date = { Date() }
     var currentLevel: () -> NucleoAnalysisLevel = { NucleoLevelCenter.shared.level }
     var setLevel: (NucleoAnalysisLevel) -> Void = { NucleoLevelCenter.shared.level = $0 }
     var meterChanged: (NucleoAnalysisLevel, NucleoLevelMeter?) -> Void = { level, meter in
@@ -595,6 +603,9 @@ final class NucleoDesk {
         var level: NucleoAnalysisLevel? = nil
         var persistLevel = false
         var origin: NucleoReadOrigin = .person
+        var conversationCost: [String: Any]? = nil
+        var readOffer = false
+        var spoken = false
     }
     private final class Read {
         let requestId: String
@@ -644,6 +655,28 @@ final class NucleoDesk {
         let startedAt: Date
         var level: NucleoAnalysisLevel = .rapido
         var origin: NucleoReadOrigin = .person
+        var companion = false
+        var confirm = false
+        var spoken = false
+        var conversationRead = false
+        var explanationCandidate: NucleoAsset? = nil
+        var explanationExact = false
+        var previous: [String: String]? = nil
+        var language = L.language
+        var locale = L.language == "pt" ? "pt-BR" : L.locale.identifier
+    }
+
+    private var deliveredTurn: Job?
+    private var cancelledTurn: Job?
+    private var acceptedTurnID: String?
+    private var failedTurn: Job?
+    private var activeTurn: Job?
+    private var lastExchange: (id: String, question: String, reply: String)?
+    var readAccess: () -> BobbyReadAccess? = { BobbyAccessCenter.shared.access }
+    var readMeter: (NucleoAnalysisLevel) -> NucleoLevelMeter? = { NucleoLevelCenter.shared.meters[$0] }
+    func clearConversation() {
+        failedTurn = nil; deliveredTurn = nil; cancelledTurn = nil; lastExchange = nil; activeTurn = nil
+        tokens = tokens.filter { $0.value.conversationCost == nil }
     }
 
     private var tokens: [String: TokenEntry] = [:]
@@ -737,7 +770,25 @@ final class NucleoDesk {
         }
         // 1. Params: exactly one of {question} · {token} · {followUpOf, question}. A plain question may
         //    say it came from a chip whose words Bobby wrote (`chip: true`); nothing else may.
+        if p.has("retry") {
+            guard !p.has("question"), !p.has("token"), !p.has("followUpOf"), !p.has("confirm"), !p.has("companion"), !p.has("chip"), !p.has("spoken"), !p.has("after") else { throw NucleoFault.invalid("retry takes no other source") }
+            let id = try p.string("retry", maxLength: 36, pattern: Self.uuidPattern)!
+            guard let job = [failedTurn, deliveredTurn, cancelledTurn].compactMap({ $0 }).first(where: { $0.requestId == id }), job.generation == generation(), profile.acceptedRiskNotice else { throw NucleoFault.invalid("stale retry") }
+            guard inflight == nil else { throw NucleoFault.busy }
+#if DEBUG
+            NucleoFixtures.recoverProbeForRetry()
+#endif
+            return await begin(job, spent: nil)
+        }
+        if p.has("token") || p.has("followUpOf") {
+            guard !p.has("confirm"), !p.has("spoken"), !p.has("after"), !p.has("companion") else { throw NucleoFault.invalid("conversation fields take a plain question") }
+        }
+        let confirm = try p.bool("confirm", required: false) ?? false
+        let spoken = try p.bool("spoken", required: false) ?? false
+        let after = try p.string("after", required: false, maxLength: 36, pattern: Self.uuidPattern)
         let chip = try p.bool("chip", required: false) ?? false
+        let companion = try p.bool("companion", required: false) ?? false
+        if companion && (confirm || p.has("token") || p.has("followUpOf")) { throw NucleoFault.invalid("companion takes a plain question") }
         let source: Source
         if p.has("token") {
             guard !p.has("question"), !p.has("followUpOf") else { throw NucleoFault.invalid("token takes no question") }
@@ -766,18 +817,26 @@ final class NucleoDesk {
         }
         let requestId = UUID().uuidString.lowercased()
         let generation = generation()
-        let job: Job
+        var job: Job
         var spent: String?
         switch source {
         case let .token(token):
             purgeTokens()
-            guard let entry = tokens.removeValue(forKey: token), entry.expires > Date(), entry.generation == generation
+            guard let entry = tokens.removeValue(forKey: token), entry.generation == generation, entry.expires > tokenNow() || entry.conversationCost != nil
             else { throw NucleoFault.invalid("unknown or expired token") }
             spent = token
             // A fallback chip ("Continue with Quick") is the user's own choice of level: keep it.
             if let level = entry.level, entry.persistLevel { setLevel(level) }
             job = Job(requestId: requestId, question: entry.question, asset: entry.asset, generation: generation, startedAt: Date(),
                       level: entry.level ?? currentLevel(), origin: entry.origin)
+            job.spoken = entry.spoken; job.conversationRead = entry.conversationCost != nil
+            if entry.expires <= tokenNow(), let shown = entry.conversationCost {
+                job.level = currentLevel()
+                let fresh = conversationCost(job.level)
+                if entry.readOffer || !NSDictionary(dictionary: shown).isEqual(to: fresh) {
+                    return confirmation(entry.asset, job: job, exact: true)
+                }
+            }
         case let .followUp(previous, q):
             guard let read = reads.first(where: { $0.requestId == previous && $0.generation == generation })
             else { throw NucleoFault.invalid("unknown followUpOf") }
@@ -792,9 +851,32 @@ final class NucleoDesk {
         case let .question(q):
             // A chip keeps the level the person saved (they picked the asset); only who wrote the words differs.
             job = Job(requestId: requestId, question: q.trimmingCharacters(in: .whitespacesAndNewlines), asset: nil,
-                      generation: generation, startedAt: Date(), level: currentLevel(), origin: chip ? .chip : .person)
+                      generation: generation, startedAt: Date(), level: currentLevel(), origin: chip ? .chip : .person, companion: companion)
         }
-        // 4.
+        job.confirm = confirm
+        if spent == nil { job.spoken = spoken }
+        if let after, let exchange = lastExchange, after == exchange.id {
+            job.previous = ["question": Self.wordBounded(exchange.question, limit: 600), "reply": Self.wordBounded(exchange.reply, limit: 700)]
+        }
+        if spent == nil, let held = cancelledTurn, held.generation == job.generation,
+           held.question == job.question, held.language == job.language,
+           held.confirm == job.confirm, held.companion == job.companion {
+            let sourceWasSpoken = job.spoken
+            job = held; job.spoken = sourceWasSpoken
+        }
+        cancelledTurn = nil
+        return await begin(job, spent: spent)
+    }
+
+    static func wordBounded(_ text: String, limit: Int) -> String {
+        guard text.count > limit else { return text }
+        let prefix = String(text.prefix(limit))
+        return prefix.lastIndex(where: \.isWhitespace).map { String(prefix[..<$0]) } ?? prefix
+    }
+
+    private func begin(_ job: Job, spent: String?) async -> [String: Any] {
+        activeTurn = job; acceptedTurnID = nil
+        let requestId = job.requestId
         askStarted(spent)
         emit("ask.stage", ["requestId": requestId, "stage": "resolving"])
         return await withCheckedContinuation { (continuation: CheckedContinuation<[String: Any], Never>) in
@@ -811,7 +893,11 @@ final class NucleoDesk {
     func cancel() -> [String: Any] {
         guard let current = inflight else { return ["cancelled": false] }
         inflight = nil
+        if let job = activeTurn, (job.confirm || job.companion), acceptedTurnID != job.requestId {
+            cancelledTurn = job // same question sent from the held draft keeps UUID and previous.
+        }
         current.task.cancel()
+        activeTurn = nil
         askFinished(Self.cancelledResult)
         current.continuation.resume(returning: Self.cancelledResult)
         return ["cancelled": true]
@@ -827,8 +913,24 @@ final class NucleoDesk {
     private func complete(_ requestId: String, _ result: [String: Any]) {
         guard let current = inflight, current.requestId == requestId else { return }
         inflight = nil
-        askFinished(result)
-        current.continuation.resume(returning: result)
+        var answer = result
+        if let job = activeTurn {
+            let status = result["status"] as? String
+            answer["requestId"] = requestId
+            if status == "companion" || status == "companion_error" || job.confirm || job.conversationRead { answer["questionSpoken"] = job.spoken }
+            if status == "companion" {
+                lastExchange = (requestId, job.question, result["text"] as? String ?? "")
+                var replay = job; replay.companion = true; replay.confirm = false
+                deliveredTurn = replay; failedTurn = nil
+            } else if status == "companion_error" {
+                var retry = job; retry.companion = true; retry.confirm = false
+                failedTurn = retry
+            }
+        }
+        activeTurn = nil
+        let delivered = decorateAnswer(answer)
+        askFinished(delivered)
+        current.continuation.resume(returning: delivered)
     }
 
     /// `origin`: a token that carries a read on (a retry, a confirmation, a sign-in) keeps who started it.
@@ -836,7 +938,7 @@ final class NucleoDesk {
                             origin: NucleoReadOrigin = .person) -> String {
         purgeTokens()
         let token = UUID().uuidString.lowercased()
-        tokens[token] = TokenEntry(asset: asset, question: question, expires: Date().addingTimeInterval(Self.tokenLifetime),
+        tokens[token] = TokenEntry(asset: asset, question: question, expires: tokenNow().addingTimeInterval(Self.tokenLifetime),
                                    generation: generation(), owner: userID(), anonymousSignInRetry: signInRetry && userID() == nil,
                                    level: level, persistLevel: persist, origin: origin)
         return token
@@ -854,7 +956,7 @@ final class NucleoDesk {
     /// The page has not asked with this token yet and it is still good: not expired, same reader.
     func holds(_ token: String) -> Bool {
         guard let entry = tokens[token] else { return false }
-        return entry.expires > Date() && entry.generation == generation()
+        return entry.expires > tokenNow() && entry.generation == generation()
     }
 
     /// A question native offered and gave up on: nothing can be asked with its token any more.
@@ -862,27 +964,103 @@ final class NucleoDesk {
         tokens[token] = nil
     }
 
-    private func purgeTokens(now: Date = Date()) {
-        tokens = tokens.filter { $0.value.expires > now && $0.value.generation == generation() }
+    private func purgeTokens(now: Date? = nil) {
+        let now = now ?? tokenNow()
+        tokens = tokens.filter { ($0.value.expires > now || $0.value.conversationCost != nil) && $0.value.generation == generation() }
     }
 
     private func isCurrent(_ job: Job) -> Bool {
         !Task.isCancelled && generation() == job.generation && profile.acceptedRiskNotice
     }
 
+    static func questionFailure(_ code: String, retryable: Bool = true) -> [String: Any] {
+        ["v": 1, "status": "companion_error", "code": code, "retryable": retryable]
+    }
+
+    /// Reprice a confirmation in RAM after an explicit level choice. Never starts a read.
+    func refreshConfirmation(_ p: NucleoParams) throws -> [String: Any] {
+        guard profile.acceptedRiskNotice else { return Self.errorResult("risk_not_accepted") }
+        guard Set(p.raw.keys) == ["token"] else { throw NucleoFault.invalid("confirmation requires only a token") }
+        let token = try p.string("token", maxLength: 128)!
+        guard let entry = tokens.removeValue(forKey: token), entry.generation == generation(), entry.conversationCost != nil else {
+            throw NucleoFault.invalid("no current confirmation")
+        }
+        var job = Job(requestId: UUID().uuidString.lowercased(), question: entry.question, asset: entry.asset,
+                      generation: generation(), startedAt: Date(), level: currentLevel(), origin: entry.origin)
+        job.spoken = entry.spoken
+        return confirmation(entry.asset, job: job, exact: true)
+    }
+
+    private func conversationToken(_ asset: NucleoAsset, job: Job, offer: Bool = false) -> String {
+        let token = issueToken(asset, question: job.question, level: job.level, origin: job.origin)
+        tokens[token]?.conversationCost = conversationCost(job.level)
+        tokens[token]?.readOffer = offer
+        tokens[token]?.spoken = job.spoken
+        return token
+    }
+
+    private func knownRefusal(_ asset: NucleoAsset, job: Job) -> [String: Any]? {
+        if let access = readAccess(), HarnessWall.closed(access) {
+            return gated(access.tier == "anon" ? "signin_required" : "subscription_required", message: nil, access: access, job: job, asset: asset)
+        }
+        if job.level.isPremium, let meter = readMeter(job.level), meter.remaining == 0, meter.bonus == 0 {
+            return levelRefused("level_exhausted", meter: meter, job: job, asset: asset)
+        }
+        return nil
+    }
+
+    private func confirmation(_ asset: NucleoAsset, job: Job, exact: Bool) -> [String: Any] {
+        if let refusal = knownRefusal(asset, job: job) { return refusal }
+        return ["v": 1, "status": "confirm", "requestId": job.requestId, "asset": asset.jsonWithClass, "exact": exact,
+         "token": conversationToken(asset, job: job),
+         "label": asset.name.count > 40 ? ConversationCopy.readFallback() : ConversationCopy.readLabel(asset.name),
+         "cost": conversationCost(job.level)]
+    }
+
+    func conversationCost(_ level: NucleoAnalysisLevel) -> [String: Any] {
+        let access = readAccess(), meter = readMeter(level)
+        let n = access?.remaining.map { $0 + (access?.bonus ?? 0) }, m = meter?.remaining.map { $0 + (meter?.bonus ?? 0) }
+        let pro = access?.isPro == true, guest = access?.tier == "anon"
+        func number(_ n: Int) -> String { n.formatted(.number.locale(L.locale)) }
+        let line: String, short: String
+        if !level.isPremium {
+            short = pro ? ConversationCopy.k5() : ConversationCopy.k3()
+            if pro { line = short }
+            else if let n { line = n == 1 ? (guest ? ConversationCopy.k4b() : ConversationCopy.k2()) : (guest ? ConversationCopy.k4(number(n)) : ConversationCopy.k1(number(n))) }
+            else { line = short }
+        } else {
+            short = pro ? ConversationCopy.k9(level.name) : ConversationCopy.k7(level.name)
+            if pro, let m { line = ConversationCopy.k8(level.name, number(m)) }
+            else if let m, let n { line = guest ? ConversationCopy.k6g(level.name, number(m), number(n)) : ConversationCopy.k6(level.name, number(m), number(n)) }
+            else { line = short }
+        }
+        return ["level": level.rawValue, "levelLabel": level.name, "remaining": n as Any? ?? NSNull(),
+                "levelRemaining": m as Any? ?? NSNull(), "pro": pro, "guest": guest, "alsoGeneral": !pro, "line": line, "short": short]
+    }
+
     private func run(_ job: Job) async -> [String: Any] {
         guard isCurrent(job) else { return Self.cancelledResult }
+        if job.companion {
+            let result = await pilot?.turn(question: job.question, requestId: job.requestId, candidate: job.explanationCandidate, speech: speakingLevel(), exact: job.explanationExact, previous: job.previous, language: job.language, locale: job.locale)
+            guard isCurrent(job) else { return Self.cancelledResult }
+            return result ?? Self.questionFailure("explain_off", retryable: pilot?.capability.known != true)
+        }
         // 5. Resolve.
         var asset: NucleoAsset
         if let known = job.asset {
             asset = known
         } else {
-            let search = await NucleoDeskIO.search(job.question)
+            let search = await NucleoDeskIO.search(job.question, pilot: pilot)
             guard isCurrent(job) else { return Self.cancelledResult }
             switch search {
             case .failed:
-                return Self.errorResult("network")
+                return job.confirm ? Self.questionFailure("offline") : Self.errorResult("network")
             case .unresolved:
+                if let result = await pilot?.turn(question: job.question, requestId: job.requestId, candidate: nil, speech: speakingLevel(), previous: job.previous, language: job.language, locale: job.locale) {
+                    guard isCurrent(job) else { return Self.cancelledResult }
+                    if job.confirm || result["code"] as? String != "explain_off" { return result }
+                }
+                if job.confirm { return Self.questionFailure("explain_off", retryable: pilot?.capability.known != true) }
                 let hits = await BobbyAPI.searchAssets(job.question, limit: 3)
                 guard isCurrent(job) else { return Self.cancelledResult }
                 let suggestions: [[String: Any]] = hits.map { hit in
@@ -891,6 +1069,35 @@ final class NucleoDesk {
                 }
                 return ["v": 1, "status": "unknown_asset", "query": job.question, "suggestions": suggestions]
             case let .resolved(resolved, needsConfirmation, matchKind, proxyNote):
+                if job.confirm {
+                    let exact = !needsConfirmation
+                    if !ConversationRouting.isRead(job.question, asset: resolved, language: job.language) {
+                        activeTurn?.explanationCandidate = resolved; activeTurn?.explanationExact = exact
+                        if let result = await pilot?.turn(question: job.question, requestId: job.requestId, candidate: resolved,
+                            speech: speakingLevel(), exact: exact, previous: job.previous, language: job.language, locale: job.locale) {
+                            guard isCurrent(job) else { return Self.cancelledResult }
+                            if result["status"] as? String == "companion" {
+                                var answer = result
+                                if exact && knownRefusal(resolved, job: job) == nil {
+                                    let cost = conversationCost(job.level)
+                                    answer["readOffer"] = ["token": conversationToken(resolved, job: job, offer: true),
+                                        "label": ConversationCopy.readLabel(resolved.name), "levelLabel": job.level.name,
+                                        "costLine": cost["line"] ?? "", "costShort": cost["short"] ?? ""]
+                                }
+                                return answer
+                            }
+                            if result["status"] as? String != "companion_offer" && !["explain_off", "paused", "limit"].contains(result["code"] as? String ?? "") { return result }
+                        }
+                    }
+                    if !(exact && job.level == .rapido && readAccess()?.isPro == true) {
+                        return confirmation(resolved, job: job, exact: exact)
+                    }
+                }
+                if CompanionPilot.shouldRoute(question: job.question, needsConfirmation: needsConfirmation, matchKind: matchKind),
+                   let result = await pilot?.turn(question: job.question, requestId: job.requestId, candidate: resolved, speech: speakingLevel()) {
+                    guard isCurrent(job) else { return Self.cancelledResult }
+                    if result["status"] as? String != "companion_offer" && result["code"] as? String != "explain_off" { return result }
+                }
                 if needsConfirmation {
                     // Never analyze an unconfirmed guess: the human confirms with this token.
                     return ["v": 1, "status": "confirm", "token": issueToken(resolved, question: job.question, level: job.level, origin: job.origin),
@@ -906,7 +1113,8 @@ final class NucleoDesk {
         if asset.isEquity, asset.symbol.range(of: Self.equitySymbolPattern, options: .regularExpression) == nil {
             return Self.unsupported(asset, "symbol_format")
         }
-        emit("ask.stage", ["requestId": job.requestId, "stage": "accepted", "asset": asset.json,
+        acceptedTurnID = job.requestId
+        emit("ask.stage", ["requestId": job.requestId, "stage": "accepted", "asset": asset.json, "cost": conversationCost(job.level),
                            "startedAt": Int((job.startedAt.timeIntervalSince1970 * 1000).rounded())])
         let symbol = asset.symbol
         let isEquity = asset.isEquity
@@ -952,8 +1160,9 @@ final class NucleoDesk {
             }
         }
         if !fixtures { BobbyTelemetry.shared.readStarted(job.requestId) }
+        let speech = speakingLevel()
         async let deskRead = NucleoDeskIO.debate(symbol: symbol, question: question, isEquity: isEquity, level: level,
-                                               auth: auth, requestId: job.requestId, onEvent: live)
+                                               auth: auth, speech: speech, requestId: job.requestId, onEvent: live)
         let market = await marketRead ?? NucleoDeskIO.Market(price: nil, changePct: nil)
         guard isCurrent(job) else { return Self.cancelledResult }
         emit("ask.stage", ["requestId": job.requestId, "stage": "market", "market": market.json])

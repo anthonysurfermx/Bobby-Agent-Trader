@@ -339,6 +339,7 @@ struct NucleoLevelSheet: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(L.t("Close", "Cerrar"))
+                .accessibilityIdentifier("nucleo-level-close")
             }
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {

@@ -42,11 +42,11 @@ final class NucleoBridgeTests: XCTestCase {
         try await super.tearDown()
     }
 
-    private func make(riskAccepted: Bool = true) -> (NucleoSession, NucleoBridge, Recorder) {
+    private func make(riskAccepted: Bool = true, telemetry: BobbyTelemetry = .shared) -> (NucleoSession, NucleoBridge, Recorder) {
         let profile = AgentProfile()
         profile.riskNoticeVersion = riskAccepted ? RiskNotice.currentVersion : 0
         let session = NucleoSession(fixtures: true, profile: profile, companions: CompanionStore(defaults: defaults),
-                                    ledger: NucleoLedger(defaults: defaults), defaults: defaults)
+                                    ledger: NucleoLedger(defaults: defaults), defaults: defaults, telemetry: telemetry)
         // These recorded bridge contracts are Quick reads. Do not inherit the simulator's
         // selected premium level; premium ordering and refusals have their own injected tests.
         session.desk.currentLevel = { .rapido }
@@ -58,6 +58,27 @@ final class NucleoBridgeTests: XCTestCase {
         let recorder = Recorder()
         session.emitter = recorder
         return (session, NucleoBridge(session: session), recorder)
+    }
+
+    func testDeniedOSPermissionOffersSettingsOnlyForTheExplicitVoiceAttempt() async throws {
+        let (session, bridge, _) = make(); defer { session.teardown() }
+        var presented: [String] = []
+        session.speechDenialPresenter = { presented.append($0) }
+        session.speechPermissionProvider = { .init(state: "denied", onDevice: true) }
+        _ = await result(bridge, "speech.permission")
+        XCTAssertTrue(presented.isEmpty, "Session checks do not open help by themselves")
+        let response = await result(bridge, "speech.permission", ["denialHint":"Voice input isn’t available right now · tap to type"])
+        XCTAssertEqual(response["state"] as? String, "denied")
+        XCTAssertEqual(presented, ["Voice input isn’t available right now · tap to type"])
+        session.speechPermissionProvider = { .init(state: "granted", onDevice: true) }
+        _ = await result(bridge, "speech.permission", ["denialHint":"A bundled caption"])
+        XCTAssertEqual(presented.count, 1)
+    }
+    func testDeniedPermissionHelpRejectsMalformedCaptionWithoutShowingIt() throws {
+        let (session, _, _) = make(); defer { session.teardown() }
+        var presentations = 0; session.speechDenialPresenter = { _ in presentations += 1 }
+        XCTAssertThrowsError(try session.speechPermissionReply(.init(state:"denied",onDevice:true), params:.init(["denialHint":42])))
+        XCTAssertEqual(presentations,0)
     }
 
     // MARK: - Helpers
@@ -349,6 +370,11 @@ final class NucleoBridgeTests: XCTestCase {
         let fuzzy = await result(bridge, "ask", ["question": "how is nvidea doing"])
         try assertGolden(fuzzy, "confirm-fuzzy", ignoring: ["token"])
         let token = try XCTUnwrap(fuzzy["token"] as? String)
+        for field in ["confirm", "spoken", "after"] {
+            let mixed: [String: Any] = ["token": token, field: field == "after" ? UUID().uuidString : true]
+            let invalid = await fault(bridge,"ask",mixed)
+            XCTAssertEqual(invalid,"invalid_params","plain-question fields cannot consume a confirmation token")
+        }
         let read = await result(bridge, "ask", ["token": token])
         try assertGolden(read, "nvda", ignoring: ["question"])
         XCTAssertEqual(read["question"] as? String, "how is nvidea doing", "the confirmed read keeps the user's own question")
@@ -390,7 +416,14 @@ final class NucleoBridgeTests: XCTestCase {
     }
 
     func testRiskGateAndConsentNeverReachTheNetwork() async throws {
-        let (_, bridge, _) = make(riskAccepted: false)
+        var observations: [BobbyTelemetry.Payload] = []
+        // Uses the production native consent predicate, with a recorded transport only.
+        let telemetry = BobbyTelemetry(owner: { UUID(uuidString: "00000000-0000-4000-8000-000000000001")! },
+                                       automaticHeartbeat: false, transport: { p, _ in observations.append(p); return 200 })
+        let (session, bridge, _) = make(riskAccepted: false, telemetry: telemetry)
+        telemetry.becameActive(); telemetry.heartbeat(); telemetry.readStarted(UUID().uuidString)
+        telemetry.webviewTerminated()
+        XCTAssertNil(telemetry.sessionId); XCTAssertEqual(telemetry.pendingCount, 0)
         NucleoFixtures.clearLog()
         try assertGolden(await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"]), "risk")
         let speak = await result(bridge, "speak", ["id": "hello-1", "text": "Hello."])
@@ -402,8 +435,17 @@ final class NucleoBridgeTests: XCTestCase {
         XCTAssertEqual(signIn["status"] as? String, "unavailable")
         try await Task.sleep(nanoseconds: 200_000_000)
         XCTAssertEqual(NucleoFixtures.log, [], "no request before the risk notice is accepted")
+        XCTAssertTrue(observations.isEmpty, "telemetry is also silent before acceptance")
         let accepted = await result(bridge, "acceptRisk", ["version": RiskNotice.currentVersion])
         XCTAssertEqual(accepted["accepted"] as? Bool, true)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(observations.map(\.event), [.foreground])
+        telemetry.heartbeat()
+        session.revokeRiskNoticeConsent()
+        XCTAssertNil(telemetry.sessionId); XCTAssertEqual(telemetry.pendingCount, 0)
+        telemetry.heartbeat(); telemetry.webviewTerminated()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(observations.map(\.event), [.foreground], "withdrawal drops queued observations")
         let stale = await result(bridge, "acceptRisk", ["version": RiskNotice.currentVersion - 1])
         XCTAssertEqual(stale["accepted"] as? Bool, false)
     }
@@ -600,24 +642,72 @@ final class NucleoBridgeTests: XCTestCase {
         }
     }
 
-    func testFinishOnboardingNeedsACompanionAndTheRiskNotice() async throws {
+    func testFinishOnboardingAssignsDefaultAfterTheRiskNotice() async throws {
         let (session, bridge, _) = make(riskAccepted: false)
         session.companions.companionId = nil
         let wasOnboarded = session.profile.onboarded
         let incomplete = await result(bridge, "finishOnboarding")
         XCTAssertEqual(incomplete["status"] as? String, "incomplete")
-        XCTAssertEqual(incomplete["missing"] as? [String], ["companion", "risk"])
+        XCTAssertEqual(incomplete["missing"] as? [String], ["risk"])
         XCTAssertEqual(session.profile.onboarded, wasOnboarded)
         _ = await result(bridge, "acceptRisk", ["version": RiskNotice.currentVersion])
-        _ = await result(bridge, "setCompanion", ["id": "byte"])
+        XCTAssertNil(session.companions.companionId)
         var routed: NucleoPage?
         session.onRoute = { routed = $0 }
         let done = await result(bridge, "finishOnboarding")
         XCTAssertEqual(done["next"] as? String, "app")
+        XCTAssertEqual(session.companions.companionId, "byte", "T2/4.7.8 default starter, same roster ordering")
         XCTAssertTrue(session.profile.onboarded)
         try await Task.sleep(nanoseconds: 50_000_000)
         XCTAssertEqual(routed, .app, "then native cross-fades to app.html")
         XCTAssertEqual(session.page, .app)
+    }
+
+    func testFirstAskHandoverIsRAMOnlyAndConsumedOnceByAppSession() async throws {
+        let (session, bridge, _) = make()
+        let question = "handover-" + UUID().uuidString
+        let ask: [String:Any] = ["question": question, "chip": true, "companion": true, "spoken": false]
+        _ = await result(bridge, "finishOnboarding", ["ask": ask])
+        XCTAssertNil(session.sessionJSON()["pendingAsk"], "events cannot consume or expose the question")
+        let onboarding = await result(bridge, "session", ["page":"onboarding"])
+        XCTAssertNil(onboarding["pendingAsk"])
+        let handed = await result(bridge, "session", ["page":"app"])
+        XCTAssertEqual(handed["pendingAsk"] as? NSDictionary, ask as NSDictionary)
+        let again = await result(bridge, "session", ["page":"app"])
+        XCTAssertNil(again["pendingAsk"])
+        XCTAssertFalse(String(describing: defaults.dictionaryRepresentation()).contains(question), "no words in defaults")
+        XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("api/desk-debate") || $0.contains("api/voice-tool") || $0.contains("api/bobby-companion") || $0.contains("api/okx-candles") || $0.contains("api/stock-candles") }, "handover itself sends no ask; post-consent vocabulary boot is allowed")
+    }
+
+    func testFirstAskHandoverDropsOnBackgroundWithdrawalAccountAndDeadline() async throws {
+        for event in ["background", "withdrawal", "account", "deadline"] {
+            let (session, bridge, _) = make()
+            var clock: TimeInterval = 100, owner = UUID()
+            session.handoverNow = { clock }; session.handoverOwner = { owner }
+            _ = await result(bridge, "finishOnboarding", ["ask":["question":"Question " + event]])
+            switch event {
+            case "background": session.appWentBackground()
+            case "withdrawal": session.revokeRiskNoticeConsent()
+            case "account": owner = UUID()
+            default: clock += 30
+            }
+            let next = await result(bridge, "session", ["page":"app"])
+            XCTAssertNil(next["pendingAsk"], event)
+        }
+    }
+
+    func testFirstAskHandoverValidatesPlainQuestionAndStrictFlags() async throws {
+        let (session, _, _) = make()
+        for ask: Any in ["text", ["question":" "], ["question":false], ["question":"Bitcoin", "chip":1],
+                         ["question":"Bitcoin", "spoken":"true"], ["question":"Bitcoin", "confirm":true],
+                         ["question":"Bitcoin", "token":"old"]] {
+            do { _ = try await session.dispatch("finishOnboarding", NucleoParams(["ask":ask])); XCTFail("invalid handover accepted") }
+            catch { }
+        }
+        let long = String(repeating:"x", count:1201)
+        _ = try await session.dispatch("finishOnboarding", NucleoParams(["ask":["question":long]]))
+        let next = try await session.dispatch("session", NucleoParams(["page":"app"])) as! [String:Any]
+        XCTAssertEqual((next["pendingAsk"] as? [String:Any])?["question"] as? String, long, "ask itself answers too_long locally")
     }
 
     func testTheAvatarOpensTheAccountSheet() async throws {
@@ -773,4 +863,247 @@ final class NucleoBridgeTests: XCTestCase {
         XCTAssertEqual(items.first?.id, "t24")
         XCTAssertEqual(ledger.items(owner: "someone").count, 0)
     }
+
+    func testConversationRetryKeepsUUIDLanguageQuestionAndPreviousAndNeverReadsMarket() async {
+        NucleoFixtures.setScenario("companion")
+        let (session, bridge, _) = make()
+        var sent: [[String: Any]] = []
+        var fail = false
+        session.companionPilot.transport = { _, method, body in
+            if method == "GET" { return (["companion": ["context": false]],405) }
+            sent.append(body ?? [:])
+            if fail { return (["version":1,"kind":"error","error":["code":"companion_unavailable","retryable":true]],503) }
+            return (["version":1,"kind":"explanation","reply":["gist":"One sentence.","text":"One sentence.","followUp":NSNull()]],200)
+        }
+        let first = await result(bridge,"ask",["question":"What is investing?","companion":true])
+        fail = true
+        let failed = await result(bridge,"ask",["question":"Simpler?","companion":true,"after":first["requestId"]!])
+        _ = await result(bridge,"ask",["retry":failed["requestId"]!])
+        XCTAssertEqual(sent.count,3)
+        XCTAssertTrue(NSDictionary(dictionary:sent[1]).isEqual(to:sent[2]),"retry sends exactly the original body")
+        XCTAssertEqual((sent[2]["previous"] as? [String:String])?["question"],"What is investing?")
+        XCTAssertEqual(failed["status"] as? String,"companion_error")
+        XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("desk-debate") || $0.contains("bobby-asset-search") })
+        session.appWentBackground()
+        let (envelope,_) = await bridge.handle(body:["v":1,"method":"ask","params":["retry":failed["requestId"]!]],trusted:true)
+        XCTAssertEqual((envelope as? [String:Any])?["ok"] as? Bool,true, "A10 keeps the failed turn on background")
+        XCTAssertEqual(sent.count,4)
+        XCTAssertTrue(NSDictionary(dictionary:sent[1]).isEqual(to:sent[3]),"A10 retry keeps the same UUID, language, question and previous")
+        session.teardown()
+    }
+
+    func testConversationConfirmationCountsBeforeTapAndKnownWallIsRefused() async {
+        NucleoFixtures.setScenario("companion")
+        let (session,bridge,_) = make()
+        let reply = await result(bridge,"ask",["question":"Bitcoin","confirm":true])
+        XCTAssertEqual(reply["status"] as? String,"confirm")
+        XCTAssertEqual((reply["cost"] as? [String:Any])?["remaining"] as? Int,5)
+        XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("desk-debate") || $0.contains("candles") })
+        session.desk.readAccess = { BobbyReadAccess(tier:"free",used:10,limit:10,remaining:0,resetsAt:nil,paywall:true) }
+        let refused = await result(bridge,"ask",["question":"Bitcoin","confirm":true])
+        XCTAssertEqual(refused["status"] as? String,"subscription_required")
+        XCTAssertNil(refused["cost"])
+        session.teardown()
+    }
+
+    func testFailedOrLostAssetExplanationReplaysExactCandidateAndUUID() async {
+        for failed in [false,true] {
+            NucleoFixtures.setScenario("companion-plain")
+            let (session,bridge,_)=make(); var sent:[[String:Any]]=[]
+            session.companionPilot.transport={ _,method,body in
+                if method == "GET" { return (["companion":["context":false,"catalog":1]],405) }
+                sent.append(body ?? [:])
+                if failed && sent.count == 1 { return (["version":1,"kind":"error","error":["code":"companion_unavailable","retryable":true]],503) }
+                return (["version":1,"kind":"explanation","reply":["gist":"One sentence.","text":"One sentence.","followUp":NSNull()]],200)
+            }
+            let original=await result(bridge,"ask",["question":"What is Bitcoin?","confirm":true])
+            XCTAssertEqual(original["status"] as? String,failed ? "companion_error" : "companion")
+            _=await result(bridge,"ask",["retry":original["requestId"]!])
+            XCTAssertEqual(sent.count,2)
+            XCTAssertEqual((sent[0]["candidate"] as? [String:Any])?["exact"] as? Bool,true)
+            XCTAssertTrue(NSDictionary(dictionary:sent[0]).isEqual(to:sent[1]),"failed or lost reply must replay its original candidate, UUID, question and language")
+            XCTAssertFalse(NucleoFixtures.log.contains{$0.contains("desk-debate")}); session.teardown()
+        }
+    }
+
+    func testCancelledExplanationResentFromHeldDraftKeepsUUIDAndPrevious() async {
+        NucleoFixtures.setScenario("companion-plain")
+        let (session,bridge,_)=make(); var sent:[[String:Any]]=[]
+        session.companionPilot.transport={ _,method,body in
+            if method == "GET" { return (["companion":["context":false,"catalog":1]],405) }
+            sent.append(body ?? [:])
+            if sent.count == 2 { while !Task.isCancelled { await Task.yield() } }
+            return (["version":1,"kind":"explanation","reply":["gist":"One sentence.","text":"One sentence.","followUp":NSNull()]],200)
+        }
+        let answer=await result(bridge,"ask",["question":"What is investing?","companion":true])
+        let pending=Task { await self.result(bridge,"ask",["question":"Simpler?","companion":true,"after":answer["requestId"]!]) }
+        for _ in 0..<1000 where sent.count < 2 { await Task.yield() }
+        XCTAssertEqual(sent.count,2)
+        _=await result(bridge,"cancel")
+        let cancelled=await pending.value; XCTAssertEqual(cancelled["status"] as? String,"cancelled")
+        _=await result(bridge,"ask",["question":"Simpler?","companion":true])
+        XCTAssertEqual(sent.count,3)
+        XCTAssertTrue(NSDictionary(dictionary:sent[1]).isEqual(to:sent[2]),"cancel/resend must not count a lost explanation twice or lose its thread")
+        session.teardown()
+    }
+
+    func testLevelRefreshRepricesTheSameAssetWithoutNetworkAndRefusesKnownWall() async {
+        NucleoFixtures.setScenario("companion-plain")
+        let (session,bridge,_)=make()
+        let original=await result(bridge,"ask",["question":"Bitcoin","confirm":true])
+        session.desk.currentLevel={.profundo}
+        let refreshed=await result(bridge,"confirm.refresh",["token":original["token"]!])
+        XCTAssertEqual(refreshed["status"] as? String,"confirm")
+        XCTAssertEqual((refreshed["cost"] as? [String:Any])?["level"] as? String,"profundo")
+        XCTAssertEqual((refreshed["asset"] as? [String:Any])?["symbol"] as? String,"BTC")
+        XCTAssertNotEqual(refreshed["token"] as? String,original["token"] as? String)
+        XCTAssertFalse(NucleoFixtures.log.contains{$0.contains("desk-debate") || $0.contains("bobby-companion")})
+        session.desk.readAccess={BobbyReadAccess(tier:"free",used:10,limit:10,remaining:0,resetsAt:nil,paywall:true)}
+        let wall=await result(bridge,"confirm.refresh",["token":refreshed["token"]!])
+        XCTAssertEqual(wall["status"] as? String,"subscription_required"); session.teardown()
+    }
+    func testSpokenPolicySurvivesExplicitReadConfirmation() async {
+        for spoken in [false,true] {
+            NucleoFixtures.setScenario("companion-plain")
+            let (session,bridge,_)=make()
+            let confirm=await result(bridge,"ask",["question":"Bitcoin","confirm":true,"spoken":spoken])
+            let read=await result(bridge,"ask",["token":confirm["token"]!])
+            XCTAssertEqual(read["status"] as? String,"ok")
+            XCTAssertEqual(read["questionSpoken"] as? Bool,spoken); session.teardown()
+        }
+    }
+
+    func testExpiredConversationConfirmationStartsOnlyWhenItsShownCostStillMatches() async {
+        NucleoFixtures.setScenario("companion-plain")
+        let (session,bridge,_)=make(); var now=Date(); session.desk.tokenNow={now}
+        let confirm=await result(bridge,"ask",["question":"Bitcoin","confirm":true])
+        now=now.addingTimeInterval(601)
+        let read=await result(bridge,"ask",["token":confirm["token"]!])
+        XCTAssertEqual(read["status"] as? String,"ok"); session.teardown()
+    }
+    func testExpiredConversationConfirmationShowsChangedAllowanceBeforeSpending() async {
+        NucleoFixtures.setScenario("companion-plain")
+        let (session,bridge,_)=make(); var now=Date(); session.desk.tokenNow={now}
+        let confirm=await result(bridge,"ask",["question":"Bitcoin","confirm":true])
+        now=now.addingTimeInterval(601)
+        session.desk.readAccess={BobbyReadAccess(tier:"free",used:6,limit:10,remaining:4,resetsAt:nil,paywall:false)}
+        let refreshed=await result(bridge,"ask",["token":confirm["token"]!])
+        XCTAssertEqual(refreshed["status"] as? String,"confirm")
+        XCTAssertEqual((refreshed["cost"] as? [String:Any])?["remaining"] as? Int,4)
+        XCTAssertNotEqual(refreshed["token"] as? String,confirm["token"] as? String)
+        XCTAssertFalse(NucleoFixtures.log.contains{$0.contains("desk-debate")}); session.teardown()
+    }
+    func testExpiredReadOfferAlwaysReturnsAConfirmationBeforeSpending() async {
+        NucleoFixtures.setScenario("companion-plain")
+        let (session,bridge,_)=make(); var now=Date(); session.desk.tokenNow={now}
+        let explanation=await result(bridge,"ask",["question":"What is Bitcoin?","confirm":true])
+        guard let offer=explanation["readOffer"] as? [String:Any], let token=offer["token"] as? String else { XCTFail("exact candidate must carry a read offer"); session.teardown(); return }
+        now=now.addingTimeInterval(601)
+        let refreshed=await result(bridge,"ask",["token":token])
+        XCTAssertEqual(refreshed["status"] as? String,"confirm")
+        XCTAssertFalse(NucleoFixtures.log.contains{$0.contains("desk-debate")}); session.teardown()
+    }
+
+    func testCompanionPresentedNeverOpensConsentEvenWithContextEnabled() async {
+        NucleoFixtures.setScenario("companion")
+        let (session,bridge,recorder) = make()
+        _ = await result(bridge,"ask",["question":"What is investing?","confirm":true])
+        _ = await result(bridge,"companion.presented",[:])
+        XCTAssertNil(session.sheet)
+        XCTAssertFalse(recorder.events.contains { $0.name == "native.sheet" })
+        session.teardown()
+    }
+
+    func testCompanionTapsUseNoNetworkAndDoNotCreateDeskReads() async throws {
+        NucleoFixtures.setScenario("companion")
+        let (session, bridge, _) = make()
+        session.companionContext.choose(true)
+        let reply = await result(bridge, "ask", ["question": "What does investing mean?"])
+        XCTAssertEqual(reply["status"] as? String, "companion")
+        XCTAssertEqual((reply["invitation"] as? [String: Any])?["questionId"] as? String, "interest")
+        _ = await result(bridge,"companion.presented",["questionId":"interest","opened":true])
+        let before = NucleoFixtures.log.count
+        let next = await result(bridge, "companion.answer", ["questionId": "interest", "value": "crypto"])
+        XCTAssertEqual(next["status"] as? String,"noted")
+        XCTAssertEqual((next["note"] as? [String:Any])?["source"] as? String,"said")
+        XCTAssertEqual((next["next"] as? [String: Any])?["id"] as? String, "barrier")
+        let skipped = await result(bridge, "companion.answer", ["questionId": "barrier","rest":true])
+        XCTAssertEqual(skipped["status"] as? String,"rested")
+        XCTAssertEqual(NucleoFixtures.log.count, before, "a tap or rest has no server request")
+        XCTAssertEqual(session.companionContext.state.notes.count, 1)
+        XCTAssertEqual(session.companionContext.state.asked, ["interest"])
+        XCTAssertNotNil(session.companionContext.state.rest?["barrier"])
+        let following = await result(bridge, "ask", ["question":"How does bitcoin work?","companion":true])
+        XCTAssertTrue(following["invitation"] is NSNull,"5.6.1: no chip directly after a note")
+        XCTAssertNil(session.desk.pendingRead()); XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("desk-debate") })
+        session.teardown()
+    }
+
+    func testCancellingAnOwnWordsAnswerNeverAppliesItsLateValidatedNote() async {
+        NucleoFixtures.setScenario("companion-answer-slow")
+        let (session, bridge, _) = make()
+        session.companionContext.choose(true)
+        _ = await result(bridge, "ask", ["question":"What is investing?","companion":true])
+        _ = await result(bridge, "companion.presented", ["questionId":"interest","opened":true])
+        NucleoFixtures.clearLog()
+        let pending = Task { await self.result(bridge, "companion.answer", ["questionId":"interest","text":"my private words"]) }
+        try? await Task.sleep(for: .milliseconds(20))
+        _ = await result(bridge, "cancel", [:])
+        let reply = await pending.value
+        XCTAssertEqual(reply["status"] as? String, "cancelled")
+        XCTAssertTrue(session.companionContext.state.notes.isEmpty)
+        XCTAssertEqual(NucleoFixtures.log.filter { $0.contains("POST bobbyprotocol.xyz/api/companion-turn") }.count, 1)
+        session.teardown()
+    }
+
+    func testInvitationNeedsExplicitTapAndCurrentMemoryCapability() async {
+        NucleoFixtures.setScenario("companion")
+        let (session,bridge,recorder)=make()
+        let first=await result(bridge,"ask",["question":"What is investing?","companion":true])
+        XCTAssertTrue(first["invitation"] is NSNull)
+        let second=await result(bridge,"ask",["question":"What is a share?","companion":true])
+        XCTAssertEqual((second["invitation"] as? [String:Any])?["kind"] as? String,"remember")
+        _ = await result(bridge,"companion.presented",["kind":"invite"])
+        XCTAssertNil(session.sheet);XCTAssertFalse(recorder.events.contains{$0.name=="native.sheet"})
+        let invite=await result(bridge,"companion.invite",[:]);XCTAssertEqual(invite["status"] as? String,"opened")
+        XCTAssertEqual(session.sheet,.companionConsent);XCTAssertFalse(session.companionContext.accepted)
+        session.companionContext.choose(true);session.companionConsentFinished(true);session.sheetDismissed()
+        XCTAssertTrue(session.companionContext.accepted);XCTAssertTrue(recorder.events.contains{$0.name=="companion.checkIn"})
+        session.teardown()
+        for scenario in ["companion-mismatch","companion-plain"] {
+            NucleoFixtures.setScenario(scenario);let (blocked,b,_)=make()
+            _ = await result(b,"ask",["question":"What is investing?","companion":true])
+            let r=await result(b,"companion.invite",[:]);XCTAssertEqual(r["status"] as? String,"unavailable");XCTAssertNil(blocked.sheet)
+            blocked.teardown()
+        }
+    }
+
+    func testCompanionOfferAndLimitLeaveTheGuessUnspentUntilConfirmation() async {
+        for scenario in ["companion-offer", "companion-limit"] {
+            NucleoFixtures.setScenario(scenario); NucleoFixtures.clearLog()
+            let (session, bridge, _) = make()
+            let reply = await result(bridge, "ask", ["question": "qué opinas de ethereun hoy"])
+            XCTAssertEqual(reply["status"] as? String, "confirm")
+            XCTAssertEqual((reply["asset"] as? [String: Any])?["symbol"] as? String, "ETH")
+            XCTAssertNotNil(reply["token"] as? String)
+            XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("desk-debate") || $0.contains("candles") })
+            session.teardown()
+        }
+    }
+
+    func testCompanionOffAndFailedSearchKeepOldBehavior() async {
+        NucleoFixtures.setScenario("companion-off")
+        let (session, bridge, _) = make()
+        let reply = await result(bridge, "ask", ["question": "What does investing mean?"])
+        XCTAssertEqual(reply["status"] as? String, "unknown_asset")
+        XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("POST") && $0.contains("companion-turn") })
+        session.teardown()
+        NucleoFixtures.setScenario("offline"); NucleoFixtures.clearLog()
+        let (offline, offlineBridge, _) = make()
+        let failed = await result(offlineBridge, "ask", ["question": "What does investing mean?"])
+        XCTAssertEqual(failed["code"] as? String, "network")
+        XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("companion-turn") })
+        offline.teardown()
+    }
+
 }

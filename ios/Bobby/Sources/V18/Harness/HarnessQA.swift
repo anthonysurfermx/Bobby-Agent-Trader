@@ -35,7 +35,7 @@ enum HarnessQA {
                 ])
                 board.set(4.2, for: "NVDA")
                 board.set(-1.6, for: "BTC")
-                return AnyView(HarnessBoardContent(board: board, asks: false, onClose: {}, onPick: { _ in }))
+                return AnyView(HarnessBoardContent(board: board, asks: false, onClose: {}, onMemory: {}, onCredits: {}, onPick: { _ in }))
             },
             // Memory, "On this iPhone": what the phone keeps for follow-ups about three assets.
             "memory-notes-three": { memory(notes(.three)) },
@@ -53,7 +53,7 @@ enum HarnessQA {
     }
 
     private static func screen(_ board: HarnessBoard) -> AnyView {
-        AnyView(HarnessBoardContent(board: board, onClose: {}, onPick: { _ in }))
+        AnyView(HarnessBoardContent(board: board, onClose: {}, onMemory: {}, onCredits: {}, onPick: { _ in }))
     }
 
     /// The Memory screen of a signed-out phone with "On this iPhone" unfolded, as one tap leaves it.

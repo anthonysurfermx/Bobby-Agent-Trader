@@ -14,7 +14,9 @@ struct MemoryView: View {
     @ObservedObject var center: MemoryCenter = .shared
     /// R11: nothing reaches the network before the risk notice is accepted.
     let riskAccepted: Bool
+    var onEducationalNotes: (() -> Void)? = nil
     /// Shown as its own sheet (a close button); pushed from the briefing settings it has a back button.
+    var onSpeaking: (() -> Void)? = nil
     var onClose: (() -> Void)? = nil
     /// Observed so a sign-in or sign-out redraws the screen; the center names the account.
     @ObservedObject private var account = AccountSession.shared
@@ -41,6 +43,17 @@ struct MemoryView: View {
                     }
                 }
                 .padding(.trailing, -7)
+                if let onEducationalNotes {
+                    Button(CompanionCopy.text("notesTitle"), action: onEducationalNotes)
+                        .quietFont(15, .regular).foregroundStyle(Theme.cream)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.vertical, 18).accessibilityIdentifier("memory-educational-notes")
+                }
+                if let onSpeaking {
+                    Button(L.t("How Bobby speaks", "Cómo te habla Bobby"), action: onSpeaking)
+                        .quietFont(15, .regular).foregroundStyle(Theme.cream)
+                        .padding(.vertical, 18).accessibilityIdentifier("memory-speaking")
+                }
                 content.padding(.top, 2)
             }
             .padding(.horizontal, 24)
@@ -119,7 +132,7 @@ struct MemoryView: View {
             "Primero acepta el aviso de riesgo: hasta entonces Bobby no envía nada a sus servidores.")
     }
 
-    static var title: String { L.t("Memory", "Memoria") }
+    static var title: String { L.t("What I remember", "Lo que recuerdo") }
     static var localLabel: String { L.t("On this iPhone", "En este iPhone") }
 
     /// Every word on the face of the screen while there is no account memory to show (nobody signed
@@ -166,7 +179,7 @@ struct MemoryView: View {
             ForEach(s.assets) { asset in assetRow(asset) }
         }
         Rectangle().fill(Theme.warmHair).frame(height: 1)
-        QuietDisclosure(label: L.t("Your preferences", "Tus preferencias"), id: "memory-prefs") {
+        QuietDisclosure(label: L.t("About you", "Sobre ti"), id: "memory-prefs") {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(MemoryPref.allCases) { field in prefPicker(field, current: s.value(field)) }
             }

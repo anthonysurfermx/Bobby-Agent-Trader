@@ -97,6 +97,12 @@
     "it": "Circa un anno",
     "de": "Etwa ein Jahr"
   },
+  "About you": {
+    "fr": "À propos de toi",
+    "pt": "Sobre ti",
+    "it": "Su di te",
+    "de": "Über dich"
+  },
   "Accept": {
     "fr": "Accepter",
     "pt": "Aceitar",
@@ -260,6 +266,12 @@
     "pt": "Pergunta primeiro por um ativo.",
     "it": "Chiedi prima di un asset.",
     "de": "Frag zuerst nach einem Wert."
+  },
+  "Ask about an asset to find it here.": {
+    "fr": "Pose une question sur un actif pour le retrouver ici.",
+    "pt": "Pergunta sobre um ativo para o retomares aqui.",
+    "it": "Chiedi di un asset per ritrovarlo qui.",
+    "de": "Frage nach einem Wert, um ihn hier wieder aufzugreifen."
   },
   "Asked once, on {0}.": {
     "fr": "Demandé une fois, le {0}.",
@@ -548,6 +560,12 @@
     "pt": "Alterar",
     "it": "Cambia",
     "de": "Ändern"
+  },
+  "Check your available reads before a new analysis.": {
+    "fr": "Vérifie tes analyses disponibles avant une nouvelle analyse.",
+    "pt": "Confirma as análises disponíveis antes de uma nova análise.",
+    "it": "Controlla le letture disponibili prima di una nuova analisi.",
+    "de": "Prüfe deine verfügbaren Lesungen vor einer neuen Analyse."
   },
   "Check your existing Pro access before starting another purchase.": {
     "fr": "Vérifiez votre accès Pro existant avant un nouvel achat.",
@@ -1187,6 +1205,12 @@
     "it": "Cronologia",
     "de": "Verlauf"
   },
+  "How Bobby speaks": {
+    "fr": "Comment Bobby te parle",
+    "pt": "Como o Bobby fala contigo",
+    "it": "Come ti parla Bobby",
+    "de": "Wie Bobby mit dir spricht"
+  },
   "How does {0} look today?": {
     "fr": "Comment se présente {0} aujourd’hui ?",
     "pt": "Como está {0} hoje?",
@@ -1211,6 +1235,18 @@
     "it": "Posso riprenderlo la prossima volta",
     "de": "Ich kann das nächstes Mal aufgreifen"
   },
+  "I can’t explain more right now. I’ll be back {0}": {
+    "fr": "Je ne peux rien expliquer de plus pour l’instant. Je reviens {0}",
+    "pt": "Por agora não posso explicar mais. Volto {0}",
+    "it": "Per ora non posso spiegare altro. Torno {0}",
+    "de": "Im Moment kann ich nichts mehr erklären. Ich bin {0} wieder da"
+  },
+  "I can’t explain more right now. Try again later.": {
+    "fr": "Je ne peux rien expliquer de plus pour l’instant. Réessaie plus tard.",
+    "pt": "Por agora não posso explicar mais. Tenta mais tarde.",
+    "it": "Per ora non posso spiegare altro. Riprova più tardi.",
+    "de": "Im Moment kann ich nichts mehr erklären. Versuch es später noch einmal."
+  },
   "Include questions from this phone": {
     "fr": "Inclure les questions de ce téléphone",
     "pt": "Incluir perguntas deste telefone",
@@ -1222,6 +1258,12 @@
     "pt": "Inclua esta referência de pagamento ao contactar a Ajuda.",
     "it": "Includi questo riferimento di pagamento quando contatti l’assistenza.",
     "de": "Gib diese Zahlungsreferenz an, wenn du den Support kontaktierst."
+  },
+  "Included in Bobby Pro": {
+    "fr": "Incluse dans Bobby Pro",
+    "pt": "Incluída no Bobby Pro",
+    "it": "Inclusa in Bobby Pro",
+    "de": "In Bobby Pro enthalten"
   },
   "Included with Bobby Pro. It is off for now.": {
     "fr": "Inclus avec Bobby Pro. Il est désactivé pour l’instant.",
@@ -1568,6 +1610,12 @@
     "pt": "Só contas novas, durante a primeira semana.",
     "it": "Solo nuovi account, durante la prima settimana.",
     "de": "Nur neue Konten, in ihrer ersten Woche."
+  },
+  "New analysis · Quick read": {
+    "fr": "Nouvelle analyse · Lecture rapide",
+    "pt": "Nova análise · Leitura rápida",
+    "it": "Nuova analisi · Lettura rapida",
+    "de": "Neue Analyse · Schnelle Lesung"
   },
   "News": {
     "fr": "Actualités",
@@ -1919,6 +1967,12 @@
     "it": "Leggi ogni piano, periodo e offerta introduttiva qui sotto prima di abbonarti.",
     "de": "Lies vor dem Abonnieren alle unten aufgeführten Tarife, Laufzeiten und Einstiegsangebote."
   },
+  "Read ready": {
+    "fr": "Analyse prête",
+    "pt": "Análise pronta",
+    "it": "Analisi pronta",
+    "de": "Analyse bereit"
+  },
   "Read, wait, review your thesis, then build with earned pieces.": {
     "fr": "Lis, attends, révise ta thèse, puis construis avec les pièces gagnées.",
     "pt": "Lê, espera, revê a tua tese e constrói com as peças conquistadas.",
@@ -1942,6 +1996,12 @@
     "pt": "A ler a evidência de preço…",
     "it": "Lettura dei dati di prezzo…",
     "de": "Kursdaten werden gelesen…"
+  },
+  "Reading {0}…": {
+    "fr": "J’analyse {0}…",
+    "pt": "A analisar {0}…",
+    "it": "Analizzo {0}…",
+    "de": "Ich analysiere {0}…"
   },
   "Reads left this week": {
     "en": "Reads left this week",
@@ -2163,6 +2223,12 @@
     "it": "Riesaminata {0}",
     "de": "Zuletzt geprüft {0}"
   },
+  "Revisit {0}": {
+    "fr": "Revoir {0}",
+    "pt": "Retomar {0}",
+    "it": "Riprendi {0}",
+    "de": "{0} erneut ansehen"
+  },
   "Risk notice": {
     "en": "Risk notice",
     "es": "Aviso de riesgo",
@@ -2248,6 +2314,18 @@
     "pt": "Ver memória",
     "it": "Vedi memoria",
     "de": "Gedächtnis ansehen"
+  },
+  "See the read": {
+    "fr": "Voir l’analyse",
+    "pt": "Ver a análise",
+    "it": "Vedi l’analisi",
+    "de": "Analyse ansehen"
+  },
+  "See the {0} read": {
+    "fr": "Voir l’analyse de {0}",
+    "pt": "Ver a análise de {0}",
+    "it": "Vedi l’analisi di {0}",
+    "de": "Analyse zu {0} ansehen"
   },
   "See why": {
     "fr": "Voir pourquoi",
@@ -2713,6 +2791,12 @@
     "it": "Prima",
     "de": "Damals"
   },
+  "These assets appeared in your reads.": {
+    "fr": "Ces actifs figuraient dans tes analyses.",
+    "pt": "Estes ativos apareceram nas tuas análises.",
+    "it": "Questi asset erano nelle tue analisi.",
+    "de": "Diese Werte kamen in deinen Analysen vor."
+  },
   "Theses you wrote": {
     "fr": "Thèses que tu as écrites",
     "pt": "Teses que escreveste",
@@ -2955,6 +3039,66 @@
     "it": "Hai usato un altro account Google Play?",
     "de": "Anderes Google Play-Konto genutzt?"
   },
+  "Uses 1 of your {0} free reads": {
+    "fr": "Utilise 1 de tes {0} analyses gratuites",
+    "pt": "Usa 1 das tuas {0} análises grátis",
+    "it": "Usa 1 delle tue {0} analisi gratuite",
+    "de": "Nutzt 1 deiner {0} kostenlosen Analysen"
+  },
+  "Uses 1 of your {0} reads": {
+    "fr": "Utilise 1 de tes {0} analyses",
+    "pt": "Usa 1 das tuas {0} análises",
+    "it": "Usa 1 delle tue {0} analisi",
+    "de": "Nutzt 1 deiner {0} Analysen"
+  },
+  "Uses 1 of your {1} {0} and 1 of your {2} free reads": {
+    "fr": "Utilise 1 de tes {1} {0} et 1 de tes {2} analyses gratuites",
+    "pt": "Usa 1 das tuas {1} {0} e 1 das tuas {2} análises grátis",
+    "it": "Usa 1 delle tue {1} {0} e 1 delle tue {2} analisi gratuite",
+    "de": "Nutzt 1 deiner {1} {0} und 1 deiner {2} kostenlosen Analysen"
+  },
+  "Uses 1 of your {1} {0} and 1 of your {2} reads": {
+    "fr": "Utilise 1 de tes {1} {0} et 1 de tes {2} analyses",
+    "pt": "Usa 1 das tuas {1} {0} e 1 das tuas {2} análises",
+    "it": "Usa 1 delle tue {1} {0} e 1 delle tue {2} analisi",
+    "de": "Nutzt 1 deiner {1} {0} und 1 deiner {2} Analysen"
+  },
+  "Uses 1 of your {1} {0} with Bobby Pro": {
+    "fr": "Utilise 1 de tes {1} {0} avec Bobby Pro",
+    "pt": "Usa 1 das tuas {1} {0} com o Bobby Pro",
+    "it": "Usa 1 delle tue {1} {0} con Bobby Pro",
+    "de": "Nutzt 1 deiner {1} {0} mit Bobby Pro"
+  },
+  "Uses 1 read": {
+    "fr": "Utilise 1 analyse",
+    "pt": "Usa 1 análise",
+    "it": "Usa 1 analisi",
+    "de": "Nutzt 1 Analyse"
+  },
+  "Uses 1 {0} and 1 read": {
+    "fr": "Utilise 1 {0} et 1 analyse",
+    "pt": "Usa 1 {0} e 1 análise",
+    "it": "Usa 1 {0} e 1 analisi",
+    "de": "Nutzt 1 {0} und 1 Analyse"
+  },
+  "Uses 1 {0} with Bobby Pro": {
+    "fr": "Utilise 1 {0} avec Bobby Pro",
+    "pt": "Usa 1 {0} com o Bobby Pro",
+    "it": "Usa 1 {0} con Bobby Pro",
+    "de": "Nutzt 1 {0} mit Bobby Pro"
+  },
+  "Uses your last free read": {
+    "fr": "Utilise ta dernière analyse gratuite",
+    "pt": "Usa a tua última análise grátis",
+    "it": "Usa la tua ultima analisi gratuita",
+    "de": "Nutzt deine letzte kostenlose Analyse"
+  },
+  "Uses your last read": {
+    "fr": "Utilise ta dernière analyse",
+    "pt": "Usa a tua última análise",
+    "it": "Usa la tua ultima analisi",
+    "de": "Nutzt deine letzte Analyse"
+  },
   "Visit": {
     "fr": "Visiter",
     "pt": "Visitar",
@@ -3014,6 +3158,12 @@
     "pt": "O que o Bobby recorda dos teus ativos e preferências",
     "it": "Ciò che Bobby ricorda dei tuoi asset e preferenze",
     "de": "Was Bobby über deine Anlagen und Vorlieben speichert"
+  },
+  "What I remember": {
+    "fr": "Ce que je retiens",
+    "pt": "O que recordo",
+    "it": "Quello che ricordo",
+    "de": "Was ich mir merke"
   },
   "What changed in {0} since I asked?": {
     "fr": "Qu’est-ce qui a changé pour {0} depuis ma question ?",
@@ -3549,6 +3699,12 @@
     "it": "notizie",
     "de": "Nachrichten"
   },
+  "on {d MMM}": {
+    "fr": "le {d MMM}",
+    "pt": "a {d} de {MMM}",
+    "it": "il {d MMM}",
+    "de": "am {d}. {MMM}"
+  },
   "period shown by your store": {
     "fr": "période indiquée par ta boutique",
     "pt": "período indicado pela tua loja",
@@ -3566,6 +3722,18 @@
     "pt": "fundamentais do projeto",
     "it": "fondamentali del progetto",
     "de": "Fundamentaldaten des Projekts"
+  },
+  "today at {t}": {
+    "fr": "aujourd’hui à {t}",
+    "pt": "hoje às {t}",
+    "it": "oggi alle {t}",
+    "de": "heute um {t} Uhr"
+  },
+  "tomorrow at {t}": {
+    "fr": "demain à {t}",
+    "pt": "amanhã às {t}",
+    "it": "domani alle {t}",
+    "de": "morgen um {t} Uhr"
   },
   "up {0}% since": {
     "fr": "+{0} % depuis",
@@ -3710,6 +3878,12 @@
     "pt": "{0}: {1}",
     "it": "{0}: {1}",
     "de": "{0}: {1}"
+  },
+  "{weekday} at {t}": {
+    "fr": "{weekday} à {t}",
+    "pt": "na {weekday} às {t}",
+    "it": "{weekday} alle {t}",
+    "de": "am {weekday} um {t} Uhr"
   },
   "“Since you asked” lines shown: {0}.": {
     "fr": "Lignes « depuis ta question » affichées : {0}.",

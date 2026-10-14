@@ -1,0 +1,54 @@
+{
+  "purpose": {
+    "en": {
+      "hold": "Bobby listens only while you hold the button, to hear your question or what you answer to Bobby.",
+      "tap": "Bobby listens only after you tap the microphone, and stops when you send, cancel or go quiet, to hear your question or what you answer to Bobby."
+    },
+    "es": {
+      "hold": "Bobby escucha solo mientras mantienes el botón, para oír tu pregunta o lo que le respondes a Bobby.",
+      "tap": "Bobby escucha solo después de que tocas el micrófono y se detiene cuando envías, cancelas o guardas silencio, para oír tu pregunta o lo que le respondes a Bobby."
+    },
+    "fr": {
+      "hold": "Bobby écoute seulement quand tu maintiens le bouton, pour entendre ta question ou ce que tu lui réponds.",
+      "tap": "Bobby écoute seulement après que tu as touché le micro et s’arrête quand tu envoies, annules ou te tais, pour entendre ta question ou ce que tu lui réponds."
+    },
+    "pt": {
+      "hold": "O Bobby escuta só enquanto você segura o botão, para ouvir sua pergunta ou o que você responde ao Bobby.",
+      "tap": "O Bobby escuta só depois que você toca no microfone e para quando você envia, cancela ou fica em silêncio, para ouvir sua pergunta ou o que você responde ao Bobby."
+    },
+    "it": {
+      "hold": "Bobby ascolta solo mentre tieni premuto il pulsante, per sentire la tua domanda o quello che rispondi a Bobby.",
+      "tap": "Bobby ascolta solo dopo che tocchi il microfono e si ferma quando invii, annulli o resti in silenzio, per sentire la tua domanda o quello che rispondi a Bobby."
+    },
+    "de": {
+      "hold": "Bobby hört nur zu, solange du die Taste gedrückt hältst, um deine Frage oder deine Antwort an Bobby zu hören.",
+      "tap": "Bobby hört erst zu, nachdem du das Mikrofon angetippt hast, und hört auf, wenn du sendest, abbrichst oder schweigst, um deine Frage oder deine Antwort an Bobby zu hören."
+    }
+  },
+  "primer": {
+    "en": {
+      "tap": "I listen only after you tap, until you send.",
+      "hold": "I only listen while you hold."
+    },
+    "es": {
+      "tap": "Solo escucho desde que tocas hasta que envías.",
+      "hold": "Solo escucho mientras mantienes."
+    },
+    "fr": {
+      "tap": "J’écoute seulement de ton appui jusqu’à l’envoi.",
+      "hold": "J’écoute seulement pendant l’appui."
+    },
+    "pt": {
+      "tap": "Só ouço desde que tocas até enviares.",
+      "hold": "Só ouço enquanto manténs o botão."
+    },
+    "it": {
+      "tap": "Ascolto solo da quando tocchi a quando invii.",
+      "hold": "Ascolto solo mentre tieni premuto."
+    },
+    "de": {
+      "tap": "Ich höre nur zu, vom Antippen bis zum Senden.",
+      "hold": "Ich höre nur zu, solange du hältst."
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "requestId": "6f8948bc-8488-487e-9301-8e90c73cde08",
+  "kind": "explanation",
+  "reply": {
+    "text": "Los CETES son un préstamo que le haces al gobierno de México por un plazo fijo: al final te devuelve lo prestado más un pago por haber esperado. Si los vendes antes de ese plazo, su precio puede haberse movido y puedes recibir menos.",
+    "followUp": "¿Qué es un plazo?"
+  },
+  "nextAction": null,
+  "personalized": false,
+  "checkIn": null,
+  "fact": {
+    "id": "mx-example-1",
+    "text": "Ejemplo de dato verificado: aquí va una sola frase, tal como la revisó una persona.",
+    "source": "Fuente de ejemplo",
+    "year": "2026",
+    "url": "https://example.org/dato"
+  },
+  "allowance": { "kind": "orientation", "consumed": 2, "remaining": 8 }
+}
