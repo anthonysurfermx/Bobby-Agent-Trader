@@ -23,6 +23,53 @@ DEVICES = {
     'pro': ('Bobby-Redesign-17Pro', 'com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro', 'iphone-17-pro'),
 }
 LOCALES = {'en':'en_US', 'es':'es_MX', 'fr':'fr_FR', 'pt':'pt_PT', 'it':'it_IT', 'de':'de_DE'}
+TEXT_SIZES = {
+    'default': ('large', 'UICTContentSizeCategoryL', ''),
+    '+1': ('extra-large', 'UICTContentSizeCategoryXL', '-plus1'),
+    'ax5': ('accessibility-extra-extra-extra-large', 'UICTContentSizeCategoryAccessibilityXXXL', '-ax5'),
+}
+MIN_FREE = 5 * 1024**3
+
+def check_disk(paths):
+    for path in paths:
+        probe = Path(path)
+        while not probe.exists(): probe = probe.parent
+        if shutil.disk_usage(probe).free <= MIN_FREE:
+            raise RuntimeError(f'At most 5 GiB free on {probe}: stopped; clean only owned intermediates before continuing')
+
+def guarded_run(command, log, paths):
+    """Stop this invocation's build/test process group if its volume reaches the disk floor."""
+    check_disk(paths)
+    process = subprocess.Popen([str(x) for x in command], text=True, stdout=log,
+                               stderr=subprocess.STDOUT, start_new_session=True)
+    try:
+        while process.poll() is None:
+            check_disk(paths)
+            time.sleep(2)
+        return process.returncode
+    except BaseException:
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGTERM)
+            try: process.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, signal.SIGKILL); process.wait()
+        raise
+
+def retire_ui_runner(udid, products):
+    """Xcode reinstalls this runner; retire only its stale container, preserving Bobby's app data."""
+    info_path = products / 'Debug-iphonesimulator/BobbyUITests-Runner.app/Info.plist'
+    if not info_path.is_file(): raise RuntimeError(f'UI test runner is missing: {info_path}')
+    bundle_id = plistlib.loads(info_path.read_bytes()).get('CFBundleIdentifier')
+    if bundle_id != 'xyz.bobbyprotocol.bobby.uitests.xctrunner':
+        raise RuntimeError(f'Refusing to uninstall an unexpected UI runner: {bundle_id}')
+    # simctl emits an OpenStep plist here; plistlib accepts only XML or binary plists.
+    listing = run(['xcrun', 'simctl', 'listapps', udid], stdout=subprocess.PIPE).stdout
+    xml = run(['plutil', '-convert', 'xml1', '-o', '-', '-'], input=listing, stdout=subprocess.PIPE).stdout
+    installed = plistlib.loads(xml.encode())
+    if bundle_id in installed:
+        run(['xcrun', 'simctl', 'uninstall', udid, bundle_id])
+        return bundle_id
+    return None
 
 def run(args, **kw):
     return subprocess.run([str(x) for x in args], check=True, text=True, **kw)
@@ -32,15 +79,16 @@ def data(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output', required=True, type=Path, help='Output root; captures go in <device>-<language> (with -plus1 when requested)')
+    parser.add_argument('--output', required=True, type=Path, help='Output root; captures go in <device>-<language> (with -plus1 or -ax5 when requested)')
     parser.add_argument('--language', choices=LOCALES, default='es')
     parser.add_argument('--device', choices=['se', 'pro', 'max', 'all'], default='all')
-    parser.add_argument('--text-size', choices=['default', '+1'], default='default')
+    parser.add_argument('--text-size', choices=TEXT_SIZES, default='default')
     parser.add_argument('--test', '--tests', dest='tests', action='append', help='UI test class or Class/method; repeat or comma-separate (default RedesignShots)')
     parser.add_argument('--record', action='store_true', help='Record the full selected UI run (offline simulator)')
     parser.add_argument('--settle-system', type=int, choices=range(0,61), default=0, help='Wait up to 60s after boot for transient system notifications before a final matrix')
     parser.add_argument('--permission-state', choices=['default','microphone-denied','speech-denied'], default='default', help='Set actual simulator TCC permissions before offline tests')
     parser.add_argument('--cleanup', action='store_true', help='Delete only simulators created by this invocation')
+    parser.add_argument('--skip-build', action='store_true', help='Reuse existing simulator build products and xctestrun in --derived-data')
     parser.add_argument('--derived-data', type=Path, default=HARNESS / 'ios/dd')
     parser.add_argument('--package-cache', type=Path, default=Path.home() / 'Library/Developer/Xcode/DerivedData/Bobby-ebrmosnbrttmoldliysreeksjobv/SourcePackages')
     args = parser.parse_args()
@@ -60,9 +108,10 @@ def main():
     created, phones, active = [], {}, None
     result = None
     recording = None
+    receipt, folder, phase = None, None, 'preflight'
+    disk_paths = [args.output, args.derived_data, HARNESS]
     try:
-        if shutil.disk_usage(HARNESS).free < 5 * 1024**3:
-            raise RuntimeError('Less than 5 GiB free: clean owned result bundles before capturing')
+        check_disk(disk_paths)
         inventory = data(['xcrun', 'simctl', 'list', 'devices', 'available', '-j'])['devices']
         booted = [d for devices in inventory.values() for d in devices if d['state'] == 'Booted']
         if booted:
@@ -90,10 +139,13 @@ def main():
         sha = run(['git', '-C', ROOT, 'rev-parse', 'HEAD'], stdout=subprocess.PIPE).stdout.strip()
         dirty = run(['git', '-C', ROOT, 'status', '--porcelain'], stdout=subprocess.PIPE).stdout.strip()
         # Leave signing enabled: an unsigned simulator binary breaks the memory Keychain.
-        with (args.output / 'build.log').open('w') as log:
-            run(common + ['-destination', f'platform=iOS Simulator,id={phones[selected[0]]}', 'build-for-testing'], stdout=log, stderr=subprocess.STDOUT)
+        if not args.skip_build:
+            with (args.output / 'build.log').open('w') as log:
+                build_command = common + ['-destination', f'platform=iOS Simulator,id={phones[selected[0]]}', 'build-for-testing']
+                build_status = guarded_run(build_command, log, disk_paths)
+                if build_status: raise RuntimeError(f'Build failed ({build_status}); see {args.output / "build.log"}')
         plans = sorted(product.glob('Bobby_iphonesimulator*.xctestrun'), key=lambda p: p.stat().st_mtime, reverse=True)
-        if not plans: raise RuntimeError('Build did not produce an xctestrun plan')
+        if not plans: raise RuntimeError('No xctestrun plan; build once before using --skip-build')
         # Keep the modified plan next to the products: __TESTROOT__ stays valid.
         with tempfile.NamedTemporaryFile(dir=product, prefix='redesign-', suffix='.xctestrun', delete=False) as f:
             plan = Path(f.name)
@@ -103,16 +155,24 @@ def main():
             for target in targets:
                 target.setdefault('EnvironmentVariables', {})['REDESIGN_LANGUAGE'] = args.language
                 target['EnvironmentVariables']['REDESIGN_PERMISSION_STATE'] = args.permission_state
+                target['EnvironmentVariables']['REDESIGN_CONTENT_SIZE'] = TEXT_SIZES[args.text_size][1]
                 target['TestLanguage'] = args.language
                 target['TestRegion'] = LOCALES[args.language].split('_')[1]
             plan.write_bytes(plistlib.dumps(config))
             for key in selected:
-                if shutil.disk_usage(HARNESS).free < 5 * 1024**3:
-                    raise RuntimeError('Less than 5 GiB free: capture stopped before boot')
+                receipt = None
+                check_disk(disk_paths)
                 udid = phones[key]; active = udid
-                folder = args.output / (DEVICES[key][2] + '-' + args.language + ('-plus1' if args.text_size == '+1' else ''))
+                folder = args.output / (DEVICES[key][2] + '-' + args.language + TEXT_SIZES[args.text_size][2])
                 folder.mkdir(parents=True, exist_ok=True)
                 if list(folder.glob('*.png')): raise RuntimeError(f'Refusing to mix captures with an existing run: {folder}')
+                phase = 'prepare-simulator'
+                receipt = {'source': sha, 'dirty': bool(dirty), 'runtime': runtime, 'simulator': udid,
+                           'device': key, 'language': args.language, 'textSize': args.text_size,
+                           'contentSize': TEXT_SIZES[args.text_size][1], 'tests': tests, 'exitCode': None,
+                           'skipBuild': args.skip_build, 'screenshots': [], 'status': 'running',
+                           'visualReview': 'pending'}
+                (folder / 'run.json').write_text(json.dumps(receipt, indent=2) + '\n')
                 # Set the owned phone's system language before SpringBoard starts: app launch
                 # arguments alone leave permission dialogs and Settings in the host language.
                 current = data(['xcrun', 'simctl', 'list', 'devices', 'available', '-j'])['devices']
@@ -125,10 +185,20 @@ def main():
                 preferences.write_bytes(plistlib.dumps(settings))
                 run(['xcrun', 'simctl', 'boot', udid])
                 run(['xcrun', 'simctl', 'bootstatus', udid, '-b'])
-                run(['xcrun', 'simctl', 'ui', udid, 'content_size', 'extra-large' if args.text_size == '+1' else 'large'])
+                run(['xcrun', 'simctl', 'ui', udid, 'content_size', TEXT_SIZES[args.text_size][0]])
                 run(['xcrun', 'simctl', 'status_bar', udid, 'override', '--time', '9:41', '--dataNetwork', 'wifi', '--wifiMode', 'active', '--wifiBars', '3', '--batteryState', 'charged', '--batteryLevel', '100'])
+                phase = 'retire-ui-runner'
+                retired_runner = retire_ui_runner(udid, product) if any(not t.startswith('BobbyTests') for t in tests) else None
+                receipt['retiredUITestRunner'] = retired_runner
+                phase = 'preinstall-app'
+                app_product = product / 'Debug-iphonesimulator/Bobby.app'
+                app_info = plistlib.loads((app_product / 'Info.plist').read_bytes())
+                if app_info.get('CFBundleIdentifier') != 'xyz.bobbyprotocol.bobby':
+                    raise RuntimeError('Refusing to preinstall an unexpected app product')
+                # Install the owned app before XCTest prepares its runner. Updating this same bundle
+                # preserves app data; only the UI runner's stale container is uninstalled above.
+                run(['xcrun', 'simctl', 'install', udid, app_product])
                 if args.permission_state != 'default':
-                    run(['xcrun','simctl','install',udid,product / 'Debug-iphonesimulator/Bobby.app'])
                     # Speech recognition is denied through its real iOS prompt in the UI test.
                     # This Xcode's simctl privacy does not expose that service.
                     run(['xcrun','simctl','privacy',udid,'revoke' if args.permission_state == 'microphone-denied' else 'grant','microphone','xyz.bobbyprotocol.bobby'])
@@ -143,13 +213,18 @@ def main():
                 command += ['-skip-testing:BobbyUITests/CompanionBuild69UITests/' + t for t in skips]
                 if args.record:
                     recording=subprocess.Popen(['xcrun','simctl','io',udid,'recordVideo','--codec=h264',str(folder/'recording.mp4')],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+                phase = 'test'
                 with (folder / 'test.log').open('w') as log:
-                    outcome = subprocess.run([str(x) for x in command + ['test-without-building']], text=True, stdout=log, stderr=subprocess.STDOUT)
+                    test_status = guarded_run(command + ['test-without-building'], log, disk_paths)
+                receipt['exitCode'] = test_status
                 if recording:
                     recording.send_signal(signal.SIGINT);recording.wait(timeout=20);recording=None
                 if not result.is_dir(): raise RuntimeError(f'No result bundle; see {folder / "test.log"}')
+                phase = 'extract-summary'
                 summary = data(['xcrun', 'xcresulttool', 'get', 'test-results', 'summary', '--path', result])
                 (folder / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
+                receipt['summary'] = 'summary.json'
+                phase = 'export-attachments'
                 with tempfile.TemporaryDirectory(prefix='attachments-', dir=folder) as raw:
                     run(['xcrun', 'xcresulttool', 'export', 'attachments', '--path', result, '--output-path', raw])
                     manifest = json.loads((Path(raw) / 'manifest.json').read_text())
@@ -175,19 +250,28 @@ def main():
                          f'Captured: {datetime.datetime.now(datetime.timezone.utc).isoformat()}',
                          f'Source: `{sha}`' + (' plus working-tree changes' if dirty else ''),
                          f'Runtime: `{runtime}`; simulator: `{udid}`; locally signed Debug build; offline UI tests.',
-                         f'Tests: {", ".join(tests)}. Exit code: {outcome.returncode}.',
+                         f'Tests: {", ".join(tests)}. Exit code: {test_status}.',
                          f'Counts: {summary.get("passedTests", "unknown")} passed, {summary.get("failedTests", "unknown")} failed, {summary.get("skippedTests", "unknown")} skipped (summary.json).',
                          'Visual review: pending. See test.log for assertions; an exported screenshot alone is not a passing test.', '',
                          '| Screenshot | UI test |', '| --- | --- |']
                 index += [f'| [{name}]({name}) | `{test}` |' for name, test in sorted(named)]
                 (folder / 'index.md').write_text('\n'.join(index) + '\n')
+                receipt.update({'screenshots': [name for name, _ in named],
+                                'status': 'pass' if test_status == 0 else 'failed'})
+                (folder / 'run.json').write_text(json.dumps(receipt, indent=2) + '\n')
                 # Export first, then remove even a failed result bundle. Retain logs/manifest for review.
                 shutil.rmtree(result); result = None
                 run(['xcrun', 'simctl', 'shutdown', udid]); active = None
                 print(f'Exported {len(named)} screenshots to {folder}', flush=True)
-                if outcome.returncode: raise RuntimeError(f'UI tests failed; inspect {folder / "test.log"}')
+                if test_status: raise RuntimeError(f'UI tests failed; inspect {folder / "test.log"}')
         finally:
             plan.unlink(missing_ok=True)
+    except BaseException as error:
+        if receipt is not None and folder is not None:
+            receipt.update({'status': 'failed', 'failurePhase': phase, 'error': str(error),
+                            'screenshots': sorted(path.name for path in folder.glob('*.png'))})
+            (folder / 'run.json').write_text(json.dumps(receipt, indent=2) + '\n')
+        raise
     finally:
         if recording:
             recording.send_signal(signal.SIGINT);recording.wait(timeout=20)
