@@ -48,6 +48,10 @@ final class NucleoPrivacyUITests: XCTestCase {
     // failure exposes its explicit retry action there; no timer submits another question.
     private var failureRetry: XCUIElement { app.webViews.buttons["Try again"] }
 
+    private func nativeNoticeStatement(_ title: String, body: String) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS %@", title, body)).firstMatch
+    }
+
     private func waitUntilHittable(_ element: XCUIElement, timeout: TimeInterval = 20,
                                    file: StaticString = #filePath, line: UInt = #line) {
         XCTAssertTrue(element.waitForExistence(timeout: timeout), "Missing element: \(element)", file: file, line: line)
@@ -207,9 +211,10 @@ final class NucleoPrivacyUITests: XCTestCase {
         scrollTo(riskRow)
         riskRow.tap()
         XCTAssertTrue(app.staticTexts["Read this once. It matters."].waitForExistence(timeout: 20))
-        let first = app.buttons[firstStatement]
+        let first = nativeNoticeStatement(firstStatement, body: disclosureEnd)
         XCTAssertTrue(first.exists, "The same AI notice must be accessible from Profile")
-        let last = app.buttons["You can lose money. You decide."]
+        let last = nativeNoticeStatement("You can lose money. You decide.",
+                                       body: "Data can be late or wrong. If you need advice, talk to a licensed professional.")
         scrollTo(last)
         capture("nucleo-profile-full-notice-bottom")
 
