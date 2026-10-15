@@ -5350,6 +5350,11 @@ function guideLayout(){
  guideDisclosure.style.fontSize=15*k+'px';guideDisclosure.style.minHeight=target+'px';
  guideNarrative.classList.toggle('conversation-reading',!!GUIDE.reading);guideNarrative.setAttribute('role','region');guideNarrative.setAttribute('aria-label',tt('aria.answer'));guideNarrative.tabIndex=GUIDE.reading?0:-1;
  guideReply.style.textAlign=GUIDE.reading?'left':'center';guideReply.style.display=guideReply.textContent?'block':'none';
+ // An error enters reading only for overflow; smaller type can restore its approved layout.
+ if(error&&GUIDE.reading){
+  var errorHeight=guideReply.offsetHeight,errorNotes=GUIDE.notes&&GUIDE.notes.length?target:0,errorRadius=clamp((602-12-32-errorHeight-4-errorNotes-16-slot)/2,Math.max(44,44/scale),98);
+  if(602-(12+2*errorRadius+32+errorHeight+4+errorNotes+16+slot)>=0){GUIDE.reading=false;guideNarrative.scrollTop=0;guideRender();return;}
+ }
  if(GUIDE.reading){
   var line=27*k,room=700-slot-16-240,height=Math.floor(room/(25*k))*25*k;
   // At the largest type, recover unused slot space before shortening the answer.

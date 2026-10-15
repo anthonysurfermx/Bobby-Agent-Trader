@@ -39,7 +39,8 @@ function harness({ language = 'en', scale = devices.SE, textScale = 3.12, replyL
     }
     get offsetHeight() {
       if (this.style.display === 'none' || !this.textContent) return 0;
-      if (this.id === 'companion-reply') return replyLines * parseFloat(this.style.lineHeight);
+      const k = context.SES.textScale / scale;
+      if (this.id === 'companion-reply') return (typeof replyLines === 'function' ? replyLines(context.SES.textScale) : replyLines) * parseFloat(this.style.lineHeight);
       if (this.id === 'conversation-body') return 10 * 25 * k + 14;
       if (this.tag === 'button') {
         // Actual CSS: retry has 20*k line-height and 30px padding. Chips have
@@ -65,6 +66,36 @@ function harness({ language = 'en', scale = devices.SE, textScale = 3.12, replyL
   });
   vm.runInContext(source, context);
   return { context, calls, k, scale, render(reply) { context.GUIDE = reply; context.guideRender(); } };
+}
+
+for (const [device, scale] of Object.entries(devices)) for (const language of languages) {
+  test(`F02 ${language} ${device}: reducing AX5 restores the same fitting error geometry as a fresh default turn`, () => {
+    const replyLines = (textScale) => textScale > 1.35 ? 6 : 2;
+    const failure = () => ({ status: 'companion_error', requestId: 'fixture-request', retryable: true });
+    const normal = harness({ language, scale, textScale: 1, replyLines }); normal.render(failure());
+    const app = harness({ language, scale, textScale: 3.12, replyLines }); app.render(failure());
+    const c = app.context;
+    assert.equal(c.GUIDE.reading, true, 'the same error first needs overflow recovery at AX5');
+    assert.ok(c.guideNarrative.scrollHeight > c.guideNarrative.clientHeight);
+    c.guideNarrative.scrollTop = c.guideNarrative.scrollHeight;
+    // Native session refresh calls guideLayout without replacing the retained turn.
+    c.SES.textScale = 1; c.guideLayout();
+    const geometry = (ctx) => ({
+      reading: !!ctx.GUIDE.reading, panelTop: ctx.guidePanel.style.top,
+      narrativeHeight: ctx.guideNarrative.style.height,
+      scrolling: ctx.guideNarrative.classList.contains('conversation-reading'),
+      replyFontSize: ctx.guideReply.style.fontSize, replyLineHeight: ctx.guideReply.style.lineHeight,
+      replyAlignment: ctx.guideReply.style.textAlign,
+      actionTop: ctx.guideActions.style.top, actionMinHeight: ctx.guideActions.style.minHeight,
+    });
+    assert.equal(!!normal.context.GUIDE.reading, false, 'the normal-sized error already fits');
+    assert.deepEqual(geometry(c), geometry(normal.context), 'no sticky reading mode or compact Retry after text becomes smaller');
+    assert.equal(c.guideReply.textContent, strings[language]['fail.answer']);
+    assert.ok(frames(app).narrativeBottom < frames(app).actionTop);
+    assert.ok(c.guideActions.children[0].offsetHeight * scale >= 44);
+    c.guideActions.children[0]._guideAction();
+    assert.equal(app.calls[0].params.params.retry, 'fixture-request');
+  });
 }
 
 const answer = (extra = {}) => ({ status: 'companion', requestId: 'fixture-request',
