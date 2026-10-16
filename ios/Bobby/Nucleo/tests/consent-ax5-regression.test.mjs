@@ -17,6 +17,17 @@ const STR = vm.runInNewContext(strings.slice(strings.indexOf('var STR = '), stri
 const legal = JSON.parse(read('fixtures/native/risk-notice.json'));
 const LANGS = ['en', 'es', 'fr', 'pt', 'it', 'de'];
 const DEVICES = { SE: [375, 667], Max: [440, 956] };
+const css = read('src/shared/conversation.css');
+const declineRule = css.match(/#consent-preview-not-now\{([^}]+)\}/)[1];
+const declineBase = Object.fromEntries(declineRule.split(';').filter(Boolean).map(rule => rule.split(':')));
+const declinePadding = Number(css.match(/\.quiet-link,\.quiet-level\{[^}]*padding:(\d+)px/)[1]) * 2;
+// Real glyph widths measured with Pillow 12.2 / System Font Regular (SFNS.ttf), no browser.
+// Font SHA256: 2bfd40dc72e6759e248f82a52a40d551338979fffc9b5c070e685b4b7ad19e66.
+// These protect line fit, not native rendering: the French SE/AX5 capture remains a separate gate.
+const declineWidths = {
+  15: { en: 56, es: 61, fr: 104, pt: 70, it: 52, de: 72 },
+  46.8: { en: 163, es: 177, fr: 306, pt: 202, it: 154, de: 205 },
+};
 
 function realFunction(source, name) {
   const start = source.indexOf('function ' + name + '(');
@@ -86,6 +97,16 @@ async function firstQuestion(language, device, textScale) {
     to() {}, moveSphere() {}, buzz() {}, after() {}, hap() {}, crit() {}, capGone() {},
     beatPost() {}, harnessOn() {}, signal() {}, agreeRelease() {}, renderTexts() {}, route() {},
     Ls: key => STR[language][key], pillFor: (_, min) => min,
+    getComputedStyle() {
+      const type = Number(stage.style['--preview-type']) || 1;
+      return { font: `400 ${15 * type}px system-ui`, paddingLeft: declinePadding / 2 + 'px', paddingRight: declinePadding / 2 + 'px' };
+    },
+    textW(text, font) {
+      assert.equal(text, STR[language]['risk.notNow']);
+      const size = Number(Number(font.match(/([\d.]+)px/)[1]).toFixed(1));
+      assert.ok(declineWidths[size], 'a measured font size is required');
+      return declineWidths[size][language];
+    },
     loadRisk: () => Promise.resolve(), fire: (...args) => native.push(args),
     report: (...args) => errors.push(args), deliverFirstAsk: () => assert.fail('no request before consent'),
   };
@@ -156,6 +177,43 @@ test('F01: fitting layouts preserve build-71 geometry and DOM in every language'
     assert.equal(c.RISK_LAYOUT.body, y);
     assert.equal(c.RISK_LAYOUT.bodyHeight, Math.min(c.rbodyEl.scrollHeight, Math.max(18, Math.floor((638 - y) / 18) * 18)));
     assert.equal(c.rbodyEl.style['--risk-solid'], '72px');
+  }
+});
+
+test('F01: measured AX5 decline labels fit one complete line within the phone', async () => {
+  for (const language of LANGS) for (const device of Object.keys(DEVICES)) {
+    const { c, fit } = await firstQuestion(language, device, 3.12);
+    const button = c.consentPreviewNotNow;
+    const width = parseFloat(button.style.width || declineBase.width);
+    const left = parseFloat(button.style.left || declineBase.left);
+    const measured = declineWidths[46.8][language];
+    assert.ok(measured + declinePadding <= width, `${language}: the complete scaled label must fit without wrapping`);
+    assert.ok(left >= 20 && left + width <= 370, 'label and padding stay within the stage margins');
+    assert.equal(left + width / 2, 195, 'the decline action remains centered');
+    const lineHeight = 15 * 3.12 * 1.4;
+    const bottom = parseFloat(declineBase.top) + Math.max(44 / fit, lineHeight + declinePadding);
+    assert.ok(bottom * fit <= DEVICES[device][1], 'one complete line and its padding stay inside the screen');
+    assert.equal(button.textContent, STR[language]['risk.notNow']);
+    assert.equal(button.attributes['aria-label'], button.textContent);
+  }
+});
+
+test('F01: decline expands only when needed and restores the approved normal width', async () => {
+  for (const language of LANGS) {
+    const { c } = await firstQuestion(language, 'SE', 1);
+    const button = c.consentPreviewNotNow;
+    assert.equal(parseFloat(button.style.width || declineBase.width), 200);
+    assert.equal(parseFloat(button.style.left || declineBase.left), 95);
+    c.SESSION.textScale = 3.12; c.consentRiskLayout();
+    const width = parseFloat(button.style.width || declineBase.width);
+    if (declineWidths[46.8][language] + declinePadding <= 200) assert.equal(width, 200);
+    else assert.ok(width > 200, 'only an overflowing label needs a wider action');
+    c.SESSION.textScale = 1; c.consentRiskLayout();
+    assert.equal(button.style.width, '', 'normal width comes from the unchanged CSS again');
+    assert.equal(button.style.left, '', 'normal centering comes from the unchanged CSS again');
+    assert.equal(parseFloat(button.style.width || declineBase.width), 200);
+    assert.equal(parseFloat(button.style.left || declineBase.left), 95);
+    assert.equal(Number(c.stage.style['--preview-type']), 1, 'the original type scale is restored too');
   }
 });
 

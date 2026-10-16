@@ -272,7 +272,7 @@ for (const scale of [1, 1.118]) for (const headings of [[22,22,22,22],[44,22,22,
   test(`iPhone approved consent at textScale ${scale}, headings ${headings}: four full-colour lines and reachable final text`, () => {
     const body = { style:{setProperty(key,value){this[key]=value;}}, scrollHeight:540, scrollTop:0 };
     const lines = headings.map(height => ({offsetHeight:height*scale,style:{}}));
-    const ctx = vm.createContext({SESSION:{textScale:scale},lineEls:lines,rbodyEl:body,RISK_LAYOUT:null,
+    const ctx = vm.createContext({SESSION:{textScale:scale},lineEls:lines,rbodyEl:body,RISK_LAYOUT:null,consentNotNowLayout:()=>{},
       sc:(el,key,value)=>el.style[key]=value,f1:value=>value.toFixed(1)});
     vm.runInContext(realFunction(consentSource,'consentRiskLayout'),ctx);
     const l=ctx.consentRiskLayout();
