@@ -61,7 +61,15 @@ final class NucleoPrivacyUITests: XCTestCase {
     }
 
     private func tapLocalQuestion() {
-        let question = app.webViews.buttons["What is investing?"]
+        // The educational example rotates daily; match its six supported English labels.
+        let questions = [
+            "What is investing?", "What is a stock?",
+            "What is inflation?", "What is an index fund?",
+            "What does risk mean?", "Why do prices move?"
+        ]
+        let question = app.webViews.buttons
+            .matching(NSPredicate(format: "label IN %@", questions))
+            .firstMatch
         waitUntilHittable(question)
         question.tap()
     }
