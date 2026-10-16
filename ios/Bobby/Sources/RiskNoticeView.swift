@@ -122,7 +122,7 @@ struct RiskNoticeView: View {
                                 .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(checks[index] && !readOnly ? Theme.orbCyan.opacity(0.4) : Theme.stroke, lineWidth: 1))
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel(item.title)
+                            .accessibilityLabel("\(item.title) \(item.body)")
                             .accessibilityValue(value(index))
                         }
 
