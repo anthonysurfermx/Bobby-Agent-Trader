@@ -31,6 +31,7 @@
     "test:e2e:trackrecord-v2": "tsx scripts/e2e-trackrecord-v2.mts",
     "test:voice-brief": "tsx scripts/test-voice-desk-brief.mts",
     "test:tts-routing": "tsx scripts/test-tts-routing.mts",
+    "test:tts-latency": "tsx scripts/test-tts-latency.mts",
     "test:voice-gender": "tsx scripts/test-voice-gender.mts",
     "test:geo-language": "node scripts/test-geo-language.mjs",
     "test:asset-discovery": "tsx scripts/test-asset-discovery.mts",

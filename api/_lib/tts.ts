@@ -204,6 +204,58 @@ const EDGE_VOICE: Record<string, string> = {
 
 const MAX_CHARS = 4000;
 
+// ---- Latency budget ----
+// The Núcleo (web desk and the iPhone app) gives a read's voice 6 s to start before it reads silently, and a
+// read's spoken line is ~600 characters. One gpt-4o-mini-tts call for that took 8.5-11 s in production
+// (2026-10-27), so every read was silent. OpenAI's MP3 is raw CBR frames (no ID3 tag, no Xing header): sentence
+// chunks synthesized in parallel concatenate into one valid file whose duration AVAudioPlayer and
+// decodeAudioData read correctly. OGG/Opus cannot be joined that way, so Telegram voice notes stay one call.
+const OPENAI_TIMEOUT_MS = 10_000;
+const EDGE_TIMEOUT_MS = 8_000;
+const CHUNK_MIN_CHARS = 140;
+const MAX_CHUNKS = 6;
+
+/**
+ * Splits text into at most MAX_CHUNKS pieces of similar length, cut at sentence ends (or, inside a very long
+ * sentence, at a comma or semicolon), so each piece is synthesized with natural prosody. Joining the pieces
+ * with single spaces gives back the text with its whitespace collapsed.
+ */
+export function speechChunks(text: string): string[] {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  if (!clean) return [];
+  const target = Math.max(CHUNK_MIN_CHARS, Math.ceil(clean.length / MAX_CHUNKS));
+  const sentences = clean.split(/(?<=[.!?…])\s+/);
+  const parts: string[] = [];
+  for (const sentence of sentences) {
+    if (sentence.length <= target * 2) { parts.push(sentence); continue; }
+    parts.push(...sentence.split(/(?<=[,;:])\s+/));
+  }
+  const chunks: string[] = [];
+  for (const part of parts) {
+    const last = chunks.length - 1;
+    if (last >= 0 && chunks[last].length + 1 + part.length <= target) chunks[last] += ' ' + part;
+    else chunks.push(part);
+  }
+  while (chunks.length > MAX_CHUNKS) {
+    // Merge the shortest adjacent pair until the cap holds.
+    let best = 0;
+    for (let i = 1; i < chunks.length - 1; i++) {
+      if (chunks[i].length + chunks[i + 1].length < chunks[best].length + chunks[best + 1].length) best = i;
+    }
+    chunks.splice(best, 2, chunks[best] + ' ' + chunks[best + 1]);
+  }
+  return chunks;
+}
+
+/** Rejects after `ms` so one stuck provider can never hold a function until the platform's 504. */
+function withTimeout<T>(task: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label}: timed out after ${ms} ms`)), ms);
+  });
+  return Promise.race([task, timeout]).finally(() => clearTimeout(timer));
+}
+
 // Voice menu for per-user agent personalization (Bobby iOS "Configura tu
 // Bobby"). STRICT allowlist — the client names a voice, but only these ship
 // to edge-tts; anything else falls back to the Bobby identity above.
@@ -285,9 +337,11 @@ async function edgeTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang' |
   const voice = resolveEdgeVoice(opts.lang, opts.voice, opts.edgeVoice, opts.locale);
   const communicate = new Communicate(text.slice(0, MAX_CHARS), { voice });
   const chunks: Uint8Array[] = [];
-  for await (const msg of communicate.stream()) {
-    if (msg.type === 'audio' && msg.data) chunks.push(msg.data as Uint8Array);
-  }
+  await withTimeout((async () => {
+    for await (const msg of communicate.stream()) {
+      if (msg.type === 'audio' && msg.data) chunks.push(msg.data as Uint8Array);
+    }
+  })(), EDGE_TIMEOUT_MS, 'edge-tts');
   if (chunks.length === 0) throw new Error('edge-tts: empty audio stream');
   return {
     audio: Buffer.concat(chunks),
@@ -305,31 +359,37 @@ async function openaiTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang'
   if (!key) throw new Error('openai-tts: OPENAI_API_KEY missing');
   const model = process.env.TTS_OPENAI_MODEL || 'gpt-4o-mini-tts';
   const resolvedVoice = resolveOpenAIVoice(opts.voice);
-  const body: Record<string, unknown> = {
+  const base: Record<string, unknown> = {
     model,
     voice: resolvedVoice,
-    input: text.slice(0, MAX_CHARS),
     response_format: opts.format,
   };
   // gpt-4o-mini-tts steers delivery via `instructions`; tts-1 only has `speed`.
   if (model.includes('gpt-4o')) {
-    body.instructions = buildInstructions(opts.lang, opts.vibe, resolvedVoice, opts.voice, opts.locale);
+    base.instructions = buildInstructions(opts.lang, opts.vibe, resolvedVoice, opts.voice, opts.locale);
   } else {
-    body.speed = Number(process.env.TTS_SPEED || '1.0');
+    base.speed = Number(process.env.TTS_SPEED || '1.0');
   }
-  const res = await fetch('https://api.openai.com/v1/audio/speech', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(12_000),
-  });
-  if (!res.ok) {
-    const body = (await res.text()).slice(0, 400);
-    if (res.status === 429 && /insufficient_quota|billing_hard_limit/.test(body)) alertProviderCredit('openai', 'insufficient_quota', 'tts');
-    throw new Error(`openai-tts ${res.status}: ${body.slice(0, 180)}`);
-  }
-  const audio = Buffer.from(await res.arrayBuffer());
-  if (audio.length === 0) throw new Error('openai-tts: empty audio');
+  const synthesize = async (input: string): Promise<Buffer> => {
+    const res = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ ...base, input }),
+      signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      const body = (await res.text()).slice(0, 400);
+      if (res.status === 429 && /insufficient_quota|billing_hard_limit/.test(body)) alertProviderCredit('openai', 'insufficient_quota', 'tts');
+      throw new Error(`openai-tts ${res.status}: ${body.slice(0, 180)}`);
+    }
+    const part = Buffer.from(await res.arrayBuffer());
+    if (part.length === 0) throw new Error('openai-tts: empty audio');
+    return part;
+  };
+  const input = text.slice(0, MAX_CHARS);
+  // MP3 pieces join into one file; Opus stays one call (see the latency budget above).
+  const pieces = opts.format === 'mp3' ? speechChunks(input) : [input];
+  const audio = Buffer.concat(await Promise.all(pieces.map(synthesize)));
   const isOpus = opts.format === 'opus';
   return {
     audio,
