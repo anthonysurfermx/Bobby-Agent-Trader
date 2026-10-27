@@ -1,14 +1,14 @@
 /* Núcleo WEB transport, part 5: Bobby's voice (ARCHITECTURE.md §2.3, §2.5, §2.6).
  *
  * The same contract as NucleoVoice.swift over NeuralVoice.swift:
- *   speak{id,text}  → POST /api/bobby-voice-free {text, lang, voice: persona, vibe} (8 s, one retry
+ *   speak{id,text}  → POST /api/bobby-voice-free {text, lang, voice: persona, vibe} (15 s, one retry
  *                     after 1.2 s, a reply under 500 bytes is a failure) → MP3 decoded and played
  *                     through a WebAudio AnalyserNode for voice.level; voice.progress while it plays.
  *                     If the network voice fails, the browser's speechSynthesis reads it (engine
  *                     "device", voice.word from word boundaries), as native falls back to AVSpeech.
  *   previewVoice    → the companion's pick line, the same MP3 the app bundles (select-<id>-<en|es>),
  *                     served from /nucleo/voice/: free, and allowed before consent (R11).
- * Exactly one voice.end per queued id, within 10 s if playback never starts (watchdog).
+ * Exactly one voice.end per queued id, within 17 s if playback never starts (watchdog).
  * Browsers only play audio after a gesture: the first tap/keypress unlocks an AudioContext
  * (and primes speechSynthesis on iOS). Before that, speak answers `muted` and the page reads silently.
  */
@@ -21,7 +21,9 @@
 
   var AC = window.AudioContext || window.webkitAudioContext || null;
   var ctx = null, analyser = null, synthPrimed = false;
-  var TTS_TIMEOUT = 8000, TTS_RETRY_WAIT = 1200, WATCHDOG_MS = 10000, MAX_TEXT = 800;
+  /* the server hedges stalled TTS pieces and answers a read's ~600-char line in 3-13 s (api/_lib/tts.ts): 8 s cut most
+     lines off. 15 s per attempt, and the watchdog covers one full attempt plus its retry wait. */
+  var TTS_TIMEOUT = 15000, TTS_RETRY_WAIT = 1200, WATCHDOG_MS = 17000, MAX_TEXT = 800;
   var SPEAK_ID = /^[A-Za-z0-9_.:-]{1,64}$/;
 
   /** iOS Safari 17+: route to the speaker and ignore the ring/silent switch like native .playback. */

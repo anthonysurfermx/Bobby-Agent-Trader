@@ -34,6 +34,7 @@ jobs:
       - run: npm run test:record-auth
       - run: npm run test:protocol-write-safety
       - run: npm run test:risk-gate
+      - run: npm run test:tts-latency
       - run: npm run test:asset-discovery
       # BP-06 (2026-09-04 review): the swap rail and the remediation regressions
       # were never executed in CI — every closure in docs/security/ ran locally.

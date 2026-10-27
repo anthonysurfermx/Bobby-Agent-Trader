@@ -308,7 +308,7 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 | `voice.level` | `{id, level N 0…1}` (≤30 Hz; from `NeuralVoice.level`) |
 | `voice.progress` | `{id, t N, duration N}` (≤10 Hz; neural engine only) |
 | `voice.word` | `{id, index I}` (device engine only, from `willSpeakRangeOfSpeechString`; the word index is counted on whitespace splits of the spoken text) |
-| `voice.end` | `{id, reason:"finished"\|"stopped"\|"failed"}`. Always sent exactly once per queued id, within 10 s if playback never starts (watchdog). |
+| `voice.end` | `{id, reason:"finished"\|"stopped"\|"failed"}`. Always sent exactly once per queued id, within 17 s on the web (10 s before 2026-10-27) if playback never starts (watchdog). |
 | `thesis.planted` | `{requestId, stage:"seed"\|"bloomed"\|"capped"\|"signed_out"\|"failed", piece:{id,name}?, horizon:{hours,reviewAt,extendable}?}` (signed in only; after `ProgressSync.outcome`) |
 | `native.sheet` | `{route, state:"open"\|"closed"}`. While a sheet is open, JS pauses rendering. |
 

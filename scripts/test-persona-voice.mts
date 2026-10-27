@@ -17,10 +17,13 @@ try {
   const speech = await generateSpeech('A calm market reading.', { voice: 'ballad', lang: 'en', format: 'mp3', preservePersona: true });
   assert.equal(speech?.provider, 'openai');
   assert.equal(attempts, 1);
-  globalThis.fetch = async () => { attempts++; throw new Error('Simulated provider failure'); };
+  const hosts: string[] = [];
+  globalThis.fetch = async (url) => { attempts++; hosts.push(new URL(String(url)).host); throw new Error('Simulated provider failure'); };
   attempts = 0;
   assert.equal(await generateSpeech('A calm market reading.', { voice: 'ballad', preservePersona: true }), null);
-  assert.equal(attempts, 1, 'Persona mode never falls through to a different voice provider');
+  // An Opus note (the default format) is one unhedged call, and never another provider.
+  assert.equal(attempts, 1, 'A failed Opus persona request is not retried');
+  assert.deepEqual([...new Set(hosts)], ['api.openai.com'], 'Persona mode never falls through to a different voice provider');
   console.log('Persona voice success, identity, bounded request and failure checks passed');
 } finally {
   globalThis.fetch = oldFetch;
