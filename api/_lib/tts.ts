@@ -205,27 +205,35 @@ const EDGE_VOICE: Record<string, string> = {
 const MAX_CHARS = 4000;
 
 // ---- Latency budget ----
-// The Núcleo (web desk and the iPhone app) gives a read's voice 6 s to start before it reads silently, and a
-// read's spoken line is ~600 characters. One gpt-4o-mini-tts call for that took 8.5-11 s in production
-// (2026-10-27), so every read was silent. OpenAI's MP3 is raw CBR frames (no ID3 tag, no Xing header): sentence
-// chunks synthesized in parallel concatenate into one valid file whose duration AVAudioPlayer and
-// decodeAudioData read correctly. OGG/Opus cannot be joined that way, so Telegram voice notes stay one call.
+// A read's spoken line is ~600 characters, and one gpt-4o-mini-tts call for it took 8.5-12.6 s in production
+// (2026-10-27): the web Núcleo dropped it (it waited 6 s, now 18 s) and the iPhone heard it late or never.
+// OpenAI's MP3 is raw CBR frames (no ID3 tag, no Xing header): sentence chunks synthesized in parallel
+// concatenate into one valid file whose duration AVAudioPlayer and decodeAudioData read correctly.
+// OGG/Opus cannot be joined that way, so a Telegram voice note stays exactly one call, unhedged, with the
+// 12 s cap it always had (it can be up to 4000 characters).
 const OPENAI_TIMEOUT_MS = 10_000;
+const OPENAI_OPUS_TIMEOUT_MS = 12_000;
+/** One MP3 line's whole OpenAI budget: past it every pending piece is cancelled and the chain moves on, well
+ *  inside the web client's 15 s and the iPhone's 20 s request timeouts. */
+const OPENAI_LINE_DEADLINE_MS = 13_000;
 // gpt-4o-mini-tts has a long tail (measured 2026-10-27, same ~150-char piece): a healthy request answers its
-// headers in ~1 s and finishes in ~3 s, but about one in four never answers at all, even after 40 s. A request
-// with no headers after OPENAI_HEADERS_TIMEOUT_MS is abandoned and replaced at once; one that answered but is
-// still pending after HEDGE_AFTER_MS gets an identical twin. Up to HEDGE_ATTEMPTS per piece; the first wins.
-const OPENAI_HEADERS_TIMEOUT_MS = 3_000;
+// headers in 0.7-1.1 s and finishes in ~3 s, but a quarter to a half of requests never answer at all, even after
+// 40 s, sometimes several in a row. A request with no headers after OPENAI_HEADERS_TIMEOUT_MS is abandoned and
+// replaced at once; one that answered but is still pending after HEDGE_AFTER_MS gets an identical twin. Up to
+// HEDGE_ATTEMPTS per piece, all inside OPENAI_LINE_DEADLINE_MS; the first answer wins.
+const OPENAI_HEADERS_TIMEOUT_MS = 2_000;
 const HEDGE_AFTER_MS = 3_500;
-const HEDGE_ATTEMPTS = 4;
+const HEDGE_ATTEMPTS = 6;
 const EDGE_TIMEOUT_MS = 8_000;
+const EDGE_OPUS_TIMEOUT_MS = 20_000;
 const CHUNK_MIN_CHARS = 140;
 const MAX_CHUNKS = 6;
 
 /**
- * Splits text into at most MAX_CHUNKS pieces of similar length, cut at sentence ends (or, inside a very long
- * sentence, at a comma or semicolon), so each piece is synthesized with natural prosody. Joining the pieces
- * with single spaces gives back the text with its whitespace collapsed.
+ * Splits text into at most MAX_CHUNKS pieces of similar length, cut at sentence ends (inside a very long
+ * sentence, at a comma, semicolon, colon or dash; failing that, between words), so each piece is synthesized
+ * with natural prosody and no piece is long enough to outlast its timeout. Joining the pieces with single
+ * spaces gives back the text with its whitespace collapsed.
  */
 export function speechChunks(text: string): string[] {
   const clean = text.replace(/\s+/g, ' ').trim();
@@ -235,7 +243,15 @@ export function speechChunks(text: string): string[] {
   const parts: string[] = [];
   for (const sentence of sentences) {
     if (sentence.length <= target * 2) { parts.push(sentence); continue; }
-    parts.push(...sentence.split(/(?<=[,;:])\s+/));
+    for (const clause of sentence.split(/(?<=[,;:—–])\s+/)) {
+      if (clause.length <= target * 2) { parts.push(clause); continue; }
+      let run = '';
+      for (const word of clause.split(' ')) {
+        if (run && run.length + 1 + word.length > target) { parts.push(run); run = word; }
+        else run = run ? `${run} ${word}` : word;
+      }
+      if (run) parts.push(run);
+    }
   }
   const chunks: string[] = [];
   for (const part of parts) {
@@ -254,34 +270,46 @@ export function speechChunks(text: string): string[] {
   return chunks;
 }
 
+/** A provider answer that another identical request cannot change (a 4xx: bad input, no credit, throttled). */
+export class FinalTtsError extends Error {}
+
 /**
  * Runs `attempt`, and launches another identical attempt every `hedgeAfterMs` while none has answered, or at
- * once when one fails, up to `maxAttempts`. The first success wins and cancels the rest; it rejects only when
- * every attempt has failed.
+ * once when one fails, up to `maxAttempts`. The first success wins and cancels the rest. It rejects when every
+ * attempt has failed, at once on a FinalTtsError, or when `outer` aborts; then nothing more is launched and
+ * every pending attempt is cancelled.
  */
-export function hedged<T>(attempt: (cancel: AbortSignal) => Promise<T>, hedgeAfterMs = HEDGE_AFTER_MS, maxAttempts = HEDGE_ATTEMPTS): Promise<T> {
+export function hedged<T>(attempt: (cancel: AbortSignal) => Promise<T>, hedgeAfterMs = HEDGE_AFTER_MS, maxAttempts = HEDGE_ATTEMPTS, outer?: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const controllers: AbortController[] = [];
     let settled = false, failed = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const settle = (finish: () => void, keep?: AbortController) => {
+      settled = true;
+      clearTimeout(timer);
+      outer?.removeEventListener('abort', onOuter);
+      for (const other of controllers) if (other !== keep) other.abort();
+      finish();
+    };
+    const onOuter = () => { if (!settled) settle(() => reject(outer?.reason ?? new Error('tts: cancelled'))); };
     const launch = () => {
       clearTimeout(timer);
       const controller = new AbortController();
       controllers.push(controller);
       if (controllers.length < maxAttempts) timer = setTimeout(() => { if (!settled) launch(); }, hedgeAfterMs);
-      attempt(controller.signal).then((value) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        for (const other of controllers) if (other !== controller) other.abort();
-        resolve(value);
+      // A synchronous throw becomes a rejection like any other failure.
+      Promise.resolve().then(() => attempt(controller.signal)).then((value) => {
+        if (!settled) settle(() => resolve(value), controller);
       }, (error) => {
         if (settled) return;
         failed++;
-        if (controllers.length < maxAttempts) launch();
-        else if (failed === controllers.length) { settled = true; reject(error); }
+        if (error instanceof FinalTtsError) settle(() => reject(error));
+        else if (controllers.length < maxAttempts) launch();
+        else if (failed === controllers.length) settle(() => reject(error));
       });
     };
+    if (outer?.aborted) { reject(outer.reason ?? new Error('tts: cancelled')); return; }
+    outer?.addEventListener('abort', onOuter, { once: true });
     launch();
   });
 }
@@ -380,7 +408,7 @@ async function edgeTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang' |
     for await (const msg of communicate.stream()) {
       if (msg.type === 'audio' && msg.data) chunks.push(msg.data as Uint8Array);
     }
-  })(), EDGE_TIMEOUT_MS, 'edge-tts');
+  })(), opts.format === 'mp3' ? EDGE_TIMEOUT_MS : EDGE_OPUS_TIMEOUT_MS, 'edge-tts');
   if (chunks.length === 0) throw new Error('edge-tts: empty audio stream');
   return {
     audio: Buffer.concat(chunks),
@@ -409,28 +437,48 @@ async function openaiTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang'
   } else {
     base.speed = Number(process.env.TTS_SPEED || '1.0');
   }
+  const mp3 = opts.format === 'mp3';
   const synthesize = async (input: string, cancel: AbortSignal): Promise<Buffer> => {
+    // Only hedged MP3 pieces give up on a request with no headers: they have a twin to replace it.
     const silent = new AbortController();
-    const noHeaders = setTimeout(() => silent.abort(new Error(`openai-tts: no response in ${OPENAI_HEADERS_TIMEOUT_MS} ms`)), OPENAI_HEADERS_TIMEOUT_MS);
+    const noHeaders = mp3
+      ? setTimeout(() => silent.abort(new Error(`openai-tts: no response in ${OPENAI_HEADERS_TIMEOUT_MS} ms`)), OPENAI_HEADERS_TIMEOUT_MS)
+      : undefined;
     const res = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({ ...base, input }),
-      signal: AbortSignal.any([AbortSignal.timeout(OPENAI_TIMEOUT_MS), cancel, silent.signal]),
+      signal: AbortSignal.any([AbortSignal.timeout(mp3 ? OPENAI_TIMEOUT_MS : OPENAI_OPUS_TIMEOUT_MS), cancel, silent.signal]),
     }).finally(() => clearTimeout(noHeaders));
     if (!res.ok) {
       const body = (await res.text()).slice(0, 400);
       if (res.status === 429 && /insufficient_quota|billing_hard_limit/.test(body)) alertProviderCredit('openai', 'insufficient_quota', 'tts');
-      throw new Error(`openai-tts ${res.status}: ${body.slice(0, 180)}`);
+      const message = `openai-tts ${res.status}: ${body.slice(0, 180)}`;
+      // An identical request gets the same 4xx (and on a 429 a burst of them would only make it worse).
+      throw res.status >= 400 && res.status < 500 ? new FinalTtsError(message) : new Error(message);
     }
     const part = Buffer.from(await res.arrayBuffer());
     if (part.length === 0) throw new Error('openai-tts: empty audio');
     return part;
   };
   const input = text.slice(0, MAX_CHARS);
-  // MP3 pieces join into one file; Opus stays one call (see the latency budget above).
-  const pieces = opts.format === 'mp3' ? speechChunks(input) : [input];
-  const audio = Buffer.concat(await Promise.all(pieces.map((piece) => hedged((cancel) => synthesize(piece, cancel)))));
+  // One budget and one cancel for the whole line: when a piece fails or the deadline passes, every other
+  // piece and its hedges stop instead of spending provider calls after the chain has moved on.
+  const line = new AbortController();
+  const deadline = setTimeout(() => line.abort(new Error(`openai-tts: line deadline ${OPENAI_LINE_DEADLINE_MS} ms`)), OPENAI_LINE_DEADLINE_MS);
+  let audio: Buffer;
+  try {
+    audio = mp3
+      ? Buffer.concat(await Promise.all(speechChunks(input).map((piece) =>
+          hedged((cancel) => synthesize(piece, cancel), HEDGE_AFTER_MS, HEDGE_ATTEMPTS, line.signal))))
+      // Opus: one call with the whole text, as before (see the latency budget above).
+      : await synthesize(input, new AbortController().signal);
+  } catch (error) {
+    line.abort(error);
+    throw error;
+  } finally {
+    clearTimeout(deadline);
+  }
   const isOpus = opts.format === 'opus';
   return {
     audio,
