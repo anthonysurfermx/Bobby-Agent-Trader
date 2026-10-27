@@ -534,7 +534,7 @@ STATES.THINK_RESOLVE = {
   tick: function(){
     if (!this.done) return;
     if (VOICE.started || VOICE.silent) go('TALK_EVIDENCE');
-    else if (clk - VOICE.reqT > 6){ bcall('stopSpeaking').catch(noop); goSilent(); go('TALK_EVIDENCE'); }
+    else if (clk - VOICE.reqT > VOICE_WAIT){ bcall('stopSpeaking').catch(noop); goSilent(); go('TALK_EVIDENCE'); }
   },
   down: function(h){ if (h === 'close') return tapG(function(){ go('RETURNING'); }); return null; }
 };
@@ -565,6 +565,9 @@ function speakRead(){
   }, function(){ if (READ === r) goSilent(); });
 }
 function goSilent(){ VOICE.silent = true; VOICE.ended = true; }
+/* s from speak() to voice.start before the read goes on silently. 6 s dropped every neural line (the TTS takes
+   3-5 s plus the download); the web transport's own 10 s watchdog (50-web-voice.js) ends a voice that never starts. */
+var VOICE_WAIT = 10;
 function sentStartT(si){ return kWordT(SENT0[si]).t0; }
 
 /* ---------- TALK_EVIDENCE: B4 satellites + karaoke ---------- */
