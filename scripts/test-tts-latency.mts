@@ -78,12 +78,12 @@ try {
   assert.equal(winner, 2, 'the hedge answered first');
   assert.equal(calls, 2);
   assert.equal(aborted, 1, 'the slow request is cancelled');
-  // A fast failure is replaced at once; three failures reject.
+  // A fast failure is replaced at once; four failures reject.
   calls = 0;
   assert.equal(await hedged(async () => { if (++calls === 1) throw new Error('500'); return 'ok'; }, 10_000), 'ok');
   calls = 0;
   await assert.rejects(hedged(async () => { calls++; throw new Error('down'); }, 10_000), /down/);
-  assert.equal(calls, 3, 'never more than three requests per piece');
+  assert.equal(calls, 4, 'never more than four requests per piece');
   // A fast answer never launches the hedge.
   calls = 0;
   assert.equal(await hedged(async () => { calls++; return 'fast'; }, 50), 'fast');
@@ -93,7 +93,7 @@ try {
   calls = 0;
   const third = await hedged(async (cancel) => { const n = ++calls; await wait(n < 3 ? 1_000 : 5, cancel); return n; }, 20);
   assert.equal(third, 3);
-  console.log('ok - stalled pieces are hedged up to three times, failed ones replaced, fast ones sent once');
+  console.log('ok - stalled pieces are hedged up to four times, failed ones replaced, fast ones sent once');
 } finally {
   globalThis.fetch = oldFetch;
   if (oldKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = oldKey;

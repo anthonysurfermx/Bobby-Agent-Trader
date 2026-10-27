@@ -22,7 +22,7 @@ try {
   attempts = 0;
   assert.equal(await generateSpeech('A calm market reading.', { voice: 'ballad', preservePersona: true }), null);
   // The same request is retried (tts.ts `hedged`), never another provider.
-  assert.equal(attempts, 3, 'A failed persona request is retried, at most three requests');
+  assert.equal(attempts, 4, 'A failed persona request is retried, at most four requests');
   assert.deepEqual([...new Set(hosts)], ['api.openai.com'], 'Persona mode never falls through to a different voice provider');
   console.log('Persona voice success, identity, bounded request and failure checks passed');
 } finally {

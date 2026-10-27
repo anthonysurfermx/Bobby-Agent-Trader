@@ -566,8 +566,8 @@ function speakRead(){
 }
 function goSilent(){ VOICE.silent = true; VOICE.ended = true; }
 /* s from speak() to voice.start before the read goes on silently. 6 s dropped every neural line (the TTS takes
-   3-5 s plus the download); the web transport's own 10 s watchdog (50-web-voice.js) ends a voice that never starts. */
-var VOICE_WAIT = 10;
+   3-13 s plus the download); the web transport's own 17 s watchdog (50-web-voice.js) ends a voice that never starts. */
+var VOICE_WAIT = 18;
 function sentStartT(si){ return kWordT(SENT0[si]).t0; }
 
 /* ---------- TALK_EVIDENCE: B4 satellites + karaoke ---------- */

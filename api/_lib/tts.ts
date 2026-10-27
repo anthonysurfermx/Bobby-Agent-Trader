@@ -211,11 +211,13 @@ const MAX_CHARS = 4000;
 // chunks synthesized in parallel concatenate into one valid file whose duration AVAudioPlayer and
 // decodeAudioData read correctly. OGG/Opus cannot be joined that way, so Telegram voice notes stay one call.
 const OPENAI_TIMEOUT_MS = 10_000;
-// gpt-4o-mini-tts has a long tail: the same ~150-char piece answers in 2-4 s most times and stalls past 10 s now
-// and then, sometimes twice in a row (measured 2026-10-27). A piece still pending after HEDGE_AFTER_MS gets
-// another identical request (up to HEDGE_ATTEMPTS) and the first answer wins; a failed request is replaced at once.
+// gpt-4o-mini-tts has a long tail (measured 2026-10-27, same ~150-char piece): a healthy request answers its
+// headers in ~1 s and finishes in ~3 s, but about one in four never answers at all, even after 40 s. A request
+// with no headers after OPENAI_HEADERS_TIMEOUT_MS is abandoned and replaced at once; one that answered but is
+// still pending after HEDGE_AFTER_MS gets an identical twin. Up to HEDGE_ATTEMPTS per piece; the first wins.
+const OPENAI_HEADERS_TIMEOUT_MS = 3_000;
 const HEDGE_AFTER_MS = 3_500;
-const HEDGE_ATTEMPTS = 3;
+const HEDGE_ATTEMPTS = 4;
 const EDGE_TIMEOUT_MS = 8_000;
 const CHUNK_MIN_CHARS = 140;
 const MAX_CHUNKS = 6;
@@ -408,12 +410,14 @@ async function openaiTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang'
     base.speed = Number(process.env.TTS_SPEED || '1.0');
   }
   const synthesize = async (input: string, cancel: AbortSignal): Promise<Buffer> => {
+    const silent = new AbortController();
+    const noHeaders = setTimeout(() => silent.abort(new Error(`openai-tts: no response in ${OPENAI_HEADERS_TIMEOUT_MS} ms`)), OPENAI_HEADERS_TIMEOUT_MS);
     const res = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({ ...base, input }),
-      signal: AbortSignal.any([AbortSignal.timeout(OPENAI_TIMEOUT_MS), cancel]),
-    });
+      signal: AbortSignal.any([AbortSignal.timeout(OPENAI_TIMEOUT_MS), cancel, silent.signal]),
+    }).finally(() => clearTimeout(noHeaders));
     if (!res.ok) {
       const body = (await res.text()).slice(0, 400);
       if (res.status === 429 && /insufficient_quota|billing_hard_limit/.test(body)) alertProviderCredit('openai', 'insufficient_quota', 'tts');
