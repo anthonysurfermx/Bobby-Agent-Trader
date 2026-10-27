@@ -505,7 +505,8 @@ ENTER.THINK_RESOLVE = function(){
   var chartW = sp0.stageAt.chart != null ? wordIndexOfSentence(sp0.sentences, sp0.stageAt.chart) : null;
   var breaks = [closeStart]; if (chartW) breaks.push(chartW);
   W.chartDue = false; W.chartT = 0; W.evT = 0; W.talkPhase = 'evidence'; W.verdictShown = false;
-  W.readLine = sayLine({ id:M.requestId, exactId:true, noSplit:true, text:sp0.text, visible:false, hold:true, breaks:breaks, amberIdx:vIdx, watchdog:6,
+  /* watchdog 18 s, like the web desk's VOICE_WAIT: 6 s dropped the first read's neural voice before it could start */
+  W.readLine = sayLine({ id:M.requestId, exactId:true, noSplit:true, text:sp0.text, visible:false, hold:true, breaks:breaks, amberIdx:vIdx, watchdog:18,
     top:function(){ return W.talkPhase === 'evidence' ? 488 : 592; } });
   if (M.chart){
     var cw = chartW != null ? chartW : Math.max(0, wordIndexOfSentence(sp0.sentences, 1) - 1);
