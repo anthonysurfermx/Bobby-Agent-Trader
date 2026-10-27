@@ -5,7 +5,19 @@
 // an exception is re-examined instead of forgotten. Anything else rated high or critical fails the build.
 import { spawnSync } from 'node:child_process';
 
-const EXCEPTIONS = [];
+const EXCEPTIONS = [
+  {
+    id: 'GHSA-mrhx-c7xc-m3w5',
+    until: '2026-11-30',
+    why: 'zod, memory exhaustion when an array schema validates a huge array: zod 3 records an issue for every failing '
+      + 'element even after .max() has failed. No zod 3 release is fixed (3.25.76 is the last); the fix is zod 4.6.6. '
+      + 'The API validates request bodies with zod 3 only after a byte cap measured on the parsed body (write-guard '
+      + '16 KB by default, companion-turn 8 KB, push-news 4 KB, briefings 2 KB), which bounds one failed parse to '
+      + 'about 16k issues, 12 ms and 3 MB. The other copies (@reown/appkit-wallet and @walletconnect/ethereum-provider '
+      + 'in the browser, @vercel/cli-config reading the local CLI config) never validate a request body. Expires when '
+      + 'the API moves to zod 4.6.6 (option B of the PR that added it).',
+  },
+];
 
 const today = process.env.AUDIT_GATE_TODAY || new Date().toISOString().slice(0, 10);
 const run = spawnSync('npm', ['audit', '--json'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });

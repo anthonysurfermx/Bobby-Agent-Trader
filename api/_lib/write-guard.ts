@@ -56,6 +56,19 @@ function originAllowed(req: VercelRequest): boolean {
   return requestOriginHost(req.headers) !== null;
 }
 
+/** Bytes of a body as the runtime handed it over: text, raw bytes, or a parsed value re-serialized. */
+function bodyBytes(body: unknown): number {
+  if (body === undefined || body === null) return 0;
+  if (typeof body === 'string') return Buffer.byteLength(body, 'utf8');
+  if (Buffer.isBuffer(body)) return body.length;
+  try {
+    const text = JSON.stringify(body);
+    return text === undefined ? 0 : Buffer.byteLength(text, 'utf8');
+  } catch {
+    return Number.POSITIVE_INFINITY; // not serializable, so not a JSON body: refused
+  }
+}
+
 /**
  * Runs the full checklist. Returns the validated body, or null after having
  * written the error response. Order: method → freeze → origin → session →
@@ -85,9 +98,15 @@ export async function guardWrite<S extends ZodTypeAny>(req: VercelRequest, res: 
     res.status(413).json({ error: `Body too large (max ${maxBytes} bytes)` });
     return null;
   }
+  // The header is only the cheap first answer: a chunked upload carries none, and the runtime may already have parsed
+  // the body. What arrived is measured as well, before any schema walks it: zod 3 spends work on every element of an
+  // oversized array (GHSA-mrhx-c7xc-m3w5), so the cap must hold whatever the headers say.
   let raw: unknown = req.body;
+  if (bodyBytes(raw) > maxBytes) {
+    res.status(413).json({ error: `Body too large (max ${maxBytes} bytes)` });
+    return null;
+  }
   if (typeof raw === 'string') {
-    if (raw.length > maxBytes) { res.status(413).json({ error: 'Body too large' }); return null; }
     try { raw = JSON.parse(raw); } catch { res.status(400).json({ error: 'Invalid JSON' }); return null; }
   }
   const parsed = opts.schema.safeParse(raw ?? {});
