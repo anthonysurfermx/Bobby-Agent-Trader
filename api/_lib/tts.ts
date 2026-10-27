@@ -211,6 +211,11 @@ const MAX_CHARS = 4000;
 // chunks synthesized in parallel concatenate into one valid file whose duration AVAudioPlayer and
 // decodeAudioData read correctly. OGG/Opus cannot be joined that way, so Telegram voice notes stay one call.
 const OPENAI_TIMEOUT_MS = 10_000;
+// gpt-4o-mini-tts has a long tail: the same ~150-char piece answers in 2-4 s most times and stalls past 10 s now
+// and then, sometimes twice in a row (measured 2026-10-27). A piece still pending after HEDGE_AFTER_MS gets
+// another identical request (up to HEDGE_ATTEMPTS) and the first answer wins; a failed request is replaced at once.
+const HEDGE_AFTER_MS = 3_500;
+const HEDGE_ATTEMPTS = 3;
 const EDGE_TIMEOUT_MS = 8_000;
 const CHUNK_MIN_CHARS = 140;
 const MAX_CHUNKS = 6;
@@ -245,6 +250,38 @@ export function speechChunks(text: string): string[] {
     chunks.splice(best, 2, chunks[best] + ' ' + chunks[best + 1]);
   }
   return chunks;
+}
+
+/**
+ * Runs `attempt`, and launches another identical attempt every `hedgeAfterMs` while none has answered, or at
+ * once when one fails, up to `maxAttempts`. The first success wins and cancels the rest; it rejects only when
+ * every attempt has failed.
+ */
+export function hedged<T>(attempt: (cancel: AbortSignal) => Promise<T>, hedgeAfterMs = HEDGE_AFTER_MS, maxAttempts = HEDGE_ATTEMPTS): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const controllers: AbortController[] = [];
+    let settled = false, failed = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const launch = () => {
+      clearTimeout(timer);
+      const controller = new AbortController();
+      controllers.push(controller);
+      if (controllers.length < maxAttempts) timer = setTimeout(() => { if (!settled) launch(); }, hedgeAfterMs);
+      attempt(controller.signal).then((value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        for (const other of controllers) if (other !== controller) other.abort();
+        resolve(value);
+      }, (error) => {
+        if (settled) return;
+        failed++;
+        if (controllers.length < maxAttempts) launch();
+        else if (failed === controllers.length) { settled = true; reject(error); }
+      });
+    };
+    launch();
+  });
 }
 
 /** Rejects after `ms` so one stuck provider can never hold a function until the platform's 504. */
@@ -370,12 +407,12 @@ async function openaiTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang'
   } else {
     base.speed = Number(process.env.TTS_SPEED || '1.0');
   }
-  const synthesize = async (input: string): Promise<Buffer> => {
+  const synthesize = async (input: string, cancel: AbortSignal): Promise<Buffer> => {
     const res = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({ ...base, input }),
-      signal: AbortSignal.timeout(OPENAI_TIMEOUT_MS),
+      signal: AbortSignal.any([AbortSignal.timeout(OPENAI_TIMEOUT_MS), cancel]),
     });
     if (!res.ok) {
       const body = (await res.text()).slice(0, 400);
@@ -389,7 +426,7 @@ async function openaiTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang'
   const input = text.slice(0, MAX_CHARS);
   // MP3 pieces join into one file; Opus stays one call (see the latency budget above).
   const pieces = opts.format === 'mp3' ? speechChunks(input) : [input];
-  const audio = Buffer.concat(await Promise.all(pieces.map(synthesize)));
+  const audio = Buffer.concat(await Promise.all(pieces.map((piece) => hedged((cancel) => synthesize(piece, cancel)))));
   const isOpus = opts.format === 'opus';
   return {
     audio,

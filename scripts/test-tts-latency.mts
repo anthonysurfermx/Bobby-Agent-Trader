@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { generateSpeech, speechChunks } from '../api/_lib/tts.js';
+import { generateSpeech, hedged, speechChunks } from '../api/_lib/tts.js';
 
 // A read's spoken line as the Núcleo builds it: the CIO's sentences (~600 chars) plus the close.
 const READ_LINE = 'The 1H evidence for ETH-USDT as of 2026-10-27 13:00 UTC shows a lateral trend with neutral momentum and RSI14 at 50.9, so there is no clear directional signal. Price at 2326 sits between its average of the last hours (EMA20 2319.4, 0.28% below the price) and its longer average (EMA50 2327.7, 0.07% above). Support at 2296.1 and resistance at 2344.5 frame a narrow range. Only the last few days are visible here, so longer trends and news are missing from this evidence. My call: wait.';
@@ -63,9 +63,40 @@ try {
   }) as typeof fetch;
   assert.equal(await generateSpeech(READ_LINE, { voice: 'cio', lang: 'en', format: 'mp3', preservePersona: true }), null);
   console.log('ok - a failed piece never yields a partial line');
+  // Hedging: a slow first request gets a twin and the first answer wins; the loser is cancelled.
+  const wait = (ms: number, signal: AbortSignal) => new Promise<void>((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    signal.addEventListener('abort', () => { clearTimeout(t); reject(new Error('aborted')); });
+  });
+  let calls = 0, aborted = 0;
+  const winner = await hedged(async (cancel) => {
+    const n = ++calls;
+    cancel.addEventListener('abort', () => aborted++);
+    await wait(n === 1 ? 500 : 20, cancel);
+    return n;
+  }, 30);
+  assert.equal(winner, 2, 'the hedge answered first');
+  assert.equal(calls, 2);
+  assert.equal(aborted, 1, 'the slow request is cancelled');
+  // A fast failure is replaced at once; three failures reject.
+  calls = 0;
+  assert.equal(await hedged(async () => { if (++calls === 1) throw new Error('500'); return 'ok'; }, 10_000), 'ok');
+  calls = 0;
+  await assert.rejects(hedged(async () => { calls++; throw new Error('down'); }, 10_000), /down/);
+  assert.equal(calls, 3, 'never more than three requests per piece');
+  // A fast answer never launches the hedge.
+  calls = 0;
+  assert.equal(await hedged(async () => { calls++; return 'fast'; }, 50), 'fast');
+  await new Promise((r) => setTimeout(r, 80));
+  assert.equal(calls, 1);
+    // Two stalled requests: the third, launched two hedge intervals in, still answers.
+  calls = 0;
+  const third = await hedged(async (cancel) => { const n = ++calls; await wait(n < 3 ? 1_000 : 5, cancel); return n; }, 20);
+  assert.equal(third, 3);
+  console.log('ok - stalled pieces are hedged up to three times, failed ones replaced, fast ones sent once');
 } finally {
   globalThis.fetch = oldFetch;
   if (oldKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = oldKey;
 }
 
-console.log('4/4 TTS latency checks passed');
+console.log('5/5 TTS latency checks passed');
