@@ -5,7 +5,8 @@ import { guardWrite } from '../api/_lib/write-guard.js';
 
 // write-guard's byte cap holds whatever the headers say: without Content-Length (a chunked upload), and on a body the
 // runtime already parsed. Those requests reached the schema before, and zod 3 validates every element of an array
-// even after .max() has failed (GHSA-mrhx-c7xc-m3w5), so a refused body must never be walked.
+// even after .max() has failed (GHSA-mrhx-c7xc-m3w5), so a refused body must never be walked. The in-memory per-IP
+// limit runs before the body is measured or parsed, so a payload the schema refuses still spends the caller's budget.
 
 function responseRecorder() {
   const state: { status?: number; body?: any; headers: Record<string, string> } = { headers: {} };
@@ -37,12 +38,12 @@ const Body = z.object({
   note: z.string().max(2_000).optional(),
 });
 
-async function guard(req: VercelRequest) {
+async function guard(req: VercelRequest, perIp = { limit: 1_000, windowSec: 60 }) {
   walked = 0;
   const { response, state } = responseRecorder();
   const result = await guardWrite(req, response, {
     methods: ['POST'], scope: 'test-write-guard', schema: Body, auth: 'none', allowNoOrigin: true,
-    perIp: { limit: 1_000, windowSec: 60 }, maxBodyBytes: CAP,
+    perIp, maxBodyBytes: CAP,
   });
   return { result, state, walked };
 }
@@ -104,6 +105,23 @@ try {
     const again = await guard(request(JSON.stringify(body)));
     assert.deepEqual(again.result?.body, body, 'the same body as text is accepted too');
     checks += 3;
+  }
+  {
+    const limited = { limit: 3, windowSec: 60 };
+    const from = { 'x-forwarded-for': '203.0.113.21' };
+    for (let i = 0; i < limited.limit; i += 1) {
+      const r = await guard(request({ events: [{}] }, from), limited);
+      assert.equal(r.state.status, 400, 'invalid payloads within the limit are answered by the schema');
+    }
+    const over = await guard(request({ events: [{}] }, from), limited);
+    assert.equal(over.state.status, 429, 'an invalid payload over the per-IP limit is refused before the parse');
+    assert.equal(over.walked, 0, 'a rate-limited body is never walked by the schema');
+    assert.equal(over.state.headers['retry-after'], '60');
+    const big = await guard(request(oversized, from), limited);
+    assert.equal(big.state.status, 429, 'the limit is checked before the body is measured');
+    const elsewhere = await guard(request({ events: [{}] }, { 'x-forwarded-for': '203.0.113.22' }), limited);
+    assert.equal(elsewhere.state.status, 400, 'another address keeps its own budget');
+    checks += 6;
   }
 
   console.log(`write-guard: ${checks} checks passed`);

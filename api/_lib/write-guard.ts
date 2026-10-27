@@ -72,8 +72,8 @@ function bodyBytes(body: unknown): number {
 /**
  * Runs the full checklist. Returns the validated body, or null after having
  * written the error response. Order: method → freeze → origin → session →
- * size → schema → wallet match → per-IP limit (memory then persistent) →
- * per-subject limit.
+ * per-IP limit (memory) → size → schema → wallet match → per-IP limit
+ * (persistent) → per-subject limit.
  */
 export async function guardWrite<S extends ZodTypeAny>(req: VercelRequest, res: VercelResponse, opts: WriteGuardOptions<S>): Promise<WriteGuardResult<S> | null> {
   if (!opts.methods.includes(req.method || '')) {
@@ -91,6 +91,17 @@ export async function guardWrite<S extends ZodTypeAny>(req: VercelRequest, res: 
   if (auth === 'wallet') {
     session = requireWalletSession(req, res);
     if (!session) return null;
+  }
+  // First line: in-memory per instance (free), counted before the body is measured or parsed, so a payload the
+  // schema refuses still spends the caller's budget. Second, after the schema: persistent across instances.
+  const ipKey = getClientIpKey(req);
+  const memKey = `${opts.scope}:${opts.perIp.limit}:${opts.perIp.windowSec}`;
+  let mem = localLimiters.get(memKey);
+  if (!mem) { mem = createLimiter(opts.perIp.limit, opts.perIp.windowSec * 1000); localLimiters.set(memKey, mem); }
+  if (mem.check(ipKey).limited) {
+    res.setHeader('Retry-After', String(opts.perIp.windowSec));
+    res.status(429).json({ error: 'Too many requests' });
+    return null;
   }
   const maxBytes = opts.maxBodyBytes ?? 16 * 1024;
   const declared = Number(req.headers['content-length'] || 0);
@@ -121,16 +132,6 @@ export async function guardWrite<S extends ZodTypeAny>(req: VercelRequest, res: 
     return null;
   }
 
-  const ipKey = getClientIpKey(req);
-  // First line: in-memory per instance (free). Second: persistent across instances.
-  const memKey = `${opts.scope}:${opts.perIp.limit}:${opts.perIp.windowSec}`;
-  let mem = localLimiters.get(memKey);
-  if (!mem) { mem = createLimiter(opts.perIp.limit, opts.perIp.windowSec * 1000); localLimiters.set(memKey, mem); }
-  if (mem.check(ipKey).limited) {
-    res.setHeader('Retry-After', String(opts.perIp.windowSec));
-    res.status(429).json({ error: 'Too many requests' });
-    return null;
-  }
   const ipLimit = await checkPersistentLimit(opts.scope, ipKey, opts.perIp.limit, opts.perIp.windowSec);
   if (ipLimit.limited) {
     res.setHeader('Retry-After', String(Math.max(1, Math.ceil((ipLimit.resetAt - Date.now()) / 1000))));
