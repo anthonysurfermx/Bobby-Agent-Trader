@@ -273,7 +273,9 @@ export default function NucleoDesk() {
 
   const say = useCallback((text: string, essential = true) => {
     if (!speakEnabledRef.current) return;
-    void voice.speak(text, { voice: companion.voicePersona, vibe: vibe.server, essential, mode: 'free' });
+    // Bobby's own voice, as on iPhone. 'free' is Edge-only on the server, and when Edge is down every
+    // line fell back to the browser's robotic voice. The server's daily budget still caps paid speech.
+    void voice.speak(text, { voice: companion.voicePersona, vibe: vibe.server, essential, mode: 'persona' });
   }, [voice, companion.voicePersona, vibe.server]);
 
   // Today's real movers under the greeting, once. Public market data: the request carries the interface language
