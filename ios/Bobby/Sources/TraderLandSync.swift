@@ -54,11 +54,11 @@ struct TraderLandWorld: Decodable {
         let fr: String?; let pt: String?; let it: String?; let de: String?
         var text: String {
             switch L.language {
-            case "fr": return fr ?? L.t(en, es)
-            case "pt": return pt ?? L.t(en, es)
-            case "it": return it ?? L.t(en, es)
-            case "de": return de ?? L.t(en, es)
-            default: return L.t(en, es)
+            case "fr": return fr ?? L.t(LocalizedText(en), es)
+            case "pt": return pt ?? L.t(LocalizedText(en), es)
+            case "it": return it ?? L.t(LocalizedText(en), es)
+            case "de": return de ?? L.t(LocalizedText(en), es)
+            default: return L.t(LocalizedText(en), es)
             }
         }
     }
@@ -238,12 +238,12 @@ enum TraderLandCatalog {
         var en = art
         if let district { en = en.replacingOccurrences(of: district + "_", with: "") }
         en = en.replacingOccurrences(of: "_", with: " ").capitalized
-        return L.t(en, namesES[art] ?? en)
+        return L.t(LocalizedText(en), namesES[art] ?? en)
     }
 
     static func districtName(_ id: String) -> String {
         let en = id.replacingOccurrences(of: "_", with: " ").capitalized
-        return L.t(en, districtNamesES[id] ?? en)
+        return L.t(LocalizedText(en), districtNamesES[id] ?? en)
     }
 }
 

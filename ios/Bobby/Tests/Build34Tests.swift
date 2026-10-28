@@ -152,7 +152,7 @@ final class Build34Tests: XCTestCase {
         for stale in ["Sign-In & Security", "Stop Using", "Inicio de sesión y seguridad", "Dejar de usar", "Ajustes"] {
             XCTAssertFalse(en.contains(stale) || es.contains(stale), stale)
         }
-        XCTAssertEqual(AccountSession.manualRevocationSteps, L.t(en, es))
+        XCTAssertEqual(AccountSession.manualRevocationSteps, L.t(LocalizedText(en), es))
     }
 
     func testApplesPageOpensInTheLanguageOfTheSteps() {
