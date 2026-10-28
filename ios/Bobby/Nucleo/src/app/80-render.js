@@ -252,7 +252,8 @@ function renderPill(){
   var lv = FLAG.listen ? DU.voice : 0, go0 = gIdle * A.pillO.x;
   op(el.micGlow, go0);
   if (go0 > 0.002){
-    tfx(el.micGlow, 0, y, lerp(0.42, 1, clamp((w - 96) / 140, 0, 1)) * (0.92 + 0.2 * lv), 0.9 + 0.35 * lv, 0);
+    // A tap conversation listens without widening the pill, so glowW opens the aura around it.
+    tfx(el.micGlow, 0, y, Math.max(lerp(0.42, 1, clamp((w - 96) / 140, 0, 1)), A.glowW.x) * (0.92 + 0.2 * lv), 0.9 + 0.35 * lv, 0);
     tfx(el.micGlowI, 0, 0, 1, 1, P.conic);
   }
   // The tap conversation owns these glyphs in conversationChrome. Two opacity

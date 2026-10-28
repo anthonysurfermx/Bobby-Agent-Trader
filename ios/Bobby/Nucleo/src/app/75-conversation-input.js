@@ -81,11 +81,11 @@ var legacyListen=STATES.LISTENING;
 if(TALK_MODE==='tap')STATES.LISTENING={
  enter:function(prev,d){
   this.back=d.back||CONV_RETURN||{name:prev,data:{}};this.startSeq=++CONV_LISTEN_SEQ;this.live=false;this.released=false;this.finalWait=0;CONV_WORD_AT=clk;
-  chromeUp();greetOut();chipsHide();meriOut();guidePanel.style.display=guideActions.style.display='none';moveSphere(300,98);A.pillW.set(96);pillMode(idleMode());
+  chromeUp();greetOut();chipsHide();meriOut();guidePanel.style.display=guideActions.style.display='none';moveSphere(300,98);A.pillW.set(96);pillMode(idleMode());A.glow.tween(.8,.24,E.fade);A.glowW.to(.8,'soft');
   draftPhrase.textContent=CONV_BASE;draftPanel.style.display='block';draftPanel.style.top='438px';conversationBorn(draftPanel,'sphere',32);A.closeO.set(1);att(el.close,'aria-label',tt('aria.discardSpoken'));
   var self=this,seq=this.startSeq;bcall('speech.start').then(function(r){if(seq!==self.startSeq||ST.name!=='LISTENING')return;self.live=r&&r.status==='listening';if(self.live){conversationAnnounce('cap.listening');U.listenIr.to(1);hint(tt(CONV_HOLD?'hint.release':'cap.listening'));}else{hint(tt('hint.micOff'));conversationReturn();}},function(){if(seq===self.startSeq)conversationReturn();});
  },
- exit:function(){this.startSeq++;U.listenIr.to(0);draftPanel.style.display='none';},
+ exit:function(){this.startSeq++;U.listenIr.to(0);A.glow.tween(.15,.24,E.fade);A.glowW.to(.42,'soft');draftPanel.style.display='none';},
  release:function(isTap,cancelled){if(cancelled){CONV_LISTEN_SEQ++;bcall('speech.stop',{cancel:true}).catch(noop);HELD=SPEECH.draft=CONV_BASE=CONV_PARTIAL='';conversationReturn();return;}if(this.released)return;this.released=true;this.live=false;U.listenIr.to(0);this.finalWait=clk||.001;var self=this;bcall('speech.stop',{}).then(function(r){if(r&&r.status==='idle')self.gotFinal(CONV_PARTIAL);}).catch(function(){self.gotFinal(CONV_PARTIAL);});},
  gotFinal:function(text){if(ST.name!=='LISTENING'||!this.released)return;var q=(CONV_BASE+' '+String(text||CONV_PARTIAL||'')).replace(/\s+/g,' ').trim();this.finalWait=0;if(q)convSend(q,true);else{conversationReturn();hint(tt('cap.empty'));conversationAnnounce('cap.empty');}},
  autoEnd:function(caption){var q=(CONV_BASE+' '+CONV_PARTIAL).trim();conversationAnnounce(q?caption:'cap.empty');this.live=false;this.startSeq++;bcall('speech.stop',{cancel:true}).catch(noop);tick('soft');if(q)holdDraft(q,caption,true);else{conversationReturn();hint(tt('cap.empty'));}},
