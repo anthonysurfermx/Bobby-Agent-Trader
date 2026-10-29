@@ -10,7 +10,7 @@ import { notifyOwner } from './_lib/provider-alert.js';
 export const config = { maxDuration: 10 };
 const Report = z.object({
   code: z.string().regex(/^[a-z0-9]{10}$/),
-  installation: z.string().uuid(),
+  installation: z.guid(),
   reason: z.enum(['offensive', 'harassment', 'spam', 'other']),
   details: z.string().trim().max(500).default(''),
 });

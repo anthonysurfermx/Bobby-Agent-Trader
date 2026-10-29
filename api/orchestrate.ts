@@ -121,7 +121,7 @@ class ModelOutputError extends Error {
 }
 
 /** One role call whose JSON is validated against the schema the decision relies on. */
-async function callRoleValidated<T>(role: string, schema: z.ZodType<T, z.ZodTypeDef, unknown>, system: string, context: string, maxTokens?: number, tier: AppTextTier = 'free'): Promise<T> {
+async function callRoleValidated<T>(role: string, schema: z.ZodType<T, unknown>, system: string, context: string, maxTokens?: number, tier: AppTextTier = 'free'): Promise<T> {
   const raw = await callRole(system, context, maxTokens, tier);
   let parsed: unknown;
   try {

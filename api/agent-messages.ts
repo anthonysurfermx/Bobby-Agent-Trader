@@ -14,7 +14,7 @@ export const config = { maxDuration: 10 };
 
 const Body = z.object({
   wallet: z.string().regex(WALLET_RE).optional(),
-  id: z.string().uuid().optional(),
+  id: z.guid().optional(),
 });
 
 async function list(req: VercelRequest, res: VercelResponse) {

@@ -82,7 +82,7 @@ export function companionDailyUsd(env: NodeJS.ProcessEnv = process.env): number 
  */
 export const CompanionRequest = z.object({
   version: z.literal(COMPANION_VERSION),
-  requestId: z.string().uuid().optional(),
+  requestId: z.guid().optional(),
   question: z.string().trim().min(1),
   language: z.enum(APP_LANGUAGES).default('en'),
   locale: z.enum(APP_LOCALES).optional(),
@@ -117,22 +117,22 @@ const Fact = z.object({ id: z.string().min(1), text: z.string().min(1), source: 
  */
 export const CompanionResponse = z.discriminatedUnion('kind', [
   z.object({
-    version: z.literal(COMPANION_VERSION), requestId: z.string().uuid().nullable(), kind: z.literal('explanation'),
+    version: z.literal(COMPANION_VERSION), requestId: z.guid().nullable(), kind: z.literal('explanation'),
     reply: z.object({ text: z.string().min(1), followUp: z.string().min(1).nullable(), gist: z.string().min(1).max(120).optional() }), nextAction: z.null(),
     personalized: z.boolean().optional(), checkIn: CheckIn.optional(), fact: Fact.optional(), allowance: Allowance,
   }),
   z.object({
-    version: z.literal(COMPANION_VERSION), requestId: z.string().uuid().nullable(), kind: z.literal('noted'),
+    version: z.literal(COMPANION_VERSION), requestId: z.guid().nullable(), kind: z.literal('noted'),
     patch: z.object({ notes: z.array(CompanionNote).min(1).max(8), asked: z.array(z.enum(QUESTION_IDS)).min(1).max(8) }), checkIn: CheckIn, allowance: Allowance,
   }),
   z.object({
-    version: z.literal(COMPANION_VERSION), requestId: z.string().uuid().nullable(), kind: z.literal('desk_offer'),
+    version: z.literal(COMPANION_VERSION), requestId: z.guid().nullable(), kind: z.literal('desk_offer'),
     reply: z.object({ text: z.string().min(1), followUp: z.string().min(1).nullable() }),
     nextAction: z.object({ type: z.literal('open_desk'), symbol: z.string().min(1), question: z.string().min(1), requiresConfirmation: z.literal(true) }),
     allowance: Allowance,
   }),
   z.object({
-    version: z.literal(COMPANION_VERSION), requestId: z.string().uuid().nullable(), kind: z.literal('error'),
+    version: z.literal(COMPANION_VERSION), requestId: z.guid().nullable(), kind: z.literal('error'),
     error: z.object({ code: z.string().min(1), retryable: z.boolean(), message: z.string().min(1) }), allowance: Allowance,
   }),
 ]);

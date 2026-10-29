@@ -47,15 +47,15 @@ export const config = { maxDuration: 15 };
 // The island size the client drew its coordinates on (optional; see drawnSize).
 const DrawnSize = z.union([z.literal(8), z.literal(10), z.literal(12), z.literal(16)]).optional();
 const Body = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('place'), inventoryId: z.string().uuid(), x: z.number().int().min(0).max(15), y: z.number().int().min(0).max(15), rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0), size: DrawnSize }),
-  z.object({ action: z.literal('move'), placementId: z.string().uuid(), x: z.number().int().min(0).max(15), y: z.number().int().min(0).max(15), rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0), size: DrawnSize }),
-  z.object({ action: z.literal('remove'), placementId: z.string().uuid() }),
+  z.object({ action: z.literal('place'), inventoryId: z.guid(), x: z.number().int().min(0).max(15), y: z.number().int().min(0).max(15), rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0), size: DrawnSize }),
+  z.object({ action: z.literal('move'), placementId: z.guid(), x: z.number().int().min(0).max(15), y: z.number().int().min(0).max(15), rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0), size: DrawnSize }),
+  z.object({ action: z.literal('remove'), placementId: z.guid() }),
   z.object({ action: z.literal('publish'), title: z.string().max(80).optional() }),
   z.object({ action: z.literal('unpublish') }),
   z.object({ action: z.literal('rename_private'), title: z.string().max(80) }),
-  z.object({ action: z.literal('close'), inventoryId: z.string().uuid(), tzOffsetMin: z.number().int().min(-840).max(840).default(0), platform: z.enum(['ios', 'web', 'android']).default('web') }),
+  z.object({ action: z.literal('close'), inventoryId: z.guid(), tzOffsetMin: z.number().int().min(-840).max(840).default(0), platform: z.enum(['ios', 'web', 'android']).default('web') }),
   // Any whole number reaches the database, which answers 'A horizon can only grow' for all but an upward 72 / 168.
-  z.object({ action: z.literal('extend'), inventoryId: z.string().uuid(), hours: z.number().int().min(0).max(1000) }),
+  z.object({ action: z.literal('extend'), inventoryId: z.guid(), hours: z.number().int().min(0).max(1000) }),
   z.object({ action: z.literal('move_core'), x: z.number().int().min(0).max(15), y: z.number().int().min(0).max(15), size: DrawnSize }),
 ]);
 
