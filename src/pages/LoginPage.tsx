@@ -66,7 +66,7 @@ export default function LoginPage() {
     formState: { errors, isSubmitting },
     setError,
     setFocus
-  } = useForm<LoginFormValues>({
+  } = useForm<z.input<typeof loginSchema>, unknown, LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: searchParams.get('email') || '',

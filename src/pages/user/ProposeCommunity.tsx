@@ -52,7 +52,7 @@ export default function ProposeCommunity() {
     handleSubmit,
     formState: { errors },
     setValue,
-  } = useForm<CommunityFormData>({
+  } = useForm<z.input<typeof communitySchema>, unknown, CommunityFormData>({
     resolver: zodResolver(communitySchema),
     defaultValues: {
       country: 'Mexico',

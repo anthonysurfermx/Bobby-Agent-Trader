@@ -27,11 +27,11 @@ const SYMBOL_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
 const Body = z.object({
   platform: z.enum(['ios', 'web', 'android']),
   events: z.array(z.object({
-    id: z.string().uuid(),
+    id: z.guid(),
     kind: z.enum(PLANT_KINDS),
     at: z.string().datetime({ offset: true }),
     tzOffsetMin: z.number().int().min(-840).max(840).default(0),
-    meta: z.record(z.unknown()).optional(),
+    meta: z.record(z.string(), z.unknown()).optional(),
     thesis: ThesisSchema.optional().catch(undefined),
   })).max(50).default([]),
   profile: z.object({

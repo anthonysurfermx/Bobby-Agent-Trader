@@ -7,11 +7,13 @@ import { spawnSync } from 'node:child_process';
 
 const EXCEPTIONS = [
   {
-    id: 'GHSA-vfj7-8cjw-p6xm',
-    until: '2026-10-17',
-    why: 'braces, stack exhaustion on deeply nested brace patterns. Every release is affected and no fixed one exists. '
-      + 'It is only reached by build tooling (tailwindcss, chokidar, fast-glob, the @vercel/node typings) with glob '
-      + 'patterns written in this repository, never with input from a user at runtime.',
+    id: 'GHSA-qr28-fpjm-wq7f',
+    until: '2026-11-28',
+    why: 'decode-uri-component, quadratic decoding of malformed percent-encoded input. It arrives only through '
+      + 'query-string@7 inside WalletConnect (@walletconnect/utils 2.21.x, via @wagmi/connectors 8.0.1 and the second '
+      + '@reown/appkit 1.7.8), which runs in the browser and never in api/. The fix, 0.5.1, is ESM-only and cannot be '
+      + 'require()d by query-string@7; @walletconnect/utils dropped query-string from 2.21.9, so the real fix is moving '
+      + 'the wallet stack (appkit / wagmi connectors) onto it before this date.',
   },
 ];
 

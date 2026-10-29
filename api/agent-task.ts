@@ -100,7 +100,7 @@ export function agentStore(env: NodeJS.ProcessEnv = process.env): AgentStore | n
 
 /** The longest errand the door takes, in characters. */
 export const MAX_QUESTION = 1200;
-const Ask = z.object({ op: z.literal('ask'), version: z.literal(ENGINE_VERSION), requestId: z.string().uuid(), sessionId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/), question: z.string().trim().min(1).max(MAX_QUESTION), language: z.enum(APP_LANGUAGES).default('en'), locale: z.enum(APP_LOCALES).optional().catch(undefined), follow: z.boolean().optional().catch(undefined) });
+const Ask = z.object({ op: z.literal('ask'), version: z.literal(ENGINE_VERSION), requestId: z.guid(), sessionId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/), question: z.string().trim().min(1).max(MAX_QUESTION), language: z.enum(APP_LANGUAGES).default('en'), locale: z.enum(APP_LOCALES).optional().catch(undefined), follow: z.boolean().optional().catch(undefined) });
 const Act = z.object({ op: z.enum(['approve', 'deny', 'cancel']), taskId: z.string().regex(/^task_[a-f0-9]{32}$/), digest: z.string().regex(/^[a-f0-9]{64}$/).optional() });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
