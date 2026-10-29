@@ -67,6 +67,7 @@ function tintTo(labc, amt){ to(W.tl, labc[0]); to(W.ta, labc[1]); to(W.tb, labc[
 function tintSnap(labc){ W.tl.x = W.tl.t = labc[0]; W.ta.x = W.ta.t = labc[1]; W.tb.x = W.tb.t = labc[2]; }
 function setHint(s){ if (W.hint === s) return; W.hintPrev = W.hint; W.hint = s; W.hintT = T; }
 function setPill(mode, label, width){
+  pill.setAttribute('aria-label', mode === 'agree' ? Ls('risk.activate') : Ls('aria.pill'));
   if (mode && mode !== W.pillMode){ W.pillModePrev = W.pillMode; W.pillMode = mode; W.pillModeT = T; }
   if (label != null && label !== W.pillLabel){ W.pillLabelPrev = W.pillLabel; W.pillLabel = label; W.pillLabelT = T; }
   if (width) to(W.pillW, width, 'pill');
