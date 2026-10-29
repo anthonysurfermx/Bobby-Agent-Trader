@@ -132,6 +132,12 @@ const cycleSrc = readFileSync(new URL('../api/bobby-cycle.ts', import.meta.url),
   assert.ok(/cycleCloseOk = await sbPatch\('agent_cycles'/.test(cycleSrc), 'cycle close must use checked sbPatch');
   // digest kind is mapped, never raw 'cron'
   assert.ok(/kind: digestKind\(kind\)/.test(cycleSrc), 'digest insert must map kind through digestKind()');
+  // the CIO verdict is declared once: a second declaration inside the debate
+  // block shadowed it, the parser saw undefined, and from 2026-08-22 no cycle
+  // stored a conviction or committed to Base
+  const verdictDecls = cycleSrc.match(/\b(?:let|const|var)\s+structuredVerdict\b/g) || [];
+  assert.equal(verdictDecls.length, 1, `structuredVerdict must be declared exactly once, found ${verdictDecls.length}`);
+  assert.ok(/\n\s+structuredVerdict = await callStructuredVerdict\(cioSystemPrompt/.test(cycleSrc), 'the debate must assign the outer structuredVerdict');
 }
 
 console.log('✓ commit-policy: 3-state matrix + receipt assessment + structural guards passed');
