@@ -56,11 +56,24 @@ function originAllowed(req: VercelRequest): boolean {
   return requestOriginHost(req.headers) !== null;
 }
 
+/** Bytes of a body as the runtime handed it over: text, raw bytes, or a parsed value re-serialized. */
+function bodyBytes(body: unknown): number {
+  if (body === undefined || body === null) return 0;
+  if (typeof body === 'string') return Buffer.byteLength(body, 'utf8');
+  if (Buffer.isBuffer(body)) return body.length;
+  try {
+    const text = JSON.stringify(body);
+    return text === undefined ? 0 : Buffer.byteLength(text, 'utf8');
+  } catch {
+    return Number.POSITIVE_INFINITY; // not serializable, so not a JSON body: refused
+  }
+}
+
 /**
  * Runs the full checklist. Returns the validated body, or null after having
  * written the error response. Order: method → freeze → origin → session →
- * size → schema → wallet match → per-IP limit (memory then persistent) →
- * per-subject limit.
+ * per-IP limit (memory) → size → schema → wallet match → per-IP limit
+ * (persistent) → per-subject limit.
  */
 export async function guardWrite<S extends ZodTypeAny>(req: VercelRequest, res: VercelResponse, opts: WriteGuardOptions<S>): Promise<WriteGuardResult<S> | null> {
   if (!opts.methods.includes(req.method || '')) {
@@ -79,15 +92,32 @@ export async function guardWrite<S extends ZodTypeAny>(req: VercelRequest, res: 
     session = requireWalletSession(req, res);
     if (!session) return null;
   }
+  // First line: in-memory per instance (free), counted before the body is measured or parsed, so a payload the
+  // schema refuses still spends the caller's budget. Second, after the schema: persistent across instances.
+  const ipKey = getClientIpKey(req);
+  const memKey = `${opts.scope}:${opts.perIp.limit}:${opts.perIp.windowSec}`;
+  let mem = localLimiters.get(memKey);
+  if (!mem) { mem = createLimiter(opts.perIp.limit, opts.perIp.windowSec * 1000); localLimiters.set(memKey, mem); }
+  if (mem.check(ipKey).limited) {
+    res.setHeader('Retry-After', String(opts.perIp.windowSec));
+    res.status(429).json({ error: 'Too many requests' });
+    return null;
+  }
   const maxBytes = opts.maxBodyBytes ?? 16 * 1024;
   const declared = Number(req.headers['content-length'] || 0);
   if (declared > maxBytes) {
     res.status(413).json({ error: `Body too large (max ${maxBytes} bytes)` });
     return null;
   }
+  // The header is only the cheap first answer: a chunked upload carries none, and the runtime may already have parsed
+  // the body. What arrived is measured as well, before any schema walks it: zod 3 spends work on every element of an
+  // oversized array (GHSA-mrhx-c7xc-m3w5), so the cap must hold whatever the headers say.
   let raw: unknown = req.body;
+  if (bodyBytes(raw) > maxBytes) {
+    res.status(413).json({ error: `Body too large (max ${maxBytes} bytes)` });
+    return null;
+  }
   if (typeof raw === 'string') {
-    if (raw.length > maxBytes) { res.status(413).json({ error: 'Body too large' }); return null; }
     try { raw = JSON.parse(raw); } catch { res.status(400).json({ error: 'Invalid JSON' }); return null; }
   }
   const parsed = opts.schema.safeParse(raw ?? {});
@@ -102,16 +132,6 @@ export async function guardWrite<S extends ZodTypeAny>(req: VercelRequest, res: 
     return null;
   }
 
-  const ipKey = getClientIpKey(req);
-  // First line: in-memory per instance (free). Second: persistent across instances.
-  const memKey = `${opts.scope}:${opts.perIp.limit}:${opts.perIp.windowSec}`;
-  let mem = localLimiters.get(memKey);
-  if (!mem) { mem = createLimiter(opts.perIp.limit, opts.perIp.windowSec * 1000); localLimiters.set(memKey, mem); }
-  if (mem.check(ipKey).limited) {
-    res.setHeader('Retry-After', String(opts.perIp.windowSec));
-    res.status(429).json({ error: 'Too many requests' });
-    return null;
-  }
   const ipLimit = await checkPersistentLimit(opts.scope, ipKey, opts.perIp.limit, opts.perIp.windowSec);
   if (ipLimit.limited) {
     res.setHeader('Retry-After', String(Math.max(1, Math.ceil((ipLimit.resetAt - Date.now()) / 1000))));

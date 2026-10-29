@@ -31,6 +31,9 @@ jobs:
       - run: npm ci
       - run: npm run test:playbooks
       - run: npm run test:api-security
+      # The write-guard byte cap holds without Content-Length and on an already-parsed body (GHSA-mrhx-c7xc-m3w5),
+      # and its in-memory per-IP limit counts a payload the schema refuses.
+      - run: npm run test:write-guard
       - run: npm run test:record-auth
       - run: npm run test:protocol-write-safety
       - run: npm run test:commit-policy

@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "test:playbooks": "tsx scripts/test-playbooks.mts",
     "test:api-security": "tsx scripts/test-api-security.mts",
+    "test:write-guard": "tsx scripts/test-write-guard.mts",
     "test:record-auth": "tsx scripts/test-record-auth.mts",
     "test:protocol-write-safety": "tsx scripts/test-protocol-write-safety.mts",
     "test:commit-policy": "tsx scripts/test-commit-policy.mts",
