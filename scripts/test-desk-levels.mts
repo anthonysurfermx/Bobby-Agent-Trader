@@ -116,7 +116,7 @@ try {
   };
   const debateMock = (scenarios: unknown = SCEN) => mock((c) => {
     const r = byRole(c);
-    const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : r === 'rebuttal' ? { analysis: REBUTTAL } : c.body.output_config?.format?.schema?.properties?.scenarios ? { ...CIO, scenarios } : CIO;
+    const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : r === 'rebuttal' ? { analysis: REBUTTAL } : (c.body.output_config?.format?.schema ?? c.body.response_format?.json_schema?.schema)?.properties?.scenarios ? { ...CIO, scenarios } : CIO;
     return hostOf(c.url) === 'api.anthropic.com' ? claude(content) : openai(content);
   });
 
@@ -697,16 +697,16 @@ try {
   debateMock();
   const usage: any[] = [];
   const deep = await runDeskDebate('Is BTC good for the next few days?', v2, 'en', { level: 'profundo', usage });
-  eq(calls.map((c) => [byRole(c), c.url.includes('anthropic') ? `${c.body.model}:${c.body.output_config.effort}` : c.body.model]), [['alpha', 'gpt-6-luna'], ['red', 'gpt-6-luna'], ['cio', 'claude-haiku-5-5:medium']], 'Profundo: luna debaters, Haiku medium CIO');
+  eq(calls.map((c) => [byRole(c), c.url.includes('anthropic') ? `${c.body.model}:${c.body.output_config.effort}` : c.body.model]), [['alpha', 'gpt-6-luna'], ['red', 'gpt-6-luna'], ['cio', 'gpt-6-sol']], 'Profundo: OpenAI debaters and CIO');
   eq([deep.sufficiency.sufficient, deep.evidenceUsed.timeframes, deep.evidenceUsed.derivatives, deep.evidenceUsed.record?.wins], [true, ['1H', '4H', '1D'], true, 6], 'Profundo: v2 evidence covers the weekly horizon');
   ok(/evidence\.timeframes holds/.test(calls[0].body.messages[0].content) && JSON.parse(calls[0].body.messages[1].content).evidence.record.wins === 6, 'Profundo: the roles see the timeframes and Bobby\'s record');
   eq(usage.map((u) => u.role), ['alpha', 'red', 'cio'], 'Profundo: one ledger row per call');
 
   debateMock();
   const max = await runDeskDebate('Is BTC good for the next few days?', v2, 'en', { level: 'maximo' });
-  eq(calls.map((c) => [byRole(c), `${c.body.model}:${c.body.output_config?.effort}`]), [['alpha', 'claude-haiku-5-5:high'], ['red', 'claude-haiku-5-5:high'], ['rebuttal', 'claude-haiku-5-5:high'], ['cio', 'claude-haiku-5-5:high']], 'Máximo: Haiku high ×4 with the second round');
+  eq(calls.map((c) => [byRole(c), `${c.body.model}:${c.body.reasoning_effort}`]), [['alpha', 'gpt-6-sol:high'], ['red', 'gpt-6-sol:high'], ['rebuttal', 'gpt-6-sol:high'], ['cio', 'gpt-6-sol:high']], 'Máximo: OpenAI high ×4 with the second round');
   eq([max.agents.rebuttal, max.agents.scenarios], [REBUTTAL, SCEN], 'Máximo: second round and scenarios returned');
-  ok(JSON.parse(calls[3].body.messages[0].content).rebuttal.analysis === REBUTTAL, 'the CIO weighs the second round');
+  ok(JSON.parse(calls[3].body.messages[1].content).rebuttal.analysis === REBUTTAL, 'the CIO weighs the second round');
   debateMock({ confirm: 'A close above the range means guaranteed profits for the week.', invalidate: SCEN.invalidate });
   await assert.rejects(runDeskDebate('Is BTC good this week?', v2, 'en', { level: 'maximo' }), (e: unknown) => e instanceof DeskOutputRejected, 'a guarantee inside the scenarios fails the debate'); checks++;
   // Rápido survives an account without access to the primary model; premium levels never fall back.
@@ -716,16 +716,19 @@ try {
   console.error = originalErr;
   eq([fellBack.agents.verdict, calls.filter((c) => c.body.model === 'gpt-4o-mini').length], ['wait', 3], 'Rápido falls back to gpt-4o-mini on a model-access 404');
   eq(calls.find((c) => c.body.model === 'gpt-4o-mini')!.body.max_tokens, 650, 'the fallback keeps its own request shape');
+  process.env.BOBBY_LLM_PRIMARY = 'anthropic';
   mock((c) => (c.url.includes('anthropic') ? json({ error: { message: 'invalid x-api-key' } }, 401) : openai({ analysis: byRole(c) === 'alpha' ? ALPHA : RED })));
   console.error = () => {};
   await assert.rejects(runDeskDebate('Is this real?', v2, 'en', { level: 'profundo' })); checks++;
   console.error = originalErr;
   ok(!calls.some((c) => c.url.includes('openai') && byRole(c) === 'cio'), 'Profundo never swaps its Haiku CIO for another model');
+  process.env.BOBBY_LLM_PRIMARY = 'openai';
   eq(levelPlan('maximo').budgetMs <= 170_000, true, 'Máximo fits inside maxDuration');
   eq(sufficiencyOf('Long term, is SOL worth holding for years?', ['1H', '4H', '1D', '1W']).sufficient, false, 'a multi-year horizon is never covered by the evidence');
 
   // Credit exhaustion crosses providers once; later roles avoid the exhausted provider.
   for (const direction of ['openai', 'anthropic']) {
+    process.env.BOBBY_LLM_PRIMARY = direction;
     const usage: any[] = [];
     mock((c) => {
       const fromOpenai = hostOf(c.url) === 'api.openai.com';
@@ -741,6 +744,8 @@ try {
     eq(usage.filter(u => u.ok).length, direction === 'openai' ? 3 : 4, 'all roles run on the available provider, including Max rebuttal');
     ok(calls.filter(c => hostOf(c.url) === (direction === 'openai' ? 'api.anthropic.com' : 'api.openai.com')).every(c => direction === 'openai' ? c.body.model === 'claude-haiku-5-5' : c.body.model === 'gpt-6-sol'), 'alternate model family matches the analysis level');
   }
+
+  process.env.BOBBY_LLM_PRIMARY = 'openai';
 
   // ---------- the endpoint: premium allowance, refusal, refund, ledger ----------
   const candles = Array.from({ length: 100 }, (_, i) => ({ ts: Date.now() - (100 - i) * H, open: 100 + i, high: 102 + i, low: 99 + i, close: 101 + i, volume: 5 }));
@@ -777,7 +782,7 @@ try {
     if (hostOf(c.url) === 'api.openai.com' || hostOf(c.url) === 'api.anthropic.com') {
       if (providerRefusal) return json({ error: { code: providerRefusal, message: 'private question must never be logged' } }, 429);
       if (modelFails) return hostOf(c.url) === 'api.anthropic.com' ? claude({ analysis: 'x' }, 'max_tokens') : openai({ analysis: 'x' }, 'length');
-      const r = byRole(c); const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : r === 'rebuttal' ? { analysis: REBUTTAL } : c.body.output_config?.format?.schema?.properties?.scenarios ? { ...(cioReply as object), scenarios: SCEN } : cioReply;
+      const r = byRole(c); const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : r === 'rebuttal' ? { analysis: REBUTTAL } : (c.body.output_config?.format?.schema ?? c.body.response_format?.json_schema?.schema)?.properties?.scenarios ? { ...(cioReply as object), scenarios: SCEN } : cioReply;
       return hostOf(c.url) === 'api.anthropic.com' ? claude(content) : openai(content);
     }
     throw new Error(`Unexpected request ${c.url}`);

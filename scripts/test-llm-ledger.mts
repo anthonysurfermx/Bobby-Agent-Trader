@@ -30,9 +30,11 @@ type Reply = (call: Call) => Response | Promise<Response>;
 const originalFetch = globalThis.fetch;
 const originalError = console.error;
 const originalWarn = console.warn;
+const originalInfo = console.info;
 const logs: unknown[][] = [];
 console.error = (...args: unknown[]) => { logs.push(args); };
 console.warn = (...args: unknown[]) => { logs.push(args); };
+console.info = (...args: unknown[]) => { logs.push(args); };
 let calls: Call[] = [];
 let replies: Reply[] = [];
 const ledgerWrites: Array<Array<Record<string, any>>> = [];
@@ -96,6 +98,19 @@ const stopEvents = (reason = 'end_turn') => [{ type: 'message_delta', delta: { s
 const streamBase = { endpoint: 'openclaw-chat', system: 'system fixture', messages: [{ role: 'user' as const, content: 'user fixture' }] };
 
 try {
+  process.env.BOBBY_LLM_PRIMARY = 'openai';
+  reset(() => new Response(JSON.stringify({ error: { code: 'unsupported_parameter', type: 'invalid_request_error', param: 'max_tokens', message: privateMarker } }), { status: 400, headers: { 'openai-organization': 'whatlet' } }));
+  await rejects(callLlm(base), 'OpenAI request failure remains a failure');
+  const diagnostic = logs.flat().filter((v): v is string => typeof v === 'string').find(v => v.includes('provider_diagnostic'));
+  eq(JSON.parse(diagnostic!).param, 'max_tokens', '400 diagnostics identify the rejected parameter');
+  ok(!JSON.stringify(logs).includes(privateMarker), 'diagnostics never retain provider messages');
+  ok(logs.flat().some(v => typeof v === 'string' && v.includes('"organization":"whatlet"')), 'response records safe organization metadata for production verification');
+  reset(call => {
+    eq(call.body.reasoning_effort, 'none', 'Luna function tools explicitly disable reasoning to avoid HTTP 400');
+    return json({ choices: [{ finish_reason: 'tool_calls', message: { tool_calls: [{ function: { name: tool.name, arguments: '{"verdict":"wait"}' } }] } }], usage: {} });
+  });
+  eq((await callLlm({ ...base, tool })).toolInput, { verdict: 'wait' }, 'cycle tool contract still succeeds on OpenAI');
+  delete process.env.BOBBY_LLM_PRIMARY;
   // Structured retries and parse failures keep separate billable rows.
   reset(() => json({ error: { type: 'api_error' } }, 500), claudeOk('{"a":1}'));
   let usage: any[] = [];
@@ -430,4 +445,5 @@ try {
   globalThis.fetch = originalFetch;
   console.error = originalError;
   console.warn = originalWarn;
+  console.info = originalInfo;
 }
