@@ -93,6 +93,12 @@ function textRequest(spec: ModelSpec, system: string, messages: TextMessage[], s
   }
   return { url: OPENAI_URL, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body };
 }
+function providerResponse(res: Response, endpoint: string, spec: ModelSpec): void {
+  if (spec.provider !== 'openai') return;
+  const organization = res.headers.get('openai-organization');
+  console.info(JSON.stringify({ route: endpoint, event: 'openai_response', model: spec.model, status: res.status,
+    organization: organization && /^[a-zA-Z0-9_-]{1,100}$/.test(organization) ? organization : null }));
+}
 function usageRow(spec: ModelSpec, started: number, data: any, stop: string | null, ok: boolean): LlmUsage {
   const u = data?.usage;
   const cached = spec.provider === 'anthropic' ? u?.cache_read_input_tokens ?? 0 : u?.prompt_tokens_details?.cached_tokens ?? 0;
@@ -119,7 +125,9 @@ function providerHttpError(status: number, code: ProviderRefusal | null, endpoin
   return new LlmHttpError(status, `${spec.model}: ${status}`, code);
 }
 async function throwHttp(res: Response, endpoint: string, spec: ModelSpec): Promise<never> {
-  throw providerHttpError(res.status, refusalCode(await res.json().catch(() => null)), endpoint, spec);
+  const body = await res.json().catch(() => null);
+  providerDiagnostic(body, endpoint, spec);
+  throw providerHttpError(res.status, refusalCode(body), endpoint, spec);
 }
 function streamProviderError(event: any, endpoint: string, spec: ModelSpec): LlmHttpError {
   const code = refusalCode(event), type = event?.error?.type;
@@ -179,6 +187,7 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmResult> {
         let data: any;
         try {
           const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body), signal: requestSignal(left, opts.signal) });
+          providerResponse(res, opts.endpoint, spec);
           if (!res.ok) {
             rows.push(usageRow(spec, started, null, `http_${res.status}`, false));
             await throwHttp(res, opts.endpoint, spec);
@@ -230,6 +239,7 @@ export async function streamText(opts: StreamTextOptions): Promise<LlmResult> {
       const record = () => { if (!recorded) { rows.push(row); recorded = true; } };
       try {
         const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body), signal: requestSignal(left, opts.signal) });
+        providerResponse(res, opts.endpoint, spec);
         if (!res.ok) { row.stop = `http_${res.status}`; record(); await throwHttp(res, opts.endpoint, spec); }
         if (!res.body) throw new Error('Missing app text stream');
         let text = '', stop: string | null = null, ended = false;
@@ -354,6 +364,15 @@ function refusalCode(body: unknown): ProviderRefusal | null {
   }
   return null;
 }
+const diagnosticCodes = new Set(['unsupported_parameter', 'unsupported_value', 'invalid_value', 'invalid_api_key', 'model_not_found', 'invalid_request_error', 'insufficient_quota', 'billing_hard_limit_reached', 'organization_restricted', 'organization_deactivated']);
+const diagnosticParams = new Set(['model', 'max_tokens', 'max_completion_tokens', 'temperature', 'reasoning_effort', 'response_format', 'tools', 'tool_choice', 'messages']);
+function providerDiagnostic(body: any, endpoint: string, spec: ModelSpec): void {
+  const error = body?.error;
+  console.error(JSON.stringify({ route: endpoint, event: 'provider_diagnostic', provider: spec.provider, model: spec.model,
+    code: diagnosticCodes.has(error?.code) ? error.code : null,
+    type: diagnosticCodes.has(error?.type) ? error.type : null,
+    param: diagnosticParams.has(error?.param) ? error.param : null }));
+}
 export class LlmHttpError extends Error {
   constructor(readonly status: number, message: string, readonly providerCode: ProviderRefusal | null = null) { super(message); }
 }
@@ -456,7 +475,10 @@ export async function completeJson(
       if (timeout) error.name = e instanceof Error ? e.name : 'TimeoutError';
       throw error;
     }
-    providerCode = res.ok ? null : refusalCode(await res.clone().json().catch(() => null));
+    providerResponse(res, opts.endpoint, spec);
+    const errorBody = res.ok ? null : await res.clone().json().catch(() => null);
+    if (!res.ok) providerDiagnostic(errorBody, opts.endpoint, spec);
+    providerCode = refusalCode(errorBody);
     // Billing exhaustion cannot recover through a retry or a cheaper-model fallback.
     if (providerCode === 'insufficient_quota' || providerCode === 'billing_hard_limit_reached') break;
     if (res.ok || !RETRY_STATUS(res.status) || !canRetry()) break;
