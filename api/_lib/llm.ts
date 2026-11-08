@@ -88,6 +88,8 @@ function textRequest(spec: ModelSpec, system: string, messages: TextMessage[], s
   body[legacyOpenAi(spec.model) ? 'max_tokens' : 'max_completion_tokens'] = spec.maxTokens;
   if (stream) { body.stream = true; body.stream_options = { include_usage: true }; }
   if (tool) {
+    // Luna's Chat Completions function tools require reasoning to be explicitly disabled.
+    if (/^gpt-6-luna(?:$|-)/.test(spec.model)) body.reasoning_effort = 'none';
     body.tools = [{ type: 'function', function: { name: tool.name, description: tool.description, parameters: tool.parameters } }];
     body.tool_choice = { type: 'function', function: { name: tool.name } };
   }
