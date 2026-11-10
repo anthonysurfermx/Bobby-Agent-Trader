@@ -3566,24 +3566,35 @@ function onStage(p){
 /* Acknowledgment after two real animation frames with a settled, visible result card.
    Native retains the signed receipt; this trusted page only names the current request UUID. */
 function observePresentedRead(){
-  if (ST.name === 'THESIS_VIEW' || A.viewOnly) return;
   var r = READ;
-  if (!r || !r.model || !r.reply || r.reply.status !== 'ok' || !r.requestId || r.presented || !canRun()) return;
-  var visible = false;
+  if (!r || !r.model || !r.reply || r.reply.status !== 'ok' || !r.requestId || r.presented || r.presentationPending || r.presentationAttempts >= 3) return;
+  if (ST.name === 'THESIS_VIEW' || A.viewOnly || !canRun()){ r.visibleFrames = 0; return; }
+  if (r.presentationRetryAt && performance.now() < r.presentationRetryAt) return;
+  var visibleCard = -1;
   if (A.cardsOn){
     for (var i = 0; i < el.cards.length; i++){
+      if (r.presentationCard != null && r.presentationCard !== i) continue;
       var c = el.cards[i];
       if (!A.rev[i] || A.rev[i].x < 0.999 || !c.textContent.trim()) continue;
       var box = c.getBoundingClientRect(), style = W.getComputedStyle(c);
       if (style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity) >= 0.5 &&
-          box.width > 0 && box.height > 0 && box.right > 0 && box.bottom > 0 && box.left < W.innerWidth && box.top < W.innerHeight){ visible = true; break; }
+          box.width > 0 && box.height > 0 && box.right > 0 && box.bottom > 0 && box.left < W.innerWidth && box.top < W.innerHeight){ visibleCard = i; break; }
     }
   }
-  if (!visible){ r.visibleFrames = 0; return; }
+  if (visibleCard < 0){ r.visibleFrames = 0; return; }
   r.visibleFrames = (r.visibleFrames || 0) + 1;
   if (r.visibleFrames < 2) return;
-  r.presented = true;
-  bcall('read.rendered', { requestId: r.requestId }).catch(noop);
+  r.presentationCard = visibleCard;
+  r.presentationPending = true;
+  r.presentationAttempts = (r.presentationAttempts || 0) + 1;
+  function finished(reply){
+    r.presentationPending = false;
+    if (reply && reply.accepted === true){ r.presented = true; return; }
+    // Only a later pair of visible frames can retry. A closed or replaced read has no timer.
+    r.visibleFrames = 0;
+    r.presentationRetryAt = performance.now() + 1000 * r.presentationAttempts;
+  }
+  bcall('read.rendered', { requestId: r.requestId }).then(finished, function(){ finished(null); });
 }
 /* the header's second line: the real asset and price from ask.stage (never a JS guess) */
 function dockAsset(){
@@ -5391,7 +5402,19 @@ STATES.COMPANION={
  exit:function(next){conversationRetire(guidePanel,'sphere');conversationRetire(guideActions,'pill');GUIDE_EPOCH++;guidePanel.style.display=guideActions.style.display='none';if(VOICE.id&&!VOICE.ended)guideStopVoice();if(['LISTENING','TYPING','PRE_PERMISSION'].indexOf(next)<0&&['COMPANION','PERSONAL_QUESTION','PERSONAL_SENDING','SPEAKING_DIAL'].indexOf(next)<0)GUIDE=null;},
  tick:function(){if(!GUIDE||GUIDE.status!=='companion')return;var ready=GUIDE.questionSpoken&&!GUIDE.voiceOff?GUIDE.voiceDone:clk-GUIDE.settledAt>=1.5;if(ready&&!GUIDE.slotReady&&!GUIDE.slotSuppressed){GUIDE.slotReady=true;guideRender();}if(!VOICE.started&&!VOICE.ended&&clk-VOICE.reqT>VOICE_WAIT){guideStopVoice();GUIDE.voiceOff=true;hint(tt('cap.voiceUnavailable'));guideRender();}},
  on:function(name,p){if(name==='voice.start'){pillMode('stop');att(el.sphereA,'aria-label',tt('aria.speaking'));}else if(name==='voice.end'){if(GUIDE)GUIDE.voiceDone=true;pillMode(idleMode());if(p&&p.reason==='failed'){GUIDE.voiceOff=true;hint(tt('cap.voiceUnavailable'));guideRender();}}},
- down:function(hit,p){if(hit==='pill')return pillDown(p,true);if(hit==='avatar')return tapG(function(){guideStopVoice();openNative('account');});if(hit==='close')return tapG(function(){var draft=GUIDE.status==='companion_error'&&READ?READ.question:'',spoken=!!GUIDE.questionSpoken,retry=draft?{retry:GUIDE.requestId}:null;GUIDE=null;READ=null;if(draft)holdDraft(draft,'',spoken,retry);else go('RETURNING');});return null;}
+ down:function(hit,p){
+  if(hit==='pill')return pillDown(p,true);
+  if(hit==='avatar')return tapG(function(){guideStopVoice();openNative('account');});
+  if(hit==='close')return tapG(function(){
+   var draft=GUIDE.status==='companion_error'&&READ?READ.question:'';
+   var spoken=!!GUIDE.questionSpoken;
+   // Before native issues an ID, the original question is the only valid retry.
+   var params=draft&&(GUIDE.requestId?{retry:GUIDE.requestId}:READ.params);
+   GUIDE=null;READ=null;
+   if(draft)holdDraft(draft,'',spoken,params);else go('RETURNING');
+  });
+  return null;
+ }
 };
 function guideFade(){var more=guideNarrative.scrollTop+guideNarrative.clientHeight<guideNarrative.scrollHeight-1;guideNarrative.style.setProperty('--fade-top',guideNarrative.scrollTop>0?'20px':'0px');guideNarrative.style.setProperty('--fade-bottom',more?'28px':'0px');}
 var guideDrag=null;

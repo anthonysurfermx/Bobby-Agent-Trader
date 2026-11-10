@@ -199,6 +199,56 @@ final class NucleoRemediationTests: XCTestCase {
         }
     }
 
+    func testChartOutageKeepsTheResolvedQuestionForOneTapRetryBeforeMetering() async throws {
+        let desk = makeDesk(Identity())
+        let question = "Analyze NVDA after yesterday's close"
+        for (status, body) in [(502, #"{"error":"provider unavailable"}"#), (429, "{}"), (200, "{}")] {
+            B34Stub.install { call in
+                call.path == "/api/stock-candles" ? .json(status, body) : Self.market(call)
+            }
+            let failed = try await desk.ask(NucleoParams(["question": question]))
+            XCTAssertEqual(failed["status"] as? String, "error")
+            XCTAssertEqual(failed["code"] as? String, "desk_unavailable")
+            XCTAssertTrue(pulseCalls().isEmpty)
+            XCTAssertFalse(B34Stub.requests.contains { $0.path == "/api/desk-debate" })
+            let token = try XCTUnwrap(failed["retry"] as? String)
+            B34Stub.install(Self.market)
+            let retried = try await desk.ask(NucleoParams(["token": token]))
+            XCTAssertEqual(retried["question"] as? String, question)
+            XCTAssertEqual(retried["status"] as? String, "ok")
+            XCTAssertFalse(B34Stub.requests.contains { $0.path == "/api/bobby-asset-search" })
+        }
+    }
+
+    func testSuccessfulEmptyChartStillReportsThinData() async throws {
+        let desk = makeDesk(Identity())
+        B34Stub.install { call in
+            call.path == "/api/stock-candles" ? .json(200, #"{"candles":[]}"#) : Self.market(call)
+        }
+        let reply = try await desk.ask(NucleoParams(["question": "Analyze NVDA"]))
+        XCTAssertEqual(reply["reason"] as? String, "thin_data")
+        XCTAssertNil(reply["retry"])
+        XCTAssertTrue(pulseCalls().isEmpty)
+    }
+
+    func testPremiumRetryOnlyPromisesAnAllowanceRefundWhenTheServerConfirmsIt() async throws {
+        let desk = makeDesk(Identity(), level: .profundo)
+        for (response, refunded) in [
+            (B34Stub.Reply.fail, false),
+            (.json(503, #"{"code":"analysis_failed"}"#), false),
+            (.json(503, #"{"code":"analysis_failed","refunded":false}"#), false),
+            (.json(503, #"{"code":"analysis_failed","refunded":true}"#), true)
+        ] {
+            B34Stub.install { call in call.path == "/api/desk-debate" ? response : Self.market(call) }
+            let reply = try await desk.ask(NucleoParams(["question": "Analyze NVDA"]))
+            XCTAssertEqual(reply["status"] as? String, "level_notice")
+            XCTAssertEqual(reply["level"] as? String, "profundo")
+            let refundMessage = L.t("Nothing was taken from your allowance.", "No se descontó nada de tu cupo.")
+            XCTAssertEqual(reply["sub"] as? String == refundMessage, refunded)
+            XCTAssertNotNil(reply["token"] as? String)
+        }
+    }
+
     func testPremiumRefusalNeverStartsALegacyMeteredPulse() async throws {
         let desk = makeDesk(Identity(), level: .profundo)
         B34Stub.install { call in
