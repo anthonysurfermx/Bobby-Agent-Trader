@@ -19,7 +19,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { X509Certificate, createHash, verify as verifySignature } from 'node:crypto';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { requireIdentity, resolveIdentity } from './_lib/user-identity.js';
-import { getSubscription, paywallOn, publicSubscription, readAccess, readLevels, touchDevice, upsertSubscription } from './_lib/access.js';
+import { getSubscription, paywallOn, publicSubscription, readAccess, readLevels, touchDevice, upsertSubscription, type SubscriptionRow } from './_lib/access.js';
 import { waitUntil } from '@vercel/functions';
 import { claimReferral, isReferralCode, referralStatus } from './_lib/referrals.js';
 import { isCouponCode, normalizeCoupon, redeemCoupon } from './_lib/coupons.js';
@@ -41,6 +41,14 @@ const APPLE_PRODUCT_IDS = new Set(['xyz.bobbyprotocol.bobby.pro.monthly']);
 const APPLE_ROOT_G3_SHA256 = '63343abfb89a6a03ebb57e9b3f5fa7be7c4f5c756f3017b3a8c488c3653e9179';
 
 const stripeReady = () => Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID);
+
+function hasBillableCardPlan(subscription: SubscriptionRow | null): boolean {
+  if (!subscription) return false;
+  if (subscription.stripe_subscription_id) return !STRIPE_TERMINAL.has(subscription.status);
+  // RevenueCat Web Billing mirrors a paid card period without a direct Stripe subscription ID.
+  return subscription.provider === 'stripe' && ['active', 'trialing'].includes(subscription.status)
+    && (!subscription.current_period_end || Date.parse(subscription.current_period_end) > Date.now());
+}
 
 /** Only bounded interface state returns from billing; callers cannot choose a return host or path. */
 function billingInterface(body: Record<string, unknown>): { query: URLSearchParams; stripeLocale?: string } {
@@ -138,9 +146,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       subscription: publicSubscription(subscription),
       // App Store sales close only for a known account that still has a card plan able to charge. A signed-out
       // caller always sees them open (the shipped iPhone paywall reads this before sign-in; it cannot buy until then).
-      payments: { stripe: stripeReady(), apple: revenueCatReady() && (!identity || (subscriptionAvailable && !(
-        subscription?.stripe_subscription_id && !STRIPE_TERMINAL.has(subscription.status)
-      ))), revenuecat: revenueCatReady() },
+      payments: { stripe: stripeReady(), apple: revenueCatReady() && (!identity || (subscriptionAvailable && !hasBillableCardPlan(subscription))),
+        revenuecat: revenueCatReady() },
     });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -181,13 +188,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try { existing = await getSubscription(identity.id); } catch { return res.status(503).json({ error: 'Payments are temporarily unavailable. Try again in a moment.' }); }
       // One plan per account: never sell a second subscription to someone who already has Bobby Pro (double billing,
       // and cancelling either one would drop Pro while the other keeps charging). Audit 2026-10-02, STRIPE-04.
-      const live = existing && ((existing.stripe_subscription_id && !STRIPE_TERMINAL.has(existing.status))
-        || (existing.provider === 'apple' && ['active', 'trialing'].includes(existing.status)
-          && (!existing.current_period_end || Date.parse(existing.current_period_end) > Date.now()))
-        || (['active', 'trialing'].includes(existing.apple_status ?? '')
-          && (!existing.apple_current_period_end || Date.parse(existing.apple_current_period_end) > Date.now())));
-      if (live) {
-        const provider = ['active', 'trialing'].includes(existing.apple_status ?? '') ? 'apple' : existing.provider;
+      const appleActive = publicSubscription(existing)?.appleActive;
+      if (appleActive || hasBillableCardPlan(existing)) {
+        const provider = appleActive ? 'apple' : 'stripe';
         return res.status(409).json({ code: 'already_pro', provider,
           error: provider === 'stripe' ? 'You already have Bobby Pro. Manage it from your account.' : 'You already have Bobby Pro through the App Store.' });
       }

@@ -268,6 +268,18 @@ const accessGet = async () => {
 reset();
 subs.set('id-buyer', { identity_id: 'id-buyer', provider: 'stripe', status: 'paused', stripe_subscription_id: 'sub_paused', stripe_customer_id: 'cus_paused' });
 eq((await accessGet()).body?.payments?.apple, false, 'Apple sales are closed for an account with a nonterminal card plan');
+for (const status of ['active', 'trialing']) {
+  reset();
+  subs.set('id-buyer', { identity_id: 'id-buyer', provider: 'stripe', status, current_period_end: future });
+  eq((await accessGet()).body?.payments?.apple, false, `An ${status} Web Billing period closes App Store sales without a direct Stripe id`);
+  const blocked = await call();
+  eq([blocked.statusCode, blocked.body?.code, blocked.body?.provider, stripeCalls.length], [409, 'already_pro', 'stripe', 0],
+    `An ${status} Web Billing period cannot start a second checkout`);
+}
+reset();
+subs.set('id-buyer', { identity_id: 'id-buyer', provider: 'stripe', status: 'active', current_period_end: '2000-01-01T00:00:00Z' });
+eq((await accessGet()).body?.payments?.apple, true, 'An elapsed Web Billing period allows an App Store purchase');
+eq((await call()).statusCode, 200, 'An elapsed Web Billing period allows a new checkout');
 reset();
 subscriptionReadFails = true;
 eq((await accessGet()).body?.payments?.apple, false, 'Apple sales fail closed when account billing state cannot be read');
