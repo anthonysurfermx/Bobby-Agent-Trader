@@ -9,7 +9,7 @@ import { AuthProvider } from './hooks/useAuth';
 import Web3ContextProvider from '@/libs/components/Web3ContextProvider';
 import ProtectedRoute, { GuestRoute } from '@/components/auth/ProtectedRoute';
 import { ThemeProvider } from '@/components/ThemeProvider';
-import { lazyWithRetry } from '@/lib/lazyWithRetry';
+import { lazyWithRetry, routeWithRetry } from '@/lib/lazyWithRetry';
 import { appLanguage } from '@/lib/app-language';
 import { clientLocale, rememberQueryLanguage } from '@/lib/client-language';
 
@@ -19,7 +19,7 @@ import UserLayout from '@/pages/user/UserLayout';
 
 // Lazy load todas las páginas para mejor performance
 const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
-const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
+const loadProtocolLanding = routeWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
 const BobbySignInPage = lazyWithRetry(() => import('@/pages/BobbySignInPage'), 'bobby-signin');
 
 // A direct visit to "/" is served by middleware. Reload client-side navigation to reach that page.
@@ -43,7 +43,7 @@ const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLandingExper
 const BobbyAppLandingA = lazyWithRetry(() => import('@/pages/BobbyAppLandingA'), 'app-landing-a');
 const BobbyAppLandingB = lazyWithRetry(() => import('@/pages/BobbyAppLandingB'), 'app-landing-b');
 // Direction A3 (sticker poster stack + Bobby's world) is /app since 2026-09-24; /app-world stays as an alias.
-const BobbyAppLandingWorld = lazyWithRetry(() => import('@/pages/BobbyAppLandingWorld'), 'app-landing-world');
+const loadAppLanding = routeWithRetry(() => import('@/pages/BobbyAppLandingWorld'), 'app-landing-world');
 const BobbySupportPage = lazy(() => import('@/pages/BobbySupportPage'));
 const BobbyRedeemPage = lazy(() => import('@/pages/BobbyRedeemPage'));
 const BobbyInvitePage = lazy(() => import('@/pages/BobbyInvitePage'));
@@ -267,7 +267,7 @@ class ErrorBoundary extends React.Component<
 // ==========================================
 
 // Crear el router con todas las rutas y future flags
-const router = createBrowserRouter(
+export const router = createBrowserRouter(
   [
     {
       path: '/',
@@ -300,27 +300,18 @@ const router = createBrowserRouter(
         },
         {
           path: 'protocol',
-          element: (
-            <Suspense fallback={<PageLoader />}>
-              <BobbyProtocolLanding />
-            </Suspense>
-          ),
+          lazy: loadProtocolLanding,
+          HydrateFallback: PageLoader,
         },
         {
           path: 'app',
-          element: (
-            <Suspense fallback={<PageLoader />}>
-              <BobbyAppLandingWorld />
-            </Suspense>
-          ),
+          lazy: loadAppLanding,
+          HydrateFallback: PageLoader,
         },
         {
           path: 'app-world',
-          element: (
-            <Suspense fallback={<PageLoader />}>
-              <BobbyAppLandingWorld />
-            </Suspense>
-          ),
+          lazy: loadAppLanding,
+          HydrateFallback: PageLoader,
         },
         {
           // The previous /app, one click away so a rollback is a route change.

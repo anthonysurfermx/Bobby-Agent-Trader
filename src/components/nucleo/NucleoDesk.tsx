@@ -250,7 +250,7 @@ export default function NucleoDesk() {
   // The live desk: each argument as it arrives; a debate that did not finish; what "Retry" re-runs.
   const [live, setLive] = useState<LiveArgs>({});
   const [agentsFailed, setAgentsFailed] = useState<{ level: DeskLevel; symbol: string; refunded: boolean } | null>(null);
-  const [deskRetry, setDeskRetry] = useState<{ symbol: string; level: DeskLevel } | null>(null);
+  const [deskRetry, setDeskRetry] = useState<{ question: string; level: DeskLevel } | null>(null);
   const [showDebate, setShowDebate] = useState(false);
   const phaseRef = useRef<Phase>(phase);
   phaseRef.current = phase;
@@ -375,7 +375,7 @@ export default function NucleoDesk() {
         : t(`The agents did not finish for ${snap.symbol}. Try again.`, `Los agentes no terminaron con ${snap.symbol}. Inténtalo de nuevo.`, `Os agentes não terminaram com ${snap.symbol}. Tente de novo.`);
       setPhase('error');
       setDeskError(msg);
-      setDeskRetry(run.failure === 'budget_paused' ? { symbol: snap.symbol, level: 'rapido' } : { symbol: snap.symbol, level: runLevel });
+      setDeskRetry({ question: questionRef.current || snap.symbol, level: run.failure === 'budget_paused' ? 'rapido' : runLevel });
       setMessages((m) => [...m, { from: 'bobby', text: msg }]);
       say(msg);
       return;
@@ -388,7 +388,7 @@ export default function NucleoDesk() {
       setPhase('error');
       const msg = t(`The desk did not answer for ${snap.symbol}. Try again in a moment.`, `El desk no respondió por ${snap.symbol}. Inténtalo de nuevo en un momento.`, `O desk não respondeu sobre ${snap.symbol}. Tente de novo em instantes.`);
       setDeskError(msg);
-      setDeskRetry({ symbol: snap.symbol, level: runLevel });
+      setDeskRetry({ question: questionRef.current || snap.symbol, level: runLevel });
       setMessages((m) => [...m, { from: 'bobby', text: msg }]);
       say(msg);
       return;
@@ -455,6 +455,7 @@ export default function NucleoDesk() {
     setDeskError(null);
     setGuide(null);
     setGuideRetry(null);
+    setDeskRetry(null);
     setAnswer(null);
     setSnapshot(null);
     setPending(null);
@@ -473,11 +474,23 @@ export default function NucleoDesk() {
     // "bitcoin" in it must not open a market read the person did not ask for.
     const { found: r, unavailable } = via === 'guide' ? { found: null, unavailable: false } : await resolveQuestion(q, controller.signal);
     if (controller.signal.aborted) return;
-    // A question that names no asset is the companion's, when the pilot is on. A search that did not answer is
-    // not "no asset": it keeps today's message. Off, or unable to answer, the desk does what it did before.
+    if (unavailable) {
+      const msg = t(
+        'Asset search is unavailable. Try your question again.', 'La búsqueda de activos no está disponible. Vuelve a intentar tu pregunta.',
+        'A busca de ativos está indisponível. Tente fazer sua pergunta novamente.', 'La recherche d’actifs est indisponible. Réessayez votre question.',
+        'La ricerca degli asset non è disponibile. Riprova con la tua domanda.', 'Die Asset-Suche ist nicht verfügbar. Versuche es mit deiner Frage erneut.',
+      );
+      exchangeRef.current = previous;
+      setDeskError(msg);
+      setDeskRetry({ question: q, level: lv });
+      setMessages((m) => [...m, { from: 'bobby', text: msg }]);
+      setPhase('error');
+      return;
+    }
+    // A question that names no asset is the companion's, when the pilot is on.
     // A look-alike the search offered for a whole sentence travels with the question: the companion says
     // whether the person meant that asset ("qué opinas de ethereun hoy") or not ("Tengo 1,000 pesos…" → MENGO).
-    if (!unavailable && (!r || readsAsAQuestion(q, r))) {
+    if (!r || readsAsAQuestion(q, r)) {
       const turn = await companionTurn(q, controller.signal, r ? { symbol: r.snapshot.symbol, name: r.confirmName } : undefined, previous);
       if (controller.signal.aborted) return;
       // An offer the person has not taken is what is on screen until they take it or ask something else.
@@ -622,10 +635,10 @@ export default function NucleoDesk() {
     setLive({}); setAgentsFailed(null); setDeskRetry(null); setGuideRetry(null); setShowDebate(false);
   };
   // "Retry" re-asks the same question, on the level that failed (or Rápido when the premium pause said so).
-  const retry = (r: { symbol: string; level: DeskLevel }) => {
+  const retry = (r: { question: string; level: DeskLevel }) => {
     sfxTock();
     if (r.level !== deskLevelRef.current) { setDeskLevel(r.level); deskLevelRef.current = r.level; }
-    void ask(questionRef.current || r.symbol);
+    void ask(r.question);
   };
 
   const chartSymbol = snapshot?.symbol ?? initialScreen.symbol;
@@ -923,7 +936,7 @@ export default function NucleoDesk() {
           <div className="n-label">{t('No verdict this time', 'Sin veredicto esta vez', 'Sem veredito desta vez')}</div>
           <p className="n-synth-head">{t('The agents did not finish, so nothing was decided. The market read below is data, not a thesis.', 'Los agentes no terminaron, así que no se decidió nada. La lectura de abajo son datos, no una tesis.', 'Os agentes não terminaram, então nada foi decidido. A leitura abaixo são dados, não uma tese.')}</p>
           {agentsFailed.level !== 'rapido' && agentsFailed.refunded && <p className="n-synth-note">{t(`Your ${levelName(agentsFailed.level)} was not used.`, `No se descontó tu ${levelName(agentsFailed.level)}.`, `Seu ${levelName(agentsFailed.level)} não foi descontado.`)}</p>}
-          <button type="button" className="n-send mt-4" onClick={() => retry({ symbol: agentsFailed.symbol, level: agentsFailed.level })}>{t('Try again', 'Reintentar', 'Tentar de novo')}</button>
+          <button type="button" className="n-send mt-4" onClick={() => retry({ question: questionRef.current || agentsFailed.symbol, level: agentsFailed.level })}>{t('Try again', 'Reintentar', 'Tentar de novo')}</button>
         </div>
       ) : agents?.synthesis ? (
         <div className="n-synth mt-8 w-full">

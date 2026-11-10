@@ -10,11 +10,11 @@ function isRetryableChunkError(error: unknown): boolean {
   );
 }
 
-export function lazyWithRetry<T extends ComponentType<any>>(
+function withRetry<T extends ComponentType<any>>(
   importer: () => LazyModule<T>,
   key: string,
 ) {
-  return lazy(async () => {
+  return async () => {
     const storageKey = `lazy-retry:${key}`;
 
     try {
@@ -41,5 +41,14 @@ export function lazyWithRetry<T extends ComponentType<any>>(
 
       throw error;
     }
-  });
+  };
+}
+
+export function lazyWithRetry<T extends ComponentType<any>>(importer: () => LazyModule<T>, key: string) {
+  return lazy(withRetry(importer, key));
+}
+
+export function routeWithRetry<T extends ComponentType<any>>(importer: () => LazyModule<T>, key: string) {
+  const load = withRetry(importer, key);
+  return async () => ({ Component: (await load()).default });
 }

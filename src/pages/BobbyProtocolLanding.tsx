@@ -157,8 +157,7 @@ function BrandMark() {
   );
 }
 
-// Full-bleed section background: video on md+, blurred still on mobile (saves data, avoids
-// mobile autoplay quirks). Poster JPGs are pre-blurred frames of the same videos.
+// Show the still at every size. Only offer the video on larger screens when motion is enabled.
 function SectionMedia({ name, className = '' }: { name: string; className?: string }) {
   return (
     <>
@@ -166,17 +165,19 @@ function SectionMedia({ name, className = '' }: { name: string; className?: stri
         src={`/posters/${name}.jpg`}
         alt=""
         aria-hidden="true"
-        className={`absolute inset-0 h-full w-full object-cover md:hidden ${className}`}
+        className={`absolute inset-0 h-full w-full object-cover md:motion-safe:hidden ${className}`}
       />
       <video
-        className={`absolute inset-0 hidden h-full w-full object-cover md:block ${className}`}
-        src={`/videos/${name}.mp4`}
+        className={`absolute inset-0 hidden h-full w-full object-cover md:motion-safe:block ${className}`}
+        poster={`/posters/${name}.jpg`}
         autoPlay
         muted
         loop
         playsInline
         aria-hidden="true"
-      />
+      >
+        <source media="(min-width: 768px) and (prefers-reduced-motion: no-preference)" src={`/videos/${name}.mp4`} type="video/mp4" />
+      </video>
     </>
   );
 }

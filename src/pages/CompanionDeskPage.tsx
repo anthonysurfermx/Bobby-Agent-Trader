@@ -10,8 +10,10 @@ import { RISK_NOTICE_VERSION, progressStore, useProgress } from '@/lib/companion
 import { consentCurrent } from '@/lib/desk-entry';
 import { htmlLang } from '@/lib/companions/i18n';
 import '@/styles/nucleo-desk.css';
+import { useNucleoFonts } from '@/hooks/useNucleoFonts';
 
 export default function CompanionDeskPage() {
+  useNucleoFonts();
   const progress = useProgress();
   useEffect(() => {
     document.body.classList.add('nucleo-ui');
