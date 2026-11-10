@@ -121,6 +121,7 @@ final class PushRegistrar: ObservableObject {
     var api = BriefingsAPI()
     var storage: PushRecordStorage
     var currentUser: () -> String? = { AccountSession.shared.session?.userId }
+    var currentGeneration: () -> UUID = { AccountSession.shared.generation }
     /// The current account's bearer (`replacing` a refused one forces a refresh).
     var accessToken: (_ replacing: String?) async -> String? = { await AccountSession.shared.accessToken(replacing: $0) }
     var riskAccepted: () -> Bool = { UserDefaults.standard.integer(forKey: "agent.riskNoticeVersion") >= RiskNotice.currentVersion }
@@ -197,12 +198,30 @@ final class PushRegistrar: ObservableObject {
 
     // MARK: registration
 
+    private struct RegistrationAccount: Equatable {
+        let owner: String
+        let generation: UUID
+    }
+
+    private var registrationAccount: RegistrationAccount? {
+        guard riskAccepted(), let owner = currentUser() else { return nil }
+        return RegistrationAccount(owner: owner, generation: currentGeneration())
+    }
+
+    private func optedIn(_ account: RegistrationAccount) async -> Bool {
+        guard registrationAccount == account else { return false }
+        let weekly = await weeklyEnabled()
+        guard registrationAccount == account else { return false }
+        let news = await newsEnabled()
+        return registrationAccount == account && (weekly || news)
+    }
+
     /// After an enable (or a sign-in that already had a binding): ask iOS for the token. R11 + account gated.
     func register() {
-        guard riskAccepted(), let owner = currentUser() else { return }
+        guard let account = registrationAccount else { return }
         Task {
             let status = await currentPermission()
-            guard status.allowsDelivery, riskAccepted(), currentUser() == owner else { return }
+            guard status.allowsDelivery, registrationAccount == account else { return }
             registerForRemote()
         }
     }
@@ -224,18 +243,17 @@ final class PushRegistrar: ObservableObject {
     /// Permission can change in Settings while the app is away. A previously failed first registration
     /// has no binding yet, so recover it only when the account still opted in and delivery is allowed.
     func appBecameActive() {
-        guard riskAccepted(), let owner = currentUser() else { return }
+        guard let account = registrationAccount else { return }
         Task {
             let status = await currentPermission()
-            guard riskAccepted(), currentUser() == owner else { return }
+            guard registrationAccount == account else { return }
+            let alreadyBound = storage.load()?.ownerUserId == account.owner
+            if alreadyBound { registerForRemote() }
+            // News also syncs the preferred language. An existing binding can refresh independently.
             let news = await newsEnabled()
-            guard riskAccepted(), currentUser() == owner else { return }
-            if storage.load()?.ownerUserId != owner {
-                guard status.allowsDelivery else { return }
-                let weekly = await weeklyEnabled()
-                let optedIn = weekly || news
-                guard optedIn, currentUser() == owner else { return }
-            }
+            guard registrationAccount == account, !alreadyBound, status.allowsDelivery else { return }
+            let weekly = await weeklyEnabled()
+            guard registrationAccount == account, weekly || news else { return }
             registerForRemote()
         }
     }
@@ -261,14 +279,12 @@ final class PushRegistrar: ObservableObject {
     }
 
     func accountDidChange() {
-        guard riskAccepted(), currentUser() != nil else { return }
+        guard let account = registrationAccount else { return }
         // Only a device that was registering this launch, or still holds a binding, follows the new account.
         guard tokenHex != nil || storage.load()?.hasBinding == true else { return }
         // The new account must have its own confirmed choice before adopting this installation.
-        let owner = currentUser()
         enqueue { registrar in
-            let weekly = await registrar.weeklyEnabled(), news = await registrar.newsEnabled()
-            guard owner != nil, registrar.currentUser() == owner, weekly || news else { return }
+            guard await registrar.optedIn(account), registrar.registrationAccount == account else { return }
             if registrar.tokenHex != nil { await registrar.syncNow() } else { registrar.register() }
         }
     }
@@ -338,43 +354,49 @@ final class PushRegistrar: ObservableObject {
     }
 
     /// The bearer of `owner`, refreshed once on a 401 only while `owner` is still the account.
-    private func auth(owner: String, bearer: String) -> BobbyMeterAuth {
+    private func auth(for account: RegistrationAccount, bearer: String) -> BobbyMeterAuth {
         BobbyMeterAuth(bearer: { bearer },
-                       refresh: { [weak self] stale in await self?.freshBearer(owner: owner, replacing: stale) },
+                       refresh: { [weak self] stale in await self?.freshBearer(for: account, replacing: stale) },
                        owner: { nil })
     }
 
-    private func freshBearer(owner: String, replacing stale: String) async -> String? {
-        guard currentUser() == owner else { return nil }
+    private func freshBearer(for account: RegistrationAccount, replacing stale: String) async -> String? {
+        guard registrationAccount == account else { return nil }
         let token = await accessToken(stale)
-        return currentUser() == owner ? token : nil
+        return registrationAccount == account ? token : nil
     }
 
     private func syncNow() async {
-        guard riskAccepted(), let owner = currentUser(), let token = tokenHex else { return }
+        guard let account = registrationAccount, let token = tokenHex else { return }
+        defer {
+            // Keep an acknowledged proof for the queued revoke, without advertising the old binding.
+            if registrationAccount != account { state = .idle; refusedRegistration = nil }
+        }
         let status = await currentPermission()
-        guard currentUser() == owner, let bearer = await accessToken(nil), currentUser() == owner else { return }
+        guard registrationAccount == account else { return }
         var record = loadRecord()
-        if record.ownerUserId != owner {
-            let weekly = await weeklyEnabled(), news = await newsEnabled()
-            guard status.allowsDelivery, riskAccepted(), currentUser() == owner, weekly || news else { return }
+        if record.ownerUserId != account.owner {
+            guard status.allowsDelivery, await optedIn(account), registrationAccount == account else { return }
         }
         let env = environment()
         let hash = Self.sha256(token)
         let device = BriefingDeviceRegistration(installationId: record.installationId, apnsToken: token,
                                                 permissionState: status.serverValue, appBuild: appBuild(), apnsEnvironment: env)
-        switch Self.decide(record: record, owner: owner, tokenHash: hash, permission: status.serverValue, environment: env, now: now()) {
-        case .none:
-            state = .registered
-        case .register:
-            await performRegister(device, owner: owner, hash: hash, auth: auth(owner: owner, bearer: bearer), record: &record)
-        case .rebind:
-            await performRebind(device, owner: owner, hash: hash, auth: auth(owner: owner, bearer: bearer), record: &record, retries: 1)
+        let action = Self.decide(record: record, owner: account.owner, tokenHash: hash, permission: status.serverValue, environment: env, now: now())
+        guard action != .none else { state = .registered; return }
+        guard let bearer = await accessToken(nil), registrationAccount == account else { return }
+        let auth = auth(for: account, bearer: bearer)
+        if action == .register {
+            await performRegister(device, account: account, hash: hash, auth: auth, record: &record)
+        } else {
+            await performRebind(device, account: account, hash: hash, auth: auth, record: &record, retries: 1)
         }
     }
 
-    private func performRegister(_ device: BriefingDeviceRegistration, owner: String, hash: String,
+    private func performRegister(_ device: BriefingDeviceRegistration, account: RegistrationAccount, hash: String,
                                  auth: BobbyMeterAuth, record: inout PushRecord) async {
+        guard registrationAccount == account else { return }
+        let owner = account.owner
         let refusalKey = owner + "|" + hash + "|" + device.apnsEnvironment
         guard refusedRegistration != refusalKey else { state = .unavailable; return }
         let digest = Self.digest(["register", owner, device.installationId, device.apnsToken, device.permissionState,
@@ -406,10 +428,12 @@ final class PushRegistrar: ObservableObject {
         }
     }
 
-    private func performRebind(_ device: BriefingDeviceRegistration, owner: String, hash: String,
+    private func performRebind(_ device: BriefingDeviceRegistration, account: RegistrationAccount, hash: String,
                                auth: BobbyMeterAuth, record: inout PushRecord, retries: Int) async {
+        guard registrationAccount == account else { return }
+        let owner = account.owner
         guard let registrationId = record.registrationId, let revision = record.bindingRevision, let proof = record.credential else {
-            return await performRegister(device, owner: owner, hash: hash, auth: auth, record: &record)
+            return await performRegister(device, account: account, hash: hash, auth: auth, record: &record)
         }
         let digest = Self.digest(["rebind", owner, registrationId, String(revision), device.installationId, device.apnsToken,
                                   device.permissionState, String(device.appBuild), device.apnsEnvironment])
@@ -430,12 +454,12 @@ final class PushRegistrar: ObservableObject {
                 // The proof no longer matches (revoked, purged, or rotated elsewhere): start over once.
                 record.dropBinding()
                 storage.save(record)
-                await performRegister(device, owner: owner, hash: hash, auth: auth, record: &record)
+                await performRegister(device, account: account, hash: hash, auth: auth, record: &record)
             case .conflict(let current?) where retries > 0:
                 record.bindingRevision = current
                 record.pending = nil
                 storage.save(record)
-                await performRebind(device, owner: owner, hash: hash, auth: auth, record: &record, retries: retries - 1)
+                await performRebind(device, account: account, hash: hash, auth: auth, record: &record, retries: retries - 1)
             default:
                 record.pending = nil
                 storage.save(record)
