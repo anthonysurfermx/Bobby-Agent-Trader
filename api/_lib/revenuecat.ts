@@ -97,6 +97,7 @@ export interface RevenueCatPaidEvent {
 }
 
 interface RcSubscriber {
+  management_url?: unknown;
   entitlements?: Record<string, { expires_date?: string | null; product_identifier?: string }>;
   subscriptions?: Record<string, RcSubscription>;
 }
@@ -329,23 +330,45 @@ async function storeAppleMirror(identityId: string, stripeSubscriptionId: string
   if (rows.length !== 1) throw new Error('apple mirror owner changed');
 }
 
-/** Mirror the subscriber's `pro` entitlement into bobby_subscriptions; returns whether it is active. */
-export async function syncRevenueCat(authUserId: string, identityId: string, paidEventOrOptions?: RevenueCatPaidEvent | { keepAccess?: boolean }): Promise<boolean> {
-  const paidEvent = paidEventOrOptions && !('keepAccess' in paidEventOrOptions) ? paidEventOrOptions as RevenueCatPaidEvent : undefined;
+async function readSubscriber(authUserId: string): Promise<RcSubscriber | undefined> {
   if (!revenueCatReady()) throw new Error('RevenueCat is not configured');
   const r = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(authUserId)}`, {
     headers: { Authorization: `Bearer ${secretKey()}`, 'Content-Type': 'application/json' },
     signal: AbortSignal.timeout(8000),
   }).catch(() => null);
   if (!r) throw new RevenueCatError(0, 'unavailable');
-  if (r.status === 401 || r.status === 403) {
-    const alert = alertRejectedKey(r.status).catch(() => undefined);
-    try { waitUntil(alert); } catch { /* outside a request context */ }
-    throw new RevenueCatError(r.status, 'key_rejected');
-  }
+  if (r.status === 401 || r.status === 403) throw new RevenueCatError(r.status, 'key_rejected');
   if (r.status === 404) throw new RevenueCatError(404, 'not_found');
   if (!r.ok) throw new RevenueCatError(r.status, 'unavailable');
   const { subscriber } = (await r.json()) as { subscriber?: RcSubscriber };
+  return subscriber;
+}
+
+/** RevenueCat returns one management URL across stores. Only its hosted web portal and Stripe's can manage a web plan. */
+export async function webBillingPortal(authUserId: string): Promise<string | null> {
+  const subscriber = await readSubscriber(authUserId).catch((error: unknown) => {
+    if (error instanceof RevenueCatError && error.kind === 'not_found') return undefined;
+    throw error;
+  });
+  const raw = subscriber?.management_url;
+  if (typeof raw !== 'string') return null;
+  try {
+    const url = new URL(raw);
+    if (url.username || url.password || !['https://billing.revenuecat.com', 'https://billing.stripe.com'].includes(url.origin)) return null;
+    return url.href;
+  } catch { return null; }
+}
+
+/** Mirror the subscriber's `pro` entitlement into bobby_subscriptions; returns whether it is active. */
+export async function syncRevenueCat(authUserId: string, identityId: string, paidEventOrOptions?: RevenueCatPaidEvent | { keepAccess?: boolean }): Promise<boolean> {
+  const paidEvent = paidEventOrOptions && !('keepAccess' in paidEventOrOptions) ? paidEventOrOptions as RevenueCatPaidEvent : undefined;
+  const subscriber = await readSubscriber(authUserId).catch((error: unknown) => {
+    if (error instanceof RevenueCatError && error.kind === 'key_rejected') {
+      const alert = alertRejectedKey(error.status).catch(() => undefined);
+      try { waitUntil(alert); } catch { /* outside a request context */ }
+    }
+    throw error;
+  });
   const ent = subscriber?.entitlements?.[PRO_ENTITLEMENT];
   const current = await getSubscription(identityId);
   const checkedAt = new Date().toISOString();

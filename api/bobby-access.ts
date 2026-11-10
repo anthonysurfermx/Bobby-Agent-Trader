@@ -7,13 +7,13 @@
 //   POST { action: 'redeem-coupon', code }  → { result, granted, bonus, access, levels }  redeem a coupon that
 //        gifts extra reads / Profundo / Máximo (api/_lib/coupons.ts); 10 attempts per hour per account, 30 per network
 //   POST { action: 'checkout' }           → { url }  Stripe Checkout, US$4.90/month (web)
-//   POST { action: 'portal' }             → { url }  Stripe billing portal (manage / cancel)
+//   POST { action: 'portal' }             → { url }  the account's web billing portal (manage / cancel)
 //   POST { action: 'revenuecat-sync' }   → { ok, access, subscription }  re-read the `pro` entitlement
 //        from RevenueCat for this account (after a purchase or restore in the app).
 //   POST { action: 'apple', signedTransaction } → { ok, access, subscription }
 //        a StoreKit 2 transaction (JWS) verified against Apple Root CA G3, then stored.
 // Headers: x-bobby-device, x-bobby-platform, and the account credential (see user-identity.ts).
-// Stripe runs only when STRIPE_SECRET_KEY + STRIPE_PRICE_ID are set; otherwise 503, never a fake success.
+// Selling by card needs STRIPE_SECRET_KEY and STRIPE_PRICE_ID. Managing an existing Stripe customer needs only the key.
 // ============================================================
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { X509Certificate, createHash, verify as verifySignature } from 'node:crypto';
@@ -27,7 +27,7 @@ import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
 import { FREE_READS, LEVEL_LIMITS, REFERRAL } from './_lib/desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
-import { revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
+import { revenueCatReady, syncRevenueCat, webBillingPortal } from './_lib/revenuecat.js';
 import { appLocale, isAppLanguage } from '../src/lib/app-language.js';
 import { customerFor, expireCheckoutSession, findCustomer, STRIPE_TERMINAL, stripeApi } from './_lib/stripe-api.js';
 import { claimCheckout, completeCheckout } from './_lib/checkout-attempt.js';
@@ -267,10 +267,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (action === 'portal') {
-      if (!stripeReady()) return res.status(503).json({ error: 'Card payments are not switched on yet.' });
       const existing = await getSubscription(identity.id);
+      if (existing && !existing.stripe_subscription_id && hasBillableCardPlan(existing)) {
+        const url = identity.authUserId ? await webBillingPortal(identity.authUserId) : null;
+        if (!url) return res.status(409).json({ code: 'billing_receipt', error: 'Open the management link in your subscription receipt.' });
+        return res.status(200).json({ url });
+      }
+      if (!process.env.STRIPE_SECRET_KEY) return res.status(503).json({ error: 'Card management is temporarily unavailable.' });
       // The row may not carry the customer yet (webhook pending or retrying): Stripe is asked by metadata, never created.
-      const portalCustomer = await findCustomer(identity.id, existing?.stripe_customer_id).catch(() => null);
+      const portalCustomer = await findCustomer(identity.id, existing?.stripe_customer_id);
       if (!portalCustomer) return res.status(404).json({ error: 'No card subscription on this account.' });
       const context = billingInterface(body);
       const portal = await stripe('billing_portal/sessions', { customer: portalCustomer, return_url: billingReturn(siteOrigin(req), context.query), ...(context.stripeLocale ? { locale: context.stripeLocale } : {}) });
@@ -317,7 +322,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (e) {
-    console.error('[bobby-access]', action, e instanceof Error ? e.message : e);
+    // An upstream portal error can include a temporary customer link. Keep its payload out of logs.
+    if (action === 'portal') console.error('[bobby-access] billing portal unavailable');
+    else console.error('[bobby-access]', action, e instanceof Error ? e.message : e);
     const busy = action === 'referral-claim' ? 'Invitations are temporarily unavailable. Try again.'
       : action === 'redeem-coupon' ? 'Coupons are temporarily unavailable. Try again.'
       : 'Payments are temporarily unavailable. Try again.';
