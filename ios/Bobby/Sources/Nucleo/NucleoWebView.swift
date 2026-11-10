@@ -27,6 +27,7 @@ final class NucleoWebController: NSObject, WKNavigationDelegate, WKUIDelegate, N
     let webView: WKWebView
     /// Hosts the web view plus the snapshot overlay of a cross-fade.
     let container = UIView()
+    private var pageOffsetObservation: NSKeyValueObservation?
     private(set) var page: NucleoPage = .app
     private var ready = false
     private var overlay: UIView?
@@ -56,6 +57,16 @@ final class NucleoWebController: NSObject, WKNavigationDelegate, WKUIDelegate, N
         webView.scrollView.isScrollEnabled = false
         webView.scrollView.bounces = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+        // Each page fits its stage and places its editor above the keyboard itself. WebKit
+        // can still pan the disabled root scroll view to reveal a focused textarea.
+        // Keep that root anchored while the page's own reading regions scroll normally.
+        pageOffsetObservation = webView.scrollView.observe(\.contentOffset) { scrollView, _ in
+            MainActor.assumeIsolated {
+                if scrollView.contentOffset.y > 0 {
+                    scrollView.setContentOffset(CGPoint(x: scrollView.contentOffset.x, y: 0), animated: false)
+                }
+            }
+        }
         webView.allowsBackForwardNavigationGestures = false
         webView.allowsLinkPreview = false
 #if DEBUG

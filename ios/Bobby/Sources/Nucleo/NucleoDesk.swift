@@ -247,10 +247,13 @@ enum NucleoDeskIO {
             let reply = try await BobbyAPI.response(candlePath(symbol: symbol, isEquity: isEquity))
             if [408, 425, 429].contains(reply.status) || (500..<600).contains(reply.status) { return .unavailable }
             guard (200..<300).contains(reply.status) else { return .bars([]) }
-            guard let obj = reply.json as? [String: Any], obj["candles"] is [Any] || obj["data"] is [Any] else {
+            guard let obj = reply.json as? [String: Any],
+                  let primary = obj["candles"] as? [Any] ?? obj["data"] as? [Any] else {
                 return .unavailable
             }
-            return .bars(decodeCandles(obj))
+            let rows = primary.isEmpty ? (obj["data"] as? [Any] ?? []) : primary
+            let bars = decodeCandles(rows)
+            return !rows.isEmpty && bars.isEmpty ? .unavailable : .bars(bars)
         } catch let error as URLError {
             return .failed(error.code)
         } catch {
@@ -259,12 +262,10 @@ enum NucleoDeskIO {
     }
 
     /// Rows need ts/open/high/low/close; volume defaults to 0; ascending by time.
-    static func decodeCandles(_ body: [String: Any]) -> [Bar] {
-        let candles = body["candles"] as? [[String: Any]] ?? []
-        let rows = candles.isEmpty ? (body["data"] as? [[String: Any]] ?? []) : candles
+    private static func decodeCandles(_ rows: [Any]) -> [Bar] {
         var out: [Bar] = []
-        for r in rows {
-            guard let t = num(r["ts"]), let o = num(r["open"]), let h = num(r["high"]),
+        for row in rows {
+            guard let r = row as? [String: Any], let t = num(r["ts"]), let o = num(r["open"]), let h = num(r["high"]),
                   let l = num(r["low"]), let c = num(r["close"]), abs(t) < 1e15 else { continue }
             out.append(Bar(t: Int(t), o: o, h: h, l: l, c: c, v: num(r["volume"]) ?? 0))
         }

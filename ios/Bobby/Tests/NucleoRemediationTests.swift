@@ -202,7 +202,8 @@ final class NucleoRemediationTests: XCTestCase {
     func testChartOutageKeepsTheResolvedQuestionForOneTapRetryBeforeMetering() async throws {
         let desk = makeDesk(Identity())
         let question = "Analyze NVDA after yesterday's close"
-        for (status, body) in [(502, #"{"error":"provider unavailable"}"#), (429, "{}"), (200, "{}")] {
+        for (status, body) in [(502, #"{"error":"provider unavailable"}"#), (429, "{}"), (200, "{}"),
+                               (200, #"{"candles":[{"close":null},null]}"#)] {
             B34Stub.install { call in
                 call.path == "/api/stock-candles" ? .json(status, body) : Self.market(call)
             }
@@ -229,6 +230,18 @@ final class NucleoRemediationTests: XCTestCase {
         XCTAssertEqual(reply["reason"] as? String, "thin_data")
         XCTAssertNil(reply["retry"])
         XCTAssertTrue(pulseCalls().isEmpty)
+    }
+
+    func testMalformedSiblingDoesNotDiscardAValidLegacyCandle() async throws {
+        let desk = makeDesk(Identity())
+        B34Stub.install { call in
+            guard call.path == "/api/stock-candles" else { return Self.market(call) }
+            let row: [String: Any] = ["ts": Date().timeIntervalSince1970 * 1000, "open": 10, "high": 11, "low": 9, "close": 10]
+            return Self.json(200, ["candles": [], "data": [NSNull(), row] as [Any]])
+        }
+        let reply = try await desk.ask(NucleoParams(["question": "Analyze NVDA"]))
+        XCTAssertEqual(reply["status"] as? String, "ok")
+        XCTAssertEqual((reply["candles"] as? [[String: Any]])?.count, 1)
     }
 
     func testPremiumRetryOnlyPromisesAnAllowanceRefundWhenTheServerConfirmsIt() async throws {

@@ -8,7 +8,7 @@ import Foundation
 
 enum NucleoFixtures {
     static let scenarios: Set<String> = ["companion-answer-slow","companion-probe-recovery","companion-gist-long","companion-limit-today","companion-limit-tomorrow","companion-confirm-last","companion-confirm-unknown","companion-confirm-guest","companion-confirm-deep","companion-confirm-max","companion-pro-deep","companion-confirm-long","companion-no-gist", "companion-wrong-gist", "companion-paused", "companion-retry", "companion-closing", "companion-no-followup", "companion-long", "companion-pro", "companion-waiting", "companion", "companion-fact", "companion-answer-error", "companion-exercise", "companion-belief", "companion-plain", "companion-off", "companion-error", "companion-limit", "companion-mismatch", "companion-offer", "default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline",
-                                         "signin_required", "subscription_required",
+                                         "signin_required", "subscription_required", "companion-candle-recovery",
                                          "levels", "upgrade_required", "level_exhausted", "budget_paused"]
     /// Analysis levels (DEBUG QA): `levels` answers a premium desk with a synthesis, a second round, scenarios,
     /// sufficiency and evidence; the other three refuse a premium level the way the server does.
@@ -20,6 +20,7 @@ enum NucleoFixtures {
     private static let lock = NSLock()
     private static var _turnCount = 0
     private static var _probeRecovered = false
+    private static var _candleOutageServed = false
     private static var _scenario: String?
     private static var _liveVoice = false
     private static var _timeScale = 1.0
@@ -52,6 +53,7 @@ enum NucleoFixtures {
     static func activate(scenario: String, liveVoice: Bool = false, timeScale: Double = 1) {
         lock.lock()
         _turnCount = 0; _probeRecovered = false; _scenario = scenarios.contains(scenario) ? scenario : "default"
+        _candleOutageServed = false
         _liveVoice = liveVoice
         _timeScale = timeScale
         _log = []
@@ -73,7 +75,10 @@ enum NucleoFixtures {
     }
 
     static func setScenario(_ scenario: String) {
-        lock.lock(); _turnCount = 0; _probeRecovered = false; _scenario = scenarios.contains(scenario) ? scenario : "default"; lock.unlock()
+        lock.lock()
+        _turnCount = 0; _probeRecovered = false; _candleOutageServed = false
+        _scenario = scenarios.contains(scenario) ? scenario : "default"
+        lock.unlock()
     }
 
     static func record(_ line: String) {
@@ -274,6 +279,13 @@ enum NucleoFixtures {
             let symbol = url.path == "/api/stock-candles"
                 ? (param("symbol") ?? "")
                 : (param("instId") ?? "").components(separatedBy: "-USDT").first ?? ""
+            if scenario == "companion-candle-recovery", symbol == "BTC", param("bar") == "1H" {
+                lock.lock()
+                let fail = !_candleOutageServed
+                _candleOutageServed = true
+                lock.unlock()
+                if fail { return (Self.json(502, ["error": "Candle provider unavailable"]), quick) }
+            }
             guard let name = files(symbol: symbol)?["candles"] else { return (Self.json(502, ["error": "No chart data"]), quick) }
             return (serve(name), quick)
         case "/api/voice-tool":

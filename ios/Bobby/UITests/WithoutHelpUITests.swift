@@ -121,6 +121,25 @@ class ConversationFixtureCase: XCTestCase {
 }
 
 final class WithoutHelpUITests: ConversationFixtureCase {
+    func testConfirmedBitcoinReadRecoversAfterFirstCandleOutage() {
+        launch("companion-candle-recovery")
+        let question = "Analyze Bitcoin"
+        ask(question)
+        ready(confirmRead)
+        confirmRead.tap()
+
+        let retry = button("fail.retry")
+        ready(retry)
+        XCTAssertFalse(button("read.result").isHittable)
+        retry.tap()
+
+        let result = button("read.result")
+        ready(result, timeout: 45)
+        result.tap()
+        ready(button("read.home"))
+        XCTAssertTrue(web.staticTexts[question].waitForExistence(timeout: 10))
+    }
+
     func testOutsideTapClosesKeyboardWithoutSendingOrLosingDraft() {
         launch(); let question = word("ex.1"); type(question)
         let field = web.textViews.firstMatch
