@@ -154,12 +154,19 @@ async function billingApi(body,{signedIn=true,host='bobbyprotocol.xyz'}={}){
   const context=vm.createContext({console:{log(){},error(){}},URL,URLSearchParams,Buffer,AbortSignal,process:{env:{STRIPE_SECRET_KEY:'sk_test_INERT',STRIPE_PRICE_ID:'price_INERT'}},fetch:async(url,init)=>{assert.ok(String(url).startsWith('https://api.stripe.com/v1/'));requests.push({url,form:new URLSearchParams(init.body)});return{ok:true,json:async()=>({url:'https://checkout.stripe.test/INERT'})};}});
   const shared={exports:{}};vm.runInContext('(function(module,exports){'+compile(read('src/lib/app-language.ts'))+'})',context)(shared,shared.exports);
   const identity={id:'inert-owner',authUserId:'inert-user'};
+  const formerPlan = {provider: 'stripe', status: 'canceled', stripe_customer_id: 'cus_INERT', stripe_subscription_id: 'sub_INERT'};
   const forbidden=()=>{throw new Error('Unrelated billing operation must not run');};
   const stubs={
     'node:crypto':crypto,'@vercel/functions':{waitUntil(){}},
     './_lib/request-security.js':{enforcePublicRateLimit:async()=>true},
     './_lib/user-identity.js':{requireIdentity:async(_req,res)=>{if(!signedIn){res.status(401).json({error:'Inert unauthenticated'});return null;}return identity;}},
-    './_lib/access.js':{getSubscription:async()=>({stripe_customer_id:'cus_INERT'})},
+    './_lib/access.js':{
+      getSubscription: async () => formerPlan,
+      publicSubscription: plan => {
+        assert.equal(plan, formerPlan);
+        return {provider: plan.provider, status: plan.status, currentPeriodEnd: null, appleActive: false, cardPlan: false};
+      },
+    },
     './_lib/referrals.js':{},'./_lib/coupons.js':{},'./_lib/rate-limit-persistent.js':{},'./_lib/rate-limit.js':{},'./_lib/desk-levels.js':{},'./_lib/bobby-db.js':{},'./_lib/revenuecat.js':{},
     // Checkout reaches Stripe through these modules: reads find nothing open, and the one create is recorded like a fetch.
     './_lib/stripe-api.js':{STRIPE_TERMINAL:new Set(['canceled','incomplete_expired']),customerFor:async()=>'cus_INERT',findCustomer:async(_id,stored)=>stored??null,expireCheckoutSession:forbidden,
@@ -176,7 +183,10 @@ async function billingApi(body,{signedIn=true,host='bobbyprotocol.xyz'}={}){
 // Checkout is idempotent per attempt (one Stripe idempotency key per attempt, and Stripe rejects a retry whose form
 // differs), so nothing from the request body may shape its form: a retry in another language or on another asset
 // must send the very same parameters. The billing portal has no idempotency key and keeps language and asset.
-const checkoutForm=(await billingApi({action:'checkout'})).requests[0].form.toString();
+const initialCheckout = await billingApi({action:'checkout'});
+assert.equal(initialCheckout.response.statusCode, 200, 'a customer with a canceled plan can start checkout');
+assert.equal(initialCheckout.requests.length, 1, 'the eligible checkout creates one Stripe session');
+const checkoutForm=initialCheckout.requests[0].form.toString();
 const assertCheckoutForm=form=>{
   assert.equal(form.toString(),checkoutForm);assert.equal(form.get('locale'),null);
   assert.equal(form.get('success_url'),'https://bobbyprotocol.xyz/desk?pro=welcome');assert.equal(form.get('cancel_url'),'https://bobbyprotocol.xyz/desk?pro=cancelled');
