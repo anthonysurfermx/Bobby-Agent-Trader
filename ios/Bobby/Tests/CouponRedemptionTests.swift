@@ -351,7 +351,7 @@ final class CouponRedemptionTests: XCTestCase {
         center.currentUser = { identity.user }; center.currentGeneration = { identity.generation }
         center.auth = .none; center.clear()
         center.load = { _ in
-            ["access": self.access(tier: "pro", bonus: 0), "subscription": ["provider": "apple", "status": "active"],
+            ["signedIn": true, "access": self.access(tier: "pro", bonus: 0), "subscription": ["provider": "apple", "status": "active"],
              "payments": ["apple": true, "revenuecat": true]]
         }
         let initial = await center.refresh()

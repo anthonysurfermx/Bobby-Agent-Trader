@@ -465,36 +465,42 @@ final class AccountSession: ObservableObject {
         request.nonce = SHA256.hash(data: Data(nonce.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
-    func completeApple(_ result: Result<ASAuthorization, Error>) async {
-        guard appleRequestGeneration == generation else { return }
+    /// Returns the session generation accepted by this specific Apple sign-in attempt.
+    @discardableResult
+    func completeApple(_ result: Result<ASAuthorization, Error>) async -> UUID? {
+        guard appleRequestGeneration == generation else { return nil }
         switch result {
         case .failure(let error):
             lastError = Self.appleSignInFailure(error)
             cancelPendingSignIn()
+            return nil
         case .success(let auth):
             guard let cred = auth.credential as? ASAuthorizationAppleIDCredential,
                   let tokenData = cred.identityToken, let idToken = String(data: tokenData, encoding: .utf8),
-                  currentNonce != nil else { lastError = L.t("Apple returned no identity token", "Apple no devolvió un token de identidad"); return }
-            await completeAppleExchange(idToken: idToken, appleUserId: cred.user, givenName: cred.fullName?.givenName)
+                  currentNonce != nil else { lastError = L.t("Apple returned no identity token", "Apple no devolvió un token de identidad"); return nil }
+            return await completeAppleExchange(idToken: idToken, appleUserId: cred.user, givenName: cred.fullName?.givenName)
         }
     }
 
     /// Exchanges the identity returned by the request prepared above. Both the request and its
     /// network answer belong to that sign-in attempt; logout, consent withdrawal or another login wins.
-    func completeAppleExchange(idToken: String, appleUserId: String, givenName: String?) async {
-        guard let started = appleRequestGeneration, generation == started, let nonce = currentNonce else { return }
+    @discardableResult
+    func completeAppleExchange(idToken: String, appleUserId: String, givenName: String?) async -> UUID? {
+        guard let started = appleRequestGeneration, generation == started, let nonce = currentNonce else { return nil }
         let attempt = signInAttempt
         appleRequestGeneration = nil
         currentNonce = nil
         do {
             var s = try await exchange(body: ["provider": "apple", "id_token": idToken, "nonce": nonce], grant: "id_token")
-            guard generation == started, signInAttempt == attempt else { return }
+            guard generation == started, signInAttempt == attempt else { return nil }
             s.appleUserId = appleUserId; s.provider = "apple"
             AppleGivenName.remember(givenName, appleUserId: appleUserId, defaults: defaults)
             accept(s)
+            return generation
         } catch {
-            guard generation == started, signInAttempt == attempt else { return }
+            guard generation == started, signInAttempt == attempt else { return nil }
             lastError = L.t("Sign in with Apple did not finish — try again.", "Iniciar sesión con Apple no terminó — inténtalo de nuevo.")
+            return nil
         }
     }
 
