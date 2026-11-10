@@ -118,6 +118,14 @@ for(const[language,locale]of locales){
   vm.runInContext('(function(React,rememberQueryLanguage,documentLocale){'+effectSource+'})',b.context)(b.react,client.rememberQueryLanguage,locale);b.effects.forEach(fn=>fn());b.go('/desk');
   check(`${locale}: root remembers a valid URL selection for plain reloads`,()=>{assert.equal(client.clientLanguage(),language);assert.equal(client.clientLocale(),locale);});
   const bill=browser(language,locale),start=bill.load('src/lib/access-client.ts').startBilling;
+  bill.response({status:409,body:{code:'billing_receipt'}});
+  const receiptHint=await start('portal');
+  const receiptWords={en:'billing email',es:'correo de facturación',fr:'e-mail de facturation',pt:'cobrança',it:'fatturazione',de:'Abrechnungs-E-Mail'};
+  check(`${locale}: the billing portal explains how to use the receipt`,()=>assert.ok(receiptHint.includes(receiptWords[language])));
+  bill.response({status:200,body:{url:'https://billing.stripe.test/INERT'}});
+  let currentChecks=0;
+  await start('portal',undefined,()=>++currentChecks===1);
+  check(`${locale}: account change discards the previous billing portal`,()=>assert.deepEqual(bill.calls.assigned,[]));
   for(const item of[{status:503,body:{error:'Card payments are not switched on yet.'}},{status:404,body:{error:'No card subscription on this account.'}},{status:401,body:{error:'Sign in in English.'}},{status:500,body:{error:'raw-provider-English-diagnostic'}},{status:200,body:{}}]){
     bill.response(item);const message=await start('checkout');
     check(`${locale}: billing ${item.status} returns interface copy`,()=>{assert.equal(typeof message,'string');assert.ok(message.length);assert.ok(!message.includes('raw-provider'));assert.ok(!message.includes('Sign in in English'));if(!['en','es'].includes(language))assert.ok(!/^(Payments|Card payments|This account|Sign in first)/.test(message));assert.equal(bill.calls.assigned.length,0);});

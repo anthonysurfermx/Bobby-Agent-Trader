@@ -209,7 +209,7 @@ export default function NucleoDesk() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteNotice, setInviteNotice] = useState<string | null>(null);
   const [signinNote, setSigninNote] = useState<{ title: string; body: string } | null>(null);
-  const [billing, setBilling] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
+  const [billing, setBilling] = useState<{ busy: boolean; error: string | null; source?: 'limit' | 'profile' }>({ busy: false, error: null });
   const [proNotice, setProNotice] = useState<'welcome' | 'cancelled' | null>(() => (params.get('pro') === 'welcome' ? 'welcome' : params.get('pro') === 'cancelled' ? 'cancelled' : null));
   const meter: Access | null = accessState?.access ?? null;
   accessRef.current = accessState;
@@ -264,6 +264,7 @@ export default function NucleoDesk() {
     accessGate.current.invalidate();
     accessRef.current = null;
     setAccessState(null);
+    setBilling({ busy: false, error: null });
     requestRef.current?.abort();
     if (!WORKING.includes(phaseRef.current) && phaseRef.current !== 'reveal') return;
     if (revealRef.current) clearTimeout(revealRef.current);
@@ -1073,10 +1074,13 @@ export default function NucleoDesk() {
     </div>
   ) : null;
 
-  const subscribe = async () => {
-    setBilling({ busy: true, error: null });
-    const err = await startBilling('checkout', { symbol: chartSymbol, timeframe: initialScreen.timeframe });
-    if (err) setBilling({ busy: false, error: err });
+  const openBilling = async (action: 'checkout' | 'portal', source: 'limit' | 'profile') => {
+    if (billing.busy) return;
+    const epoch = accessGate.current.revision;
+    const accountIsCurrent = () => accessGate.current.sameEpoch(epoch);
+    setBilling({ busy: true, error: null, source });
+    const error = await startBilling(action, { symbol: chartSymbol, timeframe: initialScreen.timeframe }, accountIsCurrent);
+    if (accountIsCurrent()) setBilling({ busy: false, error, source });
   };
   const meterLine = meter && meter.paywall && meter.tier !== 'pro' && meter.remaining !== null && meter.limit !== null
     ? meter.tier === 'anon'
@@ -1229,6 +1233,7 @@ export default function NucleoDesk() {
               max: accessState?.levels?.levels.maximo.bonus ?? 0,
             }}
             pro={{
+              billing: { busy: billing.busy, error: billing.source === 'profile' ? billing.error : null },
               label: meter?.tier === 'pro'
                 ? giftedPro ? t('Bobby Pro · gifted', 'Bobby Pro · regalado', 'Bobby Pro · presente')
                   : t('Bobby Pro · active', 'Bobby Pro · activo', 'Bobby Pro · ativo')
@@ -1245,12 +1250,11 @@ export default function NucleoDesk() {
                   ? t('Coming to the web · earn it by inviting friends', 'Muy pronto en la web · gánalo invitando amigos', 'Em breve na web · ganhe convidando amigos')
                   : t('Unlimited Quick reads · fair use · US$4.90/month', 'Lecturas Rápidas sin límite · uso razonable · US$4.90/mes', 'Análises Rápidas ilimitadas · uso razoável · US$ 4,90/mês', 'Analyses Rapides illimitées · usage raisonnable · 4,90 USD/mois', 'Analisi Rapide illimitate · uso corretto · 4,90 USD/mese', 'Unbegrenzte Schnellanalysen · angemessene Nutzung · 4,90 USD/Monat')),
               action: !subscription?.cardPlan && meter?.tier === 'pro' && (!paidPro || subscription?.provider !== 'stripe') ? undefined : () => {
-                if (subscription?.cardPlan) { void startBilling('portal', { symbol: chartSymbol, timeframe: initialScreen.timeframe }); return; }
-                if (meter?.tier === 'pro') { void startBilling('portal', { symbol: chartSymbol, timeframe: initialScreen.timeframe }); return; }
+                if (subscription?.cardPlan || meter?.tier === 'pro') { void openBilling('portal', 'profile'); return; }
                 if (!accessState?.signedIn) { setSheet('none'); setSignInPrompt(true); return; }
                 // Web checkout is off until Stripe is live: a tap must still lead somewhere, and the invite is how Pro is earned today.
                 if (!accessState.payments.stripe) { setSheet('none'); setInviteOpen(true); void refreshAccess(); return; }
-                void subscribe();
+                void openBilling('checkout', 'profile');
               },
             }}
             invite={{
@@ -1284,7 +1288,7 @@ export default function NucleoDesk() {
         {!evolution && drops[0] && <ToolUnlockOverlay key="drop" companion={companion} tool={drops[0]} onDone={() => { const tool = drops[0]; setDrops((d) => d.slice(1)); if (toolHasArt(tool)) { setSheet('profile'); setTimeout(() => setEquip((e) => ({ url: toolArt(tool), token: e.token + 1 })), 520); } }} />}
       </AnimatePresence>
 
-      <LimitDialog limit={limit} state={accessState} billing={billing} onClose={() => setLimit(null)}
+      <LimitDialog limit={limit} state={accessState} billing={{ busy: billing.busy, error: billing.source === 'limit' ? billing.error : null }} onClose={() => setLimit(null)}
         onSignIn={() => {
           const lv = limit?.level ?? 'rapido';
           setSigninNote({
@@ -1295,7 +1299,7 @@ export default function NucleoDesk() {
           });
           setLimit(null); setSheet('none'); setSignInPrompt(true);
         }}
-        onSubscribe={() => void subscribe()} onLevel={setDeskLevel} />
+        onSubscribe={() => void openBilling('checkout', 'limit')} onLevel={setDeskLevel} />
       <Dialog.Root open={inviteOpen} onOpenChange={setInviteOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="n-dlg-overlay" />

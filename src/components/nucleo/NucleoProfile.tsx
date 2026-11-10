@@ -48,13 +48,13 @@ interface Props {
   onToggleSpeak: () => void;
   onToggleSounds: () => void;
   onReset: () => void;
-  pro: { label: string; detail: string; action?: () => void };
+  pro: { label: string; detail: string; action?: () => void; billing: { busy: boolean; error: string | null } };
   giftBalances: { quick: number; deep: number; max: number };
   /** Invite friends: five slots, Bobby Pro for each friend who joins. */
   invite: { label: string; detail: string; action: () => void };
 }
 
-function Row({ icon, label, detail, onClick, children }: { icon: ReactNode; label: string; detail?: string; onClick?: () => void; children?: ReactNode }) {
+function Row({ icon, label, detail, onClick, disabled, children }: { icon: ReactNode; label: string; detail?: string; onClick?: () => void; disabled?: boolean; children?: ReactNode }) {
   const body = (
     <>
       <span className="n-row-ico">{icon}</span>
@@ -66,7 +66,7 @@ function Row({ icon, label, detail, onClick, children }: { icon: ReactNode; labe
     </>
   );
   return onClick
-    ? <button type="button" className="n-row" onClick={() => { sfxTock(); onClick(); }}>{body}</button>
+    ? <button type="button" className="n-row" disabled={disabled} onClick={() => { sfxTock(); onClick(); }}>{body}</button>
     : <div className="n-row">{body}</div>;
 }
 
@@ -180,7 +180,10 @@ export default function NucleoProfile(p: Props) {
               <span className="hidden"><ProgressSync onChoose={p.onSignIn} /></span>
             </>
           )}
-          <Row icon={<Sparkles size={16} />} label={p.pro.label} detail={p.pro.detail} onClick={p.pro.action} />
+          <Row icon={<Sparkles size={16} />} label={p.pro.label}
+            detail={p.pro.billing.busy ? t('Opening…', 'Abriendo…', 'Abrindo…') : p.pro.detail}
+            onClick={p.pro.action} disabled={p.pro.billing.busy} />
+          {p.pro.billing.error && <p role="alert" className="px-3 py-2 text-sm" style={{ color: '#FFB3B5' }}>{p.pro.billing.error}</p>}
           {giftedReads && <Row icon={<Zap size={16} />} label={t('Gifted reads', 'Lecturas regaladas', 'Leituras de presente')}
             detail={t(`Quick: ${p.giftBalances.quick} · Deep: ${p.giftBalances.deep} · Max: ${p.giftBalances.max}`, `Rápido: ${p.giftBalances.quick} · Profundo: ${p.giftBalances.deep} · Máximo: ${p.giftBalances.max}`, `Rápido: ${p.giftBalances.quick} · Profundo: ${p.giftBalances.deep} · Máximo: ${p.giftBalances.max}`)} />}
           <Row icon={<UserPlus size={16} />} label={p.invite.label} detail={p.invite.detail} onClick={p.invite.action} />
