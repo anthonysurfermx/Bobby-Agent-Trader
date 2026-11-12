@@ -20,7 +20,7 @@ const Line = z.string().trim().min(6).max(240);
  * (too long, too short, not a string, nothing) is judged by servedFollowUp, which replaces a bad one. A next
  * question must never cost the read it follows.
  */
-const Synthesis = z.object({ headline: z.string().trim().min(6).max(180), why: Line, risk: Line, watch: Line, watchLevel: z.number().finite().min(0), followUp: z.unknown() });
+const Synthesis = z.object({ headline: z.string().trim().min(6).max(180), why: Line, risk: Line, watch: Line, watchLevel: z.number().finite().min(0), followUp: z.unknown().optional() });
 const Verdict = Argument.extend({ verdict: z.enum(['wait', 'review']), direction: z.enum(['long','short','none']), synthesis: Synthesis });
 const Scenario = z.string().trim().min(10).max(600);
 const VerdictWithScenarios = Verdict.extend({ scenarios: z.object({ confirm: Scenario, invalidate: Scenario }) });

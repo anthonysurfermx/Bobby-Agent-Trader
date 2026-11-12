@@ -64,7 +64,7 @@ export default function ProposeEvent() {
     handleSubmit,
     formState: { errors },
     setValue,
-  } = useForm<EventFormData>({
+  } = useForm<z.input<typeof eventSchema>, unknown, EventFormData>({
     resolver: zodResolver(eventSchema),
     defaultValues: {
       country: 'Mexico',
