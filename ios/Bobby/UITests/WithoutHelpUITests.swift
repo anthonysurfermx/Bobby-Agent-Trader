@@ -205,6 +205,12 @@ final class WithoutHelpUITests: ConversationFixtureCase {
         launch("companion-retry"); ask(); ready(button("fail.retry")); shot("27-without-help-failure")
         button("fail.retry").tap(); answered(); XCTAssertFalse(button("fail.retry").exists); shot("28-without-help-recovered")
     }
+    /// Two quick taps on Try again send one question: the second tap finds no control and no second answer or error appears.
+    func testRecoverFromFailureTwoQuickTaps() {
+        launch("companion-retry"); ask(); ready(button("fail.retry"))
+        let frame = button("fail.retry").frame, retry = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.midX, dy: frame.midY)); retry.tap(); retry.tap()
+        answered(); XCTAssertFalse(button("fail.retry").exists); shot("28b-without-help-recovered-two-taps")
+    }
     func testReadCostShownBeforeSpending() {
         launch(); ask("Bitcoin"); ready(button("risk.notNow")); XCTAssertTrue(web.staticTexts[language == "de" ? "Nutzt 1 deiner 5 Analysen" : "Usa 1 de tus 5 lecturas"].exists, app.debugDescription)
         XCTAssertFalse(app.staticTexts["nucleo-notch"].exists); shot("29-without-help-cost")
