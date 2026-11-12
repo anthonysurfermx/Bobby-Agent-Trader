@@ -30,7 +30,7 @@ const quotaCeiling = (key: string) => key === 'global' ? QUOTA_CEILING.global : 
 // know is ignored, never a 400, so a later client keeps working.
 // `thesis` (1.8) is the only field a 1.5-1.7 client never sends. The outer body stays tolerant (unknown keys are
 // dropped, as before); the thesis object itself is strict, and an invalid one is a 400 like any other field.
-const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(APP_LANGUAGES).default('en'), locale: z.enum(APP_LOCALES).optional(), level: z.enum(['rapido','profundo','maximo']).default('rapido'), speech: z.enum(SPEECH).optional().catch(undefined), requestId: z.string().uuid().optional(), thesis: DeskThesisSchema.nullish() })
+const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(APP_LANGUAGES).default('en'), locale: z.enum(APP_LOCALES).optional(), level: z.enum(['rapido','profundo','maximo']).default('rapido'), speech: z.enum(SPEECH).optional().catch(undefined), requestId: z.guid().optional(), thesis: DeskThesisSchema.nullish() })
   .refine(body => body.locale === undefined || isAppLocale(body.locale, body.language), { path: ['locale'], message: 'Locale must match language' });
 
 /**

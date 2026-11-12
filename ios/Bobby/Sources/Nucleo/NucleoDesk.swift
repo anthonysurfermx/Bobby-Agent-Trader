@@ -41,6 +41,7 @@ enum NucleoDeskIO {
 
     enum Candles: Sendable {
         case bars([Bar])
+        case unavailable
         case failed(URLError.Code)
     }
 
@@ -176,7 +177,7 @@ enum NucleoDeskIO {
         case quota(retryAfter: Int?, message: String?)
         case tooLong(message: String?)
         case gated(status: String, message: String?, access: BobbyReadAccess?)
-        case failed(code: String, message: String?)
+        case failed(code: String, message: String?, refunded: Bool = false)
         /// 403 signin_required | upgrade_required | level_exhausted: this level is refused for this caller.
         case levelRefused(code: String, meter: NucleoLevelMeter?)
         /// A soft budget pauses premium; the hard budget pauses every level.
@@ -244,8 +245,15 @@ enum NucleoDeskIO {
     static func candles(symbol: String, isEquity: Bool) async -> Candles {
         do {
             let reply = try await BobbyAPI.response(candlePath(symbol: symbol, isEquity: isEquity))
-            guard (200..<300).contains(reply.status), let obj = reply.json as? [String: Any] else { return .bars([]) }
-            return .bars(decodeCandles(obj))
+            if [408, 425, 429].contains(reply.status) || (500..<600).contains(reply.status) { return .unavailable }
+            guard (200..<300).contains(reply.status) else { return .bars([]) }
+            guard let obj = reply.json as? [String: Any],
+                  let primary = obj["candles"] as? [Any] ?? obj["data"] as? [Any] else {
+                return .unavailable
+            }
+            let rows = primary.isEmpty ? (obj["data"] as? [Any] ?? []) : primary
+            let bars = decodeCandles(rows)
+            return !rows.isEmpty && bars.isEmpty ? .unavailable : .bars(bars)
         } catch let error as URLError {
             return .failed(error.code)
         } catch {
@@ -254,12 +262,10 @@ enum NucleoDeskIO {
     }
 
     /// Rows need ts/open/high/low/close; volume defaults to 0; ascending by time.
-    static func decodeCandles(_ body: [String: Any]) -> [Bar] {
-        let candles = body["candles"] as? [[String: Any]] ?? []
-        let rows = candles.isEmpty ? (body["data"] as? [[String: Any]] ?? []) : candles
+    private static func decodeCandles(_ rows: [Any]) -> [Bar] {
         var out: [Bar] = []
-        for r in rows {
-            guard let t = num(r["ts"]), let o = num(r["open"]), let h = num(r["high"]),
+        for row in rows {
+            guard let r = row as? [String: Any], let t = num(r["ts"]), let o = num(r["open"]), let h = num(r["high"]),
                   let l = num(r["low"]), let c = num(r["close"]), abs(t) < 1e15 else { continue }
             out.append(Bar(t: Int(t), o: o, h: h, l: l, c: c, v: num(r["volume"]) ?? 0))
         }
@@ -385,7 +391,9 @@ enum NucleoDeskIO {
         if status == 503, code == "budget_paused" {
             return .budgetPaused(allLevels: body?["quickAvailable"] as? Bool == false || body?["level"] as? String == "rapido")
         }
-        if status == 503, let code, code == "analysis_failed" || code == "desk_unavailable" { return .failed(code: code, message: message) }
+        if status == 503, let code, code == "analysis_failed" || code == "desk_unavailable" {
+            return .failed(code: code, message: message, refunded: body?["refunded"] as? Bool == true)
+        }
         guard (200..<300).contains(status), let body, let agents = body["agents"] as? [String: Any],
               let alpha = agents["alpha"] as? String, !alpha.isEmpty,
               let red = agents["red"] as? String, !red.isEmpty,
@@ -1124,6 +1132,8 @@ final class NucleoDesk {
         guard isCurrent(job) else { return Self.cancelledResult }
         let bars: [NucleoDeskIO.Bar]
         switch candleRead {
+        case .unavailable:
+            return retryable(Self.errorResult("desk_unavailable"), job: job, asset: asset)
         case let .failed(code):
             if code == .cancelled { return Self.cancelledResult }
             return retryable(Self.errorResult(code == .timedOut ? "timeout" : "network"), job: job, asset: asset)
@@ -1210,8 +1220,15 @@ final class NucleoDesk {
         }
         if premiumFailed {
             meterChanged(level, nil)
-            return levelNotice(caption: L.t("The agents didn’t finish.", "Los agentes no terminaron."),
-                               sub: L.t("Nothing was taken from your allowance.", "No se descontó nada de tu cupo."),
+            let caption: String, detail: String
+            if case .failed(_, _, refunded: true) = desk {
+                caption = L.t("The agents didn’t finish.", "Los agentes no terminaron.")
+                detail = L.t("Nothing was taken from your allowance.", "No se descontó nada de tu cupo.")
+            } else {
+                caption = L.t("Bobby couldn’t confirm the result.", "Bobby no pudo confirmar el resultado.")
+                detail = L.t("Retrying may use another read.", "Si reintentas, podrías usar otra lectura.")
+            }
+            return levelNotice(caption: caption, sub: detail,
                                cta: L.t("Try again", "Reintentar"), level: level, persist: false, job: job, asset: asset)
         }
         switch desk {
@@ -1236,7 +1253,7 @@ final class NucleoDesk {
             return ["v": 1, "status": "quota", "retryAfterSec": NucleoDeskIO.orNull(retryAfter), "message": NucleoDeskIO.orNull(message)]
         case let .tooLong(message):
             return ["v": 1, "status": "too_long", "maxLength": DeskQuestion.maxLength, "message": NucleoDeskIO.orNull(message)]
-        case let .failed(code, message):
+        case let .failed(code, message, _):
             // Only the two transient desk codes reach here (parseDebate: analysis_failed, desk_unavailable).
             return retryable(Self.errorResult(code, message), job: job, asset: asset)
         case let .ok(debate):

@@ -327,6 +327,12 @@ final class BobbyAccessCenter: ObservableObject {
             if currentUser() == started, currentGeneration() == generation, requestGeneration == revision { applePayments = false }
             return false
         }
+        // A failed token refresh can leave the local session intact. The server then returns
+        // guest pricing, which has not checked whether this account already pays on the web.
+        guard started == nil || Self.isJSONTrue(body["signedIn"]) else {
+            applePayments = false
+            return false
+        }
         apply(body)
         return true
     }
@@ -340,12 +346,12 @@ final class BobbyAccessCenter: ObservableObject {
 
     nonisolated static func paymentsReady(_ value: Any?) -> Bool {
         guard let payments = value as? [String: Any] else { return false }
-        func enabled(_ key: String) -> Bool {
-            guard let n = payments[key] as? NSNumber,
-                  CFGetTypeID(n) == CFBooleanGetTypeID() else { return false }
-            return n.boolValue
-        }
-        return enabled("apple") && enabled("revenuecat")
+        return isJSONTrue(payments["apple"]) && isJSONTrue(payments["revenuecat"])
+    }
+
+    nonisolated private static func isJSONTrue(_ value: Any?) -> Bool {
+        guard let number = value as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { return false }
+        return number.boolValue
     }
 
     enum ServerSync: Equatable {

@@ -763,6 +763,69 @@ test('a spoken failure cancelled into a held draft resends only its retry UUID',
  tap(app,app.nodes.get('close'));await flush();assert.equal(app.context.nucleo.state(),'HELD_DRAFT');
  tap(app,app.nodes.get('pill'));await flush();assert.deepEqual(asksOf(app).at(-1),{retry:id});assert.deepEqual(app.errors,[]);
 });
+
+async function holdFailedFirstQuestion(app, spoken = false) {
+  const question = 'What is investing?';
+  if (spoken) {
+    app.session.mic.state = 'granted';
+    tap(app, app.nodes.get('pill'));
+    await flush();
+    app.context.nucleoBridge.emit('speech.partial', {text: question});
+    tap(app, app.nodes.get('pill'));
+    app.context.nucleoBridge.emit('speech.final', {text: question});
+  } else {
+    keyboardOf(app)._guideAction();
+    app.nodes.get('ta').value = question;
+    app.nodes.get('ta').listeners.input();
+    app.nodes.get('taSend').listeners.click({detail: 0, stopPropagation() {}});
+  }
+  await flush();
+  app.advance(1.2);
+  app.answer({v: 1, status: 'error', code: 'bad_response'});
+  await flush();
+  app.advance(1);
+  tap(app, app.nodes.get('close'));
+  await flush();
+  assert.equal(app.context.nucleo.state(), 'HELD_DRAFT');
+}
+
+for (const spoken of [false, true]) {
+  test(`a held ${spoken ? 'spoken' : 'typed'} question retries before native issued an ID`, async () => {
+    const app = await idle();
+    await holdFailedFirstQuestion(app, spoken);
+    const original = asksOf(app)[0];
+    assert.equal(original.question, 'What is investing?');
+    assert.equal(!!original.spoken, spoken);
+    tap(app, app.nodes.get('pill'));
+    await flush();
+    assert.deepEqual(asksOf(app), [original, original]);
+  });
+}
+
+test('editing the held draft submits the new text as a typed question', async () => {
+  const app = await idle();
+  await holdFailedFirstQuestion(app, true);
+  keyboardOf(app)._guideAction();
+  assert.equal(app.nodes.get('ta').value, 'What is investing?');
+  app.nodes.get('ta').value = 'What is a share?';
+  app.nodes.get('ta').listeners.input();
+  app.nodes.get('taSend').listeners.click({detail: 0, stopPropagation() {}});
+  await flush();
+  assert.deepEqual(asksOf(app).at(-1), {question: 'What is a share?', confirm: true});
+});
+
+for (const event of ['account.changed', 'consent.withdrawn']) {
+  test(`${event} drops an unsent held retry without transmitting its question`, async () => {
+    const app = await idle();
+    await holdFailedFirstQuestion(app);
+    app.context.nucleoBridge.emit(event, {wasSignedIn: true, signedIn: true});
+    await flush();
+    app.advance(3);
+    keyboardOf(app)._guideAction();
+    assert.equal(app.nodes.get('ta').value, '');
+    assert.equal(asksOf(app).length, 1);
+  });
+}
 for (const input of ['type','speech']) test(`${input}: the next question is never an answer to a hidden personal question`, async () => {
  const app=await idle();const id='90d2564c-6064-4275-95cd-5a3c7c0b5b56';
  await companionReply(app,{status:'companion',requestId:id,text:'Explanation',companionCheckIn:{question:{id:'interest',text:'Interest?',options:[]}}});

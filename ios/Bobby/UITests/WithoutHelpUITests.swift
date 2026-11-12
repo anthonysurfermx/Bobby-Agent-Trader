@@ -121,6 +121,25 @@ class ConversationFixtureCase: XCTestCase {
 }
 
 final class WithoutHelpUITests: ConversationFixtureCase {
+    func testConfirmedBitcoinReadRecoversAfterFirstCandleOutage() {
+        launch("companion-candle-recovery")
+        let question = "Analyze Bitcoin"
+        ask(question)
+        ready(confirmRead)
+        confirmRead.tap()
+
+        let retry = button("fail.retry")
+        ready(retry)
+        XCTAssertFalse(button("read.result").isHittable)
+        retry.tap()
+
+        let result = button("read.result")
+        ready(result, timeout: 45)
+        result.tap()
+        ready(button("read.home"))
+        XCTAssertTrue(web.staticTexts[question].waitForExistence(timeout: 10))
+    }
+
     func testOutsideTapClosesKeyboardWithoutSendingOrLosingDraft() {
         launch(); let question = word("ex.1"); type(question)
         let field = web.textViews.firstMatch
@@ -185,6 +204,12 @@ final class WithoutHelpUITests: ConversationFixtureCase {
     func testRecoverFromFailureOneTap() {
         launch("companion-retry"); ask(); ready(button("fail.retry")); shot("27-without-help-failure")
         button("fail.retry").tap(); answered(); XCTAssertFalse(button("fail.retry").exists); shot("28-without-help-recovered")
+    }
+    /// Two quick taps on Try again send one question: the second tap finds no control and no second answer or error appears.
+    func testRecoverFromFailureTwoQuickTaps() {
+        launch("companion-retry"); ask(); ready(button("fail.retry"))
+        let frame = button("fail.retry").frame, retry = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.midX, dy: frame.midY)); retry.tap(); retry.tap()
+        answered(); XCTAssertFalse(button("fail.retry").exists); shot("28b-without-help-recovered-two-taps")
     }
     func testReadCostShownBeforeSpending() {
         launch(); ask("Bitcoin"); ready(button("risk.notNow")); XCTAssertTrue(web.staticTexts[language == "de" ? "Nutzt 1 deiner 5 Analysen" : "Usa 1 de tus 5 lecturas"].exists, app.debugDescription)

@@ -5,15 +5,7 @@
 // an exception is re-examined instead of forgotten. Anything else rated high or critical fails the build.
 import { spawnSync } from 'node:child_process';
 
-const EXCEPTIONS = [
-  {
-    id: 'GHSA-vfj7-8cjw-p6xm',
-    until: '2026-10-17',
-    why: 'braces, stack exhaustion on deeply nested brace patterns. Every release is affected and no fixed one exists. '
-      + 'It is only reached by build tooling (tailwindcss, chokidar, fast-glob, the @vercel/node typings) with glob '
-      + 'patterns written in this repository, never with input from a user at runtime.',
-  },
-];
+const EXCEPTIONS = [];
 
 const today = process.env.AUDIT_GATE_TODAY || new Date().toISOString().slice(0, 10);
 const run = spawnSync('npm', ['audit', '--json'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });

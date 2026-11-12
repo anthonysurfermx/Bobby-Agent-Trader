@@ -802,7 +802,7 @@ final class NucleoBridgeTests: XCTestCase {
         case let .gated(status, _, _): return status
         case let .levelRefused(code, _): return code
         case .budgetPaused: return "budget_paused"
-        case let .failed(code, _): return code
+        case let .failed(code, _, _): return code
         case .badResponse: return "bad_response"
         case .timeout: return "timeout"
         case .network: return "network"

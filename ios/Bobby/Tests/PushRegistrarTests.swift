@@ -200,6 +200,31 @@ final class PushRegistrarTests: XCTestCase {
         XCTAssertEqual(r.state, .unavailable)
     }
 
+    func testInProgressDeviceWriteReplaysItsReceiptForNewAndExistingBindings() async {
+        for existing in [false, true] {
+            server = DeviceServer()
+            let storage = PushRecordStorage.memory()
+            if existing { storage.save(bound()) }
+            let r = registrar(storage: storage)
+            server.responder = { _ in
+                BriefingsReply(json: ["code": "conflict"], status: 409, headers: ["retry-after": "5"])
+            }
+            r.didRegister(tokenHex: tokenB)
+            await r.settle()
+            XCTAssertEqual(r.state, .failed)
+            let key = storage.load()?.pending?.idempotencyKey
+            XCTAssertNotNil(key)
+            server.responder = { [regA] _ in
+                DeviceServer.receipt(regA, revision: 2, credential: "acknowledged-proof", status: existing ? 200 : 201)
+            }
+            r.didRegister(tokenHex: tokenB)
+            await r.settle()
+            XCTAssertEqual(server.calls.map { $0.headers[BriefingsAPI.idempotencyHeader] }, [key, key])
+            XCTAssertEqual(storage.load()?.credential, "acknowledged-proof")
+            XCTAssertEqual(r.state, .registered)
+        }
+    }
+
     func testLateAnswerForAIsRecordedForANeverForB() async throws {
         let storage = PushRecordStorage.memory()
         let r = registrar(storage: storage)
@@ -251,6 +276,61 @@ final class PushRegistrarTests: XCTestCase {
         XCTAssertTrue(server.calls.isEmpty)
     }
 
+    func testConsentWithdrawnWhileWaitingForBearerStopsTokenRotation() async {
+        let storage = PushRecordStorage.memory()
+        let original = bound()
+        storage.save(original)
+        let r = registrar(storage: storage)
+        let requesting = expectation(description: "token refresh in progress")
+        var resume: CheckedContinuation<String?, Never>?
+        r.accessToken = { _ in await withCheckedContinuation { resume = $0; requesting.fulfill() } }
+
+        r.didRegister(tokenHex: tokenB)
+        await fulfillment(of: [requesting], timeout: 3)
+        r.riskAccepted = { false }
+        resume?.resume(returning: "token-a")
+        await r.settle()
+
+        XCTAssertTrue(server.calls.isEmpty)
+        XCTAssertEqual(storage.load(), original)
+    }
+
+    func testSigningOutAndBackIntoSameAccountInvalidatesPendingRotation() async {
+        let storage = PushRecordStorage.memory()
+        let original = bound()
+        storage.save(original)
+        let r = registrar(storage: storage)
+        let session = account("a")
+        r.currentUser = { session.session?.userId }
+        r.currentGeneration = { session.generation }
+        let requesting = expectation(description: "previous session is refreshing its token")
+        var resume: CheckedContinuation<String?, Never>?
+        r.accessToken = { _ in await withCheckedContinuation { resume = $0; requesting.fulfill() } }
+        r.didRegister(tokenHex: tokenB)
+        await fulfillment(of: [requesting], timeout: 3)
+        session.signOut()
+        session.accept(stored("a"))
+        resume?.resume(returning: "old-token-a")
+        await r.settle()
+        XCTAssertTrue(server.calls.isEmpty)
+        XCTAssertEqual(storage.load(), original)
+    }
+
+    func testRevokedConsentPreventsFreshRegistrationAfterMissingBinding() async {
+        let storage = PushRecordStorage.memory()
+        storage.save(bound())
+        let r = registrar(storage: storage)
+        server.responder = { _ in
+            r.riskAccepted = { false }
+            return BriefingsReply(json: ["code": "not_found"], status: 404, headers: [:])
+        }
+        r.didRegister(tokenHex: tokenB)
+        await r.settle()
+        XCTAssertEqual(server.calls.count, 1)
+        XCTAssertFalse(storage.load()?.hasBinding == true)
+        XCTAssertEqual(r.state, .idle)
+    }
+
     func testMalformedTokensAreIgnored() async {
         let r = registrar()
         r.didRegister(tokenHex: "zz")
@@ -280,6 +360,22 @@ final class PushRegistrarTests: XCTestCase {
         XCTAssertEqual(server.calls[0].body["expectedBindingRevision"] as? Int, 1)
         XCTAssertEqual(storage.load()?.permission, "denied")
         XCTAssertEqual(storage.load()?.bindingRevision, 2)
+    }
+
+    func testExistingBindingRefreshesBeforeNewsPreferenceLookupCompletes() async {
+        let storage = PushRecordStorage.memory()
+        storage.save(bound())
+        let r = registrar(storage: storage)
+        var askedForRemote = false
+        r.registerForRemote = { askedForRemote = true }
+        let lookup = expectation(description: "news language sync is still performed")
+        r.newsEnabled = {
+            XCTAssertTrue(askedForRemote, "APNs registration must not wait on the news service")
+            lookup.fulfill()
+            return false
+        }
+        r.appBecameActive()
+        await fulfillment(of: [lookup], timeout: 3)
     }
 
     func testInitialRegistrationRecoversOnActiveOnlyForConfirmedOptIn() async throws {
@@ -397,6 +493,61 @@ final class PushRegistrarTests: XCTestCase {
         XCTAssertEqual(server.calls.last?.method, "DELETE")
         XCTAssertEqual(server.calls.last?.bearer, "token-b")
         XCTAssertNil(storage.load()?.ownerUserId)
+    }
+
+    func testAccountSwitchAndTokenRotationWhileFirstBindingIsInFlight() async throws {
+        let storage = PushRecordStorage.memory()
+        let session = account("a")
+        let r = registrar(storage: storage)
+        r.currentUser = { session.session?.userId }
+        r.currentGeneration = { session.generation }
+        r.accessToken = { _ in session.session?.accessToken }
+        r.observe(session)
+        let firstSent = expectation(description: "A's registration reached the server")
+        var firstReceipt: CheckedContinuation<BriefingsReply, Never>?
+        server.responder = { [regB] call in
+            if call.method == "DELETE" { return BriefingsReply(json: nil, status: 204, headers: [:]) }
+            if call.bearer == "token-a" {
+                return await withCheckedContinuation { firstReceipt = $0; firstSent.fulfill() }
+            }
+            return DeviceServer.receipt(regB, revision: 1, credential: "proof-b")
+        }
+        r.didRegister(tokenHex: tokenA)
+        await fulfillment(of: [firstSent], timeout: 3)
+        session.accept(stored("b"))
+        r.didRegister(tokenHex: tokenB)
+        firstReceipt?.resume(returning: DeviceServer.receipt(regA, revision: 1, credential: "proof-a"))
+        await r.settle()
+
+        XCTAssertEqual(server.calls.map(\.method), ["POST", "DELETE", "POST"])
+        XCTAssertEqual(server.calls.map(\.bearer), ["token-a", "token-a", "token-b"])
+        let revoke = try XCTUnwrap(server.calls.first { $0.method == "DELETE" })
+        XCTAssertEqual(revoke.headers[BriefingsAPI.proofHeader], "proof-a")
+        XCTAssertEqual(server.calls.last?.body["apnsToken"] as? String, tokenB)
+        XCTAssertEqual(storage.load()?.ownerUserId, "b")
+        XCTAssertEqual(storage.load()?.credential, "proof-b")
+        XCTAssertEqual(storage.load()?.tokenHash, PushRegistrar.sha256(tokenB))
+    }
+
+    func testSigningOutWhileBindingIsInFlightRevokesTheAcknowledgedProofAndStaysIdle() async throws {
+        let storage = PushRecordStorage.memory()
+        let session = account("a")
+        let r = registrar(storage: storage)
+        r.currentUser = { session.session?.userId }
+        r.currentGeneration = { session.generation }
+        r.observe(session)
+        server.responder = { [regA] call in
+            if call.method == "DELETE" { return BriefingsReply(json: nil, status: 204, headers: [:]) }
+            session.signOut()
+            return DeviceServer.receipt(regA, revision: 1, credential: "late-proof")
+        }
+        r.didRegister(tokenHex: tokenA)
+        await r.settle()
+        let revoke = try XCTUnwrap(server.calls.first { $0.method == "DELETE" })
+        XCTAssertEqual(revoke.headers[BriefingsAPI.proofHeader], "late-proof")
+        XCTAssertEqual(revoke.bearer, "token-a")
+        XCTAssertFalse(storage.load()?.hasBinding == true)
+        XCTAssertEqual(r.state, .idle)
     }
 
     func testFailedRevocationKeepsTheProofSoTheNextAccountRebinds() async throws {

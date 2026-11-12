@@ -315,6 +315,39 @@ final class BriefingsExperienceTests: XCTestCase {
         XCTAssertTrue(recorder.sheetStates("briefing").isEmpty)
     }
 
+    func testDuplicateTapDuringPresentationAndWhileOpenDoesNotReopenTheDismissedReport() async {
+        let (session, bridge, recorder, intent) = make()
+        await startApp(bridge)
+        intent.store(Self.briefA)
+        await settle()
+        assertOpened(session, Self.briefA)
+        intent.store(Self.briefA)
+        intent.markOpen(Self.briefA)
+        XCTAssertNil(intent.pending, "the report appeared after the duplicate tap")
+        intent.store(Self.briefA)
+        intent.markOpen(nil)
+        session.sheetDismissed()
+        await settle()
+        assertClosed(session)
+        XCTAssertEqual(recorder.sheetStates("briefing"), ["open", "closed"])
+    }
+
+    func testTapForAnotherBriefingStillOpensAfterTheVisibleReportCloses() async {
+        let (session, bridge, _, intent) = make()
+        await startApp(bridge)
+        intent.store(Self.briefA)
+        await settle()
+        intent.store(Self.briefB)
+        intent.markOpen(Self.briefA)
+        intent.store(Self.briefA)
+        await settle()
+        assertOpened(session, Self.briefA)
+        intent.markOpen(nil)
+        session.sheetDismissed()
+        await settle()
+        assertOpened(session, Self.briefB)
+    }
+
     func testOpeningStopsTheMicAndTheVoiceFirst() async {
         let (session, bridge, _, intent) = make()
         await startApp(bridge)
