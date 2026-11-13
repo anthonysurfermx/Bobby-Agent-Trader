@@ -16,8 +16,8 @@
 // watch needs an account because its notification does. A body field can never name an account, a limit or a
 // reference close. What an account may have looking at once is WATCH_LIMIT: three, ten with Bobby Pro.
 // A watch calls no model and spends no provider money; the engine's reads and dollar ceiling are not touched.
-// Storage follows BOBBY_AGENT_STORE as the engine's does: "postgres" in production (agent-watches.sql, which is
-// NOT applied anywhere yet), "memory" for a preview. With none, or with storage that does not answer: 503.
+// Storage follows BOBBY_AGENT_STORE as the engine's does: "postgres" in production (agent-watches.sql, applied as the
+// migration 20261113004301), "memory" for a preview. With none, or with storage that does not answer: 503.
 // ============================================================
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHash, randomUUID } from 'node:crypto';

@@ -1,8 +1,8 @@
 -- Watches: the contract of WatchStore (api/_lib/agent/watch-store.ts) as Postgres, one function per method, each
--- one transaction. A DRAFT until the owner applies it: the same statements are in the migration file
--- supabase/bobby-protocol/supabase/migrations/20261112190000_agent_watches.sql (a test holds the two equal), and
--- nothing has applied either anywhere shared. scripts/test-agent-watch.mts runs this file against a LOCAL scratch
--- database when DATABASE_URL is given.
+-- one transaction. Applied to production as the migration
+-- supabase/bobby-protocol/supabase/migrations/20261113004301_agent_watches.sql on 2026-11-12 (same statements: a
+-- test holds the two equal). scripts/test-agent-watch.mts runs this file against a LOCAL scratch database when
+-- DATABASE_URL is given.
 -- The table is for the service role only.
 -- What is kept, and for how long: an asset of the engine's universe, a direction, a size, a length, the close it
 -- is measured from and, once met, what code wrote that day. No word a person typed or said. A watch looks for at

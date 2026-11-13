@@ -265,7 +265,7 @@ const workerOver = {
 // ---------- 5. the contract and its migration ----------
 {
   const body = (file: string) => { const text = readFileSync(new URL(file, import.meta.url), 'utf8'); return text.slice(text.indexOf('create table if not exists agent_watches (')); };
-  ok(body('../docs/agent-engine/agent-watches.sql') === body('../supabase/bobby-protocol/supabase/migrations/20261112190000_agent_watches.sql') && body('../docs/agent-engine/agent-watches.sql').includes('create or replace function agent_watch_purge('), 'the migration holds the same statements as the contract the database test runs');
+  ok(body('../docs/agent-engine/agent-watches.sql') === body('../supabase/bobby-protocol/supabase/migrations/20261113004301_agent_watches.sql') && body('../docs/agent-engine/agent-watches.sql').includes('create or replace function agent_watch_purge('), 'the migration holds the same statements as the contract the database test runs');
   const cron = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')).crons as Array<{ path: string }>;
   ok(cron.some((job) => job.path === '/api/agent-watch?tick=1'), 'the scheduler calls the tick');
 }

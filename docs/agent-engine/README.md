@@ -137,7 +137,7 @@ The owner's decision: in production for a list of people, and for everyone only 
 - Turning it off: unset `BOBBY_AGENT_ENGINE` and deploy. Opening it to everyone: `on`, and not before the four points above.
 - What ships is the head the fourteenth set measured; the four wording rules written after it are out (`git revert de80d5d4`) until a set measures them.
 
-## Watches: an errand that ends by itself (2026-11-12, built, switched off)
+## Watches: an errand that ends by itself (2026-11-12, for the private pilot)
 
 "Tell me if Nvidia closes 5% lower this week." The first thing Bobby does without being asked again. Plan and
 reasons: `PLAN-PROACTIVE.md`. Code: `api/_lib/agent/watch.ts` (what a watch is, when it is met, the words),
@@ -158,8 +158,9 @@ SQL `agent-watches.sql`, tests `scripts/test-agent-watch.mts` (`npm run test:age
 - **Off unless `BOBBY_AGENT_WATCHES=on`**, and then only for whom the engine exists (the pilot's list). Unset, every
   method answers 404 and the scheduler's tick (`/api/agent-watch?tick=1`, every fifteen minutes) reads and sends nothing.
 
-Before it can be switched on, all the owner's: (1) the migration `20261112190000_agent_watches.sql` is **not
-applied**; (2) the privacy paragraph for watches in `PRIVACY-DRAFT.md`; (3) the limits (3 and 10). Not built yet:
+The migration `20261113004301_agent_watches.sql` was applied to production on 2026-11-12 with the owner's yes, for
+the private pilot only. Before anyone outside the pilot, the owner's: the privacy paragraph for watches in
+`PRIVACY-DRAFT.md`, and the limits (3 and 10). Not built yet:
 the iPhone's side (the card, the list, opening the notification), a watch made by voice or in a person's own words,
 a watch born from a thesis, and a price inside the day.
 

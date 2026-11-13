@@ -5,7 +5,7 @@
 -- them against a scratch database).
 -- What is kept: an asset, a direction, a size, a length and the close it is measured from, tied to an account; no
 -- word a person typed or said. A watch looks for at most 30 days and is removed 7 days after it ended.
--- NOT APPLIED anywhere. It waits for the owner's yes, as every migration does.
+-- Applied to production on 2026-11-12 (schema_migrations 20261113004301) with the owner's yes, for the private pilot.
 
 create table if not exists agent_watches (
   id text primary key check (id ~ '^watch_[a-f0-9]{32}$'),
