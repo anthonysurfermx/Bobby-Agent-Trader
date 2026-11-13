@@ -61,7 +61,7 @@ export function agentPilot(env: NodeJS.ProcessEnv = process.env): { ids: Set<str
   return { ids, installs };
 }
 /** A person on the pilot's list: by the install the server derives, or by the account they are signed in with. Never by anything a body says. */
-async function inPilot(req: VercelRequest): Promise<boolean> {
+export async function inPilot(req: VercelRequest): Promise<boolean> {
   const { ids, installs } = agentPilot();
   const install = deviceHash(req);
   if (install && installs.has(install)) return true;

@@ -137,6 +137,41 @@ The owner's decision: in production for a list of people, and for everyone only 
 - Turning it off: unset `BOBBY_AGENT_ENGINE` and deploy. Opening it to everyone: `on`, and not before the four points above.
 - What ships is the head the fourteenth set measured; the four wording rules written after it are out (`git revert de80d5d4`) until a set measures them.
 
+## Watches: an errand that ends by itself (2026-11-12, for the private pilot)
+
+"Tell me if Nvidia closes 5% lower this week." The first thing Bobby does without being asked again. Plan and
+reasons: `PLAN-PROACTIVE.md`. Code: `api/_lib/agent/watch.ts` (what a watch is, when it is met, the words),
+`watch-store.ts` (the storage contract, memory and Postgres), `watch-worker.ts` (one tick), door `api/agent-watch.ts`,
+SQL `agent-watches.sql`, tests `scripts/test-agent-watch.mts` (`npm run test:agent-watch`, in CI).
+
+- **No model, no provider money.** The condition is a choice among fixed values (falls, rises or moves; 3, 5 or 10%;
+  7 or 30 days), the check is arithmetic on closes the strict reader accepted, and the answer the day it is met is
+  written by code: the two closes and the distance between them, then the same plain reading of the last thirty days
+  that `composeByCode` gives. So the engine's instructions and toolset, and every blind set that measured them, are
+  untouched.
+- **A daily close, never a price inside a day**, and the card says "closes". The first close far enough from the
+  reference meets it. A reference the source later shows as another number (a split) makes the watch unreadable,
+  never met; a watch that could not be read on its last day ends saying so.
+- **An account, because the notification needs one** (Apple or Google). Three active watches, ten with Bobby Pro.
+- **One notification, never two**: claimed before it is sent, and a claim is never given twice. Its text names no
+  asset and no number. Without APNs credentials it stays owed.
+- **Off unless `BOBBY_AGENT_WATCHES=on`**, and then only for whom the engine exists (the pilot's list). Unset, every
+  method answers 404 and the scheduler's tick (`/api/agent-watch?tick=1`, every fifteen minutes) reads and sends nothing.
+
+The migration `20261113004301_agent_watches.sql` was applied to production on 2026-11-12 with the owner's yes, for
+the private pilot only. Before anyone outside the pilot, the owner's: the privacy paragraph for watches in
+`PRIVACY-DRAFT.md`, and the limits (3 and 10). Not built yet:
+the iPhone's side (the card, the list, opening the notification), a watch made by voice or in a person's own words,
+a watch born from a thesis, and a price inside the day.
+
+```bash
+npm run test:agent-watch
+```
+
+```bash
+DATABASE_URL=postgres://postgres@127.0.0.1:54329/agent_engine_test npm run test:agent-watch
+```
+
 ## Reproduce
 
 ```bash
