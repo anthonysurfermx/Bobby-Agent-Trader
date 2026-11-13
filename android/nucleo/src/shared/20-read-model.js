@@ -19,6 +19,7 @@
       'sat.volume': 'Volume', 'sat.vsAvg': 'vs 20h avg',
       'sat.trend': 'Trend', 'sat.ema': 'EMA 20 / 50',
       'sat.range': 'Range', 'sat.range30': '30h low–high',
+      'src.price': "The last price the source published.", 'src.rsi': "RSI over 14 candles: above 70 is called overbought, below 30 oversold.", 'src.volume': "The last closed hour's volume against the average of the 20 hours before.", 'src.trend': "Where the 20-candle average sits against the 50-candle one.", 'src.range': "The lowest and the highest price of the recent candles.",
       'trend.up': 'Up', 'trend.down': 'Down', 'trend.sideways': 'Sideways',
       'chart.support': 'SUPPORT {price}', 'chart.resistance': 'RESISTANCE {price}',
       'chart.entry': 'ENTRY {price}', 'chart.stop': 'STOP {price}', 'chart.target': 'TARGET {price}',
@@ -71,6 +72,7 @@
       'sat.volume': 'Volumen', 'sat.vsAvg': 'vs prom. 20h',
       'sat.trend': 'Tendencia', 'sat.ema': 'EMA 20 / 50',
       'sat.range': 'Rango', 'sat.range30': 'mín–máx 30h',
+      'src.price': "El último precio que publicó la fuente.", 'src.rsi': "RSI sobre 14 velas: arriba de 70 se dice sobrecomprado; abajo de 30, sobrevendido.", 'src.volume': "El volumen de la última hora cerrada frente al promedio de las 20 anteriores.", 'src.trend': "Dónde está el promedio de 20 velas frente al de 50.", 'src.range': "El precio más bajo y el más alto de las velas recientes.",
       'trend.up': 'Alcista', 'trend.down': 'Bajista', 'trend.sideways': 'Lateral',
       'chart.support': 'SOPORTE {price}', 'chart.resistance': 'RESISTENCIA {price}',
       'chart.entry': 'ENTRADA {price}', 'chart.stop': 'STOP {price}', 'chart.target': 'OBJETIVO {price}',
@@ -134,6 +136,7 @@
     "sat.ema": "EMA 20 / 50",
     "sat.range": "Fourchette",
     "sat.range30": "min–max 30 h",
+    "src.price": "Le dernier prix publié par la source.", "src.rsi": "RSI sur 14 bougies : au-dessus de 70 on parle de surachat, en dessous de 30 de survente.", "src.volume": "Le volume de la dernière heure clôturée face à la moyenne des 20 précédentes.", "src.trend": "Où se situe la moyenne de 20 bougies face à celle de 50.", "src.range": "Le prix le plus bas et le plus haut des bougies récentes.",
     "trend.up": "Haussière",
     "trend.down": "Baissière",
     "trend.sideways": "Latérale",
@@ -238,6 +241,7 @@
     "sat.ema": "EMA 20 / 50",
     "sat.range": "Intervalo",
     "sat.range30": "mín–máx 30 h",
+    "src.price": "O último preço publicado pela fonte.", "src.rsi": "RSI sobre 14 velas: acima de 70 diz-se sobrecomprado; abaixo de 30, sobrevendido.", "src.volume": "O volume da última hora fechada face à média das 20 anteriores.", "src.trend": "Onde está a média de 20 velas face à de 50.", "src.range": "O preço mais baixo e o mais alto das velas recentes.",
     "trend.up": "Em alta",
     "trend.down": "Em baixa",
     "trend.sideways": "Lateral",
@@ -343,6 +347,7 @@
     "sat.ema": "EMA 20 / 50",
     "sat.range": "Intervallo",
     "sat.range30": "min–max 30 h",
+    "src.price": "L’ultimo prezzo pubblicato dalla fonte.", "src.rsi": "RSI su 14 candele: sopra 70 si dice ipercomprato, sotto 30 ipervenduto.", "src.volume": "Il volume dell’ultima ora chiusa rispetto alla media delle 20 precedenti.", "src.trend": "Dove si trova la media a 20 candele rispetto a quella a 50.", "src.range": "Il prezzo più basso e il più alto delle candele recenti.",
     "trend.up": "Rialzista",
     "trend.down": "Ribassista",
     "trend.sideways": "Laterale",
@@ -447,6 +452,7 @@
     "sat.ema": "EMA 20 / 50",
     "sat.range": "Spanne",
     "sat.range30": "30 h Tief–Hoch",
+    "src.price": "Der letzte Preis, den die Quelle veröffentlicht hat.", "src.rsi": "RSI über 14 Kerzen: über 70 gilt als überkauft, unter 30 als überverkauft.", "src.volume": "Das Volumen der letzten abgeschlossenen Stunde gegenüber dem Mittel der 20 davor.", "src.trend": "Wo der 20-Kerzen-Durchschnitt gegenüber dem 50er liegt.", "src.range": "Der tiefste und der höchste Preis der jüngsten Kerzen.",
     "trend.up": "Steigend",
     "trend.down": "Fallend",
     "trend.sideways": "Seitwärts",
@@ -879,7 +885,53 @@
       sats.push({ slot: 'LL', id: 'range', key: t(lang, 'sat.range'), value: money(tech.support, lang, currency, locale) + '–' + money(tech.resistance, lang, currency, locale), from: null,
         delta: fin(tech.bars) ? '' : t(lang, 'sat.range30'), dot: 'neutral' });
     }
+    var nums = { price: [price], rsi: [fin(tech.rsi14) ? Math.round(tech.rsi14) : null], volume: [vr], range: [tech.support, tech.resistance], trend: [] };
+    sats.forEach(function (s) { s.nums = (nums[s.id] || []).filter(fin); s.src = t(lang, 'src.' + s.id); s.said = []; });
     return sats.slice(0, firstRead ? 3 : 4);
+  }
+
+  /** The number a spoken word carries, read both ways when a separator is ambiguous ("1,234" / "1.234"); [] when it carries none. */
+  function spokenNumbers(word) {
+    var m = /\d[\d.,]*/.exec(String(word || '').replace(/[\u00a0\u202f\s]/g, ''));
+    if (!m) return [];
+    var raw = m[0].replace(/[.,]+$/, ''), dot = raw.lastIndexOf('.'), comma = raw.lastIndexOf(',');
+    var out = [], push = function (text) { var n = Number(text); if (fin(n) && out.indexOf(n) < 0) out.push(n); };
+    if (dot < 0 && comma < 0) push(raw);
+    else {
+      var at = Math.max(dot, comma), sep = raw.charAt(at);
+      push(raw.slice(0, at).replace(/[.,]/g, '') + '.' + raw.slice(at + 1));           /* the last separator is the decimal one */
+      if (raw.indexOf(sep) === at && raw.length - at - 1 === 3) push(raw.replace(/[.,]/g, ''));  /* …or it groups thousands */
+    }
+    return out;
+  }
+  /**
+   * Which spoken words say a satellite's own figure: `said` is the list of word indexes. A price or a level matches a
+   * number within half a percent of it (the voice says "225", the glass shows $225.07); the RSI matches the word "RSI"
+   * and its whole number right beside it; the volume matches only a number written as a multiple ("1.2x").
+   * Nothing is guessed: a satellite nobody mentions keeps an empty list and never lights up.
+   */
+  function markSaid(sats, words) {
+    sats.forEach(function (s) { s.said = []; });
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i], ns = spokenNumbers(w), isRsi = /^\W*rsi\W*$/i.test(w), multiple = /\d\s*[x×]\W*$/i.test(w);
+      for (var k = 0; k < sats.length; k++) {
+        var s = sats[k], hit = false;
+        if (s.id === 'rsi') {
+          hit = isRsi;
+          if (!hit && ns.length && s.nums.length) {
+            var near = false;
+            for (var j = Math.max(0, i - 4); j <= Math.min(words.length - 1, i + 4); j++) if (/^\W*rsi\W*$/i.test(words[j])) near = true;
+            hit = near && ns.indexOf(s.nums[0]) >= 0;
+          }
+        } else if (s.id === 'volume') {
+          hit = multiple && ns.some(function (n) { return s.nums.some(function (v) { return Math.abs(n - v) < 0.051; }); });
+        } else if (!multiple && !/%\W*$/.test(w)) {
+          hit = ns.some(function (n) { return s.nums.some(function (v) { return Math.abs(n - v) <= Math.max(0.005 * Math.abs(v), 0.005); }); });
+        }
+        if (hit) s.said.push(i);
+      }
+    }
+    return sats;
   }
 
   function buildChart(r, lang, plan, locale) {
@@ -1001,7 +1053,7 @@
       rows.push({ id: 'trend', label: t(lang, 'row.trend'),
         value: [tech.trend ? t(lang, 'trend.' + tech.trend) : null, fin(tech.rsi14) ? 'RSI ' + Math.round(tech.rsi14) : null].filter(Boolean).join(' · ') });
     }
-    var sym = r.asset.symbol;
+    var sym = r.asset.symbol, spoken = buildSpoken(r, lang);
     var syn = r.synthesis || (r.agents && r.agents.synthesis);
     return {
       requestId: r.requestId, symbol: sym, name: r.asset.name, isEquity: !!r.asset.isEquity, question: r.question, lang: lang,
@@ -1017,10 +1069,10 @@
       agents: ['alpha', 'red', 'cio'].map(function (k) {
         return { id: k, name: t(lang, 'agent.' + k), hue: HUES[k], stance: firstSentence(r.agents[k]), full: r.agents[k] };
       }),
-      satellites: buildSatellites(r, lang, !!opts.firstRead, locale),
+      satellites: markSaid(buildSatellites(r, lang, !!opts.firstRead, locale), spoken.words),
       chart: buildChart(r, lang, plan, locale),
       plan: plan,
-      spoken: buildSpoken(r, lang),
+      spoken: spoken,
       thesis: {
         header: t(lang, 'thesis.header', { symbol: sym }),
         title: t(lang, 'thesis.title.' + v, { symbol: sym }),

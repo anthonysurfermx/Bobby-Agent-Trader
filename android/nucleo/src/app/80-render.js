@@ -343,7 +343,9 @@ function placeSat(node, x, y, sc, o, cy, r, inFlight, settled, hw){
      The .86 glass fill carries the look. */
 }
 function renderSats(cy, r){
-  var i, orbO = 0, FT = TM.follow * 1000, nOn = 0;
+  var i, orbO = 0, FT = TM.follow * 1000, nOn = 0, anyHot = 0;
+  var talking = K.on && (ST.name === 'TALK_EVIDENCE' || ST.name === 'TALK_CHART');
+  for (i = 0; i < 4; i++){ var sh = A.sat[i]; sh.hot = talking && sh.on ? (SAT_SRC.i === i ? 1 : satHotAt(sh, K.t)) : 0; anyHot = Math.max(anyHot, sh.hot); }
   for (i = 0; i < 4; i++){
     var s = A.sat[i], node = el.sats[i], p = s.p.x;
     satPolar(i, SP); SAT_PTS[i * 2] = SP.dx; SAT_PTS[i * 2 + 1] = SP.dy;
@@ -358,12 +360,24 @@ function renderSats(cy, r){
     var x = 195 + Math.cos(a) * rad, y = L.cy + Math.sin(a) * rad;
     var sc = SP.sc * (0.62 + 0.38 * clamp(p, 0, 1));
     var o = clamp(p * 3, 0, 1) * rimMask(x, y, cy, r) * (p < 0.999 && s.p.tw ? sstep(0, 0.35, p) : 1);
+    /* the figure being said stands out: the others step back to 45 % while it is lit */
+    o *= 1 - 0.55 * anyHot * (1 - s.hot);
+    var hq = Math.round(s.hot * 100) / 100; if (node._hot !== hq){ node._hot = hq; node.style.setProperty('--hot', String(hq)); }
     var settled = Math.abs(p - 1) < 0.02 && Math.abs(s.p.v) < 0.02;
     placeSat(node, x, y, sc, o, cy, r, p > 0.001 && !settled, settled, s.hw);
     if (o < 0.002) continue;
     var kIn = clamp((clk - s.tE - 0.12) / 0.2, 0, 1), vIn = clamp((clk - s.tE - 0.18) / 0.24, 0, 1);
     op(el.satK[i], s.tE < 1e8 ? E.fade(kIn) : 0); op(el.satV[i], s.tE < 1e8 ? E.fade(vIn) : 0); bl(el.satV[i], 3 * (1 - E.focus(vIn)));
     el.satOdo[i].render();
+  }
+  /* where a figure comes from: under the caption, gone with the satellites */
+  if (SAT_SRC.o){
+    if (SAT_SRC.i >= 0 && (clk - SAT_SRC.t0 > 6 || !talking || !A.sat[SAT_SRC.i].on)) satSrcClose();
+    var so = SAT_SRC.o.x; op(el.satSrc, so);
+    /* the two read buttons step out while the card stands on their row (they are a sibling layer above this one) */
+    if (el.readActions){ st(el.readActions, 'opacity', f2(1 - so)); st(el.readActions, 'pointerEvents', so > 0.5 ? 'none' : ''); }
+    /* it stands on the row of the two read buttons (y 688–734) and covers it while it is open: a tap closes it */
+    if (so > 0.002) tf(el.satSrc, 0, 734 - (SAT_SRC.h || 100) + 6 * (1 - so));
   }
   /* orbit ellipse through the slots, drawn from each satellite */
   var oo = (nOn ? orbO / nOn : 0) * A.orbO.x;
@@ -600,7 +614,7 @@ function renderReadActions(){
     var r = READ, saved = !stored && r.save && r.save.status === 'saved', pending = !stored && !!r.savePending;
     var next = saved ? readNextAction() : null;
     el.readNextNote.textContent = stored ? '' : pending ? tt('read.saving') : saved ? readSavedNote(r) :
-      r.save && r.save.status !== 'saved' ? tt(r.save.status === 'stale' ? 'save.stale' : 'save.failed') : tt('read.saveHelp');
+      r.save && r.save.status !== 'saved' ? tt(r.save.status === 'stale' ? 'save.stale' : 'save.failed') : '';   /* before a save the card's own line says what saving does */
     el.readNextPrimary.textContent = stored ? tt('read.home') : pending ? tt('read.saving') : saved ? (next ? next.label : tt('read.home')) : tt('read.save');
     el.readNextPrimary.disabled = pending;
     att(el.readNextPrimary, 'data-hit', stored || (saved && !next) ? 'read-home' : saved ? 'read-next' : 'read-save');

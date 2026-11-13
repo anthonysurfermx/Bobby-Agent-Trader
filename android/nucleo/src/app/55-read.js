@@ -178,13 +178,41 @@ function solveSat(i, hw, layout){
   return [x - 195, y - cy];
 }
 var CAP_TALK = 488;
+/* ---- a figure lights up while the voice says it (the read model lists the words: satellites[].said) ----
+   From 0.15 s before the word to 1.1 s after it, eased at both ends. Only while the karaoke clock runs. */
+function satHotAt(s, t){
+  var hot = 0;
+  for (var i = 0; i < s.said.length; i++){
+    var w = kWordT(s.said[i]), a = clamp((t - (w.t0 - 0.15)) / 0.18, 0, 1), b = clamp(((w.t1 + 1.1) - t) / 0.45, 0, 1);
+    hot = Math.max(hot, Math.min(a, b));
+  }
+  return hot;
+}
+/* ---- where a figure comes from: opened by a tap on it, closed by a tap, by the next figure or after 6 s ---- */
+var SAT_SRC = { i: -1, o: null, t0: -9 };
+function satSrcOpen(i){
+  var s = A.sat[i], m = s && s.m, src = READ && READ.model && READ.model.chart && READ.model.chart.source;
+  if (!m || !m.src) return;
+  if (!SAT_SRC.o) SAT_SRC.o = new V(0, 'emit');
+  el.satSrc.querySelector('.k').textContent = m.key + ' · ' + m.value;
+  el.satSrc.querySelector('.b').textContent = m.src;
+  var prov = src && !/okx|okb|x ?layer/i.test(src.provider || '') ? (src.provider || '') : '';
+  var when = src && src.asOf ? tt('meta.asOf', { when: whenLabel(src.asOf, READ.reply && READ.reply.receivedAt) }) : '';
+  el.satSrc.querySelector('.m').textContent = [prov, when].filter(Boolean).join(' · ');
+  SAT_SRC.h = el.satSrc.offsetHeight || 100;
+  SAT_SRC.i = i; SAT_SRC.t0 = clk; SAT_SRC.o.tween(1, 0.2, E.fade); tick('selection');
+}
+function satSrcClose(now){ if (!SAT_SRC.o) return; SAT_SRC.i = -1; if (now) SAT_SRC.o.set(0); else SAT_SRC.o.tween(0, 0.18, E.fade); }
+function satSrcOn(){ return SAT_SRC.i >= 0; }
 function fillSats(model){
-  A.sat.forEach(function(s){ s.on = false; s.p.set(0); s.tE = 1e9; });
+  A.sat.forEach(function(s){ s.on = false; s.p.set(0); s.tE = 1e9; s.said = []; s.hot = 0; s.m = null; });
+  satSrcClose(true);
   model.satellites.forEach(function(sm){
     var i = SLOT_I[sm.slot]; if (i == null) return;
     var s = A.sat[i], node = el.sats[i];
     fillSatNode(node, el.satK[i], el.satV[i], el.satOdo[i], sm.key, sm.value, sm.from, sm.delta, sm.dot, sm.id === 'rsi');
-    s.on = true;
+    s.on = true; s.said = sm.said || []; s.m = sm;
+    att(node, 'aria-label', sm.key + ' ' + sm.value);
   });
   var low = 0;
   A.sat.forEach(function(s, i){
@@ -347,7 +375,9 @@ function fillThesisCard(th, o){
   fillRows(c.rows, th.rows, rh);
   var yUnder = 91 + n * rh + 6, saveTop = Math.max(284, yUnder + lnH + 4);
   c.ln.style.top = yUnder + 'px'; c.xp.style.top = yUnder + 'px'; c.hz.style.top = yUnder + 'px';
-  el.save.style.top = saveTop + 'px'; el.cards[1].style.height = (saveTop + 76) + 'px';
+  /* One save on the screen: the button under the cards (#readNextPrimary) is the action, so the card ends after its
+     own line instead of repeating it. #save stays in the tree (its hit and its states are shared), never shown. */
+  el.save.style.top = saveTop + 'px'; el.cards[1].style.height = (yUnder + lnH + 24) + 'px';
   c.hz.textContent = '';
   HZ = o.horizon && o.horizon.defaultHours || 24;
   if (showHz){
@@ -365,7 +395,7 @@ function fillThesisCard(th, o){
   A.saved.set(o.readOnly ? 1 : 0); A.savePress.set(1); A.sweepT = -9; A.xp.set(0); A.xpO.set(0);
   saveRoll.set(o.readOnly ? tt('read.saved') : tt('read.save'), true);
   A.saveC = vk;
-  st(el.save, 'display', o.readOnly ? 'none' : 'block');
+  st(el.save, 'display', 'none');
 }
 function setHorizon(hrs){
   HZ = hrs;

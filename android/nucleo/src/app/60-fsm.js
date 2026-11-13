@@ -597,7 +597,7 @@ function talkTick(){
 }
 /* the evidence feeds the verdict: satellites retract, the companion sinks, the filament collapses (B6 21.30–22.34) */
 function preVerdict(){
-  PREV.on = true; gulpCanon(true);
+  PREV.on = true; gulpCanon(true); satSrcClose();
   var k = 0; [3, 2, 1, 0].forEach(function(i){ if (A.sat[i].on && A.sat[i].p.t > 0){ satRetract(i, k * 0.04); k++; } });
   A.orbO.tween(0, 0.24, E.fade);
   U.compDepth.cfg = UT(0.38); U.compDepth.to(1, null, null, 0.10); U.compOn.to(0, null, null, 0.48);
@@ -664,6 +664,9 @@ function talkDown(h){
   var action = readActionDown(h); if (action) return action;
   if (h === 'close') return tapG(function(){ go('RETURNING'); });
   if (h === 'pill' && A.mode === 'stop') return readActionDown('read-voice', A.press);
+  var sat = /^sat([0-3])$/.exec(h || '');
+  if (sat) return tapG(function(){ var i = +sat[1]; if (SAT_SRC.i === i) satSrcClose(); else if (A.sat[i].on && A.sat[i].p.x > 0.9) satSrcOpen(i); });
+  if (satSrcOn()) return tapG(function(){ satSrcClose(); });
   return null;
 }
 STATES.TALK_EVIDENCE = {
