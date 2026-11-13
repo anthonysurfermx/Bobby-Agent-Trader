@@ -44,6 +44,39 @@ for (const slug of ['nvda', 'btc']) {
 // Synthetic variants built IN THE TEST from the real BTC capture (never shipped as fixtures).
 const btc = load('btc');
 const review = (patch) => ({ ...structuredClone(btc), agents: { ...btc.agents, verdict: 'review', direction: 'long', ...(patch.agents || {}) }, ...(patch.top || {}) });
+// A figure lights up only on a word that says it: the list comes from the reply's own words and numbers, never a guess.
+test('satellites list the spoken words that say their own figure', () => {
+  const r = load('nvda'), m = RM.build(r, { lang: 'en' });
+  const by = Object.fromEntries(m.satellites.map((s) => [s.id, s]));
+  const word = (i) => m.spoken.words[i];
+  assert.ok(by.price.said.length > 0, 'the voice names the price');
+  for (const i of by.price.said) assert.ok(Math.abs(parseFloat(word(i).replace(/[^0-9.]/g, '')) - by.price.nums[0]) <= by.price.nums[0] * 0.005, word(i));
+  for (const s of m.satellites) {
+    assert.ok(typeof s.src === 'string' && s.src.length > 10 && !/^src\./.test(s.src), s.id + ' says where it comes from');
+    for (const i of s.said) assert.ok(i >= 0 && i < m.spoken.words.length);
+  }
+});
+test('a number that is not a figure of the screen lights nothing', () => {
+  const r = load('nvda');
+  r.agents = { ...r.agents, cio: 'It gained 12% in 3 sessions and 7 analysts follow it. The index sits at 99999.', synthesis: undefined }; r.synthesis = undefined;
+  const m = RM.build(r, { lang: 'en' });
+  for (const s of m.satellites) assert.deepEqual(s.said, [], s.id);
+});
+test('the RSI lights on its name and on its own number beside it, and a multiple only lights the volume', () => {
+  const r = load('nvda'), base = RM.build(r, { lang: 'en' }), rsi = base.satellites.find((s) => s.id === 'rsi'), vol = base.satellites.find((s) => s.id === 'volume');
+  r.synthesis = undefined;
+  r.agents = { ...r.agents, synthesis: undefined, cio: `The RSI at ${rsi.nums[0]} is high. Somewhere else ${rsi.nums[0]} means nothing.` + (vol ? ` Volume ran ${vol.nums[0].toFixed(1)}x its average.` : '') };
+  const m = RM.build(r, { lang: 'en' }), said = (id) => (m.satellites.find((s) => s.id === id) || { said: [] }).said.map((i) => m.spoken.words[i]);
+  assert.deepEqual(said('rsi'), ['RSI', String(rsi.nums[0])]);
+  if (vol) assert.deepEqual(said('volume'), [`${vol.nums[0].toFixed(1)}x`]);
+  assert.deepEqual(said('price'), []);
+});
+for (const lang of ['en', 'es', 'fr', 'pt', 'it', 'de']) {
+  test(`${lang}: every figure has its source sentence`, () => {
+    for (const s of RM.build(load('nvda'), { lang }).satellites) assert.ok(s.src && !s.src.startsWith('src.'), lang + ' ' + s.id);
+  });
+}
+
 test('review + agreeing intel pulse -> real conviction ring + engine plan rows', () => {
   const m = RM.build(review({}), {});
   assert.equal(m.verdict.key, 'review');

@@ -133,7 +133,7 @@ var el = {
   cBr: $('cBr'), cBrL: $('cBrL'), cBrA: $('cBrA'), cBrB: $('cBrB'), cBrT: $('cBrT'), cBrS: $('cBrS'),
   cPulse: $('cPulse'), cNow: $('cNow'), cHead: $('cHead'), cHeadG: $('cHeadG'), leadG: $('leadG'),
   verdict: $('verdict'), vWord: $('vWord'), convL: $('convL'), pct: $('pct'), d100: $('d100').firstChild, d10: $('d10').firstChild, d1: $('d1').firstChild,
-  sats: [$('sat0'), $('sat1'), $('sat2'), $('sat3')], satG: $('satG'), satT: [$('satT0'), $('satT1')], belt: $('belt'),
+  sats: [$('sat0'), $('sat1'), $('sat2'), $('sat3')], satG: $('satG'), satSrc: $('satSrc'), satT: [$('satT0'), $('satT1')], belt: $('belt'),
   ag: [$('ag0'), $('ag1'), $('ag2')], say: [$('say0'), $('say1')], live: $('live'), meta: $('meta'), tx: $('tx'), bead: $('bead'),
   greet: $('greet'), note: $('note'), ftx: [$('ftx0'), $('ftx1')], meri: [].slice.call($('meri').querySelectorAll('i')), badge: $('meri').querySelector('b'), meriHit: $('meriHit'),
   cards: [$('card0'), $('card1'), $('card2')], save: $('save'), saveSw: $('saveSw'), tpill: $('tpill'),

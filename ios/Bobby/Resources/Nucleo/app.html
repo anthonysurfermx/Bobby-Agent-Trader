@@ -152,6 +152,12 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 .sat .v em.q{font:400 13px/22px var(--sans);letter-spacing:0;font-style:normal;color:var(--ink2);margin-left:4px}
 .sat .v{margin-top:3px;height:22px;font:500 18px/22px var(--sans);letter-spacing:-.01em;color:var(--ink)}
 .sat.tap{pointer-events:auto;cursor:pointer}
+.sat.fig{box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 0 0 1px rgba(255,248,236,calc(var(--hot,0)*.5)),0 0 22px rgba(255,248,236,calc(var(--hot,0)*.2))}
+/* where a figure comes from: one sentence and its source, under the caption */
+#satSrc{opacity:0;visibility:hidden;z-index:30;left:20px;width:350px;box-sizing:border-box;padding:12px 16px 13px;border-radius:18px;background:linear-gradient(#221E1B,#171513);border:.5px solid var(--hair);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 18px 40px rgba(0,0,0,.5);pointer-events:auto;cursor:pointer}
+#satSrc .k{font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
+#satSrc .b{margin-top:5px;font:400 15px/21px var(--sans);color:var(--ink)}
+#satSrc .m{margin-top:5px;font:400 13px/16px var(--sans);color:var(--ink2)}
 .dg{display:inline-block;height:22px;overflow:hidden;vertical-align:top}
 .dg b{display:block;font-weight:inherit}
 .dg b span{display:block;height:22px}
@@ -485,10 +491,11 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     <div id="convL" class="a"></div>
     <div id="pct" class="a"><span class="col" id="d100"><b></b></span><span class="col" id="d10"><b></b></span><span class="col" id="d1"><b></b></span>%</div>
 
-    <div class="sat a" id="sat0"><div class="k"></div><div class="v"></div></div>
-    <div class="sat a" id="sat1"><div class="k"></div><div class="v"></div></div>
-    <div class="sat a" id="sat2"><div class="k"></div><div class="v"></div></div>
-    <div class="sat a" id="sat3"><div class="k"></div><div class="v"></div></div>
+    <div class="sat a tap fig" id="sat0" data-hit="sat0" role="button"><div class="k"></div><div class="v"></div></div>
+    <div class="sat a tap fig" id="sat1" data-hit="sat1" role="button"><div class="k"></div><div class="v"></div></div>
+    <div class="sat a tap fig" id="sat2" data-hit="sat2" role="button"><div class="k"></div><div class="v"></div></div>
+    <div class="sat a tap fig" id="sat3" data-hit="sat3" role="button"><div class="k"></div><div class="v"></div></div>
+    <div id="satSrc" class="a" data-hit="satSrc" role="status"><div class="k"></div><div class="b"></div><div class="m"></div></div>
     <div class="sat a tap" id="satG" data-hit="satG"><div class="k"></div><div class="v"></div></div>
     <div class="sat a tap" id="satT0" data-hit="satT0"><div class="k"></div><div class="v"></div></div>
     <div class="sat a tap" id="satT1" data-hit="satT1"><div class="k"></div><div class="v"></div></div>
@@ -737,6 +744,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'sat.volume': 'Volume', 'sat.vsAvg': 'vs 20h avg',
       'sat.trend': 'Trend', 'sat.ema': 'EMA 20 / 50',
       'sat.range': 'Range', 'sat.range30': '30h low–high',
+      'src.price': "The last price the source published.", 'src.rsi': "RSI over 14 candles: above 70 is called overbought, below 30 oversold.", 'src.volume': "The last closed hour's volume against the average of the 20 hours before.", 'src.trend': "Where the 20-candle average sits against the 50-candle one.", 'src.range': "The lowest and the highest price of the recent candles.",
       'trend.up': 'Up', 'trend.down': 'Down', 'trend.sideways': 'Sideways',
       'chart.support': 'SUPPORT {price}', 'chart.resistance': 'RESISTANCE {price}',
       'chart.entry': 'ENTRY {price}', 'chart.stop': 'STOP {price}', 'chart.target': 'TARGET {price}',
@@ -789,6 +797,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'sat.volume': 'Volumen', 'sat.vsAvg': 'vs prom. 20h',
       'sat.trend': 'Tendencia', 'sat.ema': 'EMA 20 / 50',
       'sat.range': 'Rango', 'sat.range30': 'mín–máx 30h',
+      'src.price': "El último precio que publicó la fuente.", 'src.rsi': "RSI sobre 14 velas: arriba de 70 se dice sobrecomprado; abajo de 30, sobrevendido.", 'src.volume': "El volumen de la última hora cerrada frente al promedio de las 20 anteriores.", 'src.trend': "Dónde está el promedio de 20 velas frente al de 50.", 'src.range': "El precio más bajo y el más alto de las velas recientes.",
       'trend.up': 'Alcista', 'trend.down': 'Bajista', 'trend.sideways': 'Lateral',
       'chart.support': 'SOPORTE {price}', 'chart.resistance': 'RESISTENCIA {price}',
       'chart.entry': 'ENTRADA {price}', 'chart.stop': 'STOP {price}', 'chart.target': 'OBJETIVO {price}',
@@ -852,6 +861,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     "sat.ema": "EMA 20 / 50",
     "sat.range": "Fourchette",
     "sat.range30": "min–max 30 h",
+    "src.price": "Le dernier prix publié par la source.", "src.rsi": "RSI sur 14 bougies : au-dessus de 70 on parle de surachat, en dessous de 30 de survente.", "src.volume": "Le volume de la dernière heure clôturée face à la moyenne des 20 précédentes.", "src.trend": "Où se situe la moyenne de 20 bougies face à celle de 50.", "src.range": "Le prix le plus bas et le plus haut des bougies récentes.",
     "trend.up": "Haussière",
     "trend.down": "Baissière",
     "trend.sideways": "Latérale",
@@ -956,6 +966,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     "sat.ema": "EMA 20 / 50",
     "sat.range": "Intervalo",
     "sat.range30": "mín–máx 30 h",
+    "src.price": "O último preço publicado pela fonte.", "src.rsi": "RSI sobre 14 velas: acima de 70 diz-se sobrecomprado; abaixo de 30, sobrevendido.", "src.volume": "O volume da última hora fechada face à média das 20 anteriores.", "src.trend": "Onde está a média de 20 velas face à de 50.", "src.range": "O preço mais baixo e o mais alto das velas recentes.",
     "trend.up": "Em alta",
     "trend.down": "Em baixa",
     "trend.sideways": "Lateral",
@@ -1061,6 +1072,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     "sat.ema": "EMA 20 / 50",
     "sat.range": "Intervallo",
     "sat.range30": "min–max 30 h",
+    "src.price": "L’ultimo prezzo pubblicato dalla fonte.", "src.rsi": "RSI su 14 candele: sopra 70 si dice ipercomprato, sotto 30 ipervenduto.", "src.volume": "Il volume dell’ultima ora chiusa rispetto alla media delle 20 precedenti.", "src.trend": "Dove si trova la media a 20 candele rispetto a quella a 50.", "src.range": "Il prezzo più basso e il più alto delle candele recenti.",
     "trend.up": "Rialzista",
     "trend.down": "Ribassista",
     "trend.sideways": "Laterale",
@@ -1165,6 +1177,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     "sat.ema": "EMA 20 / 50",
     "sat.range": "Spanne",
     "sat.range30": "30 h Tief–Hoch",
+    "src.price": "Der letzte Preis, den die Quelle veröffentlicht hat.", "src.rsi": "RSI über 14 Kerzen: über 70 gilt als überkauft, unter 30 als überverkauft.", "src.volume": "Das Volumen der letzten abgeschlossenen Stunde gegenüber dem Mittel der 20 davor.", "src.trend": "Wo der 20-Kerzen-Durchschnitt gegenüber dem 50er liegt.", "src.range": "Der tiefste und der höchste Preis der jüngsten Kerzen.",
     "trend.up": "Steigend",
     "trend.down": "Fallend",
     "trend.sideways": "Seitwärts",
@@ -1597,7 +1610,53 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       sats.push({ slot: 'LL', id: 'range', key: t(lang, 'sat.range'), value: money(tech.support, lang, currency, locale) + '–' + money(tech.resistance, lang, currency, locale), from: null,
         delta: fin(tech.bars) ? '' : t(lang, 'sat.range30'), dot: 'neutral' });
     }
+    var nums = { price: [price], rsi: [fin(tech.rsi14) ? Math.round(tech.rsi14) : null], volume: [vr], range: [tech.support, tech.resistance], trend: [] };
+    sats.forEach(function (s) { s.nums = (nums[s.id] || []).filter(fin); s.src = t(lang, 'src.' + s.id); s.said = []; });
     return sats.slice(0, firstRead ? 3 : 4);
+  }
+
+  /** The number a spoken word carries, read both ways when a separator is ambiguous ("1,234" / "1.234"); [] when it carries none. */
+  function spokenNumbers(word) {
+    var m = /\d[\d.,]*/.exec(String(word || '').replace(/[\u00a0\u202f\s]/g, ''));
+    if (!m) return [];
+    var raw = m[0].replace(/[.,]+$/, ''), dot = raw.lastIndexOf('.'), comma = raw.lastIndexOf(',');
+    var out = [], push = function (text) { var n = Number(text); if (fin(n) && out.indexOf(n) < 0) out.push(n); };
+    if (dot < 0 && comma < 0) push(raw);
+    else {
+      var at = Math.max(dot, comma), sep = raw.charAt(at);
+      push(raw.slice(0, at).replace(/[.,]/g, '') + '.' + raw.slice(at + 1));           /* the last separator is the decimal one */
+      if (raw.indexOf(sep) === at && raw.length - at - 1 === 3) push(raw.replace(/[.,]/g, ''));  /* …or it groups thousands */
+    }
+    return out;
+  }
+  /**
+   * Which spoken words say a satellite's own figure: `said` is the list of word indexes. A price or a level matches a
+   * number within half a percent of it (the voice says "225", the glass shows $225.07); the RSI matches the word "RSI"
+   * and its whole number right beside it; the volume matches only a number written as a multiple ("1.2x").
+   * Nothing is guessed: a satellite nobody mentions keeps an empty list and never lights up.
+   */
+  function markSaid(sats, words) {
+    sats.forEach(function (s) { s.said = []; });
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i], ns = spokenNumbers(w), isRsi = /^\W*rsi\W*$/i.test(w), multiple = /\d\s*[x×]\W*$/i.test(w);
+      for (var k = 0; k < sats.length; k++) {
+        var s = sats[k], hit = false;
+        if (s.id === 'rsi') {
+          hit = isRsi;
+          if (!hit && ns.length && s.nums.length) {
+            var near = false;
+            for (var j = Math.max(0, i - 4); j <= Math.min(words.length - 1, i + 4); j++) if (/^\W*rsi\W*$/i.test(words[j])) near = true;
+            hit = near && ns.indexOf(s.nums[0]) >= 0;
+          }
+        } else if (s.id === 'volume') {
+          hit = multiple && ns.some(function (n) { return s.nums.some(function (v) { return Math.abs(n - v) < 0.051; }); });
+        } else if (!multiple && !/%\W*$/.test(w)) {
+          hit = ns.some(function (n) { return s.nums.some(function (v) { return Math.abs(n - v) <= Math.max(0.005 * Math.abs(v), 0.005); }); });
+        }
+        if (hit) s.said.push(i);
+      }
+    }
+    return sats;
   }
 
   function buildChart(r, lang, plan, locale) {
@@ -1724,7 +1783,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       rows.push({ id: 'trend', label: t(lang, 'row.trend'),
         value: [tech.trend ? t(lang, 'trend.' + tech.trend) : null, fin(tech.rsi14) ? 'RSI ' + Math.round(tech.rsi14) : null].filter(Boolean).join(' · ') });
     }
-    var sym = r.asset.symbol;
+    var sym = r.asset.symbol, spoken = buildSpoken(r, lang);
     var syn = r.synthesis || (r.agents && r.agents.synthesis);
     return {
       requestId: r.requestId, symbol: sym, name: r.asset.name, isEquity: !!r.asset.isEquity, question: r.question, lang: lang,
@@ -1740,10 +1799,10 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       agents: ['alpha', 'red', 'cio'].map(function (k) {
         return { id: k, name: t(lang, 'agent.' + k), hue: HUES[k], stance: firstSentence(r.agents[k]), full: r.agents[k] };
       }),
-      satellites: buildSatellites(r, lang, !!opts.firstRead, locale),
+      satellites: markSaid(buildSatellites(r, lang, !!opts.firstRead, locale), spoken.words),
       chart: buildChart(r, lang, plan, locale),
       plan: plan,
-      spoken: buildSpoken(r, lang),
+      spoken: spoken,
       thesis: {
         header: t(lang, 'thesis.header', { symbol: sym }),
         title: t(lang, 'thesis.title.' + v, { symbol: sym }),
@@ -2625,7 +2684,7 @@ var el = {
   cBr: $('cBr'), cBrL: $('cBrL'), cBrA: $('cBrA'), cBrB: $('cBrB'), cBrT: $('cBrT'), cBrS: $('cBrS'),
   cPulse: $('cPulse'), cNow: $('cNow'), cHead: $('cHead'), cHeadG: $('cHeadG'), leadG: $('leadG'),
   verdict: $('verdict'), vWord: $('vWord'), convL: $('convL'), pct: $('pct'), d100: $('d100').firstChild, d10: $('d10').firstChild, d1: $('d1').firstChild,
-  sats: [$('sat0'), $('sat1'), $('sat2'), $('sat3')], satG: $('satG'), satT: [$('satT0'), $('satT1')], belt: $('belt'),
+  sats: [$('sat0'), $('sat1'), $('sat2'), $('sat3')], satG: $('satG'), satSrc: $('satSrc'), satT: [$('satT0'), $('satT1')], belt: $('belt'),
   ag: [$('ag0'), $('ag1'), $('ag2')], say: [$('say0'), $('say1')], live: $('live'), meta: $('meta'), tx: $('tx'), bead: $('bead'),
   greet: $('greet'), note: $('note'), ftx: [$('ftx0'), $('ftx1')], meri: [].slice.call($('meri').querySelectorAll('i')), badge: $('meri').querySelector('b'), meriHit: $('meriHit'),
   cards: [$('card0'), $('card1'), $('card2')], save: $('save'), saveSw: $('saveSw'), tpill: $('tpill'),
@@ -3391,7 +3450,7 @@ function buildState(){
     bead: { s: new V(0, 'emit'), o: new V(0, 'soft'), x0: 195, y0: 558, fly0: 1e9 },
     ag: [0, 1, 2].map(function(){ return { o: new V(0, 'soft'), dx: new V(0, 'emit', true), dy: new V(8, 'emit', true), draw: new V(0, 'soft'), tIn: 1e9, tOut: 1e9, stT: 1e9, stW: [] }; }),
     cioSwO: new V(1, 'soft'), vfO: new V(0, 'soft'),
-    sat: [0, 1, 2, 3].map(function(){ return { p: new V(0, 'emit'), tE: 1e9, on: false, hw: 50, talk: [0, 0], chartP: [0, 0] }; }),
+    sat: [0, 1, 2, 3].map(function(){ return { p: new V(0, 'emit'), tE: 1e9, on: false, hw: 50, talk: [0, 0], chartP: [0, 0], said: [], hot: 0, m: null }; }),
     satLay: new V(0, 'soft'), orbDraw: new V(0, 'soft'), orbO: new V(1, 'soft'),
     satG: { p: new V(0, 'emit'), o: new V(0, 'soft'), on: false, hw: 59 }, satT: [{ p: new V(0, 'emit'), on: false, hw: 50 }, { p: new V(0, 'emit'), on: false, hw: 50 }],
     capY: new V(488, 'soft', true), metaO: new V(0, 'soft'), metaY: new V(6, 'emit', true), metaPin: null, metaDrop: new V(0, 'soft', true),
@@ -3684,13 +3743,41 @@ function solveSat(i, hw, layout){
   return [x - 195, y - cy];
 }
 var CAP_TALK = 488;
+/* ---- a figure lights up while the voice says it (the read model lists the words: satellites[].said) ----
+   From 0.15 s before the word to 1.1 s after it, eased at both ends. Only while the karaoke clock runs. */
+function satHotAt(s, t){
+  var hot = 0;
+  for (var i = 0; i < s.said.length; i++){
+    var w = kWordT(s.said[i]), a = clamp((t - (w.t0 - 0.15)) / 0.18, 0, 1), b = clamp(((w.t1 + 1.1) - t) / 0.45, 0, 1);
+    hot = Math.max(hot, Math.min(a, b));
+  }
+  return hot;
+}
+/* ---- where a figure comes from: opened by a tap on it, closed by a tap, by the next figure or after 6 s ---- */
+var SAT_SRC = { i: -1, o: null, t0: -9 };
+function satSrcOpen(i){
+  var s = A.sat[i], m = s && s.m, src = READ && READ.model && READ.model.chart && READ.model.chart.source;
+  if (!m || !m.src) return;
+  if (!SAT_SRC.o) SAT_SRC.o = new V(0, 'emit');
+  el.satSrc.querySelector('.k').textContent = m.key + ' · ' + m.value;
+  el.satSrc.querySelector('.b').textContent = m.src;
+  var prov = src && !/okx|okb|x ?layer/i.test(src.provider || '') ? (src.provider || '') : '';
+  var when = src && src.asOf ? tt('meta.asOf', { when: whenLabel(src.asOf, READ.reply && READ.reply.receivedAt) }) : '';
+  el.satSrc.querySelector('.m').textContent = [prov, when].filter(Boolean).join(' · ');
+  SAT_SRC.h = el.satSrc.offsetHeight || 100;
+  SAT_SRC.i = i; SAT_SRC.t0 = clk; SAT_SRC.o.tween(1, 0.2, E.fade); tick('selection');
+}
+function satSrcClose(now){ if (!SAT_SRC.o) return; SAT_SRC.i = -1; if (now) SAT_SRC.o.set(0); else SAT_SRC.o.tween(0, 0.18, E.fade); }
+function satSrcOn(){ return SAT_SRC.i >= 0; }
 function fillSats(model){
-  A.sat.forEach(function(s){ s.on = false; s.p.set(0); s.tE = 1e9; });
+  A.sat.forEach(function(s){ s.on = false; s.p.set(0); s.tE = 1e9; s.said = []; s.hot = 0; s.m = null; });
+  satSrcClose(true);
   model.satellites.forEach(function(sm){
     var i = SLOT_I[sm.slot]; if (i == null) return;
     var s = A.sat[i], node = el.sats[i];
     fillSatNode(node, el.satK[i], el.satV[i], el.satOdo[i], sm.key, sm.value, sm.from, sm.delta, sm.dot, sm.id === 'rsi');
-    s.on = true;
+    s.on = true; s.said = sm.said || []; s.m = sm;
+    att(node, 'aria-label', sm.key + ' ' + sm.value);
   });
   var low = 0;
   A.sat.forEach(function(s, i){
@@ -3853,7 +3940,9 @@ function fillThesisCard(th, o){
   fillRows(c.rows, th.rows, rh);
   var yUnder = 91 + n * rh + 6, saveTop = Math.max(284, yUnder + lnH + 4);
   c.ln.style.top = yUnder + 'px'; c.xp.style.top = yUnder + 'px'; c.hz.style.top = yUnder + 'px';
-  el.save.style.top = saveTop + 'px'; el.cards[1].style.height = (saveTop + 76) + 'px';
+  /* One save on the screen: the button under the cards (#readNextPrimary) is the action, so the card ends after its
+     own line instead of repeating it. #save stays in the tree (its hit and its states are shared), never shown. */
+  el.save.style.top = saveTop + 'px'; el.cards[1].style.height = (yUnder + lnH + 24) + 'px';
   c.hz.textContent = '';
   HZ = o.horizon && o.horizon.defaultHours || 24;
   if (showHz){
@@ -3871,7 +3960,7 @@ function fillThesisCard(th, o){
   A.saved.set(o.readOnly ? 1 : 0); A.savePress.set(1); A.sweepT = -9; A.xp.set(0); A.xpO.set(0);
   saveRoll.set(o.readOnly ? tt('read.saved') : tt('read.save'), true);
   A.saveC = vk;
-  st(el.save, 'display', o.readOnly ? 'none' : 'block');
+  st(el.save, 'display', 'none');
 }
 function setHorizon(hrs){
   HZ = hrs;
@@ -4677,7 +4766,7 @@ function talkTick(){
 }
 /* the evidence feeds the verdict: satellites retract, the companion sinks, the filament collapses (B6 21.30–22.34) */
 function preVerdict(){
-  PREV.on = true; gulpCanon(true);
+  PREV.on = true; gulpCanon(true); satSrcClose();
   var k = 0; [3, 2, 1, 0].forEach(function(i){ if (A.sat[i].on && A.sat[i].p.t > 0){ satRetract(i, k * 0.04); k++; } });
   A.orbO.tween(0, 0.24, E.fade);
   U.compDepth.cfg = UT(0.38); U.compDepth.to(1, null, null, 0.10); U.compOn.to(0, null, null, 0.48);
@@ -4744,6 +4833,9 @@ function talkDown(h){
   var action = readActionDown(h); if (action) return action;
   if (h === 'close') return tapG(function(){ go('RETURNING'); });
   if (h === 'pill' && A.mode === 'stop') return readActionDown('read-voice', A.press);
+  var sat = /^sat([0-3])$/.exec(h || '');
+  if (sat) return tapG(function(){ var i = +sat[1]; if (SAT_SRC.i === i) satSrcClose(); else if (A.sat[i].on && A.sat[i].p.x > 0.9) satSrcOpen(i); });
+  if (satSrcOn()) return tapG(function(){ satSrcClose(); });
   return null;
 }
 STATES.TALK_EVIDENCE = {
@@ -6132,7 +6224,9 @@ function placeSat(node, x, y, sc, o, cy, r, inFlight, settled, hw){
      The .86 glass fill carries the look. */
 }
 function renderSats(cy, r){
-  var i, orbO = 0, FT = TM.follow * 1000, nOn = 0;
+  var i, orbO = 0, FT = TM.follow * 1000, nOn = 0, anyHot = 0;
+  var talking = K.on && (ST.name === 'TALK_EVIDENCE' || ST.name === 'TALK_CHART');
+  for (i = 0; i < 4; i++){ var sh = A.sat[i]; sh.hot = talking && sh.on ? (SAT_SRC.i === i ? 1 : satHotAt(sh, K.t)) : 0; anyHot = Math.max(anyHot, sh.hot); }
   for (i = 0; i < 4; i++){
     var s = A.sat[i], node = el.sats[i], p = s.p.x;
     satPolar(i, SP); SAT_PTS[i * 2] = SP.dx; SAT_PTS[i * 2 + 1] = SP.dy;
@@ -6147,12 +6241,24 @@ function renderSats(cy, r){
     var x = 195 + Math.cos(a) * rad, y = L.cy + Math.sin(a) * rad;
     var sc = SP.sc * (0.62 + 0.38 * clamp(p, 0, 1));
     var o = clamp(p * 3, 0, 1) * rimMask(x, y, cy, r) * (p < 0.999 && s.p.tw ? sstep(0, 0.35, p) : 1);
+    /* the figure being said stands out: the others step back to 45 % while it is lit */
+    o *= 1 - 0.55 * anyHot * (1 - s.hot);
+    var hq = Math.round(s.hot * 100) / 100; if (node._hot !== hq){ node._hot = hq; node.style.setProperty('--hot', String(hq)); }
     var settled = Math.abs(p - 1) < 0.02 && Math.abs(s.p.v) < 0.02;
     placeSat(node, x, y, sc, o, cy, r, p > 0.001 && !settled, settled, s.hw);
     if (o < 0.002) continue;
     var kIn = clamp((clk - s.tE - 0.12) / 0.2, 0, 1), vIn = clamp((clk - s.tE - 0.18) / 0.24, 0, 1);
     op(el.satK[i], s.tE < 1e8 ? E.fade(kIn) : 0); op(el.satV[i], s.tE < 1e8 ? E.fade(vIn) : 0); bl(el.satV[i], 3 * (1 - E.focus(vIn)));
     el.satOdo[i].render();
+  }
+  /* where a figure comes from: under the caption, gone with the satellites */
+  if (SAT_SRC.o){
+    if (SAT_SRC.i >= 0 && (clk - SAT_SRC.t0 > 6 || !talking || !A.sat[SAT_SRC.i].on)) satSrcClose();
+    var so = SAT_SRC.o.x; op(el.satSrc, so);
+    /* the two read buttons step out while the card stands on their row (they are a sibling layer above this one) */
+    if (el.readActions){ st(el.readActions, 'opacity', f2(1 - so)); st(el.readActions, 'pointerEvents', so > 0.5 ? 'none' : ''); }
+    /* it stands on the row of the two read buttons (y 688–734) and covers it while it is open: a tap closes it */
+    if (so > 0.002) tf(el.satSrc, 0, 734 - (SAT_SRC.h || 100) + 6 * (1 - so));
   }
   /* orbit ellipse through the slots, drawn from each satellite */
   var oo = (nOn ? orbO / nOn : 0) * A.orbO.x;
@@ -6389,7 +6495,7 @@ function renderReadActions(){
     var r = READ, saved = !stored && r.save && r.save.status === 'saved', pending = !stored && !!r.savePending;
     var next = saved ? readNextAction() : null;
     el.readNextNote.textContent = stored ? '' : pending ? tt('read.saving') : saved ? readSavedNote(r) :
-      r.save && r.save.status !== 'saved' ? tt(r.save.status === 'stale' ? 'save.stale' : 'save.failed') : tt('read.saveHelp');
+      r.save && r.save.status !== 'saved' ? tt(r.save.status === 'stale' ? 'save.stale' : 'save.failed') : '';   /* before a save the card's own line says what saving does */
     el.readNextPrimary.textContent = stored ? tt('read.home') : pending ? tt('read.saving') : saved ? (next ? next.label : tt('read.home')) : tt('read.save');
     el.readNextPrimary.disabled = pending;
     att(el.readNextPrimary, 'data-hit', stored || (saved && !next) ? 'read-home' : saved ? 'read-next' : 'read-save');
@@ -6634,6 +6740,11 @@ function frame(now){
    ===================================================================== */
 var MOCK_CLOCKED = false, SCRIPT = null, G = { x: 195, y: 790, vis: 0, press: 0 };
 var SCRIPTS = {
+  'read-source': { mic: 'granted', steps: [
+    { wait: 'IDLE', after: 1.0 }, { say: 'Should I buy NVIDIA right now?' },
+    { hold: '#pill', dur: 3.3 }, { wait: 'TALK_EVIDENCE', after: 2.2 },
+    { tap: '#sat1' }
+  ] },
   'read-result': { mic: 'granted', steps: [
     { wait: 'IDLE', after: 1.0 }, { say: 'Should I buy NVIDIA right now?' },
     { hold: '#pill', dur: 3.3 }, { wait: 'THINK_RESOLVE', after: 0.2 },
@@ -6654,7 +6765,7 @@ var SCRIPTS = {
     { wait: 'CARDS', after: 1.0 },
     { drag: [300, 424, 180, 424], dur: 0.3, ease: 'swipe' },
     { after: 1.1 },
-    { tap: '#save' },
+    { tap: '#readNextPrimary' },
     { wait: 'FOLLOWUPS', after: 2.2 },
     { tap: '#close' },
     { wait: 'IDLE', after: 1.6 },
@@ -6699,7 +6810,7 @@ var SCRIPTS = {
     { wait: 'CARDS', after: 1.0 },
     { drag: [300, 424, 180, 424], dur: 0.3, ease: 'swipe' },
     { after: 1.1 },
-    { tap: '#save' },
+    { tap: '#readNextPrimary' },
     { wait: 'FOLLOWUPS', after: 2.2 },
     { tap: '#close' },
     { wait: 'IDLE', after: 1.6 },

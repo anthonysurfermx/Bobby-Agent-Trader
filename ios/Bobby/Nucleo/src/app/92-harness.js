@@ -9,6 +9,11 @@
    ===================================================================== */
 var MOCK_CLOCKED = false, SCRIPT = null, G = { x: 195, y: 790, vis: 0, press: 0 };
 var SCRIPTS = {
+  'read-source': { mic: 'granted', steps: [
+    { wait: 'IDLE', after: 1.0 }, { say: 'Should I buy NVIDIA right now?' },
+    { hold: '#pill', dur: 3.3 }, { wait: 'TALK_EVIDENCE', after: 2.2 },
+    { tap: '#sat1' }
+  ] },
   'read-result': { mic: 'granted', steps: [
     { wait: 'IDLE', after: 1.0 }, { say: 'Should I buy NVIDIA right now?' },
     { hold: '#pill', dur: 3.3 }, { wait: 'THINK_RESOLVE', after: 0.2 },
@@ -29,7 +34,7 @@ var SCRIPTS = {
     { wait: 'CARDS', after: 1.0 },
     { drag: [300, 424, 180, 424], dur: 0.3, ease: 'swipe' },
     { after: 1.1 },
-    { tap: '#save' },
+    { tap: '#readNextPrimary' },
     { wait: 'FOLLOWUPS', after: 2.2 },
     { tap: '#close' },
     { wait: 'IDLE', after: 1.6 },
@@ -74,7 +79,7 @@ var SCRIPTS = {
     { wait: 'CARDS', after: 1.0 },
     { drag: [300, 424, 180, 424], dur: 0.3, ease: 'swipe' },
     { after: 1.1 },
-    { tap: '#save' },
+    { tap: '#readNextPrimary' },
     { wait: 'FOLLOWUPS', after: 2.2 },
     { tap: '#close' },
     { wait: 'IDLE', after: 1.6 },

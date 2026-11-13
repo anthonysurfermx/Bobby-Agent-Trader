@@ -30,7 +30,7 @@ function buildState(){
     bead: { s: new V(0, 'emit'), o: new V(0, 'soft'), x0: 195, y0: 558, fly0: 1e9 },
     ag: [0, 1, 2].map(function(){ return { o: new V(0, 'soft'), dx: new V(0, 'emit', true), dy: new V(8, 'emit', true), draw: new V(0, 'soft'), tIn: 1e9, tOut: 1e9, stT: 1e9, stW: [] }; }),
     cioSwO: new V(1, 'soft'), vfO: new V(0, 'soft'),
-    sat: [0, 1, 2, 3].map(function(){ return { p: new V(0, 'emit'), tE: 1e9, on: false, hw: 50, talk: [0, 0], chartP: [0, 0] }; }),
+    sat: [0, 1, 2, 3].map(function(){ return { p: new V(0, 'emit'), tE: 1e9, on: false, hw: 50, talk: [0, 0], chartP: [0, 0], said: [], hot: 0, m: null }; }),
     satLay: new V(0, 'soft'), orbDraw: new V(0, 'soft'), orbO: new V(1, 'soft'),
     satG: { p: new V(0, 'emit'), o: new V(0, 'soft'), on: false, hw: 59 }, satT: [{ p: new V(0, 'emit'), on: false, hw: 50 }, { p: new V(0, 'emit'), on: false, hw: 50 }],
     capY: new V(488, 'soft', true), metaO: new V(0, 'soft'), metaY: new V(6, 'emit', true),
