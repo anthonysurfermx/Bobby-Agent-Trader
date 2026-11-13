@@ -23,7 +23,7 @@ function buildState(){
     greet: { w: [], s: null, x: new V(0, 'snap', true), o: new V(1, 'soft') },
     note: { w: [], s: null, o: new V(0, 'soft') },
     meri: [0, 1, 2, 3].map(function(){ return { p: new V(0, 'emit'), o: new V(0, 'soft') }; }), badge: new V(0, 'emit'),
-    pillY: new V(28, 'soft', true), pillO: new V(0, 'soft'), pillW: new V(96, 'pill'), press: new V(1, 'snap'), glow: new V(0.15, 'soft'),
+    pillY: new V(28, 'soft', true), pillO: new V(0, 'soft'), pillW: new V(96, 'pill'), press: new V(1, 'snap'), glow: new V(0.15, 'soft'), glowW: new V(0.42, 'soft'),
     mode: 'mic', modeO: { mic: new V(1, 'soft'), kbd: new V(0, 'soft'), bars: new V(0, 'soft'), think: new V(0, 'soft'), stop: new V(0, 'soft') },
     barsT0: -9, barsOutT0: 1e9, goo: new V(0, 'soft'),
     tx: { words: [], lift: new V(0, 'soft', true), final: false, o: new V(1, 'soft') },

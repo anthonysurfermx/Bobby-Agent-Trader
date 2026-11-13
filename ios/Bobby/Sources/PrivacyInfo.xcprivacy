@@ -138,6 +138,24 @@
         <string>CA92.1</string>
       </array>
     </dict>
+    <dict>
+      <!-- systemUptime measures elapsed time between in-app events (the handover timer). -->
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <string>35F9.1</string>
+      </array>
+    </dict>
+    <dict>
+      <!-- attributesOfItem reads the size of files inside the app's own bundle (mascot gallery). -->
+      <key>NSPrivacyAccessedAPIType</key>
+      <string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+      <key>NSPrivacyAccessedAPITypeReasons</key>
+      <array>
+        <string>C617.1</string>
+      </array>
+    </dict>
   </array>
 </dict>
 </plist>

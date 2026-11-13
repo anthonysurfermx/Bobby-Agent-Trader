@@ -155,7 +155,7 @@ final class BobbyAccessTests: XCTestCase {
         XCTAssertNotNil(anonRow.detail)
 
         let pro = BobbyReadAccess(tier: "pro", used: 12, limit: nil, remaining: nil, resetsAt: nil, paywall: false)
-        let apple = BobbySubscription(provider: "apple", status: "active", currentPeriodEnd: "2026-10-27T12:00:00Z")
+        let apple = BobbySubscription(provider: "apple", status: "active", currentPeriodEnd: "2099-10-27T12:00:00Z")
         let proRow = try XCTUnwrap(ReadsRow.content(access: pro, subscription: apple, signedIn: true, spanish: false))
         XCTAssertEqual(proRow.title, "Bobby Pro · Active")
         XCTAssertTrue(proRow.detail?.hasPrefix("Unlimited Quick reads (fair use) · 60 Deep and 10 Max every 30 days") == true, proRow.detail ?? "")
@@ -194,7 +194,7 @@ final class BobbyAccessTests: XCTestCase {
             .profundo: try XCTUnwrap(NucleoLevelMeter(json: ["used": 60, "limit": 60, "remaining": 0, "bonus": 3])),
             .maximo: try XCTUnwrap(NucleoLevelMeter(json: ["used": 10, "limit": 10, "remaining": 0, "bonus": 1]))
         ]
-        let subscription = BobbySubscription(provider: "apple", status: "active", currentPeriodEnd: "2026-10-27T12:00:00Z")
+        let subscription = BobbySubscription(provider: "apple", status: "active", currentPeriodEnd: "2099-10-27T12:00:00Z")
         let plan = try XCTUnwrap(ReadsRow.content(access: access, subscription: subscription, signedIn: true, spanish: true))
         XCTAssertEqual(plan.title, "Bobby Pro · Activo")
         XCTAssertTrue(plan.manage)
