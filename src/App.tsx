@@ -1,17 +1,17 @@
 // src/App.tsx - CON VERCEL ANALYTICS
 import React, { lazy, Suspense } from 'react';
-import { createBrowserRouter, RouterProvider, Outlet, ScrollRestoration, Navigate, useLocation } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Outlet, ScrollRestoration, Navigate, useLocation, useMatches } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react'; // ✅ PARA REACT (no Next.js)
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './hooks/useAuth';
-import Web3ContextProvider from '@/libs/components/Web3ContextProvider';
 import ProtectedRoute, { GuestRoute } from '@/components/auth/ProtectedRoute';
 import { ThemeProvider } from '@/components/ThemeProvider';
-import { lazyWithRetry } from '@/lib/lazyWithRetry';
+import { lazyWithRetry, routeWithRetry } from '@/lib/lazyWithRetry';
 import { appLanguage } from '@/lib/app-language';
-import { clientLocale, rememberQueryLanguage } from '@/lib/client-language';
+import { clientLanguage, clientLocale, rememberQueryLanguage } from '@/lib/client-language';
+import { APP_STORE_URL } from '@/lib/app-store';
 
 // Layout components (no lazy loading para layouts)
 import MainLayout from '@/components/layout/MainLayout';
@@ -19,7 +19,8 @@ import UserLayout from '@/pages/user/UserLayout';
 
 // Lazy load todas las páginas para mejor performance
 const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
-const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
+const Web3ContextProvider = lazy(() => import('@/libs/components/Web3ContextProvider'));
+const loadProtocolLanding = routeWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
 const BobbySignInPage = lazyWithRetry(() => import('@/pages/BobbySignInPage'), 'bobby-signin');
 
 // A direct visit to "/" is served by middleware. Reload client-side navigation to reach that page.
@@ -43,7 +44,7 @@ const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLandingExper
 const BobbyAppLandingA = lazyWithRetry(() => import('@/pages/BobbyAppLandingA'), 'app-landing-a');
 const BobbyAppLandingB = lazyWithRetry(() => import('@/pages/BobbyAppLandingB'), 'app-landing-b');
 // Direction A3 (sticker poster stack + Bobby's world) is /app since 2026-09-24; /app-world stays as an alias.
-const BobbyAppLandingWorld = lazyWithRetry(() => import('@/pages/BobbyAppLandingWorld'), 'app-landing-world');
+const loadAppLanding = routeWithRetry(() => import('@/pages/BobbyAppLandingWorld'), 'app-landing-world');
 const BobbySupportPage = lazy(() => import('@/pages/BobbySupportPage'));
 const BobbyRedeemPage = lazy(() => import('@/pages/BobbyRedeemPage'));
 const BobbyInvitePage = lazy(() => import('@/pages/BobbyInvitePage'));
@@ -172,7 +173,42 @@ function PageLoader() {
   );
 }
 
-// Root layout que envuelve todo con AuthProvider y Web3ContextProvider
+const STORAGE_NOTICE = {
+  en: ['Allow site data to open this page', 'Enable site data for Bobby in your browser settings, then try again.', 'Try again', 'Get Bobby for iPhone'],
+  es: ['Permite los datos del sitio para abrir esta página', 'Activa los datos del sitio para Bobby en la configuración de tu navegador y vuelve a intentarlo.', 'Reintentar', 'Descarga Bobby para iPhone'],
+  fr: ['Autorisez les données du site pour ouvrir cette page', 'Activez les données du site pour Bobby dans les réglages du navigateur, puis réessayez.', 'Réessayer', 'Télécharger Bobby pour iPhone'],
+  pt: ['Permita os dados do site para abrir esta página', 'Ative os dados do site para Bobby nas definições do navegador e tente novamente.', 'Tentar novamente', 'Baixar Bobby para iPhone'],
+  it: ['Consenti i dati del sito per aprire questa pagina', 'Abilita i dati del sito per Bobby nelle impostazioni del browser, poi riprova.', 'Riprova', 'Scarica Bobby per iPhone'],
+  de: ['Websitedaten zulassen, um diese Seite zu öffnen', 'Erlaube Websitedaten für Bobby in den Browsereinstellungen und versuche es erneut.', 'Erneut versuchen', 'Bobby für iPhone laden'],
+};
+
+const withoutWallet = { requiresWallet: false };
+
+function WalletRoute({ children }: { children: React.ReactNode }) {
+  const matches = useMatches() as Array<{ handle?: { requiresWallet?: boolean } }>;
+  if (matches.some(match => match.handle?.requiresWallet === false)) return <>{children}</>;
+  try {
+    // WalletConnect reads this property when its module initializes. With site data disabled
+    // browsers throw here, before the SDK or a React error boundary can render the desk.
+    void window.localStorage;
+  } catch {
+    const [title, detail, retry, download] = STORAGE_NOTICE[clientLanguage()];
+    return (
+      <main className="min-h-screen grid place-items-center bg-[#0b0a09] px-6 text-[#f2ede4]">
+        <div className="max-w-sm space-y-5">
+          <h1 className="text-2xl font-semibold">{title}</h1>
+          <p className="text-[#c6c0b7]">{detail}</p>
+          <div className="flex flex-wrap items-center gap-5">
+            <button className="min-h-11 rounded-full bg-[#f2ede4] px-5 font-medium text-[#0b0a09]" onClick={() => window.location.reload()}>{retry}</button>
+            <a className="underline" href={APP_STORE_URL}>{download}</a>
+          </div>
+        </div>
+      </main>
+    );
+  }
+  return <Suspense fallback={<PageLoader />}><Web3ContextProvider>{children}</Web3ContextProvider></Suspense>;
+}
+
 function RootLayout() {
   useLocation(); // Refresh the document locale on route and query transitions.
   const documentLocale = clientLocale();
@@ -180,27 +216,25 @@ function RootLayout() {
   return (
     <ThemeProvider defaultTheme="system" storageKey="defi-mexico-theme">
       <Helmet htmlAttributes={{ lang: documentLocale }} />
-      <Web3ContextProvider>
-        <AuthProvider>
-          <Outlet />
-          <ScrollRestoration />
-          <Toaster
-            position="top-right"
-            richColors
-            closeButton
-            duration={4000}
-            toastOptions={{
-              style: {
-                background: 'hsl(var(--background))',
-                color: 'hsl(var(--foreground))',
-                border: '1px solid hsl(var(--border))',
-              },
-            }}
-          />
-          {/* ✨ VERCEL ANALYTICS COMPONENT */}
-          <Analytics />
-        </AuthProvider>
-      </Web3ContextProvider>
+      <AuthProvider>
+        <WalletRoute><Outlet /></WalletRoute>
+        <ScrollRestoration />
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          duration={4000}
+          toastOptions={{
+            style: {
+              background: 'hsl(var(--background))',
+              color: 'hsl(var(--foreground))',
+              border: '1px solid hsl(var(--border))',
+            },
+          }}
+        />
+        {/* ✨ VERCEL ANALYTICS COMPONENT */}
+        <Analytics />
+      </AuthProvider>
     </ThemeProvider>
   );
 }
@@ -267,7 +301,7 @@ class ErrorBoundary extends React.Component<
 // ==========================================
 
 // Crear el router con todas las rutas y future flags
-const router = createBrowserRouter(
+export const router = createBrowserRouter(
   [
     {
       path: '/',
@@ -285,6 +319,7 @@ const router = createBrowserRouter(
         // ==========================================
         {
           path: 's/:code',
+          handle: withoutWallet,
           element: (
             <Suspense fallback={<PageLoader />}>
               <ShortRedirect />
@@ -296,35 +331,31 @@ const router = createBrowserRouter(
         // ==========================================
         {
           index: true,
+          handle: withoutWallet,
           element: <HomeGate />,
         },
         {
           path: 'protocol',
-          element: (
-            <Suspense fallback={<PageLoader />}>
-              <BobbyProtocolLanding />
-            </Suspense>
-          ),
+          handle: withoutWallet,
+          lazy: loadProtocolLanding,
+          HydrateFallback: PageLoader,
         },
         {
           path: 'app',
-          element: (
-            <Suspense fallback={<PageLoader />}>
-              <BobbyAppLandingWorld />
-            </Suspense>
-          ),
+          handle: withoutWallet,
+          lazy: loadAppLanding,
+          HydrateFallback: PageLoader,
         },
         {
           path: 'app-world',
-          element: (
-            <Suspense fallback={<PageLoader />}>
-              <BobbyAppLandingWorld />
-            </Suspense>
-          ),
+          handle: withoutWallet,
+          lazy: loadAppLanding,
+          HydrateFallback: PageLoader,
         },
         {
           // The previous /app, one click away so a rollback is a route change.
           path: 'app-v1',
+          handle: withoutWallet,
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyAppLanding />
@@ -333,6 +364,7 @@ const router = createBrowserRouter(
         },
         {
           path: 'app-a',
+          handle: withoutWallet,
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyAppLandingA />
@@ -341,6 +373,7 @@ const router = createBrowserRouter(
         },
         {
           path: 'app-b',
+          handle: withoutWallet,
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyAppLandingB />
@@ -354,20 +387,24 @@ const router = createBrowserRouter(
         // Coupons: an Apple/Google account redeems a code for extra reads (api/_lib/coupons.ts).
         {
           path: 'redeem',
+          handle: withoutWallet,
           element: (<Suspense fallback={<PageLoader />}><BobbyRedeemPage /></Suspense>),
         },
         // Invitations: the link a friend receives (api/_lib/referrals.ts) lands here; it keeps the code and
         // sends a phone to the app or the store. /i without a code shows the "not valid" message.
         {
           path: 'i/:code',
+          handle: withoutWallet,
           element: (<Suspense fallback={<PageLoader />}><BobbyInvitePage /></Suspense>),
         },
         {
           path: 'i',
+          handle: withoutWallet,
           element: (<Suspense fallback={<PageLoader />}><BobbyInvitePage /></Suspense>),
         },
         {
           path: 'privacy',
+          handle: withoutWallet,
           element: (
             <Suspense fallback={<PageLoader />}>
               <PrivacyPage />
@@ -482,6 +519,7 @@ const router = createBrowserRouter(
         // Apple / Google sign-in, started from the static home: /signin?provider=apple|google
         {
           path: 'signin',
+          handle: withoutWallet,
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbySignInPage />
@@ -1029,6 +1067,7 @@ const router = createBrowserRouter(
         },
         {
           path: 'auth/callback',
+          handle: withoutWallet,
           element: (
             <Suspense fallback={<PageLoader />}>
               <AuthCallback />
@@ -1142,6 +1181,7 @@ const router = createBrowserRouter(
         // ==========================================
         {
           path: '*',
+          handle: withoutWallet,
           element: (
             <Suspense fallback={<PageLoader />}>
               <NotFound />

@@ -3,7 +3,6 @@
    portal to <body> are themed too and nothing leaks into the other pages. The components keep their
    Tailwind classes and their logic; this layer remaps the old terminal palette (green / sky / amber)
    onto the Núcleo tokens shared with the iPhone app and the home page. */
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&family=Sora:wght@200;300;400;500&display=swap');
 
 body.nucleo-ui {
   --n-bg: #0B0A09; --n-amb: #15121C;

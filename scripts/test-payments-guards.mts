@@ -15,6 +15,8 @@ const eq = (a: unknown, b: unknown, what: string) => { assert.deepEqual(a, b, wh
 
 const subs = new Map<string, Record<string, unknown>>();
 let subscriber: Record<string, unknown> = {};
+let subscriberStatus = 200;
+const subscriberReads: Array<{ method: string; path: string }> = [];
 let writes: Array<Record<string, unknown>> = [];
 let stripeCalls: string[] = [];
 let stripeQueries: string[] = [];
@@ -42,7 +44,10 @@ let foundCustomers: Array<Record<string, unknown>> = [];
 let lastPortalCustomer: string | null = null;
 globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const u = new URL(String(input));
-  if (u.hostname === 'api.revenuecat.com') return Response.json({ subscriber });
+  if (u.hostname === 'api.revenuecat.com') {
+    subscriberReads.push({ method: init?.method ?? 'GET', path: u.pathname });
+    return Response.json({ subscriber }, { status: subscriberStatus });
+  }
   if (u.hostname === 'api.stripe.com') {
     const m = init?.method ?? 'GET';
     stripeCalls.push(`${m} ${u.pathname}`);
@@ -268,6 +273,18 @@ const accessGet = async () => {
 reset();
 subs.set('id-buyer', { identity_id: 'id-buyer', provider: 'stripe', status: 'paused', stripe_subscription_id: 'sub_paused', stripe_customer_id: 'cus_paused' });
 eq((await accessGet()).body?.payments?.apple, false, 'Apple sales are closed for an account with a nonterminal card plan');
+for (const status of ['active', 'trialing']) {
+  reset();
+  subs.set('id-buyer', { identity_id: 'id-buyer', provider: 'stripe', status, current_period_end: future });
+  eq((await accessGet()).body?.payments?.apple, false, `An ${status} Web Billing period closes App Store sales without a direct Stripe id`);
+  const blocked = await call();
+  eq([blocked.statusCode, blocked.body?.code, blocked.body?.provider, stripeCalls.length], [409, 'already_pro', 'stripe', 0],
+    `An ${status} Web Billing period cannot start a second checkout`);
+}
+reset();
+subs.set('id-buyer', { identity_id: 'id-buyer', provider: 'stripe', status: 'active', current_period_end: '2000-01-01T00:00:00Z' });
+eq((await accessGet()).body?.payments?.apple, true, 'An elapsed Web Billing period allows an App Store purchase');
+eq((await call()).statusCode, 200, 'An elapsed Web Billing period allows a new checkout');
 reset();
 subscriptionReadFails = true;
 eq((await accessGet()).body?.payments?.apple, false, 'Apple sales fail closed when account billing state cannot be read');
@@ -448,9 +465,9 @@ eq([w.status, purchases.size, purchases.get('stripe-refund-re_pending')?.price_u
   process.env.STRIPE_SECRET_KEY = 'sk_test_x'; process.env.STRIPE_PRICE_ID = 'price_x';
   const { default: accessHandler } = await import('../api/bobby-access.ts');
   let portalIp = 0;
-  const portal = async () => {
-    const res = { statusCode: 200, body: null as any, status(c: number) { this.statusCode = c; return this; }, json(b: unknown) { this.body = b; return this; }, setHeader() {} };
-    await accessHandler({ method: 'POST', body: { action: 'portal' }, query: {}, headers: { authorization: 'Bearer user-token', 'x-forwarded-for': `10.9.7.${++portalIp}`, host: 'bobbyprotocol.xyz' } } as never, res as never);
+  const portal = async (overrides: Record<string, unknown> = {}, signedIn = true) => {
+    const res = { statusCode: 200, body: null as any, headers: new Headers(), status(c: number) { this.statusCode = c; return this; }, json(b: unknown) { this.body = b; return this; }, setHeader(key: string, value: string) { this.headers.set(key, value); } };
+    await accessHandler({ method: 'POST', body: { action: 'portal', ...overrides }, query: {}, headers: { ...(signedIn ? { authorization: 'Bearer user-token' } : {}), 'x-forwarded-for': `10.9.7.${++portalIp}`, host: 'bobbyprotocol.xyz' } } as never, res as never);
     return res;
   };
   reset();
@@ -458,8 +475,47 @@ eq([w.status, purchases.size, purchases.get('stripe-refund-re_pending')?.price_u
   eq([p.statusCode, stripeCalls.includes('POST /v1/customers')], [404, false], 'the portal never creates a customer');
   reset();
   foundCustomers = [{ id: 'cus_meta' }];
+  delete process.env.STRIPE_PRICE_ID;
   p = await portal();
-  eq([p.statusCode, p.body?.url, lastPortalCustomer], [200, 'https://billing.stripe.test/p', 'cus_meta'], 'the portal opens for a customer found by metadata');
+  eq([p.statusCode, p.body?.url, lastPortalCustomer], [200, 'https://billing.stripe.test/p', 'cus_meta'], 'a direct customer can manage billing while a webhook is pending and new sales are disabled');
+  process.env.STRIPE_PRICE_ID = 'price_x';
+  reset();
+  subscriberReads.length = 0;
+  subs.set('id-buyer', { identity_id: 'id-buyer', provider: 'stripe', status: 'active', stripe_subscription_id: 'sub_direct', stripe_customer_id: 'cus_direct' });
+  p = await portal();
+  eq([p.statusCode, lastPortalCustomer, stripeCalls, subscriberReads.length], [200, 'cus_direct', ['POST /v1/billing_portal/sessions'], 0], 'a direct subscription uses its recorded Stripe customer without a subscriber lookup');
+  reset();
+  stripeDown = true;
+  p = await portal();
+  eq(p.statusCode, 502, 'Stripe lookup outages allow retry instead of reporting a missing subscription');
+
+  reset();
+  subscriberReads.length = 0;
+  subs.set('id-buyer', { identity_id: 'id-buyer', provider: 'stripe', status: 'trialing', current_period_end: future, stripe_subscription_id: null, stripe_customer_id: 'cus_old' });
+  p = await portal({ identity_id: 'id-buyer' }, false);
+  eq([p.statusCode, subscriberReads.length], [401, 0], 'the caller cannot name another account to obtain its management URL');
+  const expectedPath = '/v1/subscribers/11111111-1111-4111-8111-111111111111';
+  delete process.env.STRIPE_SECRET_KEY;
+  for (const url of ['https://billing.revenuecat.com/appDemo/subDemo?token=fixture', 'https://billing.stripe.com/p/login/fixture']) {
+    subscriber = { management_url: url };
+    p = await portal({ authUserId: 'another-user', identity_id: 'another-identity', management_url: 'https://other.example/' });
+    eq([p.statusCode, p.body?.url, subscriberReads.at(-1)], [200, url, { method: 'GET', path: expectedPath }], 'a mirrored plan uses only the authenticated subscriber and trusted provider URL');
+    eq(p.headers.get('cache-control'), 'private, no-store', 'an authenticated portal response must never be cached');
+  }
+  process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+  for (const url of [undefined, 'invalid', 'https://apps.apple.com/account/subscriptions', 'http://billing.revenuecat.com/app', 'https://billing.revenuecat.com.bad.example/app', 'https://user@billing.revenuecat.com/app', 'https://billing.stripe.com:8443/p']) {
+    subscriber = { management_url: url };
+    p = await portal();
+    eq([p.statusCode, p.body?.code, p.body?.url], [409, 'billing_receipt', undefined], 'a missing or non-web portal points the customer to their receipt');
+  }
+  subscriberStatus = 404;
+  p = await portal();
+  eq([p.statusCode, p.body?.code], [409, 'billing_receipt'], 'a missing subscriber has no management URL');
+  subscriberStatus = 503;
+  p = await portal();
+  eq([p.statusCode, p.body?.code], [502, undefined], 'a provider outage asks the customer to retry');
+  subscriberStatus = 200;
+  eq([stripeCalls.length, writes.length], [0, 0], 'mirrored portal requests never contact Stripe or change subscription records');
 }
 
 console.log(`payments-guards: ${checks} checks passed`);

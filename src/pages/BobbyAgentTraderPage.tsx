@@ -15,6 +15,7 @@ import { useProgress, RISK_NOTICE_VERSION } from '@/lib/companions/progress';
 import { t } from '@/lib/companions/i18n';
 import NucleoRisk from '@/components/nucleo/NucleoRisk';
 import '@/styles/nucleo-desk.css';
+import { useNucleoFonts } from '@/hooks/useNucleoFonts';
 
 class BobbyErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: string }> {
   constructor(props: { children: ReactNode }) {
@@ -49,6 +50,7 @@ export default function BobbyAgentTraderPage() {
   const location = useLocation();
   const progress = useProgress();
   const riskDue = !progress.aiConsentGranted || progress.riskNoticeVersion < RISK_NOTICE_VERSION;
+  useNucleoFonts(riskDue);
   useEffect(() => {
     if (!riskDue) return;
     document.body.classList.add('nucleo-ui');
