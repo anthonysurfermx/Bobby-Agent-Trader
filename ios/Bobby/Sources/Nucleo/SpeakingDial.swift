@@ -6,6 +6,13 @@ struct SpeakingDial {
     let defaults: UserDefaults
     init(defaults: UserDefaults = .standard) { self.defaults = defaults }
     static let values = ["plain", "terms", "technical"]
+    static func label(_ value: String?) -> String {
+        switch value {
+        case "terms": return L.t("With terms", "Con términos")
+        case "technical": return L.t("Technical", "Técnico")
+        default: return L.t("Plain", "Sencillo")
+        }
+    }
     func tag(_ owner: String?) -> String { SHA256.hash(data: Data((owner ?? "guest").utf8)).map { String(format: "%02x", $0) }.joined() }
     func key(_ owner: String?, _ field: String) -> String { "bobby.speaking." + tag(owner) + "." + field }
     func prepare(existing: Bool) {

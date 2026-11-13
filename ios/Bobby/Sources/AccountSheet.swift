@@ -30,6 +30,8 @@ struct AccountSheet: View {
     var onAIConsentWithdraw: (() -> Void)? = nil
     /// Opens a 1.8 screen of the Núcleo over the glass (My theses, Reminders); nil hides those rows (the classic desk).
     var onOpenRoute: ((NucleoRoute) -> Void)? = nil
+    var onSpeaking: (() -> Void)? = nil
+    var speakingValue: (() -> String)? = nil
     let onClose: () -> Void
     @ObservedObject private var account = AccountSession.shared
     @ObservedObject private var reads = BobbyAccessCenter.shared
@@ -371,6 +373,11 @@ struct AccountSheet: View {
             VoiceSwitchRow(voice: voice, onChange: onVoiceMutedChange)
             VoiceGenderRow(voice: voice)
         }
+        if let onSpeaking, let speakingValue {
+            ProfileRow(label: L.t("How Bobby talks to you", "Cómo te habla Bobby"), detail: speakingValue(), followsDynamicType: true, action: onSpeaking) { ProfileIcon(symbol: "text.bubble") }
+                .accessibilityIdentifier("account-speaking")
+                .disabled(!profile.acceptedRiskNotice)
+        }
         Menu {
             Button(L.t("Follow iPhone language", "Usar el idioma del iPhone")) { L.select("system") }
             ForEach(AppLanguage.allCases, id: \.rawValue) { language in
@@ -669,6 +676,9 @@ private struct ProfileRow<Icon: View>: View {
     var detail: String? = nil
     var trailing: String? = nil
     var detailLineLimit: Int? = 2
+    var followsDynamicType = false
+    @ScaledMetric(relativeTo: .body) private var scaledLabel: CGFloat = 15
+    @ScaledMetric(relativeTo: .caption) private var scaledDetail: CGFloat = 12
     let action: () -> Void
     @ViewBuilder let icon: () -> Icon
 
@@ -682,9 +692,10 @@ private struct ProfileRow<Icon: View>: View {
                     .frame(width: 32, height: 32)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(label).font(.system(size: 15)).foregroundStyle(Theme.cream).lineLimit(1)
+                    Text(label).font(.system(size: followsDynamicType ? scaledLabel : 15)).foregroundStyle(Theme.cream).lineLimit(followsDynamicType ? nil : 1)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let detail {
-                        Text(detail).font(.system(size: 12)).foregroundStyle(Theme.warmDim).lineLimit(detailLineLimit)
+                        Text(detail).font(.system(size: followsDynamicType ? scaledDetail : 12)).foregroundStyle(Theme.warmDim).lineLimit(followsDynamicType ? nil : detailLineLimit)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }

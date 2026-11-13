@@ -201,12 +201,12 @@
       "de": "Ich konnte die Notizen nicht speichern. Versuche es erneut."
     },
     "answerFailed": {
-      "es": "No pude anotarlo. Puedes elegir una de las opciones.",
-      "en": "I could not note that. You can pick one of the options.",
-      "fr": "Je n’ai pas pu le noter. Tu peux choisir une des options.",
-      "pt": "Não consegui anotar. Você pode escolher uma das opções.",
-      "it": "Non sono riuscito ad annotarlo. Puoi scegliere una delle opzioni.",
-      "de": "Das konnte ich nicht notieren. Du kannst eine der Optionen wählen."
+      "es": "No pude anotarlo; puedes elegir una de las opciones.",
+      "en": "I could not note that; you can pick one of the options.",
+      "fr": "Je n’ai pas pu le noter; tu peux choisir une des options.",
+      "pt": "Não consegui anotar; você pode escolher uma das opções.",
+      "it": "Non sono riuscito ad annotarlo; puoi scegliere una delle opzioni.",
+      "de": "Das konnte ich nicht notieren; du kannst eine der Optionen wählen."
     },
     "answerPlaceholder": {
       "es": "Tu respuesta a Bobby",

@@ -153,7 +153,8 @@ private struct NucleoStage: View {
             AccountSheet(store: session.companions, profile: session.profile, detents: [.large], showsLinks: true, voice: session.voice,
                          onVoiceMutedChange: { session.sessionChanged() },
                          onAIConsentWithdraw: { session.revokeRiskNoticeConsent() },
-                         onOpenRoute: { session.switchSheet(to: $0) }) { session.sheet = nil }
+                         onOpenRoute: { session.switchSheet(to: $0) },
+                         onSpeaking: { session.openSpeakingDial() }, speakingValue: { session.speakingValueLabel }) { session.sheet = nil }
         case .riskNotice:
             // Opened from onboarding before consent: no withdraw (RiskNoticeView shows neutral marks too).
             RiskNoticeView(profile: session.profile, readOnly: true,
@@ -199,8 +200,10 @@ private struct NucleoStage: View {
             CompanionConsentView(store: session.companionContext, finished: session.companionConsentFinished)
                 .presentationBackground { QuietMemorySurface() }
         case .companionNotes:
-            CompanionNotesView(store: session.companionContext,
+            CompanionNotesView(store: session.companionContext, undo: session.companionNoteUndo,
                 questionsAvailable: { session.companionContext.allows(session.companionPilot.capability) },
+                riskAccepted: { session.profile.acceptedRiskNotice },
+                initialField: session.companionNotesField,
                 onClose: { session.sheet = nil })
                 .presentationDetents([.large]).presentationDragIndicator(.visible).presentationCornerRadius(34).presentationBackground { QuietMemorySurface() }
         case .memoryConsent:

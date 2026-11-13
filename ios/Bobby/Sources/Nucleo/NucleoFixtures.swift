@@ -7,7 +7,7 @@
 import Foundation
 
 enum NucleoFixtures {
-    static let scenarios: Set<String> = ["companion-answer-slow","companion-probe-recovery","companion-gist-long","companion-limit-today","companion-limit-tomorrow","companion-confirm-last","companion-confirm-unknown","companion-confirm-guest","companion-confirm-deep","companion-confirm-max","companion-pro-deep","companion-confirm-long","companion-no-gist", "companion-wrong-gist", "companion-paused", "companion-retry", "companion-closing", "companion-no-followup", "companion-long", "companion-pro", "companion-waiting", "companion", "companion-fact", "companion-answer-error", "companion-exercise", "companion-belief", "companion-plain", "companion-off", "companion-error", "companion-limit", "companion-mismatch", "companion-offer", "default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline",
+    static let scenarios: Set<String> = ["companion-http500","companion-http429","companion-malformed-json","companion-slow20","companion-never-finishes","companion-answer-slow","companion-probe-recovery","companion-gist-long","companion-limit-today","companion-limit-tomorrow","companion-confirm-last","companion-confirm-unknown","companion-confirm-guest","companion-confirm-deep","companion-confirm-max","companion-pro-deep","companion-confirm-long","companion-no-gist", "companion-wrong-gist", "companion-paused", "companion-retry", "companion-closing", "companion-no-followup", "companion-long", "companion-pro", "companion-waiting", "companion", "companion-fact", "companion-answer-error", "companion-exercise", "companion-belief", "companion-plain", "companion-off", "companion-error", "companion-limit", "companion-mismatch", "companion-offer", "default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline",
                                          "signin_required", "subscription_required",
                                          "levels", "upgrade_required", "level_exhausted", "budget_paused"]
     /// Analysis levels (DEBUG QA): `levels` answers a premium desk with a synthesis, a second round, scenarios,
@@ -184,6 +184,9 @@ enum NucleoFixtures {
                 }
                 return (Self.json(405, ["companion": ["context": !["companion-plain", "companion-waiting"].contains(scenario), "catalog": scenario == "companion-mismatch" ? 2 : 1, "notices": ["memory-1"]]]), quick)
             }
+            if scenario == "companion-malformed-json" {
+                return (.http(status: 200, headers: ["Content-Type":"application/json"], body: Data("{broken json".utf8)), quick)
+            }
             if let answer = json["answer"] as? [String: Any], let id = answer["questionId"] as? String,
                let text = answer["text"] as? String, let question = CompanionCatalog.question(id) {
                 if scenario == "companion-answer-error" {
@@ -228,11 +231,11 @@ enum NucleoFixtures {
             let follow: [String: String] = ["es": "¿Cómo funciona una acción?", "en": "How does a stock work?", "fr": "Comment fonctionne une action ?", "pt": "Como funciona uma ação?", "it": "Come funziona un’azione?", "de": "Wie funktioniert eine Aktie?"]
             lock.lock(); _turnCount += 1; let turnCount = _turnCount; lock.unlock()
             if scenario == "companion-paused" { return (Self.json(503, ["version": 1, "kind": "error", "error": ["code":"companion_paused", "retryable":false]]), quick) }
-            let atLimit = scenario.hasPrefix("companion-limit")
-            if scenario == "companion-error" || atLimit || (scenario == "companion-retry" && turnCount == 1) {
-                return (Self.json(atLimit ? 429 : 503,
+            let atLimit = scenario.hasPrefix("companion-limit") || scenario == "companion-http429"
+            if scenario == "companion-error" || atLimit || (scenario == "companion-retry" && turnCount == 1) || (scenario == "companion-http500" && turnCount == 1) {
+                return (Self.json(atLimit ? 429 : scenario == "companion-http500" ? 500 : 503,
                     ["version": 1, "kind": "error", "error": ["code": atLimit ? "orientation_limit" : "companion_unavailable",
-                        "message": CompanionCopy.text("unavailable"), "retryable": !atLimit]], headers: scenario == "companion-limit-today" ? ["Retry-After":"1800"] : scenario == "companion-limit-tomorrow" ? ["Retry-After":"86400"] : [:]), quick)
+                        "message": CompanionCopy.text("unavailable"), "retryable": !atLimit]], headers: scenario == "companion-limit-today" || scenario == "companion-http429" ? ["Retry-After":"1800"] : scenario == "companion-limit-tomorrow" ? ["Retry-After":"86400"] : [:]), quick)
             }
             if scenario == "companion-offer", let candidate = json["candidate"] as? [String: Any], let symbol = candidate["symbol"] as? String {
                 return (Self.json(200, ["version": 1, "kind": "desk_offer", "nextAction": ["symbol": symbol, "requiresConfirmation": true]]), quick)
@@ -246,7 +249,7 @@ enum NucleoFixtures {
             let reply: [String: Any] = ["version": 1, "kind": "explanation", "requestId": json["requestId"] ?? NSNull(),
                 "reply": ["text": answerText, "gist": shownGist, "followUp": next], "personalized": context != nil,
                 "checkIn": NSNull(), "fact": NSNull(), "nextAction": NSNull(), "allowance": ["kind": "orientation", "consumed": 1, "remaining": 11]]
-            return (Self.json(200, reply), scenario == "companion-waiting" ? 35 : quick)
+            return (Self.json(200, reply), scenario == "companion-waiting" ? 35 : scenario == "companion-slow20" ? 20 : scenario == "companion-never-finishes" ? 120 : quick)
         case "/api/bobby-asset-search":
             if scenario.hasPrefix("companion") && param("browse") != "1" {
                 if scenario == "companion-confirm-long" {

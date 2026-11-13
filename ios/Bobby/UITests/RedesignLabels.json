@@ -1,5 +1,6 @@
 {
   "en": {
+    "fixtureGist": "Investing means putting money into something whose value can change.",
     "app": {
       "risk.notNow": "Not now",
       "risk.kept": "Nothing was sent. Your question is still here.",
@@ -24,11 +25,11 @@
       "cap.voiceUnavailable": "Voice unavailable · here is the text",
       "status.preparing": "Preparing your answer…",
       "answer.readAll": "Read it all",
-      "fail.answer": "I couldn’t answer. Your question is still here.",
+      "fail.answer": "I couldn’t answer; your question is still here.",
       "fail.retry": "Try again",
-      "fail.cantExplain": "I can’t explain right now. Your question is still here.",
-      "fail.offline": "No connection. Your question is still here.",
-      "fail.paused": "I’m pausing explanations for a while. Your question is still here.",
+      "fail.cantExplain": "I can’t explain right now; your question is still here.",
+      "fail.offline": "No connection; your question is still here.",
+      "fail.paused": "I’m pausing explanations for a while; your question is still here.",
       "aria.talk": "Talk",
       "aria.type": "Type",
       "aria.sendSpoken": "Send what I said",
@@ -215,11 +216,21 @@
       "pause": "Paused"
     },
     "native": {
+      "limitKnown": "I can’t explain more right now; I’ll be back {0}",
       "ready": "Read ready",
       "read": "See the {0} read",
       "deep": "Deep",
       "quick": "Quick"
     },
+    "consent": [
+      "Do you want Bobby to remember what you tell it?",
+      "Bobby is an AI and uses models from Anthropic (United States). If you accept, a short summary of your answers travels with each question so it can explain things better for you.",
+      "It will ask you a few questions, some about your money (for example, when you might need it). You can skip any of them.",
+      "The notes are kept on this device. You can see, correct or delete them whenever you want. Bobby works the same without this.",
+      "Yes, remember",
+      "Not now",
+      "More details"
+    ],
     "companion": {
       "unavailable": "I could not finish the explanation. You can try again.",
       "retry": "Try again",
@@ -239,7 +250,7 @@
       "retention": "Money and inferred notes: 7 days. Other notes: 30 days. Reading does not renew them.",
       "expires": "Expires",
       "storageError": "I could not save the notes. Try again.",
-      "answerFailed": "I could not note that. You can pick one of the options.",
+      "answerFailed": "I could not note that; you can pick one of the options.",
       "answerPlaceholder": "Your answer to Bobby",
       "answerSend": "Send answer",
       "exerciseExplanation": "I chose “{choice}”. What does a drop like that mean?",
@@ -295,7 +306,29 @@
           "government": "Something from the government",
           "property": "Property",
           "none": "No idea"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "companies",
+            "label": "Companies I know"
+          },
+          {
+            "id": "crypto",
+            "label": "Crypto"
+          },
+          {
+            "id": "government",
+            "label": "Something from the government"
+          },
+          {
+            "id": "property",
+            "label": "Property"
+          },
+          {
+            "id": "none",
+            "label": "No idea"
+          }
+        ]
       },
       "barrier": {
         "text": "What has stopped you until today?",
@@ -306,7 +339,29 @@
           "where_to_start": "I don't know where to start",
           "no_money": "I feel I don't have enough",
           "distrust": "I don't trust it"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "fear_of_loss",
+            "label": "Fear of losing"
+          },
+          {
+            "id": "words",
+            "label": "I don't get the words"
+          },
+          {
+            "id": "where_to_start",
+            "label": "I don't know where to start"
+          },
+          {
+            "id": "no_money",
+            "label": "I feel I don't have enough"
+          },
+          {
+            "id": "distrust",
+            "label": "I don't trust it"
+          }
+        ]
       },
       "when": {
         "text": "When do you think you will need that money?",
@@ -316,7 +371,25 @@
           "2_to_7y": "In 2 to 7 years",
           "over_7y": "In more than 7 years",
           "unsure": "I don't know"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "under_2y",
+            "label": "In under 2 years"
+          },
+          {
+            "id": "2_to_7y",
+            "label": "In 2 to 7 years"
+          },
+          {
+            "id": "over_7y",
+            "label": "In more than 7 years"
+          },
+          {
+            "id": "unsure",
+            "label": "I don't know"
+          }
+        ]
       },
       "cushion": {
         "text": "If an unexpected expense came up tomorrow, would you need that money?",
@@ -325,7 +398,21 @@
           "would_need_it": "Yes",
           "would_not": "No",
           "unsure": "I don't know"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "would_need_it",
+            "label": "Yes"
+          },
+          {
+            "id": "would_not",
+            "label": "No"
+          },
+          {
+            "id": "unsure",
+            "label": "I don't know"
+          }
+        ]
       },
       "hurry": {
         "text": "How soon would you like to see results?",
@@ -334,7 +421,21 @@
           "soon": "Soon",
           "no_rush": "No rush",
           "unsure": "I don't know"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "soon",
+            "label": "Soon"
+          },
+          {
+            "id": "no_rush",
+            "label": "No rush"
+          },
+          {
+            "id": "unsure",
+            "label": "I don't know"
+          }
+        ]
       },
       "fall": {
         "text": "Just playing: 100 becomes 80. What would you do?",
@@ -344,7 +445,25 @@
           "understand": "I would want to know why",
           "continue": "I would carry on",
           "unsure": "I don't know"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "pause",
+            "label": "I would stop"
+          },
+          {
+            "id": "understand",
+            "label": "I would want to know why"
+          },
+          {
+            "id": "continue",
+            "label": "I would carry on"
+          },
+          {
+            "id": "unsure",
+            "label": "I don't know"
+          }
+        ]
       },
       "belief": {
         "text": "What have you always heard about money or investing that you take as true?",
@@ -354,7 +473,25 @@
           "need_lots_of_money": "You need a lot of money",
           "too_late": "I am already late",
           "none": "Nothing in particular"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "market_is_casino",
+            "label": "The stock market is a casino"
+          },
+          {
+            "id": "need_lots_of_money",
+            "label": "You need a lot of money"
+          },
+          {
+            "id": "too_late",
+            "label": "I am already late"
+          },
+          {
+            "id": "none",
+            "label": "Nothing in particular"
+          }
+        ]
       },
       "format": {
         "text": "How do I explain best for you?",
@@ -362,13 +499,24 @@
         "options": {
           "examples": "With examples",
           "steps": "Step by step"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "examples",
+            "label": "With examples"
+          },
+          {
+            "id": "steps",
+            "label": "Step by step"
+          }
+        ]
       }
     },
     "interest": "Does anything catch your eye?",
     "crypto": "Crypto"
   },
   "es": {
+    "fixtureGist": "Invertir significa poner dinero en algo cuyo valor puede cambiar.",
     "app": {
       "risk.notNow": "Ahora no",
       "risk.kept": "No se envió nada. Tu pregunta sigue aquí.",
@@ -393,11 +541,11 @@
       "cap.voiceUnavailable": "Voz no disponible · aquí está el texto",
       "status.preparing": "Preparando tu respuesta…",
       "answer.readAll": "Leer completa",
-      "fail.answer": "No pude responder. Tu pregunta sigue aquí.",
+      "fail.answer": "No pude responder; tu pregunta sigue aquí.",
       "fail.retry": "Reintentar",
-      "fail.cantExplain": "Ahora no puedo explicar. Tu pregunta sigue aquí.",
-      "fail.offline": "Sin conexión. Tu pregunta sigue aquí.",
-      "fail.paused": "Estoy pausando las explicaciones un rato. Tu pregunta sigue aquí.",
+      "fail.cantExplain": "Ahora no puedo explicar; tu pregunta sigue aquí.",
+      "fail.offline": "Sin conexión; tu pregunta sigue aquí.",
+      "fail.paused": "Estoy pausando las explicaciones un rato; tu pregunta sigue aquí.",
       "aria.talk": "Hablar",
       "aria.type": "Escribir",
       "aria.sendSpoken": "Enviar lo que dije",
@@ -584,11 +732,21 @@
       "pause": "Pausa"
     },
     "native": {
+      "limitKnown": "Por ahora no puedo explicar más; vuelvo {0}",
       "ready": "Lectura lista",
       "read": "Ver lectura de {0}",
       "deep": "Profundo",
       "quick": "Rápido"
     },
+    "consent": [
+      "¿Quieres que Bobby recuerde lo que le cuentas?",
+      "Bobby es una IA y usa modelos de Anthropic (Estados Unidos). Si aceptas, un resumen corto de tus respuestas viaja con cada pregunta para explicarte mejor.",
+      "Te hará algunas preguntas, también sobre tu dinero (por ejemplo, cuándo podrías necesitarlo). Puedes omitir cualquiera.",
+      "Los apuntes se guardan en este dispositivo. Puedes verlos, corregirlos o borrarlos cuando quieras. Bobby funciona igual sin esto.",
+      "Sí, recuerda",
+      "Ahora no",
+      "Más detalles"
+    ],
     "companion": {
       "unavailable": "No pude completar la explicación. Puedes intentarlo de nuevo.",
       "retry": "Intentar de nuevo",
@@ -608,7 +766,7 @@
       "retention": "Dinero y deducciones: 7 días. Otros apuntes: 30 días. Leerlos no renueva el plazo.",
       "expires": "Caduca",
       "storageError": "No pude guardar los apuntes. Intenta de nuevo.",
-      "answerFailed": "No pude anotarlo. Puedes elegir una de las opciones.",
+      "answerFailed": "No pude anotarlo; puedes elegir una de las opciones.",
       "answerPlaceholder": "Tu respuesta a Bobby",
       "answerSend": "Enviar respuesta",
       "exerciseExplanation": "Elegí «{choice}». ¿Qué significa una caída así?",
@@ -664,7 +822,29 @@
           "government": "Algo del gobierno",
           "property": "Una propiedad",
           "none": "Ni idea"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "companies",
+            "label": "Empresas que conozco"
+          },
+          {
+            "id": "crypto",
+            "label": "Cripto"
+          },
+          {
+            "id": "government",
+            "label": "Algo del gobierno"
+          },
+          {
+            "id": "property",
+            "label": "Una propiedad"
+          },
+          {
+            "id": "none",
+            "label": "Ni idea"
+          }
+        ]
       },
       "barrier": {
         "text": "¿Qué te ha detenido hasta hoy?",
@@ -675,7 +855,29 @@
           "where_to_start": "No sé por dónde empezar",
           "no_money": "Siento que no me alcanza",
           "distrust": "No confío"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "fear_of_loss",
+            "label": "Miedo a perder"
+          },
+          {
+            "id": "words",
+            "label": "No entiendo las palabras"
+          },
+          {
+            "id": "where_to_start",
+            "label": "No sé por dónde empezar"
+          },
+          {
+            "id": "no_money",
+            "label": "Siento que no me alcanza"
+          },
+          {
+            "id": "distrust",
+            "label": "No confío"
+          }
+        ]
       },
       "when": {
         "text": "¿Cuándo crees que vas a necesitar ese dinero?",
@@ -685,7 +887,25 @@
           "2_to_7y": "En 2 a 7 años",
           "over_7y": "En más de 7 años",
           "unsure": "No sé"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "under_2y",
+            "label": "En menos de 2 años"
+          },
+          {
+            "id": "2_to_7y",
+            "label": "En 2 a 7 años"
+          },
+          {
+            "id": "over_7y",
+            "label": "En más de 7 años"
+          },
+          {
+            "id": "unsure",
+            "label": "No sé"
+          }
+        ]
       },
       "cushion": {
         "text": "Si mañana te saliera un gasto inesperado, ¿necesitarías ese dinero?",
@@ -694,7 +914,21 @@
           "would_need_it": "Sí",
           "would_not": "No",
           "unsure": "No sé"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "would_need_it",
+            "label": "Sí"
+          },
+          {
+            "id": "would_not",
+            "label": "No"
+          },
+          {
+            "id": "unsure",
+            "label": "No sé"
+          }
+        ]
       },
       "hurry": {
         "text": "¿Qué tan pronto te gustaría ver resultados?",
@@ -703,7 +937,21 @@
           "soon": "Pronto",
           "no_rush": "Sin prisa",
           "unsure": "No sé"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "soon",
+            "label": "Pronto"
+          },
+          {
+            "id": "no_rush",
+            "label": "Sin prisa"
+          },
+          {
+            "id": "unsure",
+            "label": "No sé"
+          }
+        ]
       },
       "fall": {
         "text": "Solo jugando: 100 pasa a 80. ¿Qué harías?",
@@ -713,7 +961,25 @@
           "understand": "Querría entender por qué",
           "continue": "Seguiría",
           "unsure": "No sé"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "pause",
+            "label": "Pararía"
+          },
+          {
+            "id": "understand",
+            "label": "Querría entender por qué"
+          },
+          {
+            "id": "continue",
+            "label": "Seguiría"
+          },
+          {
+            "id": "unsure",
+            "label": "No sé"
+          }
+        ]
       },
       "belief": {
         "text": "¿Qué has oído siempre sobre el dinero o invertir que das por cierto?",
@@ -723,7 +989,25 @@
           "need_lots_of_money": "Se necesita mucho dinero",
           "too_late": "Ya voy tarde",
           "none": "Nada en especial"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "market_is_casino",
+            "label": "La bolsa es un casino"
+          },
+          {
+            "id": "need_lots_of_money",
+            "label": "Se necesita mucho dinero"
+          },
+          {
+            "id": "too_late",
+            "label": "Ya voy tarde"
+          },
+          {
+            "id": "none",
+            "label": "Nada en especial"
+          }
+        ]
       },
       "format": {
         "text": "¿Cómo te explico mejor?",
@@ -731,13 +1015,24 @@
         "options": {
           "examples": "Con ejemplos",
           "steps": "Paso a paso"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "examples",
+            "label": "Con ejemplos"
+          },
+          {
+            "id": "steps",
+            "label": "Paso a paso"
+          }
+        ]
       }
     },
     "interest": "¿Algo te llama la atención?",
     "crypto": "Cripto"
   },
   "fr": {
+    "fixtureGist": "Investir, c’est mettre de l’argent dans quelque chose dont la valeur peut changer.",
     "app": {
       "risk.notNow": "Pas maintenant",
       "risk.kept": "Rien n’a été envoyé. Ta question est toujours là.",
@@ -762,11 +1057,11 @@
       "cap.voiceUnavailable": "Voix indisponible · voici le texte",
       "status.preparing": "Je prépare ta réponse…",
       "answer.readAll": "Tout lire",
-      "fail.answer": "Je n’ai pas pu répondre. Ta question est toujours là.",
+      "fail.answer": "Je n’ai pas pu répondre; ta question est toujours là.",
       "fail.retry": "Réessayer",
-      "fail.cantExplain": "Je ne peux pas expliquer pour l’instant. Ta question est toujours là.",
-      "fail.offline": "Pas de connexion. Ta question est toujours là.",
-      "fail.paused": "Je mets les explications en pause un moment. Ta question est toujours là.",
+      "fail.cantExplain": "Je ne peux pas expliquer pour l’instant; ta question est toujours là.",
+      "fail.offline": "Pas de connexion; ta question est toujours là.",
+      "fail.paused": "Je mets les explications en pause un moment; ta question est toujours là.",
       "aria.talk": "Parler",
       "aria.type": "Écrire",
       "aria.sendSpoken": "Envoyer ce que j’ai dit",
@@ -953,11 +1248,21 @@
       "pause": "En pause"
     },
     "native": {
+      "limitKnown": "Je ne peux rien expliquer de plus pour l’instant; je reviens {0}",
       "ready": "Analyse prête",
       "read": "Voir l’analyse de {0}",
       "deep": "Approfondie",
       "quick": "Rapide"
     },
+    "consent": [
+      "Veux-tu que Bobby se souvienne de ce que tu lui dis ?",
+      "Bobby est une IA et utilise des modèles d'Anthropic (États-Unis). Si tu acceptes, un court résumé de tes réponses accompagne chaque question pour mieux t'expliquer.",
+      "Il te posera quelques questions, y compris sur ton argent (par exemple, quand tu pourrais en avoir besoin). Tu peux passer n'importe laquelle.",
+      "Les notes restent sur cet appareil. Tu peux les voir, les corriger ou les supprimer quand tu veux. Bobby fonctionne pareil sans cela.",
+      "Oui, souviens-toi",
+      "Pas maintenant",
+      "Plus de détails"
+    ],
     "companion": {
       "unavailable": "Je n'ai pas pu terminer l'explication. Tu peux réessayer.",
       "retry": "Réessayer",
@@ -977,7 +1282,7 @@
       "retention": "Argent et déductions : 7 jours. Autres notes : 30 jours. Les lire ne prolonge pas le délai.",
       "expires": "Expire",
       "storageError": "Je n'ai pas pu enregistrer les notes. Réessaie.",
-      "answerFailed": "Je n’ai pas pu le noter. Tu peux choisir une des options.",
+      "answerFailed": "Je n’ai pas pu le noter; tu peux choisir une des options.",
       "answerPlaceholder": "Ta réponse à Bobby",
       "answerSend": "Envoyer la réponse",
       "exerciseExplanation": "J’ai choisi « {choice} ». Que signifie une baisse comme ça ?",
@@ -1033,7 +1338,29 @@
           "government": "Quelque chose de l'État",
           "property": "L'immobilier",
           "none": "Aucune idée"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "companies",
+            "label": "Des entreprises que je connais"
+          },
+          {
+            "id": "crypto",
+            "label": "Crypto"
+          },
+          {
+            "id": "government",
+            "label": "Quelque chose de l'État"
+          },
+          {
+            "id": "property",
+            "label": "L'immobilier"
+          },
+          {
+            "id": "none",
+            "label": "Aucune idée"
+          }
+        ]
       },
       "barrier": {
         "text": "Qu'est-ce qui t'a retenu jusqu'ici ?",
@@ -1044,7 +1371,29 @@
           "where_to_start": "Je ne sais pas par où commencer",
           "no_money": "J'ai l'impression de ne pas avoir assez",
           "distrust": "Je n'ai pas confiance"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "fear_of_loss",
+            "label": "La peur de perdre"
+          },
+          {
+            "id": "words",
+            "label": "Je ne comprends pas les mots"
+          },
+          {
+            "id": "where_to_start",
+            "label": "Je ne sais pas par où commencer"
+          },
+          {
+            "id": "no_money",
+            "label": "J'ai l'impression de ne pas avoir assez"
+          },
+          {
+            "id": "distrust",
+            "label": "Je n'ai pas confiance"
+          }
+        ]
       },
       "when": {
         "text": "Quand penses-tu avoir besoin de cet argent ?",
@@ -1054,7 +1403,25 @@
           "2_to_7y": "Dans 2 à 7 ans",
           "over_7y": "Dans plus de 7 ans",
           "unsure": "Je ne sais pas"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "under_2y",
+            "label": "Dans moins de 2 ans"
+          },
+          {
+            "id": "2_to_7y",
+            "label": "Dans 2 à 7 ans"
+          },
+          {
+            "id": "over_7y",
+            "label": "Dans plus de 7 ans"
+          },
+          {
+            "id": "unsure",
+            "label": "Je ne sais pas"
+          }
+        ]
       },
       "cushion": {
         "text": "Si une dépense imprévue arrivait demain, aurais-tu besoin de cet argent ?",
@@ -1063,7 +1430,21 @@
           "would_need_it": "Oui",
           "would_not": "Non",
           "unsure": "Je ne sais pas"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "would_need_it",
+            "label": "Oui"
+          },
+          {
+            "id": "would_not",
+            "label": "Non"
+          },
+          {
+            "id": "unsure",
+            "label": "Je ne sais pas"
+          }
+        ]
       },
       "hurry": {
         "text": "En combien de temps aimerais-tu voir des résultats ?",
@@ -1072,7 +1453,21 @@
           "soon": "Vite",
           "no_rush": "Sans me presser",
           "unsure": "Je ne sais pas"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "soon",
+            "label": "Vite"
+          },
+          {
+            "id": "no_rush",
+            "label": "Sans me presser"
+          },
+          {
+            "id": "unsure",
+            "label": "Je ne sais pas"
+          }
+        ]
       },
       "fall": {
         "text": "Juste pour jouer : 100 devient 80. Que ferais-tu ?",
@@ -1082,7 +1477,25 @@
           "understand": "Je voudrais comprendre pourquoi",
           "continue": "Je continuerais",
           "unsure": "Je ne sais pas"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "pause",
+            "label": "J'arrêterais"
+          },
+          {
+            "id": "understand",
+            "label": "Je voudrais comprendre pourquoi"
+          },
+          {
+            "id": "continue",
+            "label": "Je continuerais"
+          },
+          {
+            "id": "unsure",
+            "label": "Je ne sais pas"
+          }
+        ]
       },
       "belief": {
         "text": "Qu'as-tu toujours entendu sur l'argent ou l'investissement que tu tiens pour vrai ?",
@@ -1092,7 +1505,25 @@
           "need_lots_of_money": "Il faut beaucoup d'argent",
           "too_late": "Je m'y prends trop tard",
           "none": "Rien de particulier"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "market_is_casino",
+            "label": "La Bourse, c'est un casino"
+          },
+          {
+            "id": "need_lots_of_money",
+            "label": "Il faut beaucoup d'argent"
+          },
+          {
+            "id": "too_late",
+            "label": "Je m'y prends trop tard"
+          },
+          {
+            "id": "none",
+            "label": "Rien de particulier"
+          }
+        ]
       },
       "format": {
         "text": "Comment je t'explique le mieux ?",
@@ -1100,13 +1531,24 @@
         "options": {
           "examples": "Avec des exemples",
           "steps": "Étape par étape"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "examples",
+            "label": "Avec des exemples"
+          },
+          {
+            "id": "steps",
+            "label": "Étape par étape"
+          }
+        ]
       }
     },
     "interest": "Quelque chose t'attire ?",
     "crypto": "Crypto"
   },
   "pt": {
+    "fixtureGist": "Investir é colocar dinheiro em algo cujo valor pode mudar.",
     "app": {
       "risk.notNow": "Agora não",
       "risk.kept": "Nada foi enviado. A tua pergunta continua aqui.",
@@ -1131,11 +1573,11 @@
       "cap.voiceUnavailable": "Voz indisponível · aqui está o texto",
       "status.preparing": "A preparar a tua resposta…",
       "answer.readAll": "Ler tudo",
-      "fail.answer": "Não consegui responder. A tua pergunta continua aqui.",
+      "fail.answer": "Não consegui responder; a tua pergunta continua aqui.",
       "fail.retry": "Tentar novamente",
-      "fail.cantExplain": "Agora não consigo explicar. A tua pergunta continua aqui.",
-      "fail.offline": "Sem ligação. A tua pergunta continua aqui.",
-      "fail.paused": "Estou a pausar as explicações por um bocado. A tua pergunta continua aqui.",
+      "fail.cantExplain": "Agora não consigo explicar; a tua pergunta continua aqui.",
+      "fail.offline": "Sem ligação; a tua pergunta continua aqui.",
+      "fail.paused": "Estou a pausar as explicações por um bocado; a tua pergunta continua aqui.",
       "aria.talk": "Falar",
       "aria.type": "Escrever",
       "aria.sendSpoken": "Enviar o que eu disse",
@@ -1322,11 +1764,21 @@
       "pause": "Em pausa"
     },
     "native": {
+      "limitKnown": "Por agora não posso explicar mais; volto {0}",
       "ready": "Análise pronta",
       "read": "Ver a análise de {0}",
       "deep": "Profunda",
       "quick": "Rápida"
     },
+    "consent": [
+      "Quer que o Bobby lembre do que você conta?",
+      "O Bobby é uma IA e usa modelos da Anthropic (Estados Unidos). Se você aceitar, um resumo curto das suas respostas vai junto com cada pergunta para explicar melhor.",
+      "Ele vai fazer algumas perguntas, inclusive sobre o seu dinheiro (por exemplo, quando você pode precisar dele). Você pode pular qualquer uma.",
+      "As anotações ficam neste aparelho. Você pode ver, corrigir ou apagar quando quiser. O Bobby funciona igual sem isso.",
+      "Sim, lembre",
+      "Agora não",
+      "Mais detalhes"
+    ],
     "companion": {
       "unavailable": "Não consegui terminar a explicação. Você pode tentar de novo.",
       "retry": "Tentar de novo",
@@ -1346,7 +1798,7 @@
       "retention": "Dinheiro e deduções: 7 dias. Outras anotações: 30 dias. Ler não renova o prazo.",
       "expires": "Expira",
       "storageError": "Não consegui salvar as anotações. Tente de novo.",
-      "answerFailed": "Não consegui anotar. Você pode escolher uma das opções.",
+      "answerFailed": "Não consegui anotar; você pode escolher uma das opções.",
       "answerPlaceholder": "Sua resposta ao Bobby",
       "answerSend": "Enviar resposta",
       "exerciseExplanation": "Escolhi “{choice}”. O que significa uma queda assim?",
@@ -1402,7 +1854,29 @@
           "government": "Algo do governo",
           "property": "Um imóvel",
           "none": "Não faço ideia"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "companies",
+            "label": "Empresas que conheço"
+          },
+          {
+            "id": "crypto",
+            "label": "Cripto"
+          },
+          {
+            "id": "government",
+            "label": "Algo do governo"
+          },
+          {
+            "id": "property",
+            "label": "Um imóvel"
+          },
+          {
+            "id": "none",
+            "label": "Não faço ideia"
+          }
+        ]
       },
       "barrier": {
         "text": "O que te segurou até hoje?",
@@ -1413,7 +1887,29 @@
           "where_to_start": "Não sei por onde começar",
           "no_money": "Sinto que não tenho o bastante",
           "distrust": "Não confio"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "fear_of_loss",
+            "label": "Medo de perder"
+          },
+          {
+            "id": "words",
+            "label": "Não entendo os termos"
+          },
+          {
+            "id": "where_to_start",
+            "label": "Não sei por onde começar"
+          },
+          {
+            "id": "no_money",
+            "label": "Sinto que não tenho o bastante"
+          },
+          {
+            "id": "distrust",
+            "label": "Não confio"
+          }
+        ]
       },
       "when": {
         "text": "Quando você acha que vai precisar desse dinheiro?",
@@ -1423,7 +1919,25 @@
           "2_to_7y": "Em 2 a 7 anos",
           "over_7y": "Em mais de 7 anos",
           "unsure": "Não sei"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "under_2y",
+            "label": "Em menos de 2 anos"
+          },
+          {
+            "id": "2_to_7y",
+            "label": "Em 2 a 7 anos"
+          },
+          {
+            "id": "over_7y",
+            "label": "Em mais de 7 anos"
+          },
+          {
+            "id": "unsure",
+            "label": "Não sei"
+          }
+        ]
       },
       "cushion": {
         "text": "Se amanhã surgisse um gasto inesperado, você precisaria desse dinheiro?",
@@ -1432,7 +1946,21 @@
           "would_need_it": "Sim",
           "would_not": "Não",
           "unsure": "Não sei"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "would_need_it",
+            "label": "Sim"
+          },
+          {
+            "id": "would_not",
+            "label": "Não"
+          },
+          {
+            "id": "unsure",
+            "label": "Não sei"
+          }
+        ]
       },
       "hurry": {
         "text": "Em quanto tempo você gostaria de ver resultados?",
@@ -1441,7 +1969,21 @@
           "soon": "Logo",
           "no_rush": "Sem pressa",
           "unsure": "Não sei"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "soon",
+            "label": "Logo"
+          },
+          {
+            "id": "no_rush",
+            "label": "Sem pressa"
+          },
+          {
+            "id": "unsure",
+            "label": "Não sei"
+          }
+        ]
       },
       "fall": {
         "text": "Só de brincadeira: 100 vira 80. O que você faria?",
@@ -1451,7 +1993,25 @@
           "understand": "Ia querer entender o porquê",
           "continue": "Eu continuaria",
           "unsure": "Não sei"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "pause",
+            "label": "Eu pararia"
+          },
+          {
+            "id": "understand",
+            "label": "Ia querer entender o porquê"
+          },
+          {
+            "id": "continue",
+            "label": "Eu continuaria"
+          },
+          {
+            "id": "unsure",
+            "label": "Não sei"
+          }
+        ]
       },
       "belief": {
         "text": "O que você sempre ouviu sobre dinheiro ou investir e dá como certo?",
@@ -1461,7 +2021,25 @@
           "need_lots_of_money": "Precisa de muito dinheiro",
           "too_late": "Já é tarde para mim",
           "none": "Nada em especial"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "market_is_casino",
+            "label": "A bolsa é um cassino"
+          },
+          {
+            "id": "need_lots_of_money",
+            "label": "Precisa de muito dinheiro"
+          },
+          {
+            "id": "too_late",
+            "label": "Já é tarde para mim"
+          },
+          {
+            "id": "none",
+            "label": "Nada em especial"
+          }
+        ]
       },
       "format": {
         "text": "Como eu te explico melhor?",
@@ -1469,13 +2047,24 @@
         "options": {
           "examples": "Com exemplos",
           "steps": "Passo a passo"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "examples",
+            "label": "Com exemplos"
+          },
+          {
+            "id": "steps",
+            "label": "Passo a passo"
+          }
+        ]
       }
     },
     "interest": "Alguma coisa chama sua atenção?",
     "crypto": "Cripto"
   },
   "it": {
+    "fixtureGist": "Investire significa mettere denaro in qualcosa il cui valore può cambiare.",
     "app": {
       "risk.notNow": "Non ora",
       "risk.kept": "Non è stato inviato nulla. La tua domanda è ancora qui.",
@@ -1500,11 +2089,11 @@
       "cap.voiceUnavailable": "Voce non disponibile · ecco il testo",
       "status.preparing": "Preparo la tua risposta…",
       "answer.readAll": "Leggi tutto",
-      "fail.answer": "Non sono riuscito a rispondere. La tua domanda è ancora qui.",
+      "fail.answer": "Non sono riuscito a rispondere; la tua domanda è ancora qui.",
       "fail.retry": "Riprova",
-      "fail.cantExplain": "Ora non riesco a spiegare. La tua domanda è ancora qui.",
-      "fail.offline": "Nessuna connessione. La tua domanda è ancora qui.",
-      "fail.paused": "Metto in pausa le spiegazioni per un po’. La tua domanda è ancora qui.",
+      "fail.cantExplain": "Ora non riesco a spiegare; la tua domanda è ancora qui.",
+      "fail.offline": "Nessuna connessione; la tua domanda è ancora qui.",
+      "fail.paused": "Metto in pausa le spiegazioni per un po’; la tua domanda è ancora qui.",
       "aria.talk": "Parla",
       "aria.type": "Scrivi",
       "aria.sendSpoken": "Invia quello che ho detto",
@@ -1691,11 +2280,21 @@
       "pause": "In pausa"
     },
     "native": {
+      "limitKnown": "Per ora non posso spiegare altro; torno {0}",
       "ready": "Analisi pronta",
       "read": "Vedi l’analisi di {0}",
       "deep": "Approfondita",
       "quick": "Rapida"
     },
+    "consent": [
+      "Vuoi che Bobby ricordi quello che gli racconti?",
+      "Bobby è un'IA e usa modelli di Anthropic (Stati Uniti). Se accetti, un breve riassunto delle tue risposte viaggia con ogni domanda per spiegarti meglio.",
+      "Ti farà alcune domande, anche sul tuo denaro (per esempio, quando potrebbe servirti). Puoi saltarne qualsiasi.",
+      "Gli appunti restano su questo dispositivo. Puoi vederli, correggerli o cancellarli quando vuoi. Bobby funziona allo stesso modo anche senza.",
+      "Sì, ricorda",
+      "Non ora",
+      "Più dettagli"
+    ],
     "companion": {
       "unavailable": "Non sono riuscito a completare la spiegazione. Puoi riprovare.",
       "retry": "Riprova",
@@ -1715,7 +2314,7 @@
       "retention": "Denaro e deduzioni: 7 giorni. Altri appunti: 30 giorni. Leggerli non rinnova la scadenza.",
       "expires": "Scade",
       "storageError": "Non ho potuto salvare gli appunti. Riprova.",
-      "answerFailed": "Non sono riuscito ad annotarlo. Puoi scegliere una delle opzioni.",
+      "answerFailed": "Non sono riuscito ad annotarlo; puoi scegliere una delle opzioni.",
       "answerPlaceholder": "La tua risposta a Bobby",
       "answerSend": "Invia risposta",
       "exerciseExplanation": "Ho scelto «{choice}». Che cosa significa un calo così?",
@@ -1771,7 +2370,29 @@
           "government": "Qualcosa dello Stato",
           "property": "Una casa",
           "none": "Non ne ho idea"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "companies",
+            "label": "Aziende che conosco"
+          },
+          {
+            "id": "crypto",
+            "label": "Cripto"
+          },
+          {
+            "id": "government",
+            "label": "Qualcosa dello Stato"
+          },
+          {
+            "id": "property",
+            "label": "Una casa"
+          },
+          {
+            "id": "none",
+            "label": "Non ne ho idea"
+          }
+        ]
       },
       "barrier": {
         "text": "Che cosa ti ha frenato finora?",
@@ -1782,7 +2403,29 @@
           "where_to_start": "Non so da dove cominciare",
           "no_money": "Mi sembra di non avere abbastanza",
           "distrust": "Non mi fido"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "fear_of_loss",
+            "label": "Paura di perdere"
+          },
+          {
+            "id": "words",
+            "label": "Non capisco i termini"
+          },
+          {
+            "id": "where_to_start",
+            "label": "Non so da dove cominciare"
+          },
+          {
+            "id": "no_money",
+            "label": "Mi sembra di non avere abbastanza"
+          },
+          {
+            "id": "distrust",
+            "label": "Non mi fido"
+          }
+        ]
       },
       "when": {
         "text": "Quando pensi che ti servirà quel denaro?",
@@ -1792,7 +2435,25 @@
           "2_to_7y": "Tra 2 e 7 anni",
           "over_7y": "Tra più di 7 anni",
           "unsure": "Non lo so"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "under_2y",
+            "label": "Tra meno di 2 anni"
+          },
+          {
+            "id": "2_to_7y",
+            "label": "Tra 2 e 7 anni"
+          },
+          {
+            "id": "over_7y",
+            "label": "Tra più di 7 anni"
+          },
+          {
+            "id": "unsure",
+            "label": "Non lo so"
+          }
+        ]
       },
       "cushion": {
         "text": "Se domani arrivasse una spesa imprevista, ti servirebbe quel denaro?",
@@ -1801,7 +2462,21 @@
           "would_need_it": "Sì",
           "would_not": "No",
           "unsure": "Non lo so"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "would_need_it",
+            "label": "Sì"
+          },
+          {
+            "id": "would_not",
+            "label": "No"
+          },
+          {
+            "id": "unsure",
+            "label": "Non lo so"
+          }
+        ]
       },
       "hurry": {
         "text": "Tra quanto vorresti vedere risultati?",
@@ -1810,7 +2485,21 @@
           "soon": "Presto",
           "no_rush": "Senza fretta",
           "unsure": "Non lo so"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "soon",
+            "label": "Presto"
+          },
+          {
+            "id": "no_rush",
+            "label": "Senza fretta"
+          },
+          {
+            "id": "unsure",
+            "label": "Non lo so"
+          }
+        ]
       },
       "fall": {
         "text": "Solo per gioco: 100 diventa 80. Che cosa faresti?",
@@ -1820,7 +2509,25 @@
           "understand": "Vorrei capire perché",
           "continue": "Andrei avanti",
           "unsure": "Non lo so"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "pause",
+            "label": "Mi fermerei"
+          },
+          {
+            "id": "understand",
+            "label": "Vorrei capire perché"
+          },
+          {
+            "id": "continue",
+            "label": "Andrei avanti"
+          },
+          {
+            "id": "unsure",
+            "label": "Non lo so"
+          }
+        ]
       },
       "belief": {
         "text": "Che cosa hai sempre sentito sul denaro o sugli investimenti che dai per vero?",
@@ -1830,7 +2537,25 @@
           "need_lots_of_money": "Servono tanti soldi",
           "too_late": "Ormai è tardi",
           "none": "Niente di particolare"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "market_is_casino",
+            "label": "La borsa è un casinò"
+          },
+          {
+            "id": "need_lots_of_money",
+            "label": "Servono tanti soldi"
+          },
+          {
+            "id": "too_late",
+            "label": "Ormai è tardi"
+          },
+          {
+            "id": "none",
+            "label": "Niente di particolare"
+          }
+        ]
       },
       "format": {
         "text": "Come ti spiego meglio?",
@@ -1838,13 +2563,24 @@
         "options": {
           "examples": "Con esempi",
           "steps": "Passo dopo passo"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "examples",
+            "label": "Con esempi"
+          },
+          {
+            "id": "steps",
+            "label": "Passo dopo passo"
+          }
+        ]
       }
     },
     "interest": "C'è qualcosa che ti incuriosisce?",
     "crypto": "Cripto"
   },
   "de": {
+    "fixtureGist": "Investieren bedeutet, Geld in etwas zu stecken, dessen Wert sich ändern kann.",
     "app": {
       "risk.notNow": "Jetzt nicht",
       "risk.kept": "Es wurde nichts gesendet. Deine Frage ist noch da.",
@@ -1869,11 +2605,11 @@
       "cap.voiceUnavailable": "Stimme nicht verfügbar · hier ist der Text",
       "status.preparing": "Ich bereite deine Antwort vor…",
       "answer.readAll": "Alles lesen",
-      "fail.answer": "Ich konnte nicht antworten. Deine Frage ist noch da.",
+      "fail.answer": "Ich konnte nicht antworten; deine Frage ist noch da.",
       "fail.retry": "Erneut versuchen",
-      "fail.cantExplain": "Ich kann gerade nichts erklären. Deine Frage ist noch da.",
-      "fail.offline": "Keine Verbindung. Deine Frage ist noch da.",
-      "fail.paused": "Ich pausiere die Erklärungen für eine Weile. Deine Frage ist noch da.",
+      "fail.cantExplain": "Ich kann gerade nichts erklären; deine Frage ist noch da.",
+      "fail.offline": "Keine Verbindung; deine Frage ist noch da.",
+      "fail.paused": "Ich pausiere die Erklärungen für eine Weile; deine Frage ist noch da.",
       "aria.talk": "Sprechen",
       "aria.type": "Schreiben",
       "aria.sendSpoken": "Senden, was ich gesagt habe",
@@ -2060,11 +2796,21 @@
       "pause": "Pausiert"
     },
     "native": {
+      "limitKnown": "Im Moment kann ich nichts mehr erklären; ich bin {0} wieder da",
       "ready": "Analyse bereit",
       "read": "Analyse zu {0} ansehen",
       "deep": "Vertieft",
       "quick": "Schnell"
     },
+    "consent": [
+      "Soll Bobby sich merken, was du ihm erzählst?",
+      "Bobby ist eine KI und nutzt Modelle von Anthropic (USA). Wenn du zustimmst, geht eine kurze Zusammenfassung deiner Antworten mit jeder Frage mit, damit Bobby dir besser erklären kann.",
+      "Bobby stellt dir ein paar Fragen, auch zu deinem Geld (zum Beispiel, wann du es brauchen könntest). Du kannst jede überspringen.",
+      "Die Notizen bleiben auf diesem Gerät. Du kannst sie jederzeit ansehen, korrigieren oder löschen. Bobby funktioniert auch ohne das genauso.",
+      "Ja, merk es dir",
+      "Jetzt nicht",
+      "Mehr Details"
+    ],
     "companion": {
       "unavailable": "Ich konnte die Erklärung nicht abschließen. Du kannst es noch einmal versuchen.",
       "retry": "Erneut versuchen",
@@ -2084,7 +2830,7 @@
       "retention": "Geld und abgeleitete Notizen: 7 Tage. Andere Notizen: 30 Tage. Lesen verlängert die Frist nicht.",
       "expires": "Läuft ab",
       "storageError": "Ich konnte die Notizen nicht speichern. Versuche es erneut.",
-      "answerFailed": "Das konnte ich nicht notieren. Du kannst eine der Optionen wählen.",
+      "answerFailed": "Das konnte ich nicht notieren; du kannst eine der Optionen wählen.",
       "answerPlaceholder": "Deine Antwort an Bobby",
       "answerSend": "Antwort senden",
       "exerciseExplanation": "Ich habe „{choice}“ gewählt. Was bedeutet so ein Rückgang?",
@@ -2140,7 +2886,29 @@
           "government": "Etwas vom Staat",
           "property": "Immobilien",
           "none": "Keine Ahnung"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "companies",
+            "label": "Firmen, die ich kenne"
+          },
+          {
+            "id": "crypto",
+            "label": "Krypto"
+          },
+          {
+            "id": "government",
+            "label": "Etwas vom Staat"
+          },
+          {
+            "id": "property",
+            "label": "Immobilien"
+          },
+          {
+            "id": "none",
+            "label": "Keine Ahnung"
+          }
+        ]
       },
       "barrier": {
         "text": "Was hat dich bisher abgehalten?",
@@ -2151,7 +2919,29 @@
           "where_to_start": "Ich weiß nicht, wo ich anfangen soll",
           "no_money": "Ich habe das Gefühl, es reicht nicht",
           "distrust": "Ich traue dem nicht"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "fear_of_loss",
+            "label": "Angst zu verlieren"
+          },
+          {
+            "id": "words",
+            "label": "Ich verstehe die Begriffe nicht"
+          },
+          {
+            "id": "where_to_start",
+            "label": "Ich weiß nicht, wo ich anfangen soll"
+          },
+          {
+            "id": "no_money",
+            "label": "Ich habe das Gefühl, es reicht nicht"
+          },
+          {
+            "id": "distrust",
+            "label": "Ich traue dem nicht"
+          }
+        ]
       },
       "when": {
         "text": "Wann, glaubst du, brauchst du das Geld?",
@@ -2161,7 +2951,25 @@
           "2_to_7y": "In 2 bis 7 Jahren",
           "over_7y": "In mehr als 7 Jahren",
           "unsure": "Ich weiß es nicht"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "under_2y",
+            "label": "In weniger als 2 Jahren"
+          },
+          {
+            "id": "2_to_7y",
+            "label": "In 2 bis 7 Jahren"
+          },
+          {
+            "id": "over_7y",
+            "label": "In mehr als 7 Jahren"
+          },
+          {
+            "id": "unsure",
+            "label": "Ich weiß es nicht"
+          }
+        ]
       },
       "cushion": {
         "text": "Wenn morgen eine unerwartete Ausgabe käme, bräuchtest du dieses Geld?",
@@ -2170,7 +2978,21 @@
           "would_need_it": "Ja",
           "would_not": "Nein",
           "unsure": "Ich weiß es nicht"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "would_need_it",
+            "label": "Ja"
+          },
+          {
+            "id": "would_not",
+            "label": "Nein"
+          },
+          {
+            "id": "unsure",
+            "label": "Ich weiß es nicht"
+          }
+        ]
       },
       "hurry": {
         "text": "Wie schnell möchtest du Ergebnisse sehen?",
@@ -2179,7 +3001,21 @@
           "soon": "Bald",
           "no_rush": "Ohne Eile",
           "unsure": "Ich weiß es nicht"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "soon",
+            "label": "Bald"
+          },
+          {
+            "id": "no_rush",
+            "label": "Ohne Eile"
+          },
+          {
+            "id": "unsure",
+            "label": "Ich weiß es nicht"
+          }
+        ]
       },
       "fall": {
         "text": "Nur zum Spiel: Aus 100 werden 80. Was würdest du tun?",
@@ -2189,7 +3025,25 @@
           "understand": "Ich würde verstehen wollen, warum",
           "continue": "Ich würde weitermachen",
           "unsure": "Ich weiß es nicht"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "pause",
+            "label": "Ich würde aufhören"
+          },
+          {
+            "id": "understand",
+            "label": "Ich würde verstehen wollen, warum"
+          },
+          {
+            "id": "continue",
+            "label": "Ich würde weitermachen"
+          },
+          {
+            "id": "unsure",
+            "label": "Ich weiß es nicht"
+          }
+        ]
       },
       "belief": {
         "text": "Was hast du über Geld oder Geldanlage immer gehört und hältst es für wahr?",
@@ -2199,7 +3053,25 @@
           "need_lots_of_money": "Man braucht viel Geld",
           "too_late": "Ich bin schon zu spät dran",
           "none": "Nichts Besonderes"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "market_is_casino",
+            "label": "Die Börse ist ein Casino"
+          },
+          {
+            "id": "need_lots_of_money",
+            "label": "Man braucht viel Geld"
+          },
+          {
+            "id": "too_late",
+            "label": "Ich bin schon zu spät dran"
+          },
+          {
+            "id": "none",
+            "label": "Nichts Besonderes"
+          }
+        ]
       },
       "format": {
         "text": "Wie erkläre ich es dir am besten?",
@@ -2207,7 +3079,17 @@
         "options": {
           "examples": "Mit Beispielen",
           "steps": "Schritt für Schritt"
-        }
+        },
+        "orderedOptions": [
+          {
+            "id": "examples",
+            "label": "Mit Beispielen"
+          },
+          {
+            "id": "steps",
+            "label": "Schritt für Schritt"
+          }
+        ]
       }
     },
     "interest": "Gibt es etwas, das dich neugierig macht?",

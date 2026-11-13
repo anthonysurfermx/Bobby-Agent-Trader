@@ -18,12 +18,16 @@ extension NativeTranslations18 {
         result["Uses 1 {0} and 1 read"] = ["fr": "Utilise 1 {0} et 1 analyse", "pt": "Usa 1 {0} e 1 análise", "it": "Usa 1 {0} e 1 analisi", "de": "Nutzt 1 {0} und 1 Analyse"]
         result["Uses 1 of your {1} {0} with Bobby Pro"] = ["fr": "Utilise 1 de tes {1} {0} avec Bobby Pro", "pt": "Usa 1 das tuas {1} {0} com o Bobby Pro", "it": "Usa 1 delle tue {1} {0} con Bobby Pro", "de": "Nutzt 1 deiner {1} {0} mit Bobby Pro"]
         result["Uses 1 {0} with Bobby Pro"] = ["fr": "Utilise 1 {0} avec Bobby Pro", "pt": "Usa 1 {0} com o Bobby Pro", "it": "Usa 1 {0} con Bobby Pro", "de": "Nutzt 1 {0} mit Bobby Pro"]
-        result["I can’t explain more right now. I’ll be back {0}"] = ["fr": "Je ne peux rien expliquer de plus pour l’instant. Je reviens {0}", "pt": "Por agora não posso explicar mais. Volto {0}", "it": "Per ora non posso spiegare altro. Torno {0}", "de": "Im Moment kann ich nichts mehr erklären. Ich bin {0} wieder da"]
-        result["I can’t explain more right now. Try again later."] = ["fr": "Je ne peux rien expliquer de plus pour l’instant. Réessaie plus tard.", "pt": "Por agora não posso explicar mais. Tenta mais tarde.", "it": "Per ora non posso spiegare altro. Riprova più tardi.", "de": "Im Moment kann ich nichts mehr erklären. Versuch es später noch einmal."]
+        result["I can’t explain more right now; I’ll be back {0}"] = ["fr": "Je ne peux rien expliquer de plus pour l’instant; je reviens {0}", "pt": "Por agora não posso explicar mais; volto {0}", "it": "Per ora non posso spiegare altro; torno {0}", "de": "Im Moment kann ich nichts mehr erklären; ich bin {0} wieder da"]
+        result["I can’t explain more right now; try again later."] = ["fr": "Je ne peux rien expliquer de plus pour l’instant; réessaie plus tard.", "pt": "Por agora não posso explicar mais; tenta mais tarde.", "it": "Per ora non posso spiegare altro; riprova più tardi.", "de": "Im Moment kann ich nichts mehr erklären; versuch es später noch einmal."]
         result["today at {t}"] = ["fr": "aujourd’hui à {t}", "pt": "hoje às {t}", "it": "oggi alle {t}", "de": "heute um {t} Uhr"]
         result["tomorrow at {t}"] = ["fr": "demain à {t}", "pt": "amanhã às {t}", "it": "domani alle {t}", "de": "morgen um {t} Uhr"]
         result["{weekday} at {t}"] = ["fr": "{weekday} à {t}", "pt": "na {weekday} às {t}", "it": "{weekday} alle {t}", "de": "am {weekday} um {t} Uhr"]
         result["on {d MMM}"] = ["fr": "le {d MMM}", "pt": "a {d} de {MMM}", "it": "il {d MMM}", "de": "am {d}. {MMM}"]
+        result["How Bobby talks to you"] = ["fr": "Comment Bobby te parle", "pt": "Como o Bobby fala contigo", "it": "Come ti parla Bobby", "de": "Wie Bobby mit dir spricht"]
+        result["Plain"] = ["fr": "Simple", "pt": "Simples", "it": "Semplice", "de": "Einfach"]
+        result["With terms"] = ["fr": "Avec les termes", "pt": "Com termos", "it": "Con termini", "de": "Mit Begriffen"]
+        result["Technical"] = ["fr": "Technique", "pt": "Técnico", "it": "Tecnico", "de": "Technisch"]
         return result
     }()
 }

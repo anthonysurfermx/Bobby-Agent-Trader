@@ -133,6 +133,9 @@ def main():
                     # This Xcode's simctl privacy does not expose that service.
                     run(['xcrun','simctl','privacy',udid,'revoke' if args.permission_state == 'microphone-denied' else 'grant','microphone','xyz.bobbyprotocol.bobby'])
                 if args.settle_system: time.sleep(args.settle_system)
+                # A reused runner can retain a CFBundle URL to a retired app container.
+                # Install its test bundle fresh; preserve the fixture app and its preferences.
+                run(['xcrun','simctl','uninstall',udid,'xyz.bobbyprotocol.bobby.uitests.xctrunner'])
                 result = folder / 'result.xcresult'
                 command = ['xcodebuild', '-xctestrun', plan, '-destination', f'platform=iOS Simulator,id={udid}',
                            '-derivedDataPath', args.derived_data, '-clonedSourcePackagesDirPath', args.package_cache,

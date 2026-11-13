@@ -347,13 +347,15 @@ struct QuietToggle: View {
 struct QuietSecondary: View {
     let title: String
     let id: String
+    var minimumHeight: CGFloat = 50
+    var fillsHeight = false
     let action: () -> Void
     @Environment(\.isEnabled) private var enabled
     var body: some View {
         Button(action: action) {
             Text(title).quietFont(16, .semibold).multilineTextAlignment(.center).quietWraps()
                 .foregroundStyle(Theme.cream).padding(.horizontal, 18).padding(.vertical, 12)
-                .frame(maxWidth: .infinity, minHeight: 50)
+                .frame(maxWidth: .infinity, minHeight: minimumHeight, maxHeight: fillsHeight ? .infinity : nil)
                 .background(Capsule().fill(Theme.cream.opacity(0.06)))
                 .overlay(Capsule().stroke(Theme.cream.opacity(0.30)))
                 .opacity(enabled ? 1 : 0.45)
@@ -365,24 +367,38 @@ struct QuietSecondaryPair: View {
     let first: String, second: String
     let firstID: String, secondID: String
     let choose: (Bool) -> Void
-    @ScaledMetric private var fontSize = 16.0
     var body: some View {
-        GeometryReader { geometry in
-            let font = UIFont.systemFont(ofSize: fontSize, weight: .semibold)
-            let width = (geometry.size.width - 12) / 2 - 36
-            let stack = (first as NSString).size(withAttributes: [.font: font]).width > width || (second as NSString).size(withAttributes: [.font: font]).width > width
-            let layout = stack ? AnyLayout(VStackLayout(spacing: 12)) : AnyLayout(HStackLayout(spacing: 12))
-            layout {
-                QuietSecondary(title: first, id: firstID) { choose(true) }
-                QuietSecondary(title: second, id: secondID) { choose(false) }
-            }.background(GeometryReader { g in Color.clear.preference(key: QuietPairHeight.self, value: g.size.height) })
-        }.frame(height: height).onPreferenceChange(QuietPairHeight.self) { height = $0 }
+        QuietEqualAnswersLayout {
+            QuietSecondary(title: first, id: firstID, fillsHeight: true) { choose(true) }
+            QuietSecondary(title: second, id: secondID, fillsHeight: true) { choose(false) }
+        }
     }
-    @State private var height: CGFloat = 112
 }
-private struct QuietPairHeight: PreferenceKey {
-    static let defaultValue: CGFloat = 112
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+
+/// Measure the actual SwiftUI labels, including Dynamic Type, before placing equal controls.
+private struct QuietEqualAnswersLayout: Layout {
+    private let spacing: CGFloat = 12
+    private func measure(_ proposal: ProposedViewSize, _ subviews: Subviews) -> (width: CGFloat, height: CGFloat, stacked: Bool) {
+        let ideals = subviews.map { $0.sizeThatFits(.unspecified) }
+        let width = proposal.width ?? ideals.reduce(0) { $0 + $1.width } + spacing
+        let cellWidth = max(0, (width - spacing) / 2)
+        let stacked = ideals.contains { $0.width > cellWidth }
+        let height = subviews.map { $0.sizeThatFits(ProposedViewSize(width: stacked ? width : cellWidth, height: nil)).height }.max() ?? 50
+        return (width, height, stacked)
+    }
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let m = measure(proposal, subviews)
+        return CGSize(width: m.width, height: m.stacked ? m.height * 2 + spacing : m.height)
+    }
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let m = measure(ProposedViewSize(width: bounds.width, height: nil), subviews)
+        let width = m.stacked ? bounds.width : (bounds.width - spacing) / 2
+        for (index, view) in subviews.enumerated() {
+            view.place(at: CGPoint(x: bounds.minX + (m.stacked ? 0 : CGFloat(index) * (width + spacing)),
+                                   y: bounds.minY + (m.stacked ? CGFloat(index) * (m.height + spacing) : 0)),
+                       anchor: .topLeading, proposal: ProposedViewSize(width: width, height: m.height))
+        }
+    }
 }
 
 struct QuietChoice: View {

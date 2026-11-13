@@ -2,11 +2,13 @@ import XCTest
 import Security
 @testable import Bobby
 
+private let companionTestNow = Date(timeIntervalSince1970: 1_792_000_000)
+
 @MainActor
 final class CompanionContextTests: XCTestCase {
     private func store() -> CompanionContextStore {
         var data: Data?
-        return CompanionContextStore(read: { data }, write: { data = $0; return true })
+        return CompanionContextStore(read: { data }, write: { data = $0; return true }, clock: { companionTestNow })
     }
     private let live = CompanionPilot.Capability(enabled: true, context: true, catalog: 1, notices: ["memory-1"])
 
@@ -49,7 +51,7 @@ final class CompanionContextTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         var data: Data?
-        let s = CompanionContextStore(read: { data }, write: { data = $0; return true })
+        let s = CompanionContextStore(read: { data }, write: { data = $0; return true }, clock: { companionTestNow })
         s.choose(true); s.answered(); s.answer("interest", value: "crypto")
         let old = data
         s.prepareInstall(defaults: defaults)
@@ -59,10 +61,10 @@ final class CompanionContextTests: XCTestCase {
         XCTAssertTrue(s.accepted); XCTAssertEqual(s.state.notes.first?.value, "companies")
         defaults.removePersistentDomain(forName: suite)
         data = old
-        let reinstall = CompanionContextStore(read: { data }, write: { data = $0; return true })
+        let reinstall = CompanionContextStore(read: { data }, write: { data = $0; return true }, clock: { companionTestNow })
         reinstall.prepareInstall(defaults: defaults)
         XCTAssertFalse(reinstall.decided); XCTAssertTrue(reinstall.state.notes.isEmpty)
-        let reloaded = CompanionContextStore(read: { data }, write: { data = $0; return true })
+        let reloaded = CompanionContextStore(read: { data }, write: { data = $0; return true }, clock: { companionTestNow })
         XCTAssertFalse(reloaded.decided); XCTAssertTrue(reloaded.state.notes.isEmpty)
         XCTAssertEqual(CompanionCopy.privacyURL.fragment, "notes")
     }
@@ -71,7 +73,7 @@ final class CompanionContextTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         var data: Data?, canRemove = false
-        let s = CompanionContextStore(read: { data }, write: { data = $0; return true }, remove: { canRemove })
+        let s = CompanionContextStore(read: { data }, write: { data = $0; return true }, remove: { canRemove }, clock: { companionTestNow })
         s.choose(true); let revision = s.revision
         s.prepareInstall(defaults: defaults)
         XCTAssertFalse(s.accepted); XCTAssertTrue(s.storageError); XCTAssertNotEqual(s.revision, revision)
@@ -149,7 +151,7 @@ final class CompanionContextTests: XCTestCase {
     }
 
     func testTypedFallKeepsExerciseProvenanceAndCatalogLabelsCoverEveryValue() {
-        let s = store(), now = Date()
+        let s = store(), now = companionTestNow
         s.choose(true, now: now.addingTimeInterval(-2 * 86400))
         s.opened(now: now.addingTimeInterval(-86400)); s.opened(now: now); s.answered()
         XCTAssertTrue(s.apply(["notes": [["field": "fall", "value": "pause", "source": "shown"]], "asked": ["fall"]], for: "fall"))
@@ -163,7 +165,7 @@ final class CompanionContextTests: XCTestCase {
     }
 
     func testTapSkipCorrectionDeletionAndExpiry() {
-        let s = store(); let now = Date()
+        let s = store(); let now = companionTestNow
         s.choose(true, now: now); s.answered(now: now)
         s.answer("interest", value: "crypto", now: now)
         XCTAssertEqual(s.next()?.id, "barrier")
@@ -192,7 +194,7 @@ final class CompanionContextTests: XCTestCase {
 
     func testReturnDaysAreVisitsAndOnlyAfterAnswering() {
         let s = store(); var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(secondsFromGMT: 0)!
-        let now = cal.startOfDay(for: Date())
+        let now = cal.startOfDay(for: companionTestNow)
         s.choose(true, now: now, calendar: cal)
         XCTAssertNil(s.next())
         s.opened(now: now.addingTimeInterval(3600), calendar: cal); XCTAssertEqual(s.state.day, 1)
@@ -203,14 +205,14 @@ final class CompanionContextTests: XCTestCase {
 
     func testPersistedChoiceSurvivesNewStoreAndFailureStoresNothing() {
         var bytes: Data?
-        let s = CompanionContextStore(read: { bytes }, write: { bytes = $0; return true })
+        let s = CompanionContextStore(read: { bytes }, write: { bytes = $0; return true }, clock: { companionTestNow })
         s.choose(true); s.answered(); s.answer("interest", value: "companies")
-        let restored = CompanionContextStore(read: { bytes }, write: { bytes = $0; return true })
+        let restored = CompanionContextStore(read: { bytes }, write: { bytes = $0; return true }, clock: { companionTestNow })
         XCTAssertTrue(restored.accepted); XCTAssertEqual(restored.state.notes.first?.value, "companies")
         restored.choose(false)
-        let declined = CompanionContextStore(read: { bytes }, write: { bytes = $0; return true })
+        let declined = CompanionContextStore(read: { bytes }, write: { bytes = $0; return true }, clock: { companionTestNow })
         XCTAssertTrue(declined.decided); XCTAssertFalse(declined.accepted); XCTAssertTrue(declined.state.notes.isEmpty)
-        let failed = CompanionContextStore(read: { nil }, write: { _ in false })
+        let failed = CompanionContextStore(read: { nil }, write: { _ in false }, clock: { companionTestNow })
         failed.choose(true); XCTAssertFalse(failed.accepted); XCTAssertTrue(failed.storageError)
     }
 
@@ -220,22 +222,22 @@ final class CompanionContextTests: XCTestCase {
             SecItemDelete([kSecClass: kSecClassGenericPassword,
                 kSecAttrService: "xyz.bobbyprotocol.bobby.companion.context", kSecAttrAccount: account] as CFDictionary)
         }
-        let first = CompanionContextStore(account: account)
+        let first = CompanionContextStore(account: account, clock: { companionTestNow })
         first.choose(true); first.answered(); first.answer("interest", value: "crypto")
         XCTAssertFalse(first.storageError)
-        let relaunched = CompanionContextStore(account: account)
+        let relaunched = CompanionContextStore(account: account, clock: { companionTestNow })
         XCTAssertTrue(relaunched.accepted)
         XCTAssertEqual(relaunched.state.notes.first?.value, "crypto")
         relaunched.choose(false)
-        let disabled = CompanionContextStore(account: account)
+        let disabled = CompanionContextStore(account: account, clock: { companionTestNow })
         XCTAssertTrue(disabled.decided); XCTAssertFalse(disabled.accepted)
         XCTAssertTrue(disabled.state.notes.isEmpty)
         XCTAssertTrue(disabled.reset())
-        let erased = CompanionContextStore(account: account)
+        let erased = CompanionContextStore(account: account, clock: { companionTestNow })
         XCTAssertFalse(erased.decided); XCTAssertTrue(erased.state.notes.isEmpty)
     }
     func testReaderPatchPersistsOnlyEnumsAndRejectsUnrelatedOrMalformedNotesAtomically() {
-        let s = store(); let now = Date(); s.choose(true); s.answered()
+        let s = store(); let now = companionTestNow; s.choose(true); s.answered()
         let patch: [String: Any] = ["notes": [["field": "interest", "value": "funds", "source": "said"]], "asked": ["interest"]]
         XCTAssertTrue(s.apply(patch, for: "interest", now: now))
         XCTAssertEqual(s.state.notes.first?.value, "funds")
@@ -266,7 +268,7 @@ final class CompanionContextTests: XCTestCase {
 final class InvitationPacingTests: XCTestCase {
     private var calendar: Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(secondsFromGMT: 0)!; return c }
     private let now = Date(timeIntervalSince1970: 1_792_000_000)
-    private func pacing() -> CompanionPacing { CompanionPacing(defaults: UserDefaults(suiteName: "invitation-test-" + UUID().uuidString)!) }
+    private func pacing() -> CompanionPacing { CompanionPacing(defaults: UserDefaults(suiteName: "invitation-test-" + UUID().uuidString)!, clock: { companionTestNow }) }
     func testSecondEducationalAnswerAndOnlyOncePerLocalDay() {
         let p = pacing()
         XCTAssertTrue(p.delivered(now: now, calendar: calendar)); XCTAssertFalse(p.remembers(decided: false, now: now, calendar: calendar))
@@ -325,7 +327,7 @@ final class InvitationPacingTests: XCTestCase {
         XCTAssertTrue(p.permits(q, now: now.addingTimeInterval(86400), calendar: calendar))
     }
     func testAnAnswerToTheVisibleQuestionIsAcceptedAfterMidnight() throws {
-        var bytes: Data?; let store = CompanionContextStore(read: { bytes }, write: { bytes = $0; return true })
+        var bytes: Data?; let store = CompanionContextStore(read: { bytes }, write: { bytes = $0; return true }, clock: { companionTestNow })
         let evening = calendar.startOfDay(for: now).addingTimeInterval(86399)
         store.choose(true, now: evening, calendar: calendar); store.answered(now: evening, calendar: calendar)
         let question = try XCTUnwrap(store.next(now: evening, calendar: calendar))
@@ -340,21 +342,21 @@ final class InvitationPacingTests: XCTestCase {
     }
     func testPacingPersistsAndExplicitEraseNeverBringsInvitationBack() {
         let defaults = UserDefaults(suiteName: "invitation-test-" + UUID().uuidString)!
-        let p = CompanionPacing(defaults: defaults); p.shown("dial", now: now); p.declined(now: now)
-        let restored = CompanionPacing(defaults: defaults)
+        let p = CompanionPacing(defaults: defaults, clock: { companionTestNow }); p.shown("dial", now: now); p.declined(now: now)
+        let restored = CompanionPacing(defaults: defaults, clock: { companionTestNow })
         XCTAssertTrue(restored.state.dialShown); XCTAssertEqual(restored.state.declines,1)
         restored.reset(retired: true); XCTAssertTrue(restored.state.retired)
     }
     func testBuild69RecordWithFourNotesLoadsIntactAndWireKeepsExactlyFiveKeys() throws {
         let old: [String:Any] = ["notice":"memory-1","accepted":true,"decidedAt":now.timeIntervalSinceReferenceDate,"day":1,"lastOpen":now.timeIntervalSinceReferenceDate,"answeredOn":now.timeIntervalSinceReferenceDate,"asked":["interest","barrier","when","cushion"],"notes":[["field":"interest","value":"crypto","source":"said"],["field":"barrier","value":"words","source":"said"],["field":"when","value":"under_2y","source":"said"],["field":"cushion","value":"would_need_it","source":"said"]].map { $0.merging(["createdAt":now.timeIntervalSinceReferenceDate,"expiresAt":now.addingTimeInterval(30*86400).timeIntervalSinceReferenceDate] as [String:Any]) { _,b in b } }]
         var bytes: Data? = try JSONSerialization.data(withJSONObject: old)
-        let store = CompanionContextStore(read:{bytes},write:{bytes=$0;return true})
+        let store = CompanionContextStore(read:{bytes},write:{bytes=$0;return true}, clock: { companionTestNow })
         XCTAssertTrue(store.accepted); XCTAssertEqual(store.state.notes.count,4); XCTAssertNil(store.state.rest)
         let wire=try XCTUnwrap(store.wire(capability:.init(enabled:true,context:true,catalog:1,notices:["memory-1"]),now:now))
         XCTAssertEqual(Set(wire.keys),Set(["version","consent","day","asked","notes"]))
     }
     func testRestSkipsUntilNextLocalDayAndSecondRestRetires() throws {
-        var bytes:Data?;let store=CompanionContextStore(read:{bytes},write:{bytes=$0;return true})
+        var bytes:Data?;let store=CompanionContextStore(read:{bytes},write:{bytes=$0;return true}, clock: { companionTestNow })
         store.choose(true,now:now,calendar:calendar);store.answered(now:now,calendar:calendar)
         XCTAssertTrue(store.restQuestion("interest",now:now,calendar:calendar))
         XCTAssertEqual(store.next(now:now,calendar:calendar)?.id,"barrier")
@@ -364,7 +366,7 @@ final class InvitationPacingTests: XCTestCase {
         XCTAssertEqual(store.next(now:tomorrow,calendar:calendar)?.id,"barrier")
     }
     func testDeletedNoteRetiresButExpiredNoteBecomesAskable() {
-        var bytes:Data?;let store=CompanionContextStore(read:{bytes},write:{bytes=$0;return true})
+        var bytes:Data?;let store=CompanionContextStore(read:{bytes},write:{bytes=$0;return true}, clock: { companionTestNow })
         store.choose(true,now:now,calendar:calendar);store.answered(now:now,calendar:calendar);store.answer("interest",value:"crypto",now:now)
         store.delete("interest");XCTAssertTrue(store.state.asked.contains("interest"))
         store.answer("barrier",value:CompanionCatalog.question("barrier")!.options[0].id,now:now)
@@ -373,7 +375,7 @@ final class InvitationPacingTests: XCTestCase {
     }
     func testUndecodableRecordCannotBeOverwrittenBeforeBackup() {
         var bytes:Data?=Data("broken legacy bytes".utf8)
-        let store=CompanionContextStore(read:{bytes},write:{bytes=$0;return true})
+        let store=CompanionContextStore(read:{bytes},write:{bytes=$0;return true}, clock: { companionTestNow })
         store.choose(true);XCTAssertFalse(store.accepted);XCTAssertEqual(bytes,Data("broken legacy bytes".utf8))
         let defaults=UserDefaults(suiteName:"corrupt-test-"+UUID().uuidString)!;defaults.set(true,forKey:"companion.context.install.v1")
         store.prepareInstall(defaults:defaults);store.choose(true)
@@ -381,7 +383,7 @@ final class InvitationPacingTests: XCTestCase {
         XCTAssertTrue(store.accepted)
     }
     func testFailedDeclineClosesForTheLaunchAndKeepsWireEmpty() {
-        let store=CompanionContextStore(read:{nil},write:{_ in false})
+        let store=CompanionContextStore(read:{nil},write:{_ in false}, clock: { companionTestNow })
         store.choose(true);XCTAssertFalse(store.accepted);store.choose(false)
         XCTAssertTrue(store.decided);XCTAssertNil(store.wire(capability:.init(enabled:true,context:true,catalog:1,notices:["memory-1"])))
     }
@@ -391,7 +393,7 @@ final class InvitationPacingTests: XCTestCase {
 final class CompanionNotesOwnershipTests: XCTestCase {
     private func seeded() -> CompanionContextStore {
         var data: Data?
-        let store = CompanionContextStore(read: { data }, write: { data = $0; return true })
+        let store = CompanionContextStore(read: { data }, write: { data = $0; return true }, clock: { companionTestNow })
         store.choose(true); store.answered(); store.answer("interest", value: "crypto")
         return store
     }
@@ -407,16 +409,16 @@ final class CompanionNotesOwnershipTests: XCTestCase {
         XCTAssertFalse(store.bindOwner(nil)); XCTAssertFalse(store.bindOwner("a")); XCTAssertEqual(store.state, before)
     }
     func testDifferentAccountResetsBeforeContextCanTravelAndSurvivesRestart() {
-        var data:Data?;let store=CompanionContextStore(read:{data},write:{data=$0;return true})
+        var data:Data?;let store=CompanionContextStore(read:{data},write:{data=$0;return true}, clock: { companionTestNow })
         store.choose(true);store.answered();store.answer("interest",value:"crypto");store.bindOwner("a")
         XCTAssertTrue(store.bindOwner("b"));XCTAssertFalse(store.accepted);XCTAssertFalse(store.decided);XCTAssertTrue(store.state.notes.isEmpty)
         XCTAssertNil(store.wire(capability:.init(enabled:true,context:true,catalog:1,notices:["memory-1"])))
-        let restarted=CompanionContextStore(read:{data},write:{data=$0;return true})
+        let restarted=CompanionContextStore(read:{data},write:{data=$0;return true}, clock: { companionTestNow })
         XCTAssertFalse(restarted.bindOwner("b"));XCTAssertTrue(restarted.state.notes.isEmpty);XCTAssertFalse(restarted.accepted)
     }
     func testFailedAccountResetCannotLeakOldNotes() {
         var data:Data?;var failing=false
-        let store=CompanionContextStore(read:{data},write:{if failing{return false};data=$0;return true})
+        let store=CompanionContextStore(read:{data},write:{if failing{return false};data=$0;return true}, clock: { companionTestNow })
         store.choose(true);store.answered();store.answer("interest",value:"crypto");store.bindOwner("a");failing=true
         XCTAssertTrue(store.bindOwner("b"));XCTAssertFalse(store.accepted);XCTAssertTrue(store.state.notes.isEmpty);XCTAssertTrue(store.storageError)
         XCTAssertNil(store.wire(capability:.init(enabled:true,context:true,catalog:1,notices:["memory-1"])))

@@ -9,9 +9,9 @@ var DIAL_WORDS = {
  de: ['Wie soll ich mit dir sprechen?', ['Einfach','Mit Begriffen','Technisch'], ['Der Kurs stieg schnell. Eine nahe Grenze stoppte ihn schon einmal.','Der Kurs stieg schnell (überkauft). Eine Grenze ist nah (Widerstand).','Überkauft auf 1H, unter Widerstand. Bestätigung fehlt.'], 'So passt es','Jetzt starten','Was möchtest du heute verstehen?', ['Einfacher','So passt es','Technischer']]
 };
 var DIAL_EXITS = {"en": ["Save", "Leave as is", "That didn’t save. Try again."], "es": ["Guardar", "Dejar como está", "No se guardó. Inténtalo de nuevo."], "fr": ["Enregistrer", "Laisser tel quel", "Non enregistré. Réessaie."], "pt": ["Guardar", "Deixar como está", "Não foi guardado. Tenta de novo."], "it": ["Salva", "Lascia così", "Non salvato. Riprova."], "de": ["Speichern", "So lassen", "Nicht gespeichert. Versuch es noch einmal."]};
-var dialReturn = null;
+var dialReturn = null, dialReadReturn = false;
 function dialExitWords(){return DIAL_EXITS[LANG]||DIAL_EXITS.en;}
-function dialClose(){dialBusy=false;if(dialReturn){var answer=dialReturn;dialReturn=null;answer.invitation=null;answer.slotBorn=false;go('COMPANION',{reply:answer});}else go('RETURNING');}
+function dialClose(){dialBusy=false;if(dialReturn){var answer=dialReturn;dialReturn=null;answer.invitation=null;answer.slotBorn=false;go('COMPANION',{reply:answer});}else if(dialReadReturn&&READ){dialReadReturn=false;go('HANDBACK',{restored:true});}else{dialReadReturn=false;go('RETURNING');}}
 var dial = D.getElementById('speakingDial'), dialIndex = 0, dialBusy = false, dialOwner = null, dialGreeting = false;
 function dialWords(){ return DIAL_WORDS[LANG] || DIAL_WORDS.en; }
 function dialPaint(index){
@@ -36,8 +36,8 @@ function dialSave(index, feedback){
  }, function(){ dialBusy = false; if (gen === OWNER_GEN) D.getElementById('speakingError').textContent = dialExitWords()[2]; });
 }
 STATES.SPEAKING_DIAL = {
- enter: function(){
-  dialReturn = GUIDE || null; dialOwner = SES.speaking.owner; dialBusy = false; chipsHide(); greetOut(); meriOut(); hint('');
+ enter: function(prev){
+  dialReturn = prev==='COMPANION' ? GUIDE : null; dialReadReturn=!!READ && ['HANDBACK','CARDS','FOLLOWUPS'].indexOf(prev)>=0; dialOwner = SES.speaking.owner; dialBusy = false; chipsHide(); greetOut(); meriOut(); hint('');
   stage.classList.add('speaking-on'); dial.classList.add('on'); dial.setAttribute('aria-hidden','false'); D.getElementById('speakingRange').focus();
   S.cy[RM ? 'set' : 'to'](302); S.r[RM ? 'set' : 'to'](112); U.faceOn.to(0); U.presence.to(0); tintHome();
   D.getElementById('speakingError').textContent = ''; dialPaint(Math.max(0, DIAL_VALUES.indexOf(SES.speaking.value)));

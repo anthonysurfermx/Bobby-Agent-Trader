@@ -3,6 +3,7 @@
 // voice.level / voice.progress / voice.word / voice.end back. NeuralVoice keeps
 // `speaking` false while the TTS request is in flight, so start and end are found on
 // the edges of `speaking`, and a bounded watchdog guarantees exactly one voice.end per id.
+import AVFoundation
 import Combine
 import Foundation
 import QuartzCore
@@ -47,6 +48,19 @@ final class NucleoVoice {
         voice.$playback.sink { [weak self] playback in self?.playbackChanged(playback) }.store(in: &cancellables)
         voice.onFailure = { [weak self] in self?.finish(reason: "failed") }
         voice.onDeviceWord = { [weak self] range in self?.deviceWord(range) }
+        NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)
+            .receive(on: DispatchQueue.main).sink { [weak self] notification in
+                guard let type = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                      type == AVAudioSession.InterruptionType.began.rawValue else { return }
+                self?.stop(reason: "interrupted")
+            }.store(in: &cancellables)
+        NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)
+            .receive(on: DispatchQueue.main).sink { [weak self] notification in
+                guard let raw = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+                      let reason = AVAudioSession.RouteChangeReason(rawValue: raw),
+                      reason == .oldDeviceUnavailable || reason == .newDeviceAvailable else { return }
+                self?.stop(reason: "interrupted")
+            }.store(in: &cancellables)
     }
 
     var isActive: Bool { current != nil }

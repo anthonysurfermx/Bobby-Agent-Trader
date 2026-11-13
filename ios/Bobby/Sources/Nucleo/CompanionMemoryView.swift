@@ -55,100 +55,187 @@ private struct ConsentBottomHeight: PreferenceKey {
 
 struct CompanionNotesView: View {
     @ObservedObject var store: CompanionContextStore
+    @ObservedObject var undo: CompanionNoteUndo
     let questionsAvailable: () -> Bool
+    var riskAccepted: () -> Bool = { true }
+    var initialField: String? = nil
     let onClose: () -> Void
     @State private var showingConsent = false
-    @State private var correcting: CompanionQuestion?
+    @State private var detail: String?
+    @State private var openedInitialField = false
     @State private var pendingDeletion: NotesDeletion?
+    @Environment(\.dynamicTypeSize) private var typeSize
+    private var canRemember: Bool { riskAccepted() && questionsAvailable() }
+    private var lavender: Color { Color(red:185/255,green:173/255,blue:235/255) }
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 20) {
                 HStack(alignment: .top) {
-                    Text(CompanionCopy.text("notesTitle"))
-                        .font(.system(size: 26, weight: .light, design: .rounded)).fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("companion-notes-title")
+                    Text(CompanionCopy.text("notesTitle")).quietFont(28, .light, relativeTo: .title).tracking(-0.98).quietWraps()
+                        .accessibilityAddTraits(.isHeader).accessibilityIdentifier("companion-notes-title")
                     Spacer(minLength: 8)
-                    Button(action: onClose) { Image(systemName: "xmark").frame(width: 44, height: 44) }
-                        .accessibilityLabel(CompanionCopy.text("close"))
+                    QuietGlyphButton(systemImage: "xmark", label: CompanionCopy.text("closeNotes"), id: "companion-notes-close", minimumTarget: 48) { forgetUndo(); onClose() }
                 }
-                Toggle(CompanionCopy.text("memory"), isOn: Binding(get: { store.accepted }, set: { yes in
-                    if yes { showingConsent = true } else { pendingDeletion = .memoryOff }
-                })).accessibilityIdentifier("companion-memory-toggle")
-                Text(CompanionCopy.text("retention")).font(.footnote).foregroundStyle(Theme.warmMuted)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(CompanionCopy.text("deviceNotes")).font(.footnote).foregroundStyle(Theme.warmMuted)
-                    .fixedSize(horizontal: false, vertical: true)
-                if store.state.notes.isEmpty { Text(CompanionCopy.text("empty")).foregroundStyle(Theme.warmMuted) }
-                ForEach(store.state.notes) { note in
-                    if let question = CompanionCatalog.question(note.field), let label = question.label(note.value) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(question.title).font(.system(size: 14)).foregroundStyle(Theme.warmMuted).fixedSize(horizontal: false, vertical: true)
-                            Text(label).font(.system(size: 18)).fixedSize(horizontal: false, vertical: true)
-                                .accessibilityIdentifier("companion-note-\(note.field)")
-                            Text(CompanionCopy.text(question.needsConfirmation(note.value) ? "inferred" : note.source)).font(.footnote).foregroundStyle(Theme.warmMuted)
-                            Text(CompanionCopy.text("expires") + " · " + note.expiresAt.formatted(.dateTime.locale(L.locale).day().month().year()))
-                                .font(.footnote).foregroundStyle(Theme.warmMuted)
-                            HStack(spacing: 20) {
-                                if questionsAvailable() {
-                                    Button(CompanionCopy.text("correct")) { correcting = question }
-                                        .accessibilityIdentifier("companion-correct-\(note.field)")
+                if typeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(CompanionCopy.text("memory")).quietFont(16).quietWraps().frame(maxWidth: .infinity, alignment: .leading)
+                        HStack(spacing: 12) { Spacer(); memoryState; memoryToggle }
+                    }
+                } else {
+                    HStack(spacing: 12) {
+                        Text(CompanionCopy.text("memory")).quietFont(16).quietWraps()
+                        Spacer(minLength: 8); memoryState; memoryToggle
+                    }.frame(minHeight: 50)
+                }
+                if !canRemember { meta(CompanionCopy.text(riskAccepted() ? "memoryOff" : "needsAI")) }
+                meta(CompanionCopy.text("retention"))
+                meta(CompanionCopy.text("travel"))
+                meta(CompanionCopy.text("deviceNotes"))
+                if !store.accepted { meta(CompanionCopy.text("offState")).accessibilityIdentifier("companion-notes-off") }
+                else if visibleRows.isEmpty { meta(CompanionCopy.text("empty")).accessibilityIdentifier("companion-notes-empty") }
+                ForEach(visibleRows) { note in
+                    if note.field == undo.note?.field { undoRow }
+                    else if let q = CompanionCatalog.question(note.field), let label = q.label(note.value) {
+                        Button { forgetUndo(); detail = note.field } label: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    Text(label).quietFont(22, .light, relativeTo: .title2).tracking(-0.77).quietWraps().accessibilityIdentifier("companion-note-\(note.field)")
+                                    Spacer(minLength: 10)
+                                    Image(systemName: "chevron.right").font(.system(size: 12)).foregroundStyle(Theme.warmMuted).accessibilityHidden(true)
                                 }
-                                Button(CompanionCopy.text("delete"), role: .destructive) { store.delete(note.field) }
-                                    .foregroundStyle(Theme.down)
-                                    .accessibilityIdentifier("companion-delete-\(note.field)")
-                            }.frame(minHeight: 44)
-                            Divider()
-                        }
+                                Text(CompanionCopy.text(note.source == "inferred" ? "toConfirm" : note.source)).quietFont(13)
+                                    .foregroundStyle(note.source == "inferred" ? lavender : Theme.warmMuted).quietWraps()
+                                Rectangle().fill(Theme.cream.opacity(0.08)).frame(height:1)
+                            }.padding(.vertical,10).frame(minHeight:48).contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityIdentifier("companion-note-row-\(note.field)")
                     }
                 }
                 if !store.state.notes.isEmpty {
-                    Button(CompanionCopy.text("deleteAll"), role: .destructive) { pendingDeletion = .allNotes }
-                        .foregroundStyle(Theme.down).frame(minHeight: 44).accessibilityIdentifier("companion-delete-all")
+                    QuietDestructive(title: CompanionCopy.text("deleteAll"), id: "companion-delete-all") { forgetUndo(); pendingDeletion = .allNotes }
                 }
-                if store.storageError { Text(CompanionCopy.text("storageError")).font(.footnote) }
+                if store.storageError { meta(CompanionCopy.text("storageError")) }
             }.padding(24).foregroundStyle(Theme.cream)
-        }
-        .background(Theme.nucleoSurface.ignoresSafeArea())
-        .task { store.opened() }
-        .sheet(isPresented: $showingConsent) {
-            CompanionConsentView(store: store) { _ in showingConsent = false }
-                .presentationDetents([.large]).presentationBackground(Theme.nucleoSurface)
-        }
-        .sheet(item: $pendingDeletion) { deletion in
-            NotesDeletionSheet(store: store, deletion: deletion) { confirmed in
-                if confirmed {
-                    if deletion == .memoryOff { store.choose(false) } else { store.deleteAll() }
-                    if store.storageError { return }
-                }
-                pendingDeletion = nil
+        }.scrollIndicators(.hidden).background(QuietMemorySurface()).environment(\.colorScheme,.dark)
+            .task {
+                store.opened()
+                guard !openedInitialField else { return }
+                openedInitialField = true
+                if let initialField, store.state.notes.contains(where: { $0.field == initialField }) { detail = initialField }
             }
-            .presentationDetents([.medium, .large]).presentationBackground(Theme.nucleoSurface)
+            .onChange(of: store.state.notes) { _, notes in
+                if let field = detail, !notes.contains(where: { $0.field == field }) { detail = nil }
+            }
+            .onChange(of: store.state.ownerTag) { _, _ in forgetUndo() }
+            .onChange(of: store.accepted) { _, accepted in if !accepted { forgetUndo() } }
+            .sheet(isPresented: $showingConsent) {
+                CompanionConsentView(store: store) { _ in showingConsent = false }.presentationBackground { QuietMemorySurface() }
+            }
+            .sheet(item: $pendingDeletion) { deletion in
+                NotesDeletionSheet(store: store, deletion: deletion) { confirmed in
+                    if confirmed {
+                        if deletion == .memoryOff { store.choose(false) } else { store.deleteAll() }
+                        if store.storageError { return }
+                    }
+                    pendingDeletion = nil
+                }.presentationDetents([.large]).presentationDragIndicator(.visible).presentationCornerRadius(34).presentationBackground { QuietMemorySurface() }
+            }
+            .sheet(isPresented: Binding(get: { detail != nil }, set: { if !$0 { detail = nil } }), onDismiss: beginUndo) {
+                if let detail {
+                    CompanionNoteDetail(store: store, field: detail, questionsAvailable: questionsAvailable,
+                        closed: { self.detail = nil }, deleted: { note in
+                            let position = store.state.notes.firstIndex { $0.field == note.field } ?? 0
+                            undo.stage(note, index: position, ownerTag: store.state.ownerTag)
+                            guard store.delete(note.field) else { undo.clear(); return }
+                            self.detail = nil
+                        }).presentationDetents([.large]).presentationDragIndicator(.visible).presentationCornerRadius(34).presentationBackground { QuietMemorySurface() }
+                }
+            }
+    }
+    private var memoryState: some View {
+        Text(CompanionCopy.text(store.accepted ? "on" : "off")).quietFont(13).foregroundStyle(Theme.warmMuted).quietWraps()
+    }
+    private var memoryToggle: some View {
+        Toggle(CompanionCopy.text("memory"), isOn: Binding(get: { store.accepted }, set: { yes in
+            forgetUndo(); if yes { showingConsent = true } else { pendingDeletion = .memoryOff }
+        })).labelsHidden().frame(minWidth:51,minHeight:48).contentShape(Rectangle()).tint(Theme.orbViolet)
+            .disabled(!canRemember).accessibilityIdentifier("companion-memory-toggle")
+    }
+    private var visibleRows: [CompanionContextStore.Note] {
+        var rows = store.state.notes
+        if let note = undo.note, !rows.contains(where: { $0.field == note.field }) {
+            rows.insert(note, at: min(undo.index, rows.count))
         }
-        .sheet(item: $correcting) { question in
-            CompanionCorrectionView(store: store, question: question) { correcting = nil }
-                .presentationDetents([.medium, .large]).presentationBackground(Theme.nucleoSurface)
+        return rows
+    }
+    private var undoRow: some View {
+        HStack {
+            Text(CompanionCopy.text("noteDeleted")).quietFont(13).quietWraps().accessibilityIdentifier("companion-note-deleted")
+            Spacer()
+            QuietTextLink(title: CompanionCopy.text("undo"), id: "companion-note-undo") {
+                _ = undo.restore(in: store)
+            }
+        }.frame(minHeight:48)
+    }
+    private func meta(_ text: String) -> some View { Text(text).quietFont(13).foregroundStyle(Theme.warmMuted).quietWraps() }
+    private func beginUndo() {
+        undo.didDismiss(voiceOver: UIAccessibility.isVoiceOverRunning)
+        let token = undo.generation
+        if undo.deadline != nil {
+            Task { @MainActor [weak clock = undo] in
+                try? await Task.sleep(for: .seconds(5))
+                clock?.expire(token)
+            }
         }
     }
+    private func forgetUndo() { undo.clear() }
 }
 
-private struct CompanionCorrectionView: View {
+private struct CompanionNoteDetail: View {
     @ObservedObject var store: CompanionContextStore
-    let question: CompanionQuestion
-    let finished: () -> Void
+    let field: String
+    let questionsAvailable: () -> Bool
+    let closed: () -> Void
+    let deleted: (CompanionContextStore.Note) -> Void
+    @State private var correcting = false
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(question.title).font(.title3).fixedSize(horizontal: false, vertical: true)
-                ForEach(question.options) { option in
-                    Button(question.label(option.id) ?? "") {
-                        store.answer(question.id, value: option.id, source: "confirmed")
-                        if !store.storageError { finished() }
-                    }.frame(minHeight: 44).accessibilityIdentifier("companion-correct-option-\(option.id)")
-                }
-                Button(CompanionCopy.text("skip"), action: finished).frame(minHeight: 44)
-                if store.storageError { Text(CompanionCopy.text("storageError")) }
-            }.padding(24).foregroundStyle(Theme.cream)
-        }.background(Theme.nucleoSurface.ignoresSafeArea())
+            if let note = store.state.notes.first(where: { $0.field == field }),
+               let question = CompanionCatalog.question(field), let label = question.label(note.value) {
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack(alignment: .top) {
+                        Text(question.title).quietFont(13).foregroundStyle(Theme.warmMuted).quietWraps().accessibilityIdentifier("companion-detail-question")
+                        Spacer(minLength: 8)
+                        QuietGlyphButton(systemImage: "xmark", label: CompanionCopy.text("closeNotes"), id: "companion-detail-close", minimumTarget: 48, action: closed)
+                    }
+                    Text(label).quietFont(28, .light, relativeTo: .title).tracking(-0.98).quietWraps().accessibilityIdentifier("companion-detail-value")
+                    Text(CompanionCopy.text("detail." + note.source).replacingOccurrences(of: "{date}", with: fullDate(note.expiresAt)))
+                        .quietFont(13).foregroundStyle(Theme.warmMuted).quietWraps().accessibilityIdentifier("companion-detail-origin")
+                    if correcting {
+                        ForEach(question.correctionValues, id: \.self) { value in
+                            QuietChoice(title: question.label(value) ?? "", selected: note.value == value, id: "companion-correct-option-\(value)") {
+                                if store.correct(field, value: value) { correcting = false }
+                            }
+                        }
+                        QuietSecondary(title: CompanionCopy.text("leave"), id: "companion-correction-leave") { correcting = false }
+                    } else {
+                        if note.source == "inferred" {
+                            QuietPrimary(title: CompanionCopy.text("confirmYes"), id: "companion-note-confirm") { _ = store.confirm(field) }
+                        }
+                        if questionsAvailable() {
+                            QuietSecondary(title: CompanionCopy.text("correct"), id: "companion-correct-\(field)") { correcting = true }
+                        }
+                        QuietDestructive(title: CompanionCopy.text("delete"), id: "companion-delete-\(field)") {
+                            deleted(note)
+                        }
+                    }
+                    if store.storageError { Text(CompanionCopy.text("storageError")).quietFont(13).quietWraps() }
+                }.padding(24).foregroundStyle(Theme.cream)
+            }
+        }.scrollIndicators(.hidden).background(QuietMemorySurface()).environment(\.colorScheme,.dark)
+    }
+    private func fullDate(_ date: Date) -> String {
+        let formatter = DateFormatter(); formatter.locale = L.locale; formatter.dateStyle = .long
+        return formatter.string(from: date)
     }
 }
 
@@ -165,14 +252,12 @@ private struct NotesDeletionSheet: View {
         let off = deletion == .memoryOff
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text(CompanionCopy.text(off ? "offTitle" : "deleteTitle"))
-                    .font(.title2).fixedSize(horizontal: false, vertical: true)
-                Text(CompanionCopy.text(off ? "offBody" : "deleteBody"))
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(CompanionCopy.text(off ? "offTitle" : "deleteTitle")).quietFont(28, .light, relativeTo: .title).tracking(-0.98).quietWraps()
+                Text(CompanionCopy.text(off ? "offBody" : "deleteBody")).quietFont(16).quietWraps()
                 QuietDestructive(title: CompanionCopy.text(off ? "offConfirm" : "deleteAll"), id: "companion-delete-confirm") { finished(true) }
                 QuietSecondary(title: CompanionCopy.text(off ? "offCancel" : "deleteCancel"), id: "companion-delete-cancel") { finished(false) }
-                if store.storageError { Text(CompanionCopy.text("storageError")).font(.footnote) }
+                if store.storageError { Text(CompanionCopy.text("storageError")).quietFont(13).quietWraps() }
             }.foregroundStyle(Theme.cream).padding(24)
-        }.background(Theme.nucleoSurface.ignoresSafeArea())
+        }.background(QuietMemorySurface()).environment(\.colorScheme,.dark)
     }
 }

@@ -943,3 +943,36 @@ test('I-2b: the reading notes link opens only native notes and revocation remove
  mark._guideAction();await flush();assert.equal(app.calls.filter(c=>c.method==='companion.notes').length,1);assert.equal(asksOf(app).length,1);
  app.context.nucleoBridge.emit('companion.revoked',{});assert.equal(mark.style.display,'none');assert.deepEqual(app.errors,[]);
 });
+
+test('1.8.1 Profile dial restores the educational answer without replaying narration',async()=>{
+ const app=await idle({speaking:{owner:'a',value:null,offer:false,refine:false}});memoryStrings(app);
+ await companionReply(app,{status:'companion',requestId:'profile-dial',gist:'Learning.',text:'Learning. Explanation.',invitation:null});app.advance(2);await flush();
+ const speeches=app.calls.filter(c=>c.method==='speak'&&c.params.id!=='speaking-dial').length;
+ app.context.nucleoBridge.emit('speaking.open',{});assert.equal(app.context.nucleo.state(),'SPEAKING_DIAL');
+ app.nodes.get('speakingSkip').listeners.click();await flush();assert.equal(app.context.nucleo.state(),'COMPANION');
+ assert.equal(companionPanel(app).children[0].children[0].textContent,'Learning.');
+ assert.equal(app.calls.filter(c=>c.method==='speak'&&c.params.id!=='speaking-dial').length,speeches);assert.equal(asksOf(app).length,1);assert.deepEqual(app.errors,[]);
+});
+
+for(const language of ['en','es','fr','pt','it','de'])test('1.8.1 '+language+': dial exposes only its two exits',async()=>{
+ const app=await idle({language,speaking:{owner:'a',value:null,offer:false,refine:false}});memoryStrings(app);
+ await companionReply(app,{status:'companion',gist:'Learning.',text:'Learning. Explanation.',invitation:null});
+ app.context.nucleoBridge.emit('speaking.open',{});app.advance(1);await flush();
+ assert.equal(keyboardOf(app).style.display,'none');assert.equal(app.nodes.get('close').getAttribute('aria-hidden'),'true');assert.deepEqual(app.errors,[]);
+});
+
+for(const language of ['en','es','fr','pt','it','de'])for(const code of ['offline','unavailable','explain_off','paused'])test('1.8.1 '+language+' '+code+': failure is one sentence and keeps the draft',async()=>{
+ const app=await idle({language}),id='90d2564c-6064-4275-95cd-5a3c7c0b5b56';
+ await companionReply(app,{status:'companion_error',requestId:id,code,retryable:true,message:'Internal Server Error'});
+ const line=companionPanel(app).children[0].children[0].textContent;
+ assert.equal((line.match(/[.!?](?:\s|$)/gu)||[]).length,1,line);assert.ok(!line.includes('Internal Server Error'));
+ tap(app,app.nodes.get('close'));await flush();
+ assert.equal(app.context.nucleo.state(),'HELD_DRAFT');keyboardOf(app).listeners.click({detail:0,stopPropagation(){}});await flush();assert.equal(app.context.nucleo.state(),'TYPING');assert.equal(app.nodes.get('ta').value,'What is investing?');assert.equal(asksOf(app).length,1);assert.deepEqual(app.errors,[]);
+});
+
+for(const language of ['en','es','fr','pt','it','de'])test('1.8.1 '+language+': revoked waiting explanation retains its exact generic draft',async()=>{
+ const app=await idle({language});keyboardOf(app).listeners.click({detail:0,stopPropagation(){}});
+ const table=vm.runInNewContext('('+read('../src/app/40-strings.js').split('/*STRINGS-BEGIN*/')[1].split('/*STRINGS-END*/')[0]+')');const question=table[language]['ex.1'];app.nodes.get('ta').value=question;app.nodes.get('ta').listeners.input();app.nodes.get('taSend').listeners.click({detail:0,stopPropagation(){}});
+ await flush();app.advance(1.2);app.context.nucleoBridge.emit('companion.revoked',{});app.answer({status:'cancelled'});await flush();app.advance(1);await flush();
+ assert.equal(app.context.nucleo.state(),'HELD_DRAFT');keyboardOf(app).listeners.click({detail:0,stopPropagation(){}});await flush();assert.equal(app.context.nucleo.state(),'TYPING');assert.equal(app.nodes.get('ta').value,question);assert.equal(asksOf(app).length,1);assert.deepEqual(app.errors,[]);
+});
