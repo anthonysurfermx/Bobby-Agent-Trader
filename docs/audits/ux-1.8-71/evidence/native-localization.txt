@@ -1,0 +1,1 @@
+PASS: 1384 unique native source keys, 1444 catalog rows, four translations with matching placeholders

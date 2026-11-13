@@ -1,0 +1,1574 @@
+[
+  {
+    "lang": "en",
+    "device": "se",
+    "metric": {
+      "controls": [
+        {
+          "id": "notice",
+          "rect": {
+            "bottom": 551.359130859375,
+            "height": 43.99658203125,
+            "left": 108.46701049804688,
+            "right": 266.52386474609375,
+            "top": 507.362548828125,
+            "width": 158.05685424804688,
+            "x": 108.46701049804688,
+            "y": 507.362548828125
+          }
+        },
+        {
+          "id": "pill",
+          "rect": {
+            "bottom": 592.7132568359375,
+            "height": 44.25592041015625,
+            "left": 110.04757690429688,
+            "right": 264.94329833984375,
+            "top": 548.4573364257812,
+            "width": 154.89572143554688,
+            "x": 110.04757690429688,
+            "y": 548.4573364257812
+          }
+        },
+        {
+          "id": "consent-preview-not-now",
+          "rect": {
+            "bottom": 641.4515380859375,
+            "height": 43.99658203125,
+            "left": 108.46701049804688,
+            "right": 266.52386474609375,
+            "top": 597.4549560546875,
+            "width": 158.05685424804688,
+            "x": 108.46701049804688,
+            "y": 597.4549560546875
+          }
+        }
+      ],
+      "lines": [
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 373.5204772949219,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 319.2748718261719,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 319.2748718261719
+          },
+          "text": "Allow AI processing of my questions."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 539.4801635742188,
+            "height": 54.245574951171875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 485.2345886230469,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 485.2345886230469
+          },
+          "text": "Not investment advice."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 705.4398803710938,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 651.1942749023438,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 651.1942749023438
+          },
+          "text": "Bobby never touches your money."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 871.3995971679688,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 817.1539916992188,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 817.1539916992188
+          },
+          "text": "You can lose money. You decide."
+        },
+        {
+          "cls": "rb dn",
+          "font": "40.56px",
+          "line": "56.16px",
+          "rect": {
+            "bottom": 1033.8463134765625,
+            "height": 44.41033935546875,
+            "left": 57.09852981567383,
+            "right": 317.8923225402832,
+            "top": 989.4359741210938,
+            "width": 260.7937927246094,
+            "x": 57.09852981567383,
+            "y": 989.4359741210938
+          },
+          "text": "Bobby sends your question and market data to OpenAI or Anthropic, depending on the analysis level. With voice on, reply text goes to OpenAI or Microsoft for speech. Dictation is transcribed on your iPhone when the language is installed; otherwise Apple's speech service transcribes it. Bobby does not store the audio. Avoid personal or account details. You can withdraw AI consent here at any time."
+        }
+      ],
+      "stageScroll": 0
+    },
+    "ax": "Browser tab: 59936430, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=en&mic=denied&auditScale=3.12\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\n~1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=en&mic=denied&auditScale=3.12\n~\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-onboarding.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=en&mic=denied&auditScale=3.12\nThe focused UI element is 68 button Step 1s, ID: step1"
+  },
+  {
+    "lang": "es",
+    "device": "se",
+    "metric": {
+      "controls": [
+        {
+          "id": "notice",
+          "rect": {
+            "bottom": 551.359130859375,
+            "height": 43.99658203125,
+            "left": 108.46701049804688,
+            "right": 266.52386474609375,
+            "top": 507.362548828125,
+            "width": 158.05685424804688,
+            "x": 108.46701049804688,
+            "y": 507.362548828125
+          }
+        },
+        {
+          "id": "pill",
+          "rect": {
+            "bottom": 592.7132568359375,
+            "height": 44.25592041015625,
+            "left": 100.16902923583984,
+            "right": 274.82186126708984,
+            "top": 548.4573364257812,
+            "width": 174.65283203125,
+            "x": 100.16902923583984,
+            "y": 548.4573364257812
+          }
+        },
+        {
+          "id": "consent-preview-not-now",
+          "rect": {
+            "bottom": 641.4515380859375,
+            "height": 43.99658203125,
+            "left": 108.46701049804688,
+            "right": 266.52386474609375,
+            "top": 597.4549560546875,
+            "width": 158.05685424804688,
+            "x": 108.46701049804688,
+            "y": 597.4549560546875
+          }
+        }
+      ],
+      "lines": [
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 373.5204772949219,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 319.2748718261719,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 319.2748718261719
+          },
+          "text": "Permito que la IA procese mis preguntas."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 539.4801635742188,
+            "height": 54.245574951171875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 485.2345886230469,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 485.2345886230469
+          },
+          "text": "No es asesoría de inversión."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 650.9102783203125,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 596.6646728515625,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 596.6646728515625
+          },
+          "text": "Bobby nunca toca tu dinero."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 762.3403930664062,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 708.0947875976562,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 708.0947875976562
+          },
+          "text": "Puedes perder dinero. Tú decides."
+        },
+        {
+          "cls": "rb dn",
+          "font": "40.56px",
+          "line": "56.16px",
+          "rect": {
+            "bottom": 924.7870483398438,
+            "height": 44.4102783203125,
+            "left": 57.09852981567383,
+            "right": 317.8923225402832,
+            "top": 880.3767700195312,
+            "width": 260.7937927246094,
+            "x": 57.09852981567383,
+            "y": 880.3767700195312
+          },
+          "text": "Bobby envía tu pregunta y datos de mercado a OpenAI o Anthropic, según el nivel de análisis. Con voz activa, el texto de respuesta va a OpenAI o Microsoft para narrarlo. El dictado se transcribe en tu iPhone si el idioma está instalado; si no, lo transcribe el servicio de voz de Apple. Bobby no guarda el audio. Evita datos personales o de cuentas. Puedes retirar aquí el consentimiento de IA cuando quieras."
+        }
+      ],
+      "stageScroll": 0
+    },
+    "ax": "Browser tab: 59936430, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=es&mic=denied&auditScale=3.12\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\n~1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=es&mic=denied&auditScale=3.12\n~\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-onboarding.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=es&mic=denied&auditScale=3.12\nThe focused UI element is 67 button Step 1s, ID: step1"
+  },
+  {
+    "lang": "fr",
+    "device": "se",
+    "metric": {
+      "controls": [
+        {
+          "id": "notice",
+          "rect": {
+            "bottom": 551.359130859375,
+            "height": 43.99658203125,
+            "left": 108.46701049804688,
+            "right": 266.52386474609375,
+            "top": 507.362548828125,
+            "width": 158.05685424804688,
+            "x": 108.46701049804688,
+            "y": 507.362548828125
+          }
+        },
+        {
+          "id": "pill",
+          "rect": {
+            "bottom": 592.7132568359375,
+            "height": 44.25592041015625,
+            "left": 89.50018310546875,
+            "right": 285.49072265625,
+            "top": 548.4573364257812,
+            "width": 195.99053955078125,
+            "x": 89.50018310546875,
+            "y": 548.4573364257812
+          }
+        },
+        {
+          "id": "consent-preview-not-now",
+          "rect": {
+            "bottom": 641.4515380859375,
+            "height": 43.99658203125,
+            "left": 108.46701049804688,
+            "right": 266.52386474609375,
+            "top": 597.4549560546875,
+            "width": 158.05685424804688,
+            "x": 108.46701049804688,
+            "y": 597.4549560546875
+          }
+        }
+      ],
+      "lines": [
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 427.7660827636719,
+            "height": 108.4912109375,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 319.2748718261719,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 319.2748718261719
+          },
+          "text": "J’autorise le traitement de mes questions par l’IA."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 594.0098266601562,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 539.7642211914062,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 539.7642211914062
+          },
+          "text": "Aucun conseil en investissement."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 759.9695434570312,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 705.7239379882812,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 705.7239379882812
+          },
+          "text": "Bobby ne touche jamais à ton argent."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 925.9292602539062,
+            "height": 54.24566650390625,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 871.68359375,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 871.68359375
+          },
+          "text": "Tu peux perdre de l’argent. Tu décides."
+        },
+        {
+          "cls": "rb dn",
+          "font": "40.56px",
+          "line": "56.16px",
+          "rect": {
+            "bottom": 1088.3758544921875,
+            "height": 44.4102783203125,
+            "left": 57.09852981567383,
+            "right": 317.8923225402832,
+            "top": 1043.965576171875,
+            "width": 260.7937927246094,
+            "x": 57.09852981567383,
+            "y": 1043.965576171875
+          },
+          "text": "Bobby transmet ta question et les données de marché à OpenAI ou Anthropic selon le niveau d’analyse. Lorsque la voix est activée, le texte de réponse est envoyé à OpenAI ou Microsoft pour la synthèse vocale. La dictée est transcrite sur ton iPhone si la langue est installée ; sinon, le service de reconnaissance vocale d’Apple la transcrit. Bobby ne conserve pas l’audio. Évite les données personnelles ou de compte. Tu peux retirer ce consentement ici à tout moment."
+        }
+      ],
+      "stageScroll": 0
+    },
+    "ax": "Browser tab: 59936430, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=fr&mic=denied&auditScale=3.12\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\n~1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=fr&mic=denied&auditScale=3.12\n~\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-onboarding.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=fr&mic=denied&auditScale=3.12\nThe focused UI element is 69 button Step 1s, ID: step1"
+  },
+  {
+    "lang": "pt",
+    "device": "se",
+    "metric": {
+      "controls": [
+        {
+          "id": "notice",
+          "rect": {
+            "bottom": 551.359130859375,
+            "height": 43.99658203125,
+            "left": 108.46701049804688,
+            "right": 266.52386474609375,
+            "top": 507.362548828125,
+            "width": 158.05685424804688,
+            "x": 108.46701049804688,
+            "y": 507.362548828125
+          }
+        },
+        {
+          "id": "pill",
+          "rect": {
+            "bottom": 592.7132568359375,
+            "height": 44.25592041015625,
+            "left": 100.56417083740234,
+            "right": 274.42671966552734,
+            "top": 548.4573364257812,
+            "width": 173.862548828125,
+            "x": 100.56417083740234,
+            "y": 548.4573364257812
+          }
+        },
+        {
+          "id": "consent-preview-not-now",
+          "rect": {
+            "bottom": 641.4515380859375,
+            "height": 43.99658203125,
+            "left": 108.46701049804688,
+            "right": 266.52386474609375,
+            "top": 597.4549560546875,
+            "width": 158.05685424804688,
+            "x": 108.46701049804688,
+            "y": 597.4549560546875
+          }
+        }
+      ],
+      "lines": [
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 427.7660827636719,
+            "height": 108.4912109375,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 319.2748718261719,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 319.2748718261719
+          },
+          "text": "Autorizo o processamento das minhas perguntas por IA."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 647.7491455078125,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 593.5035400390625,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 593.5035400390625
+          },
+          "text": "Não é aconselhamento de investimento."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 868.2384643554688,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 813.9928588867188,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 813.9928588867188
+          },
+          "text": "O Bobby nunca toca no teu dinheiro."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 1034.1982421875,
+            "height": 54.24566650390625,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 979.9525756835938,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 979.9525756835938
+          },
+          "text": "Podes perder dinheiro. A decisão é tua."
+        },
+        {
+          "cls": "rb dn",
+          "font": "40.56px",
+          "line": "56.16px",
+          "rect": {
+            "bottom": 1196.6448974609375,
+            "height": 44.4102783203125,
+            "left": 57.09852981567383,
+            "right": 317.8923225402832,
+            "top": 1152.234619140625,
+            "width": 260.7937927246094,
+            "x": 57.09852981567383,
+            "y": 1152.234619140625
+          },
+          "text": "O Bobby envia a pergunta e os dados de mercado à OpenAI ou Anthropic, conforme o nível de análise. Com voz ativa, o texto da resposta vai para a OpenAI ou Microsoft para gerar voz. O ditado é transcrito no teu iPhone se o idioma estiver instalado; caso contrário, é transcrito pelo serviço de reconhecimento de voz da Apple. O Bobby não guarda o áudio. Evita dados pessoais ou de contas. Podes retirar o consentimento de IA aqui a qualquer momento."
+        }
+      ],
+      "stageScroll": 0
+    },
+    "ax": "Browser tab: 59936430, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=pt&mic=denied&auditScale=3.12\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\n~1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=pt&mic=denied&auditScale=3.12\n~\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-onboarding.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=pt&mic=denied&auditScale=3.12\nThe focused UI element is 67 button Step 1s, ID: step1"
+  },
+  {
+    "lang": "it",
+    "device": "se",
+    "metric": {
+      "controls": [
+        {
+          "id": "notice",
+          "rect": {
+            "bottom": 551.359130859375,
+            "height": 43.99658203125,
+            "left": 108.46701049804688,
+            "right": 266.52386474609375,
+            "top": 507.362548828125,
+            "width": 158.05685424804688,
+            "x": 108.46701049804688,
+            "y": 507.362548828125
+          }
+        },
+        {
+          "id": "pill",
+          "rect": {
+            "bottom": 592.7132568359375,
+            "height": 44.25592041015625,
+            "left": 78.83134460449219,
+            "right": 296.1595458984375,
+            "top": 548.4573364257812,
+            "width": 217.3282012939453,
+            "x": 78.83134460449219,
+            "y": 548.4573364257812
+          }
+        },
+        {
+          "id": "consent-preview-not-now",
+          "rect": {
+            "bottom": 641.4515380859375,
+            "height": 43.99658203125,
+            "left": 108.46701049804688,
+            "right": 266.52386474609375,
+            "top": 597.4549560546875,
+            "width": 158.05685424804688,
+            "x": 108.46701049804688,
+            "y": 597.4549560546875
+          }
+        }
+      ],
+      "lines": [
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 427.7660827636719,
+            "height": 108.4912109375,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 319.2748718261719,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 319.2748718261719
+          },
+          "text": "Consento l’elaborazione delle mie domande tramite IA."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 647.7491455078125,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 593.5035400390625,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 593.5035400390625
+          },
+          "text": "Non è consulenza d’investimento."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 813.7088623046875,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 759.4632568359375,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 759.4632568359375
+          },
+          "text": "Bobby non tocca mai il tuo denaro."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 979.6685791015624,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 925.4229736328124,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 925.4229736328124
+          },
+          "text": "Puoi perdere denaro. Decidi tu."
+        },
+        {
+          "cls": "rb dn",
+          "font": "40.56px",
+          "line": "56.16px",
+          "rect": {
+            "bottom": 1142.115234375,
+            "height": 44.4102783203125,
+            "left": 57.09852981567383,
+            "right": 317.8923225402832,
+            "top": 1097.7049560546875,
+            "width": 260.7937927246094,
+            "x": 57.09852981567383,
+            "y": 1097.7049560546875
+          },
+          "text": "Bobby invia la domanda e i dati di mercato a OpenAI o Anthropic, in base al livello di analisi. Con la voce attiva, il testo della risposta va a OpenAI o Microsoft per la sintesi vocale. La dettatura viene trascritta sull’iPhone se la lingua è installata; altrimenti la trascrive il servizio di riconoscimento vocale di Apple. Bobby non conserva l’audio. Evita dati personali o dell’account. Puoi revocare il consenso all’IA qui in qualsiasi momento."
+        }
+      ],
+      "stageScroll": 0
+    },
+    "ax": "Browser tab: 59936430, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=it&mic=denied&auditScale=3.12\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\n~1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=it&mic=denied&auditScale=3.12\n~\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-onboarding.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=it&mic=denied&auditScale=3.12\nThe focused UI element is 67 button Step 1s, ID: step1"
+  },
+  {
+    "lang": "de",
+    "device": "se",
+    "metric": {
+      "controls": [
+        {
+          "id": "notice",
+          "rect": {
+            "bottom": 551.359130859375,
+            "height": 43.99658203125,
+            "left": 108.46701049804688,
+            "right": 266.52386474609375,
+            "top": 507.362548828125,
+            "width": 158.05685424804688,
+            "x": 108.46701049804688,
+            "y": 507.362548828125
+          }
+        },
+        {
+          "id": "pill",
+          "rect": {
+            "bottom": 592.7132568359375,
+            "height": 44.25592041015625,
+            "left": 93.05646514892578,
+            "right": 281.9344253540039,
+            "top": 548.4573364257812,
+            "width": 188.87796020507812,
+            "x": 93.05646514892578,
+            "y": 548.4573364257812
+          }
+        },
+        {
+          "id": "consent-preview-not-now",
+          "rect": {
+            "bottom": 641.4515380859375,
+            "height": 43.99658203125,
+            "left": 108.46701049804688,
+            "right": 266.52386474609375,
+            "top": 597.4549560546875,
+            "width": 158.05685424804688,
+            "x": 108.46701049804688,
+            "y": 597.4549560546875
+          }
+        }
+      ],
+      "lines": [
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 427.7660827636719,
+            "height": 108.4912109375,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 319.2748718261719,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 319.2748718261719
+          },
+          "text": "Ich erlaube die Verarbeitung meiner Fragen durch KI."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 594.0098266601562,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 539.7642211914062,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 539.7642211914062
+          },
+          "text": "Keine Anlageberatung."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 705.4398803710938,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 651.1942749023438,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 651.1942749023438
+          },
+          "text": "Bobby greift nie auf dein Geld zu."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 871.3995971679688,
+            "height": 54.24560546875,
+            "left": 49.19568634033203,
+            "right": 325.7952346801758,
+            "top": 817.1539916992188,
+            "width": 276.59954833984375,
+            "x": 49.19568634033203,
+            "y": 817.1539916992188
+          },
+          "text": "Du kannst Geld verlieren. Du entscheidest."
+        },
+        {
+          "cls": "rb dn",
+          "font": "40.56px",
+          "line": "56.16px",
+          "rect": {
+            "bottom": 1088.3758544921875,
+            "height": 44.4102783203125,
+            "left": 57.09852981567383,
+            "right": 317.8923225402832,
+            "top": 1043.965576171875,
+            "width": 260.7937927246094,
+            "x": 57.09852981567383,
+            "y": 1043.965576171875
+          },
+          "text": "Bobby sendet deine Frage und Marktdaten je nach Analysestufe an OpenAI oder Anthropic. Bei eingeschalteter Stimme geht der Antworttext zur Spracherzeugung an OpenAI oder Microsoft. Diktate werden auf deinem iPhone transkribiert, wenn die Sprache installiert ist; andernfalls transkribiert sie Apples Spracherkennungsdienst. Bobby speichert die Audiodaten nicht. Vermeide persönliche Daten und Kontodaten. Du kannst die KI-Einwilligung hier jederzeit widerrufen."
+        }
+      ],
+      "stageScroll": 0
+    },
+    "ax": "Browser tab: 59936430, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=de&mic=denied&auditScale=3.12\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\n~1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=de&mic=denied&auditScale=3.12\n~\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-onboarding.html?page=onboarding&width=375&height=667&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=de&mic=denied&auditScale=3.12\nThe focused UI element is 69 button Step 1s, ID: step1"
+  },
+  {
+    "lang": "en",
+    "device": "max",
+    "metric": {
+      "controls": [
+        {
+          "id": "notice",
+          "rect": {
+            "bottom": 752.5653076171875,
+            "height": 43.99920654296875,
+            "left": 104.74359130859376,
+            "right": 325.25640869140625,
+            "top": 708.5661010742188,
+            "width": 220.5128173828125,
+            "x": 104.74359130859376,
+            "y": 708.5661010742188
+          }
+        },
+        {
+          "id": "pill",
+          "rect": {
+            "bottom": 827.64306640625,
+            "height": 61.74359130859375,
+            "left": 106.94871520996094,
+            "right": 323.05126953125,
+            "top": 765.8994750976562,
+            "width": 216.10255432128903,
+            "x": 106.94871520996094,
+            "y": 765.8994750976562
+          }
+        },
+        {
+          "id": "consent-preview-not-now",
+          "rect": {
+            "bottom": 878.2576293945312,
+            "height": 43.99920654296875,
+            "left": 104.74359130859376,
+            "right": 325.25640869140625,
+            "top": 834.2584228515625,
+            "width": 220.5128173828125,
+            "x": 104.74359130859376,
+            "y": 834.2584228515625
+          }
+        }
+      ],
+      "lines": [
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 521.8365478515625,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 446.1558837890625,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 446.1558837890625
+          },
+          "text": "Allow AI processing of my questions."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 753.375,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 677.6943359375,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 677.6943359375
+          },
+          "text": "Not investment advice."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 984.9134521484376,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 909.2327880859376,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 909.2327880859376
+          },
+          "text": "Bobby never touches your money."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 1216.451904296875,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 1140.771240234375,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 1140.771240234375
+          },
+          "text": "You can lose money. You decide."
+        },
+        {
+          "cls": "rb dn",
+          "font": "40.56px",
+          "line": "56.16px",
+          "rect": {
+            "bottom": 1443.089111328125,
+            "height": 61.9588623046875,
+            "left": 33.07692337036133,
+            "right": 396.9230537414551,
+            "top": 1381.1302490234375,
+            "width": 363.84613037109375,
+            "x": 33.07692337036133,
+            "y": 1381.1302490234375
+          },
+          "text": "Bobby sends your question and market data to OpenAI or Anthropic, depending on the analysis level. With voice on, reply text goes to OpenAI or Microsoft for speech. Dictation is transcribed on your iPhone when the language is installed; otherwise Apple's speech service transcribes it. Bobby does not store the audio. Avoid personal or account details. You can withdraw AI consent here at any time."
+        }
+      ],
+      "stageScroll": 0
+    },
+    "ax": "Browser tab: 59936430, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=en&mic=denied&auditScale=3.12\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=en&mic=denied&auditScale=3.12\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-onboarding.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=en&mic=denied&auditScale=3.12\n\t\t\t4 container Description: Bobby, ID: stage\n\t\t\t\t5 image Description: Bobby, ID: gl\n\t\t\t\t6 image snow\n\t\t\t\t7 container verdict\n\t\t\t\t\t8 container vpct\n\t\t\t\t\t\t9 container\n\t\t\t\t\t\t\t10 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t\t11 container\n\t\t\t\t\t\t\t12 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t\t13 text %\n\t\t\t\t14 container pct\n\t\t\t\t\t15 container\n\t\t\t\t\t\t16 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t17 container\n\t\t\t\t\t\t18 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t19 text %\n\t\t\t\t20 container prompt\n\t\t\t\t\t21 text Who \n\t\t\t\t\t22 text lives \n\t\t\t\t\t23 text in \n\t\t\t\t\t24 text here?\n\t\t\t\t25 container lines\n\t\t\t\t\t26 container\n\t\t\t\t\t\t27 text Allow  AI  processing  of  my  questions.\n\t\t\t\t\t28 container\n\t\t\t\t\t\t29 text Not  investment  advice.\n\t\t\t\t\t30 container\n\t\t\t\t\t\t31 text Bobby  never  touches  your  money.\n\t\t\t\t\t32 container\n\t\t\t\t\t\t33 text You  can  lose  money.  You  decide.\n\t\t\t\t\t34 container Allow AI processing of my questions.\n\t\t\t\t\t\t35 text Bobby sends your question and market data to OpenAI or Anthropic, depending on the analysis level. With voice on, reply text goes to OpenAI or Microsoft for speech. Dictation is transcribed on your iPhone when the language is installed; otherwise Apple's speech service transcribes it. Bobby does not store the audio. Avoid personal or account details. You can withdraw AI consent here at any time.\n\t\t\t\t36 button Read the full notice, ID: notice\n\t\t\t\t37 container title\n\t\t\t\t\t38 text I’m \n\t\t\t\t\t39 text Bobby. \n\t\t\t\t\t40 text I \n\t\t\t\t\t41 text help \n\t\t\t\t\t42 text you \n\t\t\t\t\t43 text understand \n\t\t\t\t\t44 text before \n\t\t\t\t\t45 text you \n\t\t\t\t\t46 text decide.\n\t\t\t\t47 text Bobby\n\t\t\t\t48 container cards\n\t\t\t\t\t49 container cT\n\t\t\t\t\t\t50 heading Value: 3, ID: tTitle\n\t\t\t\t\t\t51 button save\n\t\t\t\t\t52 container cI\n\t\t\t\t\t\t53 text ISLA\n\t\t\t\t\t\t54 heading Value: 3, ID: iTitle\n\t\t\t\t55 container chipsBox\n\t\t\t\t\t56 container chips\n\t\t\t\t\t\t57 button\n\t\t\t\t\t\t58 button\n\t\t\t\t\t\t59 button\n\t\t\t\t60 button Description: I agree to the risk notice and AI processing, ID: pill\n\t\t\t\t61 container\n\t\t\t\t\t62 text Bobby\n\t\t\t\t\t63 text What is investing?\n\t\t\t\t\t64 button Description: Profile, ID: riskProfile\n\t\t\t\t65 text PAUSED\n\t\t\t\t66 button Description: Not now, ID: consent-preview-not-now\n\t67 container controls\n\t\t68 button Step 1s, ID: step1\n\t\t69 button Step 10s, ID: step10\n\t\t70 button Step 180s, ID: step180\n\t\t71 button Ask fixture, ID: example\n\t\t72 button Restore fixture, ID: restore\n\t\t73 button Reset scroll, ID: recenter\n\t\t74 text RISK\n\nThe focused UI element is 68 button Step 1s, ID: step1"
+  },
+  {
+    "lang": "es",
+    "device": "max",
+    "metric": {
+      "controls": [
+        {
+          "id": "notice",
+          "rect": {
+            "bottom": 752.5653076171875,
+            "height": 43.99920654296875,
+            "left": 104.74359130859376,
+            "right": 325.25640869140625,
+            "top": 708.5661010742188,
+            "width": 220.5128173828125,
+            "x": 104.74359130859376,
+            "y": 708.5661010742188
+          }
+        },
+        {
+          "id": "pill",
+          "rect": {
+            "bottom": 827.64306640625,
+            "height": 61.74359130859375,
+            "left": 93.16666412353516,
+            "right": 336.8333511352539,
+            "top": 765.8994750976562,
+            "width": 243.66668701171875,
+            "x": 93.16666412353516,
+            "y": 765.8994750976562
+          }
+        },
+        {
+          "id": "consent-preview-not-now",
+          "rect": {
+            "bottom": 878.2576293945312,
+            "height": 43.99920654296875,
+            "left": 104.74359130859376,
+            "right": 325.25640869140625,
+            "top": 834.2584228515625,
+            "width": 220.5128173828125,
+            "x": 104.74359130859376,
+            "y": 834.2584228515625
+          }
+        }
+      ],
+      "lines": [
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 521.8365478515625,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 446.1558837890625,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 446.1558837890625
+          },
+          "text": "Permito que la IA procese mis preguntas."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 753.375,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 677.6943359375,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 677.6943359375
+          },
+          "text": "No es asesoría de inversión."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 908.8365478515624,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 833.1558837890625,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 833.1558837890625
+          },
+          "text": "Bobby nunca toca tu dinero."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 1064.298095703125,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 988.617431640625,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 988.617431640625
+          },
+          "text": "Puedes perder dinero. Tú decides."
+        },
+        {
+          "cls": "rb dn",
+          "font": "40.56px",
+          "line": "56.16px",
+          "rect": {
+            "bottom": 1290.935302734375,
+            "height": 61.958984375,
+            "left": 33.07692337036133,
+            "right": 396.9230537414551,
+            "top": 1228.976318359375,
+            "width": 363.84613037109375,
+            "x": 33.07692337036133,
+            "y": 1228.976318359375
+          },
+          "text": "Bobby envía tu pregunta y datos de mercado a OpenAI o Anthropic, según el nivel de análisis. Con voz activa, el texto de respuesta va a OpenAI o Microsoft para narrarlo. El dictado se transcribe en tu iPhone si el idioma está instalado; si no, lo transcribe el servicio de voz de Apple. Bobby no guarda el audio. Evita datos personales o de cuentas. Puedes retirar aquí el consentimiento de IA cuando quieras."
+        }
+      ],
+      "stageScroll": 0
+    },
+    "ax": "Browser tab: 59936430, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=es&mic=denied&auditScale=3.12\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=es&mic=denied&auditScale=3.12\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-onboarding.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=es&mic=denied&auditScale=3.12\n\t\t\t4 container Description: Bobby, ID: stage\n\t\t\t\t5 image Description: Bobby, ID: gl\n\t\t\t\t6 image snow\n\t\t\t\t7 container verdict\n\t\t\t\t\t8 container vpct\n\t\t\t\t\t\t9 container\n\t\t\t\t\t\t\t10 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t\t11 container\n\t\t\t\t\t\t\t12 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t\t13 text %\n\t\t\t\t14 container pct\n\t\t\t\t\t15 container\n\t\t\t\t\t\t16 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t17 container\n\t\t\t\t\t\t18 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t19 text %\n\t\t\t\t20 container prompt\n\t\t\t\t\t21 text ¿Quién \n\t\t\t\t\t22 text vive \n\t\t\t\t\t23 text aquí?\n\t\t\t\t24 container lines\n\t\t\t\t\t25 container\n\t\t\t\t\t\t26 text Permito  que  la  IA  procese  mis  preguntas.\n\t\t\t\t\t27 container\n\t\t\t\t\t\t28 text No  es  asesoría  de  inversión.\n\t\t\t\t\t29 container\n\t\t\t\t\t\t30 text Bobby  nunca  toca  tu  dinero.\n\t\t\t\t\t31 container\n\t\t\t\t\t\t32 text Puedes  perder  dinero.  Tú  decides.\n\t\t\t\t\t33 container Permito que la IA procese mis preguntas.\n\t\t\t\t\t\t34 text Bobby envía tu pregunta y datos de mercado a OpenAI o Anthropic, según el nivel de análisis. Con voz activa, el texto de respuesta va a OpenAI o Microsoft para narrarlo. El dictado se transcribe en tu iPhone si el idioma está instalado; si no, lo transcribe el servicio de voz de Apple. Bobby no guarda el audio. Evita datos personales o de cuentas. Puedes retirar aquí el consentimiento de IA cuando quieras.\n\t\t\t\t35 button Leer el aviso completo, ID: notice\n\t\t\t\t36 container title\n\t\t\t\t\t37 text Soy \n\t\t\t\t\t38 text Bobby. \n\t\t\t\t\t39 text Te \n\t\t\t\t\t40 text ayudo \n\t\t\t\t\t41 text a \n\t\t\t\t\t42 text entender \n\t\t\t\t\t43 text antes \n\t\t\t\t\t44 text de \n\t\t\t\t\t45 text decidir.\n\t\t\t\t46 text Bobby\n\t\t\t\t47 container cards\n\t\t\t\t\t48 container cT\n\t\t\t\t\t\t49 heading Value: 3, ID: tTitle\n\t\t\t\t\t\t50 button save\n\t\t\t\t\t51 container cI\n\t\t\t\t\t\t52 text ISLA\n\t\t\t\t\t\t53 heading Value: 3, ID: iTitle\n\t\t\t\t54 container chipsBox\n\t\t\t\t\t55 container chips\n\t\t\t\t\t\t56 button\n\t\t\t\t\t\t57 button\n\t\t\t\t\t\t58 button\n\t\t\t\t59 button Description: Acepto el aviso de riesgo y el procesamiento con IA, ID: pill\n\t\t\t\t60 container\n\t\t\t\t\t61 text Bobby\n\t\t\t\t\t62 text ¿Qué es invertir?\n\t\t\t\t\t63 button Description: Perfil, ID: riskProfile\n\t\t\t\t64 text PAUSA\n\t\t\t\t65 button Description: Ahora no, ID: consent-preview-not-now\n\t66 container controls\n\t\t67 button Step 1s, ID: step1\n\t\t68 button Step 10s, ID: step10\n\t\t69 button Step 180s, ID: step180\n\t\t70 button Ask fixture, ID: example\n\t\t71 button Restore fixture, ID: restore\n\t\t72 button Reset scroll, ID: recenter\n\t\t73 text RISK\n\nThe focused UI element is 67 button Step 1s, ID: step1"
+  },
+  {
+    "lang": "fr",
+    "device": "max",
+    "metric": {
+      "controls": [
+        {
+          "id": "notice",
+          "rect": {
+            "bottom": 752.5653076171875,
+            "height": 43.99920654296875,
+            "left": 104.74359130859376,
+            "right": 325.25640869140625,
+            "top": 708.5661010742188,
+            "width": 220.5128173828125,
+            "x": 104.74359130859376,
+            "y": 708.5661010742188
+          }
+        },
+        {
+          "id": "pill",
+          "rect": {
+            "bottom": 827.64306640625,
+            "height": 61.74359130859375,
+            "left": 78.28205108642578,
+            "right": 351.7179641723633,
+            "top": 765.8994750976562,
+            "width": 273.4359130859375,
+            "x": 78.28205108642578,
+            "y": 765.8994750976562
+          }
+        },
+        {
+          "id": "consent-preview-not-now",
+          "rect": {
+            "bottom": 878.2576293945312,
+            "height": 43.99920654296875,
+            "left": 104.74359130859376,
+            "right": 325.25640869140625,
+            "top": 834.2584228515625,
+            "width": 220.5128173828125,
+            "x": 104.74359130859376,
+            "y": 834.2584228515625
+          }
+        }
+      ],
+      "lines": [
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 597.5172729492188,
+            "height": 151.36138916015625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 446.1558837890625,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 446.1558837890625
+          },
+          "text": "J’autorise le traitement de mes questions par l’IA."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 829.4519653320312,
+            "height": 75.68072509765625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 753.771240234375,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 753.771240234375
+          },
+          "text": "Aucun conseil en investissement."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 1060.9903564453125,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 985.3096923828124,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 985.3096923828124
+          },
+          "text": "Bobby ne touche jamais à ton argent."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 1292.52880859375,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 1216.84814453125,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 1216.84814453125
+          },
+          "text": "Tu peux perdre de l’argent. Tu décides."
+        },
+        {
+          "cls": "rb dn",
+          "font": "40.56px",
+          "line": "56.16px",
+          "rect": {
+            "bottom": 1519.166015625,
+            "height": 61.9588623046875,
+            "left": 33.07692337036133,
+            "right": 396.9230537414551,
+            "top": 1457.2071533203125,
+            "width": 363.84613037109375,
+            "x": 33.07692337036133,
+            "y": 1457.2071533203125
+          },
+          "text": "Bobby transmet ta question et les données de marché à OpenAI ou Anthropic selon le niveau d’analyse. Lorsque la voix est activée, le texte de réponse est envoyé à OpenAI ou Microsoft pour la synthèse vocale. La dictée est transcrite sur ton iPhone si la langue est installée ; sinon, le service de reconnaissance vocale d’Apple la transcrit. Bobby ne conserve pas l’audio. Évite les données personnelles ou de compte. Tu peux retirer ce consentement ici à tout moment."
+        }
+      ],
+      "stageScroll": 0
+    },
+    "ax": "Browser tab: 59936430, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=fr&mic=denied&auditScale=3.12\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=fr&mic=denied&auditScale=3.12\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-onboarding.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=fr&mic=denied&auditScale=3.12\n\t\t\t4 container Description: Bobby, ID: stage\n\t\t\t\t5 image Description: Bobby, ID: gl\n\t\t\t\t6 image snow\n\t\t\t\t7 container verdict\n\t\t\t\t\t8 container vpct\n\t\t\t\t\t\t9 container\n\t\t\t\t\t\t\t10 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t\t11 container\n\t\t\t\t\t\t\t12 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t\t13 text %\n\t\t\t\t14 container pct\n\t\t\t\t\t15 container\n\t\t\t\t\t\t16 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t17 container\n\t\t\t\t\t\t18 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t19 text %\n\t\t\t\t20 container prompt\n\t\t\t\t\t21 text Qui \n\t\t\t\t\t22 text habite \n\t\t\t\t\t23 text ici \n\t\t\t\t\t24 text ?\n\t\t\t\t25 container lines\n\t\t\t\t\t26 container\n\t\t\t\t\t\t27 text J’autorise  le  traitement  de  mes  questions  par  l’IA.\n\t\t\t\t\t28 container\n\t\t\t\t\t\t29 text Aucun  conseil  en  investissement.\n\t\t\t\t\t30 container\n\t\t\t\t\t\t31 text Bobby  ne  touche  jamais  à  ton  argent.\n\t\t\t\t\t32 container\n\t\t\t\t\t\t33 text Tu  peux  perdre  de  l’argent.  Tu  décides.\n\t\t\t\t\t34 container J’autorise le traitement de mes questions par l’IA.\n\t\t\t\t\t\t35 text Bobby transmet ta question et les données de marché à OpenAI ou Anthropic selon le niveau d’analyse. Lorsque la voix est activée, le texte de réponse est envoyé à OpenAI ou Microsoft pour la synthèse vocale. La dictée est transcrite sur ton iPhone si la langue est installée ; sinon, le service de reconnaissance vocale d’Apple la transcrit. Bobby ne conserve pas l’audio. Évite les données personnelles ou de compte. Tu peux retirer ce consentement ici à tout moment.\n\t\t\t\t36 button Lire l’avertissement complet, ID: notice\n\t\t\t\t37 container title\n\t\t\t\t\t38 text Je \n\t\t\t\t\t39 text suis \n\t\t\t\t\t40 text Bobby. \n\t\t\t\t\t41 text Je \n\t\t\t\t\t42 text t’aide \n\t\t\t\t\t43 text à \n\t\t\t\t\t44 text comprendre \n\t\t\t\t\t45 text avant \n\t\t\t\t\t46 text de \n\t\t\t\t\t47 text décider.\n\t\t\t\t48 text Bobby\n\t\t\t\t49 container cards\n\t\t\t\t\t50 container cT\n\t\t\t\t\t\t51 heading Value: 3, ID: tTitle\n\t\t\t\t\t\t52 button save\n\t\t\t\t\t53 container cI\n\t\t\t\t\t\t54 text ISLA\n\t\t\t\t\t\t55 heading Value: 3, ID: iTitle\n\t\t\t\t56 container chipsBox\n\t\t\t\t\t57 container chips\n\t\t\t\t\t\t58 button\n\t\t\t\t\t\t59 button\n\t\t\t\t\t\t60 button\n\t\t\t\t61 button Description: J’accepte l’avertissement sur les risques et le traitement par IA, ID: pill\n\t\t\t\t62 container\n\t\t\t\t\t63 text Bobby\n\t\t\t\t\t64 text C’est quoi, investir ?\n\t\t\t\t\t65 button Description: Ton profil, ID: riskProfile\n\t\t\t\t66 text EN PAUSE\n\t\t\t\t67 button Description: Pas maintenant, ID: consent-preview-not-now\n\t68 container controls\n\t\t69 button Step 1s, ID: step1\n\t\t70 button Step 10s, ID: step10\n\t\t71 button Step 180s, ID: step180\n\t\t72 button Ask fixture, ID: example\n\t\t73 button Restore fixture, ID: restore\n\t\t74 button Reset scroll, ID: recenter\n\t\t75 text RISK\n\nThe focused UI element is 69 button Step 1s, ID: step1"
+  },
+  {
+    "lang": "pt",
+    "device": "max",
+    "metric": {
+      "controls": [
+        {
+          "id": "notice",
+          "rect": {
+            "bottom": 752.5653076171875,
+            "height": 43.99920654296875,
+            "left": 104.74359130859376,
+            "right": 325.25640869140625,
+            "top": 708.5661010742188,
+            "width": 220.5128173828125,
+            "x": 104.74359130859376,
+            "y": 708.5661010742188
+          }
+        },
+        {
+          "id": "pill",
+          "rect": {
+            "bottom": 827.64306640625,
+            "height": 61.74359130859375,
+            "left": 93.71794891357422,
+            "right": 336.2820358276367,
+            "top": 765.8994750976562,
+            "width": 242.5640869140625,
+            "x": 93.71794891357422,
+            "y": 765.8994750976562
+          }
+        },
+        {
+          "id": "consent-preview-not-now",
+          "rect": {
+            "bottom": 878.2576293945312,
+            "height": 43.99920654296875,
+            "left": 104.74359130859376,
+            "right": 325.25640869140625,
+            "top": 834.2584228515625,
+            "width": 220.5128173828125,
+            "x": 104.74359130859376,
+            "y": 834.2584228515625
+          }
+        }
+      ],
+      "lines": [
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 597.5172729492188,
+            "height": 151.36138916015625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 446.1558837890625,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 446.1558837890625
+          },
+          "text": "Autorizo o processamento das minhas perguntas por IA."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 904.42626953125,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 828.74560546875,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 828.74560546875
+          },
+          "text": "Não é aconselhamento de investimento."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 1212.0416259765625,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 1136.3609619140625,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 1136.3609619140625
+          },
+          "text": "O Bobby nunca toca no teu dinheiro."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 1443.580078125,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 1367.8994140625,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 1367.8994140625
+          },
+          "text": "Podes perder dinheiro. A decisão é tua."
+        },
+        {
+          "cls": "rb dn",
+          "font": "40.56px",
+          "line": "56.16px",
+          "rect": {
+            "bottom": 1670.2174072265625,
+            "height": 61.958984375,
+            "left": 33.07692337036133,
+            "right": 396.9230537414551,
+            "top": 1608.2584228515625,
+            "width": 363.84613037109375,
+            "x": 33.07692337036133,
+            "y": 1608.2584228515625
+          },
+          "text": "O Bobby envia a pergunta e os dados de mercado à OpenAI ou Anthropic, conforme o nível de análise. Com voz ativa, o texto da resposta vai para a OpenAI ou Microsoft para gerar voz. O ditado é transcrito no teu iPhone se o idioma estiver instalado; caso contrário, é transcrito pelo serviço de reconhecimento de voz da Apple. O Bobby não guarda o áudio. Evita dados pessoais ou de contas. Podes retirar o consentimento de IA aqui a qualquer momento."
+        }
+      ],
+      "stageScroll": 0
+    },
+    "ax": "Browser tab: 59936430, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=pt&mic=denied&auditScale=3.12\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=pt&mic=denied&auditScale=3.12\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-onboarding.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=pt&mic=denied&auditScale=3.12\n\t\t\t4 container Description: Bobby, ID: stage\n\t\t\t\t5 image Description: Bobby, ID: gl\n\t\t\t\t6 image snow\n\t\t\t\t7 container verdict\n\t\t\t\t\t8 container vpct\n\t\t\t\t\t\t9 container\n\t\t\t\t\t\t\t10 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t\t11 container\n\t\t\t\t\t\t\t12 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t\t13 text %\n\t\t\t\t14 container pct\n\t\t\t\t\t15 container\n\t\t\t\t\t\t16 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t17 container\n\t\t\t\t\t\t18 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t19 text %\n\t\t\t\t20 container prompt\n\t\t\t\t\t21 text Quem \n\t\t\t\t\t22 text vive \n\t\t\t\t\t23 text aqui?\n\t\t\t\t24 container lines\n\t\t\t\t\t25 container\n\t\t\t\t\t\t26 text Autorizo  o  processamento  das  minhas  perguntas  por  IA.\n\t\t\t\t\t27 container\n\t\t\t\t\t\t28 text Não  é  aconselhamento  de  investimento.\n\t\t\t\t\t29 container\n\t\t\t\t\t\t30 text O  Bobby  nunca  toca  no  teu  dinheiro.\n\t\t\t\t\t31 container\n\t\t\t\t\t\t32 text Podes  perder  dinheiro.  A  decisão  é  tua.\n\t\t\t\t\t33 container Autorizo o processamento das minhas perguntas por IA.\n\t\t\t\t\t\t34 text O Bobby envia a pergunta e os dados de mercado à OpenAI ou Anthropic, conforme o nível de análise. Com voz ativa, o texto da resposta vai para a OpenAI ou Microsoft para gerar voz. O ditado é transcrito no teu iPhone se o idioma estiver instalado; caso contrário, é transcrito pelo serviço de reconhecimento de voz da Apple. O Bobby não guarda o áudio. Evita dados pessoais ou de contas. Podes retirar o consentimento de IA aqui a qualquer momento.\n\t\t\t\t35 button Ler o aviso completo, ID: notice\n\t\t\t\t36 container title\n\t\t\t\t\t37 text Sou \n\t\t\t\t\t38 text o \n\t\t\t\t\t39 text Bobby. \n\t\t\t\t\t40 text Ajudo-te \n\t\t\t\t\t41 text a \n\t\t\t\t\t42 text entender \n\t\t\t\t\t43 text antes \n\t\t\t\t\t44 text de \n\t\t\t\t\t45 text decidires.\n\t\t\t\t46 text Bobby\n\t\t\t\t47 container cards\n\t\t\t\t\t48 container cT\n\t\t\t\t\t\t49 heading Value: 3, ID: tTitle\n\t\t\t\t\t\t50 button save\n\t\t\t\t\t51 container cI\n\t\t\t\t\t\t52 text ISLA\n\t\t\t\t\t\t53 heading Value: 3, ID: iTitle\n\t\t\t\t54 container chipsBox\n\t\t\t\t\t55 container chips\n\t\t\t\t\t\t56 button\n\t\t\t\t\t\t57 button\n\t\t\t\t\t\t58 button\n\t\t\t\t59 button Description: Aceito o aviso de risco e o processamento por IA, ID: pill\n\t\t\t\t60 container\n\t\t\t\t\t61 text Bobby\n\t\t\t\t\t62 text O que é investir?\n\t\t\t\t\t63 button Description: O teu perfil, ID: riskProfile\n\t\t\t\t64 text EM PAUSA\n\t\t\t\t65 button Description: Agora não, ID: consent-preview-not-now\n\t66 container controls\n\t\t67 button Step 1s, ID: step1\n\t\t68 button Step 10s, ID: step10\n\t\t69 button Step 180s, ID: step180\n\t\t70 button Ask fixture, ID: example\n\t\t71 button Restore fixture, ID: restore\n\t\t72 button Reset scroll, ID: recenter\n\t\t73 text RISK\n\nThe focused UI element is 67 button Step 1s, ID: step1"
+  },
+  {
+    "lang": "it",
+    "device": "max",
+    "metric": {
+      "controls": [
+        {
+          "id": "notice",
+          "rect": {
+            "bottom": 752.5653076171875,
+            "height": 43.99920654296875,
+            "left": 104.74359130859376,
+            "right": 325.25640869140625,
+            "top": 708.5661010742188,
+            "width": 220.5128173828125,
+            "x": 104.74359130859376,
+            "y": 708.5661010742188
+          }
+        },
+        {
+          "id": "pill",
+          "rect": {
+            "bottom": 827.64306640625,
+            "height": 61.74359130859375,
+            "left": 63.39743423461914,
+            "right": 366.6025733947754,
+            "top": 765.8994750976562,
+            "width": 303.20513916015625,
+            "x": 63.39743423461914,
+            "y": 765.8994750976562
+          }
+        },
+        {
+          "id": "consent-preview-not-now",
+          "rect": {
+            "bottom": 878.2576293945312,
+            "height": 43.99920654296875,
+            "left": 104.74359130859376,
+            "right": 325.25640869140625,
+            "top": 834.2584228515625,
+            "width": 220.5128173828125,
+            "x": 104.74359130859376,
+            "y": 834.2584228515625
+          }
+        }
+      ],
+      "lines": [
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 597.5172729492188,
+            "height": 151.36138916015625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 446.1558837890625,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 446.1558837890625
+          },
+          "text": "Consento l’elaborazione delle mie domande tramite IA."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 904.42626953125,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 828.74560546875,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 828.74560546875
+          },
+          "text": "Non è consulenza d’investimento."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 1135.9647216796875,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 1060.2840576171875,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 1060.2840576171875
+          },
+          "text": "Bobby non tocca mai il tuo denaro."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 1367.503173828125,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 1291.822509765625,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 1291.822509765625
+          },
+          "text": "Puoi perdere denaro. Decidi tu."
+        },
+        {
+          "cls": "rb dn",
+          "font": "40.56px",
+          "line": "56.16px",
+          "rect": {
+            "bottom": 1594.140380859375,
+            "height": 61.9588623046875,
+            "left": 33.07692337036133,
+            "right": 396.9230537414551,
+            "top": 1532.1815185546875,
+            "width": 363.84613037109375,
+            "x": 33.07692337036133,
+            "y": 1532.1815185546875
+          },
+          "text": "Bobby invia la domanda e i dati di mercato a OpenAI o Anthropic, in base al livello di analisi. Con la voce attiva, il testo della risposta va a OpenAI o Microsoft per la sintesi vocale. La dettatura viene trascritta sull’iPhone se la lingua è installata; altrimenti la trascrive il servizio di riconoscimento vocale di Apple. Bobby non conserva l’audio. Evita dati personali o dell’account. Puoi revocare il consenso all’IA qui in qualsiasi momento."
+        }
+      ],
+      "stageScroll": 0
+    },
+    "ax": "Browser tab: 59936430, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=it&mic=denied&auditScale=3.12\".\nThe following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.\n~1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=it&mic=denied&auditScale=3.12\n~\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-onboarding.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=it&mic=denied&auditScale=3.12\n~\t\t\t\t\t21 text Chi \n~\t\t\t\t\t23 text qui?\n~\t\t\t\t\t\t26 text Consento  l’elaborazione  delle  mie  domande  tramite  IA.\n~\t\t\t\t\t\t28 text Non  è  consulenza  d’investimento.\n~\t\t\t\t\t\t30 text Bobby  non  tocca  mai  il  tuo  denaro.\n~\t\t\t\t\t\t32 text Puoi  perdere  denaro.  Decidi  tu.\n~\t\t\t\t\t33 container Consento l’elaborazione delle mie domande tramite IA.\n~\t\t\t\t\t\t34 text Bobby invia la domanda e i dati di mercato a OpenAI o Anthropic, in base al livello di analisi. Con la voce attiva, il testo della risposta va a OpenAI o Microsoft per la sintesi vocale. La dettatura viene trascritta sull’iPhone se la lingua è installata; altrimenti la trascrive il servizio di riconoscimento vocale di Apple. Bobby non conserva l’audio. Evita dati personali o dell’account. Puoi revocare il consenso all’IA qui in qualsiasi momento.\n~\t\t\t\t35 button Leggi l’avvertenza completa, ID: notice\n~\t\t\t\t\t37 text Sono \n~\t\t\t\t\t38 text Bobby. \n~\t\t\t\t\t39 text Ti \n~\t\t\t\t\t40 text aiuto \n~\t\t\t\t\t42 text capire \n~\t\t\t\t\t43 text prima \n~\t\t\t\t\t44 text di \n~\t\t\t\t\t45 text decidere.\n~\t\t\t\t59 button Description: Accetto l’avviso sui rischi e l’elaborazione tramite IA, ID: pill\n~\t\t\t\t\t62 text Che cos’è investire?\n~\t\t\t\t\t63 button Description: Il tuo profilo, ID: riskProfile\n~\t\t\t\t64 text IN PAUSA\n~\t\t\t\t65 button Description: Non ora, ID: consent-preview-not-now\nThe focused UI element is 67 button Step 1s, ID: step1"
+  },
+  {
+    "lang": "de",
+    "device": "max",
+    "metric": {
+      "controls": [
+        {
+          "id": "notice",
+          "rect": {
+            "bottom": 752.5653076171875,
+            "height": 43.99920654296875,
+            "left": 104.74359130859376,
+            "right": 325.25640869140625,
+            "top": 708.5661010742188,
+            "width": 220.5128173828125,
+            "x": 104.74359130859376,
+            "y": 708.5661010742188
+          }
+        },
+        {
+          "id": "pill",
+          "rect": {
+            "bottom": 827.64306640625,
+            "height": 61.74359130859375,
+            "left": 83.24359130859375,
+            "right": 346.75640869140625,
+            "top": 765.8994750976562,
+            "width": 263.5128173828125,
+            "x": 83.24359130859375,
+            "y": 765.8994750976562
+          }
+        },
+        {
+          "id": "consent-preview-not-now",
+          "rect": {
+            "bottom": 878.2576293945312,
+            "height": 43.99920654296875,
+            "left": 104.74359130859376,
+            "right": 325.25640869140625,
+            "top": 834.2584228515625,
+            "width": 220.5128173828125,
+            "x": 104.74359130859376,
+            "y": 834.2584228515625
+          }
+        }
+      ],
+      "lines": [
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 597.5172729492188,
+            "height": 151.36138916015625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 446.1558837890625,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 446.1558837890625
+          },
+          "text": "Ich erlaube die Verarbeitung meiner Fragen durch KI."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 829.4519653320312,
+            "height": 75.68072509765625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 753.771240234375,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 753.771240234375
+          },
+          "text": "Keine Anlageberatung."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 984.9134521484376,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 909.2327880859376,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 909.2327880859376
+          },
+          "text": "Bobby greift nie auf dein Geld zu."
+        },
+        {
+          "cls": "ln",
+          "font": "19px",
+          "line": "68.64px",
+          "rect": {
+            "bottom": 1216.451904296875,
+            "height": 75.6806640625,
+            "left": 22.051280975341797,
+            "right": 407.9487419128418,
+            "top": 1140.771240234375,
+            "width": 385.8974609375,
+            "x": 22.051280975341797,
+            "y": 1140.771240234375
+          },
+          "text": "Du kannst Geld verlieren. Du entscheidest."
+        },
+        {
+          "cls": "rb dn",
+          "font": "40.56px",
+          "line": "56.16px",
+          "rect": {
+            "bottom": 1519.166015625,
+            "height": 61.9588623046875,
+            "left": 33.07692337036133,
+            "right": 396.9230537414551,
+            "top": 1457.2071533203125,
+            "width": 363.84613037109375,
+            "x": 33.07692337036133,
+            "y": 1457.2071533203125
+          },
+          "text": "Bobby sendet deine Frage und Marktdaten je nach Analysestufe an OpenAI oder Anthropic. Bei eingeschalteter Stimme geht der Antworttext zur Spracherzeugung an OpenAI oder Microsoft. Diktate werden auf deinem iPhone transkribiert, wenn die Sprache installiert ist; andernfalls transkribiert sie Apples Spracherkennungsdienst. Bobby speichert die Audiodaten nicht. Vermeide persönliche Daten und Kontodaten. Du kannst die KI-Einwilligung hier jederzeit widerrufen."
+        }
+      ],
+      "stageScroll": 0
+    },
+    "ax": "Browser tab: 59936430, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=de&mic=denied&auditScale=3.12\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=de&mic=denied&auditScale=3.12\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-onboarding.html?page=onboarding&width=430&height=932&harness=1&freeze=1&script=audit-first-question&t=7&first=1&lang=de&mic=denied&auditScale=3.12\n\t\t\t4 container Description: Bobby, ID: stage\n\t\t\t\t5 image Description: Bobby, ID: gl\n\t\t\t\t6 image snow\n\t\t\t\t7 container verdict\n\t\t\t\t\t8 container vpct\n\t\t\t\t\t\t9 container\n\t\t\t\t\t\t\t10 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t\t11 container\n\t\t\t\t\t\t\t12 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t\t13 text %\n\t\t\t\t14 container pct\n\t\t\t\t\t15 container\n\t\t\t\t\t\t16 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t17 container\n\t\t\t\t\t\t18 text 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t19 text %\n\t\t\t\t20 container prompt\n\t\t\t\t\t21 text Wer \n\t\t\t\t\t22 text wohnt \n\t\t\t\t\t23 text hier?\n\t\t\t\t24 container lines\n\t\t\t\t\t25 container\n\t\t\t\t\t\t26 text Ich  erlaube  die  Verarbeitung  meiner  Fragen  durch  KI.\n\t\t\t\t\t27 container\n\t\t\t\t\t\t28 text Keine  Anlageberatung.\n\t\t\t\t\t29 container\n\t\t\t\t\t\t30 text Bobby  greift  nie  auf  dein  Geld  zu.\n\t\t\t\t\t31 container\n\t\t\t\t\t\t32 text Du  kannst  Geld  verlieren.  Du  entscheidest.\n\t\t\t\t\t33 container Ich erlaube die Verarbeitung meiner Fragen durch KI.\n\t\t\t\t\t\t34 text Bobby sendet deine Frage und Marktdaten je nach Analysestufe an OpenAI oder Anthropic. Bei eingeschalteter Stimme geht der Antworttext zur Spracherzeugung an OpenAI oder Microsoft. Diktate werden auf deinem iPhone transkribiert, wenn die Sprache installiert ist; andernfalls transkribiert sie Apples Spracherkennungsdienst. Bobby speichert die Audiodaten nicht. Vermeide persönliche Daten und Kontodaten. Du kannst die KI-Einwilligung hier jederzeit widerrufen.\n\t\t\t\t35 button Vollständigen Hinweis lesen, ID: notice\n\t\t\t\t36 container title\n\t\t\t\t\t37 text Ich \n\t\t\t\t\t38 text bin \n\t\t\t\t\t39 text Bobby. \n\t\t\t\t\t40 text Ich \n\t\t\t\t\t41 text helfe \n\t\t\t\t\t42 text dir \n\t\t\t\t\t43 text zu \n\t\t\t\t\t44 text verstehen, \n\t\t\t\t\t45 text bevor \n\t\t\t\t\t46 text du \n\t\t\t\t\t47 text entscheidest.\n\t\t\t\t48 text Bobby\n\t\t\t\t49 container cards\n\t\t\t\t\t50 container cT\n\t\t\t\t\t\t51 heading Value: 3, ID: tTitle\n\t\t\t\t\t\t52 button save\n\t\t\t\t\t53 container cI\n\t\t\t\t\t\t54 text ISLA\n\t\t\t\t\t\t55 heading Value: 3, ID: iTitle\n\t\t\t\t56 container chipsBox\n\t\t\t\t\t57 container chips\n\t\t\t\t\t\t58 button\n\t\t\t\t\t\t59 button\n\t\t\t\t\t\t60 button\n\t\t\t\t61 button Description: Ich stimme dem Risikohinweis und der KI-Verarbeitung zu, ID: pill\n\t\t\t\t62 container\n\t\t\t\t\t63 text Bobby\n\t\t\t\t\t64 text Was heißt investieren?\n\t\t\t\t\t65 button Description: Dein Profil, ID: riskProfile\n\t\t\t\t66 text PAUSIERT\n\t\t\t\t67 button Description: Jetzt nicht, ID: consent-preview-not-now\n\t68 container controls\n\t\t69 button Step 1s, ID: step1\n\t\t70 button Step 10s, ID: step10\n\t\t71 button Step 180s, ID: step180\n\t\t72 button Ask fixture, ID: example\n\t\t73 button Restore fixture, ID: restore\n\t\t74 button Reset scroll, ID: recenter\n\t\t75 text RISK\n\nThe focused UI element is 69 button Step 1s, ID: step1"
+  }
+]

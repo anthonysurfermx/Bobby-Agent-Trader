@@ -1,0 +1,818 @@
+[
+  {
+    "screen": "home",
+    "language": "en",
+    "device": "se",
+    "metrics": {
+      "chips": [
+        {
+          "clientWidth": 159,
+          "label": "What is investing?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 49.19559860229492,
+            "right": 175.6836051940918,
+            "top": 505.7791748046875,
+            "width": 126.48800659179688,
+            "x": 49.19559860229492,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 159,
+          "text": "What is investing?"
+        },
+        {
+          "clientWidth": 61,
+          "label": "How is BTC looking?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 181.9626312255859,
+            "right": 231.2995758056641,
+            "top": 505.7791748046875,
+            "width": 49.336944580078125,
+            "x": 181.9626312255859,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 61,
+          "text": "BTC"
+        },
+        {
+          "clientWidth": 74,
+          "label": "How is NVDA looking?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 237.28224182128903,
+            "right": 296.21368408203125,
+            "top": 505.7791748046875,
+            "width": 58.93144226074219,
+            "x": 237.28224182128903,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 74,
+          "text": "NVDA"
+        }
+      ],
+      "rect": {
+        "bottom": 666.9962768554688,
+        "height": 666.9962768554688,
+        "left": 33.38999938964844,
+        "right": 341.5991668701172,
+        "top": 0,
+        "width": 308.20916748046875,
+        "x": 33.38999938964844,
+        "y": 0
+      }
+    },
+    "ax": "Browser tab: 59936424, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=en&mic=denied&auditScale=1\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=en&mic=denied&auditScale=1\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-app.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=en&mic=denied&auditScale=1\n\t\t\t4 container stage\n\t\t\t\t5 image Description: Bobby is idle, ID: sphereA\n\t\t\t\t6 container ui\n\t\t\t\t\t7 container greet\n\t\t\t\t\t\t8 container\n\t\t\t\t\t\t\t9 text Good morning.\n\t\t\t\t\t\t10 text What do you want to understand today?\n\t\t\t\t\t11 button Description: Sphere faces: Desk, Squad, ID: meriHit\n\t\t\t\t\t12 container chipRow\n\t\t\t\t\t\t13 button What is investing?\n\t\t\t\t\t\t14 button How is BTC looking?\n\t\t\t\t\t\t15 button How is NVDA looking?\n\t\t\t\t\t16 text Bobby\n\t\t\t\t\t17 button Description: Mira. Account and progress, ID: avatar\n\t\t\t\t\t18 button Description: Talk, ID: pill\n\t\t\t\t\t19 button Description: Type, ID: conversation-keyboard\n\t20 container controls\n\t\t21 button Step 1s, ID: step1\n\t\t22 button Step 10s, ID: step10\n\t\t23 button Step 180s, ID: step180\n\t\t24 button Ask fixture, ID: example\n\t\t25 button Reset scroll, ID: recenter\n\nThe focused UI element is 1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=en&mic=denied&auditScale=1"
+  },
+  {
+    "screen": "home",
+    "language": "es",
+    "device": "se",
+    "metrics": {
+      "chips": [
+        {
+          "clientWidth": 149,
+          "label": "¿Qué es invertir?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 49.19559860229492,
+            "right": 168.0339469909668,
+            "top": 505.7791748046875,
+            "width": 118.83834838867188,
+            "x": 49.19559860229492,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 149,
+          "text": "¿Qué es invertir?"
+        },
+        {
+          "clientWidth": 61,
+          "label": "¿Cómo se ve BTC?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 174.05982971191406,
+            "right": 223.3967742919922,
+            "top": 505.7791748046875,
+            "width": 49.336944580078125,
+            "x": 174.05982971191406,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 61,
+          "text": "BTC"
+        },
+        {
+          "clientWidth": 74,
+          "label": "¿Cómo se ve NVDA?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 229.3794403076172,
+            "right": 288.31085205078125,
+            "top": 505.7791748046875,
+            "width": 58.93141174316406,
+            "x": 229.3794403076172,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 74,
+          "text": "NVDA"
+        }
+      ],
+      "rect": {
+        "bottom": 666.9962768554688,
+        "height": 666.9962768554688,
+        "left": 33.38999938964844,
+        "right": 341.5991668701172,
+        "top": 0,
+        "width": 308.20916748046875,
+        "x": 33.38999938964844,
+        "y": 0
+      }
+    },
+    "ax": "Browser tab: 59936424, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=es&mic=denied&auditScale=1\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=es&mic=denied&auditScale=1\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-app.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=es&mic=denied&auditScale=1\n\t\t\t4 container stage\n\t\t\t\t5 image Description: Bobby está en reposo, ID: sphereA\n\t\t\t\t6 container ui\n\t\t\t\t\t7 container greet\n\t\t\t\t\t\t8 container\n\t\t\t\t\t\t\t9 text Buenos días.\n\t\t\t\t\t\t10 text ¿Qué quieres entender hoy?\n\t\t\t\t\t11 button Description: Caras de la esfera: Escritorio, Escuadrón, ID: meriHit\n\t\t\t\t\t12 container chipRow\n\t\t\t\t\t\t13 button ¿Qué es invertir?\n\t\t\t\t\t\t14 button ¿Cómo se ve BTC?\n\t\t\t\t\t\t15 button ¿Cómo se ve NVDA?\n\t\t\t\t\t16 text Bobby\n\t\t\t\t\t17 button Description: Mira. Cuenta y progreso, ID: avatar\n\t\t\t\t\t18 button Description: Hablar, ID: pill\n\t\t\t\t\t19 button Description: Escribir, ID: conversation-keyboard\n\t20 container controls\n\t\t21 button Step 1s, ID: step1\n\t\t22 button Step 10s, ID: step10\n\t\t23 button Step 180s, ID: step180\n\t\t24 button Ask fixture, ID: example\n\t\t25 button Reset scroll, ID: recenter\n\nThe focused UI element is 1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=es&mic=denied&auditScale=1"
+  },
+  {
+    "screen": "home",
+    "language": "fr",
+    "device": "se",
+    "metrics": {
+      "chips": [
+        {
+          "clientWidth": 171,
+          "label": "C’est quoi, investir ?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 49.19559860229492,
+            "right": 185.09287643432617,
+            "top": 505.7791748046875,
+            "width": 135.89727783203125,
+            "x": 49.19559860229492,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 171,
+          "text": "C’est quoi, investir ?"
+        },
+        {
+          "clientWidth": 61,
+          "label": "Que penser de BTC ?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 191.4459991455078,
+            "right": 240.78292846679688,
+            "top": 505.7791748046875,
+            "width": 49.33692932128906,
+            "x": 191.4459991455078,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 61,
+          "text": "BTC"
+        },
+        {
+          "clientWidth": 74,
+          "label": "Que penser de NVDA ?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 246.76559448242188,
+            "right": 305.697021484375,
+            "top": 505.7791748046875,
+            "width": 58.931427001953125,
+            "x": 246.76559448242188,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 74,
+          "text": "NVDA"
+        }
+      ],
+      "rect": {
+        "bottom": 666.9962768554688,
+        "height": 666.9962768554688,
+        "left": 33.38999938964844,
+        "right": 341.5991668701172,
+        "top": 0,
+        "width": 308.20916748046875,
+        "x": 33.38999938964844,
+        "y": 0
+      }
+    },
+    "ax": "Browser tab: 59936424, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=fr&mic=denied&auditScale=1\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=fr&mic=denied&auditScale=1\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-app.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=fr&mic=denied&auditScale=1\n\t\t\t4 container stage\n\t\t\t\t5 image Description: Bobby est au repos, ID: sphereA\n\t\t\t\t6 container ui\n\t\t\t\t\t7 container greet\n\t\t\t\t\t\t8 text Bonjour.\n\t\t\t\t\t\t9 text Que veux-tu comprendre aujourd’hui ?\n\t\t\t\t\t10 button Description: Faces de la sphère : Bureau, Équipe, ID: meriHit\n\t\t\t\t\t11 container chipRow\n\t\t\t\t\t\t12 button C’est quoi, investir ?\n\t\t\t\t\t\t13 button Que penser de BTC ?\n\t\t\t\t\t\t14 button Que penser de NVDA ?\n\t\t\t\t\t15 text Bobby\n\t\t\t\t\t16 button Description: Mira. Compte et progression, ID: avatar\n\t\t\t\t\t17 button Description: Parler, ID: pill\n\t\t\t\t\t18 button Description: Écrire, ID: conversation-keyboard\n\t19 container controls\n\t\t20 button Step 1s, ID: step1\n\t\t21 button Step 10s, ID: step10\n\t\t22 button Step 180s, ID: step180\n\t\t23 button Ask fixture, ID: example\n\t\t24 button Reset scroll, ID: recenter\n\nThe focused UI element is 1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=fr&mic=denied&auditScale=1"
+  },
+  {
+    "screen": "home",
+    "language": "pt",
+    "device": "se",
+    "metrics": {
+      "chips": [
+        {
+          "clientWidth": 149,
+          "label": "O que é investir?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 49.19559860229492,
+            "right": 167.60793685913086,
+            "top": 505.7791748046875,
+            "width": 118.41233825683594,
+            "x": 49.19559860229492,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 149,
+          "text": "O que é investir?"
+        },
+        {
+          "clientWidth": 61,
+          "label": "Como está BTC?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 174.05982971191406,
+            "right": 223.3967742919922,
+            "top": 505.7791748046875,
+            "width": 49.336944580078125,
+            "x": 174.05982971191406,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 61,
+          "text": "BTC"
+        },
+        {
+          "clientWidth": 74,
+          "label": "Como está NVDA?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 229.3794403076172,
+            "right": 288.31085205078125,
+            "top": 505.7791748046875,
+            "width": 58.93141174316406,
+            "x": 229.3794403076172,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 74,
+          "text": "NVDA"
+        }
+      ],
+      "rect": {
+        "bottom": 666.9962768554688,
+        "height": 666.9962768554688,
+        "left": 33.38999938964844,
+        "right": 341.5991668701172,
+        "top": 0,
+        "width": 308.20916748046875,
+        "x": 33.38999938964844,
+        "y": 0
+      }
+    },
+    "ax": "Browser tab: 59936424, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=pt&mic=denied&auditScale=1\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=pt&mic=denied&auditScale=1\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-app.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=pt&mic=denied&auditScale=1\n\t\t\t4 container stage\n\t\t\t\t5 image Description: O Bobby está em repouso, ID: sphereA\n\t\t\t\t6 container ui\n\t\t\t\t\t7 container greet\n\t\t\t\t\t\t8 container\n\t\t\t\t\t\t\t9 text Bom dia.\n\t\t\t\t\t\t10 text O que queres entender hoje?\n\t\t\t\t\t11 button Description: Faces da esfera: Mesa, Equipa, ID: meriHit\n\t\t\t\t\t12 container chipRow\n\t\t\t\t\t\t13 button O que é investir?\n\t\t\t\t\t\t14 button Como está BTC?\n\t\t\t\t\t\t15 button Como está NVDA?\n\t\t\t\t\t16 text Bobby\n\t\t\t\t\t17 button Description: Mira. Conta e progresso, ID: avatar\n\t\t\t\t\t18 button Description: Falar, ID: pill\n\t\t\t\t\t19 button Description: Escrever, ID: conversation-keyboard\n\t20 container controls\n\t\t21 button Step 1s, ID: step1\n\t\t22 button Step 10s, ID: step10\n\t\t23 button Step 180s, ID: step180\n\t\t24 button Ask fixture, ID: example\n\t\t25 button Reset scroll, ID: recenter\n\nThe focused UI element is 1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=pt&mic=denied&auditScale=1"
+  },
+  {
+    "screen": "home",
+    "language": "it",
+    "device": "se",
+    "metrics": {
+      "chips": [
+        {
+          "clientWidth": 172,
+          "label": "Che cos’è investire?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 49.19559860229492,
+            "right": 185.62385177612305,
+            "top": 505.7791748046875,
+            "width": 136.42825317382812,
+            "x": 49.19559860229492,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 172,
+          "text": "Che cos’è investire?"
+        },
+        {
+          "clientWidth": 61,
+          "label": "Come sta andando BTC?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 192.2362823486328,
+            "right": 241.57321166992188,
+            "top": 505.7791748046875,
+            "width": 49.33692932128906,
+            "x": 192.2362823486328,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 61,
+          "text": "BTC"
+        },
+        {
+          "clientWidth": 74,
+          "label": "Come sta andando NVDA?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 247.55587768554688,
+            "right": 306.4873046875,
+            "top": 505.7791748046875,
+            "width": 58.931427001953125,
+            "x": 247.55587768554688,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 74,
+          "text": "NVDA"
+        }
+      ],
+      "rect": {
+        "bottom": 666.9962768554688,
+        "height": 666.9962768554688,
+        "left": 33.38999938964844,
+        "right": 341.5991668701172,
+        "top": 0,
+        "width": 308.20916748046875,
+        "x": 33.38999938964844,
+        "y": 0
+      }
+    },
+    "ax": "Browser tab: 59936424, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=it&mic=denied&auditScale=1\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=it&mic=denied&auditScale=1\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-app.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=it&mic=denied&auditScale=1\n\t\t\t4 container stage\n\t\t\t\t5 image Description: Bobby è a riposo, ID: sphereA\n\t\t\t\t6 container ui\n\t\t\t\t\t7 container greet\n\t\t\t\t\t\t8 text Buongiorno.\n\t\t\t\t\t\t9 text Cosa vuoi capire oggi?\n\t\t\t\t\t10 button Description: Facce della sfera: Scrivania, Squadra, ID: meriHit\n\t\t\t\t\t11 container chipRow\n\t\t\t\t\t\t12 button Che cos’è investire?\n\t\t\t\t\t\t13 button Come sta andando BTC?\n\t\t\t\t\t\t14 button Come sta andando NVDA?\n\t\t\t\t\t15 text Bobby\n\t\t\t\t\t16 button Description: Mira. Account e progressi, ID: avatar\n\t\t\t\t\t17 button Description: Parla, ID: pill\n\t\t\t\t\t18 button Description: Scrivi, ID: conversation-keyboard\n\t19 container controls\n\t\t20 button Step 1s, ID: step1\n\t\t21 button Step 10s, ID: step10\n\t\t22 button Step 180s, ID: step180\n\t\t23 button Ask fixture, ID: example\n\t\t24 button Reset scroll, ID: recenter\n\nThe focused UI element is 1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=it&mic=denied&auditScale=1"
+  },
+  {
+    "screen": "home",
+    "language": "de",
+    "device": "se",
+    "metrics": {
+      "chips": [
+        {
+          "clientWidth": 190,
+          "label": "Was heißt investieren?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 49.19559860229492,
+            "right": 199.76862716674805,
+            "top": 505.7791748046875,
+            "width": 150.57302856445312,
+            "x": 49.19559860229492,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 190,
+          "text": "Was heißt investieren?"
+        },
+        {
+          "clientWidth": 61,
+          "label": "Wie steht es um BTC?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 206.46131896972656,
+            "right": 255.7982482910156,
+            "top": 505.7791748046875,
+            "width": 49.33692932128906,
+            "x": 206.46131896972656,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 61,
+          "text": "BTC"
+        },
+        {
+          "clientWidth": 74,
+          "label": "Wie steht es um NVDA?",
+          "rect": {
+            "bottom": 549.7755737304688,
+            "height": 43.99639892578125,
+            "left": 261.7809143066406,
+            "right": 320.71234130859375,
+            "top": 505.7791748046875,
+            "width": 58.931427001953125,
+            "x": 261.7809143066406,
+            "y": 505.7791748046875
+          },
+          "scrollWidth": 74,
+          "text": "NVDA"
+        }
+      ],
+      "rect": {
+        "bottom": 666.9962768554688,
+        "height": 666.9962768554688,
+        "left": 33.38999938964844,
+        "right": 341.5991668701172,
+        "top": 0,
+        "width": 308.20916748046875,
+        "x": 33.38999938964844,
+        "y": 0
+      }
+    },
+    "ax": "Browser tab: 59936424, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=de&mic=denied&auditScale=1\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=de&mic=denied&auditScale=1\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-app.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=de&mic=denied&auditScale=1\n\t\t\t4 container stage\n\t\t\t\t5 image Description: Bobby ruht, ID: sphereA\n\t\t\t\t6 container ui\n\t\t\t\t\t7 container greet\n\t\t\t\t\t\t8 container\n\t\t\t\t\t\t\t9 text Guten Morgen.\n\t\t\t\t\t\t10 text Was möchtest du heute verstehen?\n\t\t\t\t\t11 button Description: Flächen der Kugel: Schreibtisch, Team, ID: meriHit\n\t\t\t\t\t12 container chipRow\n\t\t\t\t\t\t13 button Was heißt investieren?\n\t\t\t\t\t\t14 button Wie steht es um BTC?\n\t\t\t\t\t\t15 button Wie steht es um NVDA?\n\t\t\t\t\t16 text Bobby\n\t\t\t\t\t17 button Description: Mira. Konto und Fortschritt, ID: avatar\n\t\t\t\t\t18 button Description: Sprechen, ID: pill\n\t\t\t\t\t19 button Description: Schreiben, ID: conversation-keyboard\n\t20 container controls\n\t\t21 button Step 1s, ID: step1\n\t\t22 button Step 10s, ID: step10\n\t\t23 button Step 180s, ID: step180\n\t\t24 button Ask fixture, ID: example\n\t\t25 button Reset scroll, ID: recenter\n\nThe focused UI element is 1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=375&height=667&harness=1&freeze=1&t=8&lang=de&mic=denied&auditScale=1"
+  },
+  {
+    "screen": "home",
+    "language": "en",
+    "device": "max",
+    "metrics": {
+      "chips": [
+        {
+          "clientWidth": 159,
+          "label": "What is investing?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 22.05120086669922,
+            "right": 198.52111053466797,
+            "top": 706.3583984375,
+            "width": 176.46990966796875,
+            "x": 22.05120086669922,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 159,
+          "text": "What is investing?"
+        },
+        {
+          "clientWidth": 61,
+          "label": "How is BTC looking?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 207.28128051757812,
+            "right": 276.11376953125,
+            "top": 706.3583984375,
+            "width": 68.83248901367188,
+            "x": 207.28128051757812,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 61,
+          "text": "BTC"
+        },
+        {
+          "clientWidth": 74,
+          "label": "How is NVDA looking?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 284.4604797363281,
+            "right": 366.6787414550781,
+            "top": 706.3583984375,
+            "width": 82.21826171875,
+            "x": 284.4604797363281,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 74,
+          "text": "NVDA"
+        }
+      ],
+      "rect": {
+        "bottom": 931.2806689739228,
+        "height": 930.5606689453124,
+        "left": 0,
+        "right": 429.9984130859375,
+        "top": 0.7200000286102295,
+        "width": 429.9984130859375,
+        "x": 0,
+        "y": 0.7200000286102295
+      }
+    },
+    "ax": "Browser tab: 59936424, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=en&mic=denied&auditScale=1\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=en&mic=denied&auditScale=1\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-app.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=en&mic=denied&auditScale=1\n\t\t\t4 container stage\n\t\t\t\t5 image Description: Bobby is idle, ID: sphereA\n\t\t\t\t6 container ui\n\t\t\t\t\t7 container greet\n\t\t\t\t\t\t8 container\n\t\t\t\t\t\t\t9 text Good morning.\n\t\t\t\t\t\t10 text What do you want to understand today?\n\t\t\t\t\t11 button Description: Sphere faces: Desk, Squad, ID: meriHit\n\t\t\t\t\t12 container chipRow\n\t\t\t\t\t\t13 button What is investing?\n\t\t\t\t\t\t14 button How is BTC looking?\n\t\t\t\t\t\t15 button How is NVDA looking?\n\t\t\t\t\t16 text Bobby\n\t\t\t\t\t17 button Description: Mira. Account and progress, ID: avatar\n\t\t\t\t\t18 button Description: Talk, ID: pill\n\t\t\t\t\t19 button Description: Type, ID: conversation-keyboard\n\t20 container controls\n\t\t21 button Step 1s, ID: step1\n\t\t22 button Step 10s, ID: step10\n\t\t23 button Step 180s, ID: step180\n\t\t24 button Ask fixture, ID: example\n\t\t25 button Reset scroll, ID: recenter\n\nThe focused UI element is 1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=en&mic=denied&auditScale=1"
+  },
+  {
+    "screen": "home",
+    "language": "es",
+    "device": "max",
+    "metrics": {
+      "chips": [
+        {
+          "clientWidth": 149,
+          "label": "¿Qué es invertir?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 22.05120086669922,
+            "right": 187.8486557006836,
+            "top": 706.3583984375,
+            "width": 165.79745483398438,
+            "x": 22.05120086669922,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 149,
+          "text": "¿Qué es invertir?"
+        },
+        {
+          "clientWidth": 61,
+          "label": "¿Cómo se ve BTC?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 196.2556915283203,
+            "right": 265.0881652832031,
+            "top": 706.3583984375,
+            "width": 68.83247375488281,
+            "x": 196.2556915283203,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 61,
+          "text": "BTC"
+        },
+        {
+          "clientWidth": 74,
+          "label": "¿Cómo se ve NVDA?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 273.43487548828125,
+            "right": 355.65313720703125,
+            "top": 706.3583984375,
+            "width": 82.21826171875,
+            "x": 273.43487548828125,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 74,
+          "text": "NVDA"
+        }
+      ],
+      "rect": {
+        "bottom": 931.2806689739228,
+        "height": 930.5606689453124,
+        "left": 0,
+        "right": 429.9984130859375,
+        "top": 0.7200000286102295,
+        "width": 429.9984130859375,
+        "x": 0,
+        "y": 0.7200000286102295
+      }
+    },
+    "ax": "Browser tab: 59936424, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=es&mic=denied&auditScale=1\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=es&mic=denied&auditScale=1\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-app.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=es&mic=denied&auditScale=1\n\t\t\t4 container stage\n\t\t\t\t5 image Description: Bobby está en reposo, ID: sphereA\n\t\t\t\t6 container ui\n\t\t\t\t\t7 container greet\n\t\t\t\t\t\t8 container\n\t\t\t\t\t\t\t9 text Buenos días.\n\t\t\t\t\t\t10 text ¿Qué quieres entender hoy?\n\t\t\t\t\t11 button Description: Caras de la esfera: Escritorio, Escuadrón, ID: meriHit\n\t\t\t\t\t12 container chipRow\n\t\t\t\t\t\t13 button ¿Qué es invertir?\n\t\t\t\t\t\t14 button ¿Cómo se ve BTC?\n\t\t\t\t\t\t15 button ¿Cómo se ve NVDA?\n\t\t\t\t\t16 text Bobby\n\t\t\t\t\t17 button Description: Mira. Cuenta y progreso, ID: avatar\n\t\t\t\t\t18 button Description: Hablar, ID: pill\n\t\t\t\t\t19 button Description: Escribir, ID: conversation-keyboard\n\t20 container controls\n\t\t21 button Step 1s, ID: step1\n\t\t22 button Step 10s, ID: step10\n\t\t23 button Step 180s, ID: step180\n\t\t24 button Ask fixture, ID: example\n\t\t25 button Reset scroll, ID: recenter\n\nThe focused UI element is 1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=es&mic=denied&auditScale=1"
+  },
+  {
+    "screen": "home",
+    "language": "fr",
+    "device": "max",
+    "metrics": {
+      "chips": [
+        {
+          "clientWidth": 171,
+          "label": "C’est quoi, investir ?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 22.05120086669922,
+            "right": 211.6484603881836,
+            "top": 706.3583984375,
+            "width": 189.5972595214844,
+            "x": 22.05120086669922,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 171,
+          "text": "C’est quoi, investir ?"
+        },
+        {
+          "clientWidth": 61,
+          "label": "Que penser de BTC ?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 220.5120086669922,
+            "right": 289.344482421875,
+            "top": 706.3583984375,
+            "width": 68.83247375488281,
+            "x": 220.5120086669922,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 61,
+          "text": "BTC"
+        },
+        {
+          "clientWidth": 74,
+          "label": "Que penser de NVDA ?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 297.69122314453125,
+            "right": 379.9094543457031,
+            "top": 706.3583984375,
+            "width": 82.21823120117188,
+            "x": 297.69122314453125,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 74,
+          "text": "NVDA"
+        }
+      ],
+      "rect": {
+        "bottom": 931.2806689739228,
+        "height": 930.5606689453124,
+        "left": 0,
+        "right": 429.9984130859375,
+        "top": 0.7200000286102295,
+        "width": 429.9984130859375,
+        "x": 0,
+        "y": 0.7200000286102295
+      }
+    },
+    "ax": "Browser tab: 59936424, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=fr&mic=denied&auditScale=1\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=fr&mic=denied&auditScale=1\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-app.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=fr&mic=denied&auditScale=1\n\t\t\t4 container stage\n\t\t\t\t5 image Description: Bobby est au repos, ID: sphereA\n\t\t\t\t6 container ui\n\t\t\t\t\t7 container greet\n\t\t\t\t\t\t8 text Bonjour.\n\t\t\t\t\t\t9 text Que veux-tu comprendre aujourd’hui ?\n\t\t\t\t\t10 button Description: Faces de la sphère : Bureau, Équipe, ID: meriHit\n\t\t\t\t\t11 container chipRow\n\t\t\t\t\t\t12 button C’est quoi, investir ?\n\t\t\t\t\t\t13 button Que penser de BTC ?\n\t\t\t\t\t\t14 button Que penser de NVDA ?\n\t\t\t\t\t15 text Bobby\n\t\t\t\t\t16 button Description: Mira. Compte et progression, ID: avatar\n\t\t\t\t\t17 button Description: Parler, ID: pill\n\t\t\t\t\t18 button Description: Écrire, ID: conversation-keyboard\n\t19 container controls\n\t\t20 button Step 1s, ID: step1\n\t\t21 button Step 10s, ID: step10\n\t\t22 button Step 180s, ID: step180\n\t\t23 button Ask fixture, ID: example\n\t\t24 button Reset scroll, ID: recenter\n\nThe focused UI element is 1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=fr&mic=denied&auditScale=1"
+  },
+  {
+    "screen": "home",
+    "language": "pt",
+    "device": "max",
+    "metrics": {
+      "chips": [
+        {
+          "clientWidth": 149,
+          "label": "O que é investir?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 22.05120086669922,
+            "right": 187.2543258666992,
+            "top": 706.3583984375,
+            "width": 165.203125,
+            "x": 22.05120086669922,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 149,
+          "text": "O que é investir?"
+        },
+        {
+          "clientWidth": 61,
+          "label": "Como está BTC?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 196.2556915283203,
+            "right": 265.0881652832031,
+            "top": 706.3583984375,
+            "width": 68.83247375488281,
+            "x": 196.2556915283203,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 61,
+          "text": "BTC"
+        },
+        {
+          "clientWidth": 74,
+          "label": "Como está NVDA?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 273.43487548828125,
+            "right": 355.65313720703125,
+            "top": 706.3583984375,
+            "width": 82.21826171875,
+            "x": 273.43487548828125,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 74,
+          "text": "NVDA"
+        }
+      ],
+      "rect": {
+        "bottom": 931.2806689739228,
+        "height": 930.5606689453124,
+        "left": 0,
+        "right": 429.9984130859375,
+        "top": 0.7200000286102295,
+        "width": 429.9984130859375,
+        "x": 0,
+        "y": 0.7200000286102295
+      }
+    },
+    "ax": "Browser tab: 59936424, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=pt&mic=denied&auditScale=1\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=pt&mic=denied&auditScale=1\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-app.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=pt&mic=denied&auditScale=1\n\t\t\t4 container stage\n\t\t\t\t5 image Description: O Bobby está em repouso, ID: sphereA\n\t\t\t\t6 container ui\n\t\t\t\t\t7 container greet\n\t\t\t\t\t\t8 container\n\t\t\t\t\t\t\t9 text Bom dia.\n\t\t\t\t\t\t10 text O que queres entender hoje?\n\t\t\t\t\t11 button Description: Faces da esfera: Mesa, Equipa, ID: meriHit\n\t\t\t\t\t12 container chipRow\n\t\t\t\t\t\t13 button O que é investir?\n\t\t\t\t\t\t14 button Como está BTC?\n\t\t\t\t\t\t15 button Como está NVDA?\n\t\t\t\t\t16 text Bobby\n\t\t\t\t\t17 button Description: Mira. Conta e progresso, ID: avatar\n\t\t\t\t\t18 button Description: Falar, ID: pill\n\t\t\t\t\t19 button Description: Escrever, ID: conversation-keyboard\n\t20 container controls\n\t\t21 button Step 1s, ID: step1\n\t\t22 button Step 10s, ID: step10\n\t\t23 button Step 180s, ID: step180\n\t\t24 button Ask fixture, ID: example\n\t\t25 button Reset scroll, ID: recenter\n\nThe focused UI element is 1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=pt&mic=denied&auditScale=1"
+  },
+  {
+    "screen": "home",
+    "language": "it",
+    "device": "max",
+    "metrics": {
+      "chips": [
+        {
+          "clientWidth": 172,
+          "label": "Che cos’è investire?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 22.05120086669922,
+            "right": 212.38924407958984,
+            "top": 706.3583984375,
+            "width": 190.33804321289065,
+            "x": 22.05120086669922,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 172,
+          "text": "Che cos’è investire?"
+        },
+        {
+          "clientWidth": 61,
+          "label": "Come sta andando BTC?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 221.61456298828125,
+            "right": 290.4470520019531,
+            "top": 706.3583984375,
+            "width": 68.83248901367188,
+            "x": 221.61456298828125,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 61,
+          "text": "BTC"
+        },
+        {
+          "clientWidth": 74,
+          "label": "Come sta andando NVDA?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 298.79376220703125,
+            "right": 381.0120239257813,
+            "top": 706.3583984375,
+            "width": 82.21826171875,
+            "x": 298.79376220703125,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 74,
+          "text": "NVDA"
+        }
+      ],
+      "rect": {
+        "bottom": 931.2806689739228,
+        "height": 930.5606689453124,
+        "left": 0,
+        "right": 429.9984130859375,
+        "top": 0.7200000286102295,
+        "width": 429.9984130859375,
+        "x": 0,
+        "y": 0.7200000286102295
+      }
+    },
+    "ax": "Browser tab: 59936424, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=it&mic=denied&auditScale=1\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=it&mic=denied&auditScale=1\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-app.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=it&mic=denied&auditScale=1\n\t\t\t4 container stage\n\t\t\t\t5 image Description: Bobby è a riposo, ID: sphereA\n\t\t\t\t6 container ui\n\t\t\t\t\t7 container greet\n\t\t\t\t\t\t8 text Buongiorno.\n\t\t\t\t\t\t9 text Cosa vuoi capire oggi?\n\t\t\t\t\t10 button Description: Facce della sfera: Scrivania, Squadra, ID: meriHit\n\t\t\t\t\t11 container chipRow\n\t\t\t\t\t\t12 button Che cos’è investire?\n\t\t\t\t\t\t13 button Come sta andando BTC?\n\t\t\t\t\t\t14 button Come sta andando NVDA?\n\t\t\t\t\t15 text Bobby\n\t\t\t\t\t16 button Description: Mira. Account e progressi, ID: avatar\n\t\t\t\t\t17 button Description: Parla, ID: pill\n\t\t\t\t\t18 button Description: Scrivi, ID: conversation-keyboard\n\t19 container controls\n\t\t20 button Step 1s, ID: step1\n\t\t21 button Step 10s, ID: step10\n\t\t22 button Step 180s, ID: step180\n\t\t23 button Ask fixture, ID: example\n\t\t24 button Reset scroll, ID: recenter\n\nThe focused UI element is 1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=it&mic=denied&auditScale=1"
+  },
+  {
+    "screen": "home",
+    "language": "de",
+    "device": "max",
+    "metrics": {
+      "chips": [
+        {
+          "clientWidth": 190,
+          "label": "Was heißt investieren?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 22.05120086669922,
+            "right": 232.12334442138672,
+            "top": 706.3583984375,
+            "width": 210.0721435546875,
+            "x": 22.05120086669922,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 190,
+          "text": "Was heißt investieren?"
+        },
+        {
+          "clientWidth": 61,
+          "label": "Wie steht es um BTC?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 241.4606475830078,
+            "right": 310.2931213378906,
+            "top": 706.3583984375,
+            "width": 68.83247375488281,
+            "x": 241.4606475830078,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 61,
+          "text": "BTC"
+        },
+        {
+          "clientWidth": 74,
+          "label": "Wie steht es um NVDA?",
+          "rect": {
+            "bottom": 750.4608154296875,
+            "height": 44.1024169921875,
+            "left": 318.6398620605469,
+            "right": 400.8580932617187,
+            "top": 706.3583984375,
+            "width": 82.21823120117188,
+            "x": 318.6398620605469,
+            "y": 706.3583984375
+          },
+          "scrollWidth": 74,
+          "text": "NVDA"
+        }
+      ],
+      "rect": {
+        "bottom": 931.2806689739228,
+        "height": 930.5606689453124,
+        "left": 0,
+        "right": 429.9984130859375,
+        "top": 0.7200000286102295,
+        "width": 429.9984130859375,
+        "x": 0,
+        "y": 0.7200000286102295
+      }
+    },
+    "ax": "Browser tab: 59936424, Title: \"Offline Bobby 71 audit harness\", URL: \"http://127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=de&mic=denied&auditScale=1\".\n1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=de&mic=denied&auditScale=1\n\t2 container Description: Bobby offline UI, ID: phone\n\t\t3 AXWebArea Bobby, URL: 127.0.0.1:4718/audit-app.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=de&mic=denied&auditScale=1\n\t\t\t4 container stage\n\t\t\t\t5 image Description: Bobby ruht, ID: sphereA\n\t\t\t\t6 container ui\n\t\t\t\t\t7 container pct\n\t\t\t\t\t\t8 container d100\n\t\t\t\t\t\t\t9 text 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t\t10 container d10\n\t\t\t\t\t\t\t11 text 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t\t12 container d1\n\t\t\t\t\t\t\t13 text 0 1 2 3 4 5 6 7 8 9\n\t\t\t\t\t\t14 text %\n\t\t\t\t\t15 container greet\n\t\t\t\t\t\t16 text Was möchtest du heute verstehen?\n\t\t\t\t\t17 button\n\t\t\t\t\t18 button\n\t\t\t\t\t19 button Description: Flächen der Kugel: Schreibtisch, Team, ID: meriHit\n\t\t\t\t\t20 container card1\n\t\t\t\t\t\t21 heading 3\n\t\t\t\t\t\t22 button save\n\t\t\t\t\t23 container card2\n\t\t\t\t\t\t24 heading 3\n\t\t\t\t\t\t25 button\n\t\t\t\t\t26 container perm\n\t\t\t\t\t\t27 heading 4\n\t\t\t\t\t\t28 button\n\t\t\t\t\t29 text Bobby\n\t\t\t\t\t30 button Description: Analyse schließen, ID: close\n\t\t\t\t\t31 button Description: Mira. Konto und Fortschritt, ID: avatar\n\t\t\t\t\t32 button Description: Sprechen, ID: pill\n\t\t\t\t\t33 button lvl\n\t\t\t\t\t34 button\n\t35 container controls\n\t\t36 button Step 1s, ID: step1\n\t\t37 button Step 10s, ID: step10\n\t\t38 button Step 180s, ID: step180\n\t\t39 button Ask fixture, ID: example\n\t\t40 button Reset scroll, ID: recenter\n\nThe focused UI element is 1 AXWebArea Offline Bobby 71 audit harness, URL: 127.0.0.1:4718/audit.html?page=app&width=430&height=932&harness=1&freeze=1&t=8&lang=de&mic=denied&auditScale=1"
+  }
+]
