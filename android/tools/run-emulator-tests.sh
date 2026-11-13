@@ -10,7 +10,7 @@
 #   device   the real activity with its page: the profile, the permission question, a notice, a rotation
 #   others   every other instrumented test
 #   page     the bundled page kept running in a WebView while a read plays: the line on the glass, the row after a read
-# The tests decide the result: a failed part fails this script after everything is collected.
+# The tests decide the result: a part that fails twice fails this script after everything is collected.
 set -u
 cd "$(dirname "$0")/.."
 
@@ -37,8 +37,20 @@ part() {
   name=$1
   shift
   echo "==== Instrumented tests: $name ===="
-  ./gradlew :app:connectedDebugAndroidTest --no-daemon "$@" || status=1
   mkdir -p "$out/$name"
+  if ! ./gradlew :app:connectedDebugAndroidTest --no-daemon "$@"; then
+    # A hosted runner draws in software, and a slow first frame becomes a timeout in a case that passes
+    # the next time: on 2026-10-08 four runs failed on four different cases, each green on a re-run.
+    # So a failed part is run once more, only while the emulator is still there, and it fails the
+    # script only when it fails twice. The first attempt's report is kept beside the second's.
+    cp -R app/build/reports/androidTests/connected "$out/$name/first-attempt-report" 2>/dev/null || true
+    if adb get-state > /dev/null 2>&1; then
+      echo "==== Instrumented tests: $name, second attempt ===="
+      ./gradlew :app:connectedDebugAndroidTest --no-daemon "$@" || status=1
+    else
+      status=1
+    fi
+  fi
   cp -R app/build/reports/androidTests/connected "$out/$name/report" 2>/dev/null || true
   cp -R app/build/outputs/androidTest-results/connected "$out/$name/results" 2>/dev/null || true
   adb pull "$device_shots/." "$out/shots" > /dev/null 2>&1 || true
