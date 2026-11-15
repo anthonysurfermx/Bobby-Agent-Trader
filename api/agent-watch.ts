@@ -9,6 +9,9 @@
 //        The close it is measured from is read HERE, by the strict reader, before anything is stored: an asset
 //        that cannot be read now is refused, never watched blind.
 //   POST { op: "cancel" | "seen", watchId }
+//   POST { op: "thesis", watchId, thesis: { hypothesis, worry?, changeMind? } }
+//        only with BOBBY_AGENT_WATCH_NOTES on: what a met watch means for the thesis the person saved on their
+//        phone. The thesis is used for this one answer: it is not stored and it is not logged. { version, watchId, paragraph }
 //   GET  ?tick=1                          the scheduler only (Bearer CRON_SECRET): one tick of the worker.
 // Every reply to a person is the whole list, so a client never has to merge.
 //
@@ -33,6 +36,7 @@ import { UNIVERSE, readDaily } from './_lib/agent/tools.js';
 import { WATCH_DAYS, WATCH_DIRECTIONS, WATCH_LIMIT, WATCH_PERCENTS, WATCH_VERSION, watchView } from './_lib/agent/watch.js';
 import { MemoryWatchStore, PgWatchStore, postgrestWatchRpc, type NewWatch, type WatchStore } from './_lib/agent/watch-store.js';
 import { runWatchTick, watchWorkerDeps, type WatchWorkerDeps } from './_lib/agent/watch-worker.js';
+import { noteDeps, thesisParagraph, watchNotesOn, type NoteDeps } from './_lib/agent/watch-note.js';
 
 export const config = { maxDuration: 60 };
 /** A tick stops starting work this long after it began: the function's own limit is sixty seconds. */
@@ -40,7 +44,7 @@ const TICK_BUDGET_MS = 45_000;
 export const agentWatchesOn = (env: NodeJS.ProcessEnv = process.env): boolean => env.BOBBY_AGENT_WATCHES === 'on';
 
 let memory: MemoryWatchStore | null = null;
-export interface WatchDoorDeps { store: WatchStore; account: (req: VercelRequest) => Promise<Identity>; isPro: (identity: string) => Promise<boolean>; limit: (identity: string) => Promise<void>; worker: Partial<WatchWorkerDeps> }
+export interface WatchDoorDeps { store: WatchStore; account: (req: VercelRequest) => Promise<Identity>; isPro: (identity: string) => Promise<boolean>; limit: (identity: string) => Promise<void>; worker: Partial<WatchWorkerDeps>; note: Partial<NoteDeps> }
 let testDeps: Partial<WatchDoorDeps> | null = null;
 /** Tests only: the store, the account, the plan and the worker's sources; null restores the real ones and a fresh memory store. */
 export function __setWatchTestDeps(over: typeof testDeps): void { testDeps = over; memory = null; }
@@ -56,6 +60,8 @@ const Create = z.object({
   op: z.literal('create'), requestId: z.guid(), symbol: z.string().regex(/^[A-Z]{1,8}$/), direction: z.enum(WATCH_DIRECTIONS),
   percent: one(WATCH_PERCENTS), days: one(WATCH_DAYS), language: z.enum(APP_LANGUAGES).default('en'), locale: z.enum(APP_LOCALES).optional().catch(undefined),
 }).strict();
+const words = (max: number) => z.string().trim().min(1).max(max);
+const Thesis = z.object({ op: z.literal('thesis'), watchId: z.string().regex(/^watch_[a-f0-9]{32}$/), thesis: z.object({ hypothesis: words(600), worry: words(600).optional(), changeMind: words(600).optional() }).strict() }).strict();
 const Act = z.object({ op: z.enum(['cancel', 'seen']), watchId: z.string().regex(/^watch_[a-f0-9]{32}$/) }).strict();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -119,6 +125,16 @@ async function door(req: VercelRequest, res: VercelResponse) {
     if (made.state === 'mismatch') return refuse(409, 'request_id_reused');
     if (made.state === 'limit') return refuse(409, 'watch_limit');
     return list(made.state === 'new' ? 201 : 200, limit);
+  }
+  const thesis = Thesis.safeParse(body);
+  if (thesis.success) {
+    if (!watchNotesOn()) return refuse(404, 'not_found');
+    await (testDeps?.limit ?? ((id: string) => accountLimit('agent-watch-thesis', id, 6)))(identity.id);
+    const watch = await store.get(identity.id, thesis.data.watchId);
+    if (!watch || watch.state !== 'met') return refuse(404, 'not_found');
+    const paragraph = await thesisParagraph(watch, thesis.data.thesis, noteDeps(testDeps?.note ?? {}));
+    if (!paragraph) return refuse(503, 'watch_note_unavailable');
+    return res.status(200).json({ version: WATCH_VERSION, watchId: watch.id, paragraph });
   }
   const act = Act.safeParse(body);
   if (!act.success) return refuse(400, 'invalid_request');

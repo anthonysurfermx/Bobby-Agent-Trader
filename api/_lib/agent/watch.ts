@@ -157,6 +157,12 @@ export function watchPayload(watch: Pick<Watch, 'id' | 'language' | 'locale'>): 
 }
 
 /** What a client is told of a watch. The account it belongs to is not in it. */
+/** The note of a met watch as a client sees it: the sentences and where they were read. Never the model or the cost. */
+function noteView(result: unknown) {
+  const note = (result as { note?: { why?: unknown; found?: unknown; sources?: unknown } }).note;
+  if (!note || typeof note.why !== 'string' || !Array.isArray(note.sources)) return null;
+  return { why: note.why, found: note.found === true, sources: (note.sources as Array<Record<string, unknown>>).filter((s) => typeof s.url === 'string' && typeof s.title === 'string').map((s) => ({ title: s.title as string, url: s.url as string, host: typeof s.host === 'string' ? s.host : '' })) };
+}
 export function watchView(watch: Watch) {
   const label = watchLabel(watch);
   return {
@@ -166,7 +172,7 @@ export function watchView(watch: Watch) {
     reference: watch.reference, met: watch.met,
     // One plain sentence for a watch that ended without its condition: a person is never left with a bare state.
     notice: watch.state === 'expired' ? (watch.unreadable ? UNFOLLOWED : EXPIRED)[watch.language](label) : null,
-    result: watch.result ? { ...watch.result.presentation, analysis: watch.result.analysis ? { subjects: watch.result.analysis.subjects, windowDays: watch.result.analysis.windowDays, figures: watch.result.analysis.figures, evidence: watch.result.analysis.evidence } : null } : null,
+    result: watch.result ? { ...watch.result.presentation, note: noteView(watch.result), analysis: watch.result.analysis ? { subjects: watch.result.analysis.subjects, windowDays: watch.result.analysis.windowDays, figures: watch.result.analysis.figures, evidence: watch.result.analysis.evidence } : null } : null,
     seen: watch.seenAt !== null,
   };
 }

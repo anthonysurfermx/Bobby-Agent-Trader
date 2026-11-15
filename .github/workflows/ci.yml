@@ -54,6 +54,7 @@ jobs:
       - run: npm run test:harness-brain
       - run: npm run test:agent-engine
       - run: npm run test:agent-watch
+      - run: npm run test:agent-watch-note
       - run: npm run test:stock-ticker-routing
       - run: npm run test:remediation-r2
       - run: npm run test:rpc-redaction

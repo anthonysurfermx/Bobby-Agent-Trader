@@ -72,3 +72,6 @@ android/store_icon.png
 /docs/qa/dashboard-live-2026-10-03/
 /docs/qa/client-telemetry-2026-10-03/
 /ios/Bobby/docs/client-telemetry-evidence.json
+
+# Runs of the watch-note evaluation (they hold provider output)
+scripts/agent-watch-note-eval/out/
