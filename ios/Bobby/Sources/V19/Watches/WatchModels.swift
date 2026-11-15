@@ -18,6 +18,41 @@ enum WatchState: String, Equatable, Sendable {
     case active, met, expired, cancelled
 }
 
+/// Where a sentence of a note was read: shown by its site's name, opened in the browser.
+struct WatchSource: Equatable, Identifiable, Sendable {
+    let title: String
+    let url: URL
+    let host: String
+    var id: String { url.absoluteString }
+
+    init?(json: Any?) {
+        guard let row = json as? [String: Any], let title = row["title"] as? String, !title.isEmpty,
+              let link = row["url"] as? String, let url = URL(string: link), url.scheme == "https", let host = url.host, !host.isEmpty else { return nil }
+        self.title = title
+        self.url = url
+        self.host = (row["host"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? host
+    }
+}
+
+/// What Bobby wrote when a watch was met, beyond the numbers: what was published about the move.
+struct WatchNote: Equatable, Sendable {
+    let why: String
+    /// False when nothing published explained the move: the sentence says so and has no source.
+    let found: Bool
+    let sources: [WatchSource]
+
+    init?(json: Any?) {
+        guard let body = json as? [String: Any], let why = body["why"] as? String, !why.isEmpty else { return nil }
+        let sources = ((body["sources"] as? [Any]) ?? []).compactMap(WatchSource.init(json:))
+        let found = body["found"] as? Bool ?? false
+        // A reported cause with nowhere it was read is not shown as one.
+        guard !found || !sources.isEmpty else { return nil }
+        self.why = why
+        self.found = found
+        self.sources = sources
+    }
+}
+
 /// One watch as the server tells it.
 struct BobbyWatch: Equatable, Identifiable, Sendable {
     let id: String
@@ -31,6 +66,8 @@ struct BobbyWatch: Equatable, Identifiable, Sendable {
     /// Met: the first sentence and the whole text Bobby wrote that day.
     let gist: String?
     let text: String?
+    /// Met, when the server wrote one: what was published about the move, with its sources.
+    let note: WatchNote?
     /// Expired: the one sentence that says it did not happen, or could not be followed.
     let notice: String?
     let seen: Bool
@@ -56,6 +93,7 @@ struct BobbyWatch: Equatable, Identifiable, Sendable {
         self.label = label
         self.gist = (result?["gist"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         self.text = (result?["text"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        self.note = WatchNote(json: result?["note"])
         self.notice = (row["notice"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         self.seen = row["seen"] as? Bool ?? false
     }
@@ -122,6 +160,18 @@ struct WatchAPI {
 
     func cancel(_ id: String) async throws -> WatchBoard { try await call(method: "POST", body: ["op": "cancel", "watchId": id]) }
     func seen(_ id: String) async throws -> WatchBoard { try await call(method: "POST", body: ["op": "seen", "watchId": id]) }
+
+    /// What a met watch means for the thesis the person saved on this phone. The words travel in this
+    /// one request and the server keeps none of them. nil: nothing to show (never an error on screen).
+    func thesis(_ id: String, hypothesis: String, worry: String, changeMind: String) async -> String? {
+        var words: [String: Any] = ["hypothesis": String(hypothesis.prefix(600))]
+        if !worry.isEmpty { words["worry"] = String(worry.prefix(600)) }
+        if !changeMind.isEmpty { words["changeMind"] = String(changeMind.prefix(600)) }
+        guard let reply = try? await transport.json(Self.path, "POST", ["op": "thesis", "watchId": id, "thesis": words], [:], auth),
+              reply.status == 200, let body = reply.json as? [String: Any], body["watchId"] as? String == id,
+              let paragraph = body["paragraph"] as? String, !paragraph.isEmpty else { return nil }
+        return paragraph
+    }
 
     private func call(method: String, body: [String: Any]?) async throws -> WatchBoard {
         let reply: BriefingsReply

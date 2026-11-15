@@ -153,7 +153,7 @@ private struct NucleoStage: View {
             AccountSheet(store: session.companions, profile: session.profile, detents: [.large], showsLinks: true, voice: session.voice,
                          onVoiceMutedChange: { session.sessionChanged() },
                          onAIConsentWithdraw: { session.revokeRiskNoticeConsent() },
-                         onOpenRoute: { session.switchSheet(to: $0) }) { session.sheet = nil }
+                         onOpenRoute: { if $0 == .watches { session.prepareWatches() }; session.switchSheet(to: $0) }) { session.sheet = nil }
         case .riskNotice:
             // Opened from onboarding before consent: no withdraw (RiskNoticeView shows neutral marks too).
             RiskNoticeView(profile: session.profile, readOnly: true,
@@ -226,6 +226,11 @@ private struct NucleoStage: View {
                 .presentationBackground(Theme.nucleoSurface)
         case .reminders:
             RemindersSheet(session: session) { session.sheet = nil }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .watches:
+            WatchesSheet(center: .shared, entry: WatchFocus.entry) { session.sheet = nil }
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)

@@ -19,6 +19,7 @@ enum V18 {
         ThesisNudges.register(center)
         ReminderNudges.register(center)
         CreditsNudges.register(center)
+        WatchNudges.register(center)
     }
 }
 
@@ -38,4 +39,8 @@ enum NudgePriority {
     static let reminders = 50
     /// Credits running low.
     static let credits = 40
+    /// 1.9.x: a watch that was met and nobody opened: what the person asked to be told, right under a follow-up.
+    static let watchMet = 94
+    /// 1.9.x: the offer to watch the asset just read. Offered, never pushed.
+    static let watchOffer = 55
 }

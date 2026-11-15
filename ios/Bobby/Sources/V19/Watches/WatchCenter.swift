@@ -5,6 +5,8 @@
 //  - iOS permission for notifications is asked ONLY inside `start`, which only the Watch button
 //    calls. Never at launch, never from a refresh. A watch is not started for someone iOS will
 //    not let Bobby tell: the person is told to allow notifications instead.
+//  - This phone is registered for notifications only once a watch is really looking (`delivery`),
+//    and the registrar asks `confirmedWatching` before it binds the phone to the account.
 //  - A door that is not there (`.notOffered`) hides every entry point: `offered` is false and
 //    stays false until the next launch or sign-in asks again.
 //  - A retry of the same choice reuses its request id, so a lost answer never makes two watches.
@@ -13,9 +15,20 @@
 import Combine
 import Foundation
 
+/// The person's own words about an asset, as they wrote them in their thesis.
+struct WatchThesisWords: Equatable, Sendable {
+    var hypothesis: String
+    var worry = ""
+    var changeMind = ""
+}
+
 @MainActor
 final class WatchCenter: ObservableObject {
+    #if DEBUG
+    static var shared = WatchCenter()   // the review fixture replaces it (WatchQA)
+    #else
     static let shared = WatchCenter()
+    #endif
 
     enum Problem: Equatable {
         case signIn, notifications, limit(Int), unreadable, unavailable
@@ -27,17 +40,22 @@ final class WatchCenter: ObservableObject {
     @Published private(set) var offered = true
     @Published private(set) var busy = false
     @Published private(set) var problem: Problem?
+    /// watch id → what it means for the person's thesis, asked once per watch while the app is open.
+    @Published private(set) var thesisRead: [String: String] = [:]
+    private var thesisAsked = Set<String>()
 
     struct Dependencies {
         var api: () -> WatchAPI = { WatchAPI() }
         var riskAccepted: () -> Bool = { UserDefaults.standard.integer(forKey: "agent.riskNoticeVersion") >= RiskNotice.currentVersion }
         var signedIn: () async -> Bool = { await AccountSession.shared.accessToken() != nil }
-        /// Asks iOS (the system prompt the first time) and registers this phone; true when Bobby may notify.
-        var allowNotifications: @MainActor () async -> Bool = {
-            let permission = await PushRegistrar.shared.requestPermission()
-            guard permission.allowsDelivery else { return false }
-            PushRegistrar.shared.register()
-            return true
+        /// Asks iOS (the system prompt the first time); true when Bobby may notify.
+        var allowNotifications: @MainActor () async -> Bool = { await PushRegistrar.shared.requestPermission().allowsDelivery }
+        /// A watch is looking: this phone asks iOS for its token and binds it to the account.
+        var delivery: @MainActor () -> Void = { PushRegistrar.shared.register() }
+        /// The thesis the person saved on this phone about an asset, when there is an active one.
+        var thesis: @MainActor (_ symbol: String) -> WatchThesisWords? = { symbol in
+            ThesisBook(defaults: .standard).activeThesis(symbol: symbol, owner: AccountSession.shared.session?.userId)
+                .map { WatchThesisWords(hypothesis: $0.hypothesis, worry: $0.worry, changeMind: $0.changeMind) }
         }
     }
     private let deps: Dependencies
@@ -52,6 +70,7 @@ final class WatchCenter: ObservableObject {
     func accountChanged() {
         epoch += 1
         board = nil; problem = nil; busy = false; pending = nil; offered = true
+        thesisRead = [:]; thesisAsked = []
     }
 
     /// The list, when the person opens the screen or the app comes back.
@@ -77,7 +96,15 @@ final class WatchCenter: ObservableObject {
         let done = await run { try await $0.create(symbol: symbol, direction: direction, percent: percent, days: days, requestId: id) }
         // Answered either way but "try again": the next tap of the same choice is a new request.
         if done || (problem != .unavailable && problem != nil) { pending = nil }
+        if done { deps.delivery() }
         return done
+    }
+
+    /// For the notification registrar: does this account have a watch looking? Asks the server once
+    /// when the phone does not know yet (a cold launch).
+    func confirmedWatching() async -> Bool {
+        if board == nil { await refresh() }
+        return board?.active.isEmpty == false
     }
 
     func stop(_ id: String) async { await run { try await $0.cancel(id) } }
@@ -86,6 +113,19 @@ final class WatchCenter: ObservableObject {
     func opened(_ id: String) async {
         guard board?.watches.first(where: { $0.id == id })?.seen == false else { return }
         await run { try await $0.seen(id) }
+    }
+
+    /// A met watch with a note was opened: when the person has a thesis on that asset, ask what the
+    /// event means for it. Their words go in that one request; nothing is asked without a thesis.
+    func readAgainstThesis(_ id: String) async {
+        guard offered, deps.riskAccepted(), !thesisAsked.contains(id),
+              let watch = board?.watches.first(where: { $0.id == id }), watch.state == .met, watch.note != nil,
+              let thesis = deps.thesis(watch.symbol), !thesis.hypothesis.isEmpty else { return }
+        thesisAsked.insert(id)
+        let started = epoch
+        let paragraph = await deps.api().thesis(id, hypothesis: thesis.hypothesis, worry: thesis.worry, changeMind: thesis.changeMind)
+        guard started == epoch, let paragraph else { return }
+        thesisRead[id] = paragraph
     }
 
     @discardableResult

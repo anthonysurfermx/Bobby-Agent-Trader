@@ -5,6 +5,7 @@ import XCTest
 
 final class WatchTests: XCTestCase {
     private var previousSelection: String?
+    private var delivered = 0
 
     override func setUp() {
         super.setUp()
@@ -50,7 +51,7 @@ final class WatchTests: XCTestCase {
         }
     }
     @MainActor private func center(_ script: Script, risk: Bool = true, signedIn: Bool = true, notifications: @escaping () async -> Bool = { true }) -> WatchCenter {
-        WatchCenter(deps: .init(api: { WatchAPI(transport: script.transport, auth: .none) }, riskAccepted: { risk }, signedIn: { signedIn }, allowNotifications: notifications))
+        WatchCenter(deps: .init(api: { WatchAPI(transport: script.transport, auth: .none) }, riskAccepted: { risk }, signedIn: { signedIn }, allowNotifications: notifications, delivery: { self.delivered += 1 }))
     }
 
     // MARK: reading
@@ -207,7 +208,7 @@ final class WatchTests: XCTestCase {
         let center = WatchCenter(deps: .init(api: { WatchAPI(transport: BriefingsTransport(json: { _, _, _, _, _ in
             await withCheckedContinuation { release = $0 }
             return BriefingsReply(json: WatchTests.body([WatchTests.row(WatchTests.activeId)]), status: 200, headers: [:])
-        }, bytes: { _ in .unavailable }), auth: .none) }, riskAccepted: { true }, signedIn: { true }, allowNotifications: { true }))
+        }, bytes: { _ in .unavailable }), auth: .none) }, riskAccepted: { true }, signedIn: { true }, allowNotifications: { true }, delivery: {}))
         _ = script
         let asking = Task { await center.refresh() }
         while release == nil { await Task.yield() }
