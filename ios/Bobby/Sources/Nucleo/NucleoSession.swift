@@ -46,10 +46,12 @@ enum NucleoPage: Equatable {
 enum NucleoRoute: String, Identifiable, CaseIterable {
     case squad, locker, isla, account, riskNotice, paywall, levels, invite, briefing
     case credits, theses, thesisEditor, thesisReview, memory, memoryConsent, reminders, briefingSettings, followUp, languageSettings, companionConsent, companionNotes
+    /// 1.9.x: what Bobby is watching (V19/Watches). Native only, like the 1.8 screens.
+    case watches
     var id: String { rawValue }
 
     static let nativeOnly: Set<NucleoRoute> = [.paywall, .invite, .briefing, .credits, .theses, .thesisEditor, .thesisReview,
-                                               .memory, .memoryConsent, .reminders, .briefingSettings, .followUp, .languageSettings, .companionConsent, .companionNotes]
+                                               .memory, .memoryConsent, .reminders, .briefingSettings, .followUp, .languageSettings, .companionConsent, .companionNotes, .watches]
     static let openable: Set<String> = Set(allCases.filter { !nativeOnly.contains($0) }.map(\.rawValue))
 }
 
@@ -389,6 +391,7 @@ final class NucleoSession: ObservableObject {
                 fixtureHandoverStart = nil
             }
 #endif
+            if let reply = await watchAsk(p) { return reply }
             return try await desk.ask(p)
         case "companion.invite":
             guard profile.acceptedRiskNotice, !companionContext.accepted,
@@ -651,6 +654,57 @@ final class NucleoSession: ObservableObject {
         guard let harness else { return false }
         let said = harness.access()
         return HarnessWall.closed(said) || levels.open(said) == false
+    }
+
+    // MARK: - Watches (1.9.x)
+
+    let watchGlass = WatchGlass()
+    var watchTapIntent: WatchTapIntent = .shared
+
+    /// A sentence that asks for a watch, or a tap on the line it left on the glass: answered here,
+    /// and the desk is not asked. nil for everything else, which is every ordinary question.
+    private func watchAsk(_ p: NucleoParams) async -> [String: Any]? {
+        guard profile.acceptedRiskNotice, onboarded, !desk.isBusy else { return nil }
+        if let token = try? p.string("token", required: false, maxLength: 128), watchGlass.owns(token) {
+            return await watchGlass.act(token) { [weak self] entry in self?.openWatches(entry) }
+        }
+        guard !p.has("token"), !p.has("followUpOf"), !p.has("retry"), (try? p.bool("companion", required: false)) != true,
+              let question = try? p.string("question", required: false) else { return nil }
+        return watchGlass.offer(question)
+    }
+
+    /// The list of watches, opened on an asset to watch, a met watch, or just the list.
+    @discardableResult
+    func openWatches(_ entry: WatchFocus.Entry = WatchFocus.Entry()) -> Bool {
+        WatchFocus.entry = entry
+        return openNative(.watches)
+    }
+
+    /// From the profile: the list, ready to watch the asset just read when it can be.
+    func prepareWatches() {
+        let board = WatchCenter.shared.board
+        WatchFocus.entry = WatchNudges.entry(NucleoNudge(id: "watch.offer.profile", text: "", cta: ""),
+                                             moment: NudgeCenter.shared.moment(signedIn: signedIn), board: board)
+    }
+
+    /// Opens the answer a tapped notification is about, behind the briefing tap's gate. Consumed once.
+    @discardableResult
+    func drainWatchIntent() -> Bool {
+        guard !tornDown, let gate = briefingGate, watchTapIntent.pending != nil, gate.signedIn(),
+              currentPage == NucleoPage.app.name, gate.appActive(),
+              profile.acceptedRiskNotice, onboarded, sheet == nil, openSheet == nil, !speechPromptOpen,
+              !gate.listening(), !gate.deskBusy(), !gate.narrating(), let id = watchTapIntent.take() else { return false }
+        return openWatches(WatchFocus.Entry(openId: id))
+    }
+
+    /// The account's watches, when the app comes forward or the account changes. A door that is not
+    /// there answers once and is not asked again (WatchCenter.offered).
+    private func refreshWatches() {
+        guard !fixtures, signedIn, profile.acceptedRiskNotice else { return }
+        Task { [weak self] in
+            await WatchCenter.shared.refresh()
+            self?.sessionChanged()
+        }
     }
 
     // MARK: - The nudge (1.8)
@@ -1382,6 +1436,7 @@ final class NucleoSession: ObservableObject {
         emit("native.sheet", ["route": route.rawValue, "state": "closed"])
         if route == .paywall { finishPaywall() }
         if route == .thesisReview { reminderIntent.markOpen(nil) }
+        if route == .watches { WatchFocus.clear() }
         if route == .briefing {
             selectedBriefId = nil
             if briefingWantsPro {
@@ -1466,6 +1521,7 @@ final class NucleoSession: ObservableObject {
         companionContext.opened()
         emit("app.state", ["state": "active"])
         if signedIn { Task { await AccountSession.shared.checkAppleCredential() } }
+        refreshWatches()
         sessionChanged()
         scheduleBriefingDrain()
     }
@@ -1494,6 +1550,7 @@ final class NucleoSession: ObservableObject {
                 self?.drainReminderIntent()
                 self?.drainHarnessIntent()
                 self?.drainNewsIntent()
+                self?.drainWatchIntent()
             }
             return
         }
@@ -1505,6 +1562,7 @@ final class NucleoSession: ObservableObject {
             self?.drainReminderIntent()
             self?.drainHarnessIntent()
             self?.drainNewsIntent()
+            self?.drainWatchIntent()
         }
     }
 
@@ -1678,6 +1736,10 @@ final class NucleoSession: ObservableObject {
             .compactMap { $0 }
             .sink { [weak self] _ in self?.scheduleBriefingDrain() }
             .store(in: &cancellables)
+        watchTapIntent.$pending
+            .compactMap { $0 }
+            .sink { [weak self] _ in self?.scheduleBriefingDrain() }
+            .store(in: &cancellables)
         // A briefing notification was tapped (cold launch, warm, or while busy): try now; it waits otherwise.
         briefingIntent.$pending
             .compactMap { $0 }
@@ -1761,6 +1823,10 @@ final class NucleoSession: ObservableObject {
         NudgeCenter.shared.owner = accountUserID
         NudgeCenter.shared.forgetMoment()
         V18Focus.clear()
+        WatchFocus.clear()
+        watchGlass.reset()
+        WatchCenter.shared.accountChanged()
+        refreshWatches()
         sheetHandoff = nil
         readHandoff = nil
         dropReadOffer()

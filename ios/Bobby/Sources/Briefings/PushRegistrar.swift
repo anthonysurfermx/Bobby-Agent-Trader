@@ -140,6 +140,9 @@ final class PushRegistrar: ObservableObject {
     }
     /// Separate promotional consent: free and Pro accounts are equally eligible.
     var newsEnabled: () async -> Bool = { await NewsPushCenter.shared.confirmedEnabled() }
+    /// 1.9.x: a watch that is looking is its own reason to notify (V19/Watches); asked last, and only
+    /// when neither of the two above holds.
+    var watchEnabled: () async -> Bool = { await WatchCenter.shared.confirmedWatching() }
     var registerForRemote: () -> Void = { UIApplication.shared.registerForRemoteNotifications() }
     var environment: () -> String = { PushRegistrar.apnsEnvironment(profileText: PushRegistrar.embeddedProfileText()) }
     var appBuild: () -> Int = { Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0 }
@@ -213,7 +216,10 @@ final class PushRegistrar: ObservableObject {
         let weekly = await weeklyEnabled()
         guard registrationAccount == account else { return false }
         let news = await newsEnabled()
-        return registrationAccount == account && (weekly || news)
+        guard registrationAccount == account else { return false }
+        if weekly || news { return true }
+        let watching = await watchEnabled()
+        return registrationAccount == account && watching
     }
 
     /// After an enable (or a sign-in that already had a binding): ask iOS for the token. R11 + account gated.
@@ -252,8 +258,10 @@ final class PushRegistrar: ObservableObject {
             // News also syncs the preferred language. An existing binding can refresh independently.
             let news = await newsEnabled()
             guard registrationAccount == account, !alreadyBound, status.allowsDelivery else { return }
-            let weekly = await weeklyEnabled()
-            guard registrationAccount == account, weekly || news else { return }
+            var wanted = news
+            if !wanted { wanted = await weeklyEnabled() }
+            if !wanted, registrationAccount == account { wanted = await watchEnabled() }
+            guard registrationAccount == account, wanted else { return }
             registerForRemote()
         }
     }
@@ -551,7 +559,10 @@ final class BobbyAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
         let reminder = ReminderIntent.tap(from: response.notification.request.content.userInfo)
         let news = NewsPushIntent.tap(from: response.notification.request.content.userInfo)
         let followUp = HarnessTap.tap(from: response.notification.request.content.userInfo)
+        let watch = WatchTapIntent.watchId(from: response.notification.request.content.userInfo)
         Task { @MainActor in
+            // 1.9.x: a watch that was met (V19/Watches): its answer opens once the glass is free.
+            if tapped, let watch { WatchTapIntent.shared.store(watch) }
             // Stored only: the experience drains it once the page, account and consent are ready.
             if tapped, let briefId { BriefingIntent.shared.store(briefId) }
             // 1.8: a tapped thesis reminder waits the same way (Reminders/ReminderIntent.swift).
