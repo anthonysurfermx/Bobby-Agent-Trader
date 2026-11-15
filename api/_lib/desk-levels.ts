@@ -10,7 +10,7 @@
 // BOBBY_APP_TEXT_MODEL and BOBBY_PRO_TEXT_MODEL configure the Free and Pro models respectively.
 // When its credit runs out a role switches to OpenAI
 // (gpt-6-luna, gpt-6-sol on Máximo) and the other way round — see alternateProvider. BOBBY_LLM_PRIMARY=openai
-// restores the earlier OpenAI-first plans for Rápido/Profundo without a code change.
+// selects OpenAI first for every role and level, including the CIO and second round.
 // Rápido rides the existing read meter (bobby_consume_read); Profundo and Máximo have their own.
 // ============================================================
 import type { ModelSpec } from './llm.js';
@@ -65,15 +65,15 @@ const claude = (effort: 'low' | 'medium' | 'high', tier: AppTextTier): ModelSpec
 export const primaryProvider = appPrimaryProvider;
 
 export function levelPlan(level: DeskLevel, tier: AppTextTier = 'free'): LevelPlan {
+  const claudeFirst = primaryProvider() === 'anthropic';
   if (level === 'maximo') {
-    const s = claude('high', tier);
+    const s: ModelSpec = claudeFirst ? claude('high', tier) : { provider: 'openai', model: 'gpt-6-sol', effort: 'high', maxTokens: 6000, timeoutMs: 70_000 };
     return { alpha: s, red: s, rebuttal: s, cio: s, fallback: null, evidence: 'v2', scenarios: true, budgetMs: 160_000 };
   }
-  const claudeFirst = primaryProvider() === 'anthropic';
   if (level === 'profundo') {
     return claudeFirst
       ? { alpha: claude('low', tier), red: claude('low', tier), rebuttal: null, cio: claude('medium', tier), fallback: null, evidence: 'v2', scenarios: false, budgetMs: 120_000 }
-      : { alpha: luna(), red: luna(), rebuttal: null, cio: claude('medium', tier), fallback: null, evidence: 'v2', scenarios: false, budgetMs: 120_000 };
+      : { alpha: luna(), red: luna(), rebuttal: null, cio: { provider: 'openai', model: 'gpt-6-sol', effort: 'medium', maxTokens: 4000, timeoutMs: 55_000 }, fallback: null, evidence: 'v2', scenarios: false, budgetMs: 120_000 };
   }
   // Rápido keeps a model-access fallback (401/403/404 on the primary model) on the other provider.
   return claudeFirst

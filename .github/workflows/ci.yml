@@ -33,6 +33,7 @@ jobs:
       - run: npm run test:api-security
       - run: npm run test:record-auth
       - run: npm run test:protocol-write-safety
+      - run: npm run test:commit-policy
       - run: npm run test:risk-gate
       - run: npm run test:tts-latency
       - run: npm run test:asset-discovery
@@ -52,6 +53,7 @@ jobs:
       - run: npm run test:user-memory
       - run: npm run test:harness-brain
       - run: npm run test:agent-engine
+      - run: npm run test:agent-watch
       - run: npm run test:stock-ticker-routing
       - run: npm run test:remediation-r2
       - run: npm run test:rpc-redaction

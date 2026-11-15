@@ -136,7 +136,7 @@ const CONSENT_KEY = 'bobby.companion.progress.v1';
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 /** How long a request stays in flight, and how soon after a subscribe the auth client reports the session it has. */
 const NETWORK_MS = 12, AUTH_MS = 2;
-function browser({ route = '/desk', language = 'en', locale = 'en-US', consent = false, session = null, stored = {}, kept = {}, historyState = null, access = {}, desktop = false, wallet = false, stocks = false, pulse = null, debate = null, fast = false } = {}) {
+function browser({ route = '/desk', language = 'en', locale = 'en-US', consent = false, session = null, stored = {}, kept = {}, historyState = null, access = {}, desktop = false, wallet = false, stocks = false, pulse = null, debate = null, fast = false, searchUnavailable = () => false } = {}) {
   const storage = new Map(Object.entries({ bobby_lang: language, bobby_locale: locale, bobby_geo: locale.split('-')[1], ...stored }));
   if (consent) storage.set(CONSENT_KEY, JSON.stringify({ aiConsentGranted: true, riskNoticeVersion: 7, onboarded: true }));
   const requests = [], replaced = [];
@@ -175,6 +175,7 @@ function browser({ route = '/desk', language = 'en', locale = 'en-US', consent =
     if (href === '/api/track') return new Response(null, { status: 204 });
     if (href === '/api/geo') return json({ country: null });
     if (href.startsWith('/api/bobby-asset-search?browse=1')) return json({ movers: [{ symbol: 'BTC', change24h: 1.2 }, { symbol: 'NVDA', change24h: -0.8 }], browse: {} });
+    if (href.startsWith('/api/bobby-asset-search') && searchUnavailable()) return json({}, 503);
     if (href.startsWith('/api/bobby-asset-search')) return json({ resolved: { baseSymbol: 'NVDA', symbol: 'NVDA', displayName: 'NVIDIA', assetClass: 'equity', aliases: ['NVDA'] } });
     if (href === '/api/bobby-access') return json({ access: { tier: signedIn ? 'free' : 'anon', used: 0, limit: 3, remaining: 3, resetsAt: null, paywall: true, ...access }, signedIn, subscription: null, payments: { stripe: false, apple: true } });
     // A read answers with the meter it left behind: one read fewer.
@@ -434,6 +435,24 @@ await asyncCheck('agreeing sends that question exactly once, and only then does 
   await b.settle(desk, 4);
   assert.equal(b.requests.filter((r) => r.path === '/api/desk-debate').length, 1);
   assert.equal(b.requests.filter((r) => r.path === '/api/track' && r.body.event === 'desk_entered').length, 1, 'still one desk_entered');
+});
+
+await asyncCheck('an unavailable asset search preserves the question and does not spend a read until retry succeeds', async () => {
+  let unavailable = true;
+  const b = browser({ consent: true, searchUnavailable: () => unavailable });
+  const desk = b.mount(b.T.NucleoDesk);
+  await b.settle(desk);
+  typeAndSend(desk, QUESTION);
+  await b.settle(desk);
+  assert.match(find(desk.tree, (e) => e.props?.role === 'alert').props.children, /Asset search is unavailable/);
+  assert.ok(!b.requests.some((r) => ['/api/companion-turn', '/api/voice-tool', '/api/desk-debate'].includes(r.path)));
+  const retry = find(desk.tree, (e) => e.type === 'button' && e.props.children === 'Try again');
+  unavailable = false;
+  retry.props.onClick();
+  await b.settle(desk, 12);
+  assert.deepEqual(b.requests.filter((r) => r.path === '/api/bobby-asset-search' && r.method === 'POST').map((r) => r.body.q), [QUESTION, QUESTION]);
+  assert.deepEqual(b.requests.filter((r) => r.path === '/api/desk-debate').map((r) => r.body.question), [QUESTION]);
+  assert.equal(b.requests.filter((r) => r.path === '/api/voice-tool').length, 1);
 });
 
 await asyncCheck('a starter chip, the microphone, the profile and Explore all wait behind the same notice', async () => {

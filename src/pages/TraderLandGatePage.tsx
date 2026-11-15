@@ -13,6 +13,7 @@ import { useLandCredential } from '@/lib/trader-land/useLandCredential';
 import { landPieceLabel } from '@/lib/trader-land/piece-labels';
 import LandGrowthGuide from '@/components/companion/LandGrowthGuide';
 import './trader-land.css';
+import { useNucleoFonts } from '@/hooks/useNucleoFonts';
 
 type District = 'crypto_bay' | 'evidence_mines' | 'thesis_citadel' | 'risk_reef' | 'axiom_archive';
 type PathOrientation = 'ne_sw' | 'nw_se';
@@ -288,6 +289,7 @@ function visitorWorld(payload: PublicWorldPayload): World {
 }
 
 export default function TraderLandGatePage() {
+  useNucleoFonts();
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [demo, setDemo] = useState<World | null>(null);
   const [remote, setRemote] = useState<World | null>(null);

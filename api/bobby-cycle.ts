@@ -915,7 +915,9 @@ ${PUBLIC_VOICE} The hook and thesis follow these rules too; the structured field
     }${hasContradictions ? `\nSELF-CORRECTION: Recent failures — if thesis resembles one, sit out.` : ''}`;
 
     // Use structured output (OpenAI function calling) — 100% reliable JSON extraction
-    let structuredVerdict = await callStructuredVerdict(cioSystemPrompt, `MARKET CONTEXT:\n${cioContext}`);
+    // Assign the OUTER binding: a `let` here shadowed it, so the verdict
+    // died with this block — conviction stayed null and nothing committed.
+    structuredVerdict = await callStructuredVerdict(cioSystemPrompt, `MARKET CONTEXT:\n${cioContext}`);
     const cioText = (v: StructuredVerdict) => `${v.hook}\n\n${v.thesis}${v.risks?.length ? `\n\nRisks: ${v.risks.join('; ')}` : ''}`;
     let cioViolation = publicTextViolation(cioText(structuredVerdict));
     if (cioViolation) {

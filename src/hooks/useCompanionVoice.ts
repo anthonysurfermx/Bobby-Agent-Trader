@@ -15,7 +15,7 @@ export interface SpeakOptions {
   voice: string;
   vibe?: 'wise' | 'direct' | 'analytical';
   essential?: boolean;
-  mode?: 'free';
+  mode?: 'free' | 'persona';
   playbackRate?: number;
 }
 
@@ -142,7 +142,8 @@ export function useCompanionVoice() {
           if (!canGenerateSpeech() || gen !== generation.current) return;
           const res = await fetch('/api/bobby-voice-free', {
             method: 'POST',
-            signal: AbortSignal.timeout(8000),
+            // The server allows a persona line 13 s; the Núcleo web and iPhone wait 15 s as well.
+            signal: AbortSignal.timeout(15000),
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text, mode: opts.mode, lang: ttsLang(), locale: speechLocale(), voice, ...(opts.vibe ? { vibe: opts.vibe } : {}) }),
           });

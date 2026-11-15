@@ -258,6 +258,18 @@ async function readSeries(instrument: Instrument, ctx: ToolContext): Promise<Rea
   return { instrument, url, series, bars: valid.bars, quality: 'valid', note: null };
 }
 
+/**
+ * One instrument's daily closes as the strict reader accepted them, or null when it refused them: what a watch
+ * (watch.ts) is checked against. The same request and the same reader as read_assets, so a watch and a read can
+ * never disagree about a close.
+ */
+export async function readDaily(symbol: string, ctx: ToolContext): Promise<{ bars: DailyBar[]; currency: string } | null> {
+  const instrument = BY_SYMBOL.get(symbol);
+  if (!instrument) return null;
+  const read = await readSeries(instrument, ctx);
+  return read.bars?.length && read.series?.currency ? { bars: read.bars, currency: read.series.currency } : null;
+}
+
 export async function readAssets(args: CompareArgs, ctx: ToolContext): Promise<ToolOutput> {
   const now = ctx.now(), reads = await Promise.all(args.symbols.map((symbol) => readSeries(BY_SYMBOL.get(symbol)!, ctx)));
   const limitations: string[] = [];

@@ -52,24 +52,35 @@ export async function fetchAccess(headers?: Record<string, string>): Promise<Acc
 
 /** Opens Stripe Checkout (or the billing portal) for Bobby Pro; returns an error message when it cannot. */
 function billingFailure(status?: number, error?: string, code?: string): string {
+  if (code === 'billing_receipt') return t(
+    'To manage your subscription, open the link in your billing email.',
+    'Para administrar tu suscripción, abre el enlace del correo de facturación.',
+    'Para gerenciar sua assinatura, abra o link no e-mail de cobrança.',
+    'Pour gérer ton abonnement, ouvre le lien dans ton e-mail de facturation.',
+    'Per gestire il tuo abbonamento, apri il link nell’email di fatturazione.',
+    'Um dein Abo zu verwalten, öffne den Link in deiner Abrechnungs-E-Mail.',
+  );
   if (code === 'already_pro') return t('You already have Bobby Pro.', 'Ya tienes Bobby Pro.', 'Você já tem o Bobby Pro.', 'Tu as déjà Bobby Pro.', 'Hai già Bobby Pro.', 'Du hast Bobby Pro bereits.');
   if (status === 401 || status === 403) return t('Sign in first: Bobby Pro belongs to your Bobby account.', 'Inicia sesión primero: Bobby Pro pertenece a tu cuenta de Bobby.', 'Entre primeiro: o Bobby Pro pertence à sua conta Bobby.', 'Connecte-toi d’abord : Bobby Pro est lié à ton compte Bobby.', 'Accedi prima: Bobby Pro appartiene al tuo account Bobby.', 'Melde dich zuerst an: Bobby Pro gehört zu deinem Bobby-Konto.');
   if (error === 'Card payments are not switched on yet.') return t('Card payments are not available yet.', 'Los pagos con tarjeta aún no están disponibles.', 'Os pagamentos com cartão ainda não estão disponíveis.', 'Les paiements par carte ne sont pas encore disponibles.', 'I pagamenti con carta non sono ancora disponibili.', 'Kartenzahlungen sind noch nicht verfügbar.');
   if (error === 'No card subscription on this account.') return t('This account has no card subscription to manage.', 'Esta cuenta no tiene una suscripción con tarjeta que administrar.', 'Esta conta não tem uma assinatura paga com cartão para gerenciar.', 'Ce compte n’a pas d’abonnement payé par carte à gérer.', 'Questo account non ha un abbonamento pagato con carta da gestire.', 'Für dieses Konto gibt es kein per Karte bezahltes Abo zu verwalten.');
   return t('Payments are temporarily unavailable. Please try again.', 'Los pagos no están disponibles por ahora. Inténtalo de nuevo.', 'Os pagamentos estão temporariamente indisponíveis. Tente novamente.', 'Les paiements sont momentanément indisponibles. Réessaie.', 'I pagamenti non sono disponibili al momento. Riprova.', 'Zahlungen sind vorübergehend nicht verfügbar. Versuche es erneut.');
 }
-export async function startBilling(action: 'checkout' | 'portal', market?: { symbol: string; timeframe: string }): Promise<string | null> {
+export async function startBilling(action: 'checkout' | 'portal', market?: { symbol: string; timeframe: string }, accountIsCurrent = () => true): Promise<string | null> {
   try {
+    const headers = await accessHeaders();
+    if (!accountIsCurrent()) return null;
     if (action === 'checkout') {
       // Load after this module initializes: the tracker shares accessHeaders and the install id.
       void import('@/lib/track').then(({ track }) => track('purchase_start', 'desk')).catch(() => {});
     }
     const params = new URLSearchParams(window.location.search);
-    const r = await fetch('/api/bobby-access', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) }, body: JSON.stringify({ action, language: clientLanguage(), locale: clientLocale(), country: params.get('country'), symbol: market?.symbol ?? params.get('symbol'), timeframe: market?.timeframe ?? params.get('timeframe') }) });
+    const r = await fetch('/api/bobby-access', { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify({ action, language: clientLanguage(), locale: clientLocale(), country: params.get('country'), symbol: market?.symbol ?? params.get('symbol'), timeframe: market?.timeframe ?? params.get('timeframe') }) });
     const body = (await r.json().catch(() => ({}))) as { url?: string; error?: string; code?: string; provider?: string };
+    if (!accountIsCurrent()) return null;
     if (r.ok && body.url) { window.location.assign(body.url); return null; }
     // Already paying by card (e.g. a past_due renewal): open the billing portal to fix it instead of a dead end.
-    if (action === 'checkout' && r.status === 409 && body.code === 'already_pro' && body.provider === 'stripe') return startBilling('portal', market);
+    if (action === 'checkout' && r.status === 409 && body.code === 'already_pro' && body.provider === 'stripe') return startBilling('portal', market, accountIsCurrent);
     return billingFailure(r.status, body.error, body.code);
   } catch { return billingFailure(); }
 }

@@ -157,8 +157,7 @@ function BrandMark() {
   );
 }
 
-// Full-bleed section background: video on md+, blurred still on mobile (saves data, avoids
-// mobile autoplay quirks). Poster JPGs are pre-blurred frames of the same videos.
+// Show the still at every size. Only offer the video on larger screens when motion is enabled.
 function SectionMedia({ name, className = '' }: { name: string; className?: string }) {
   return (
     <>
@@ -166,17 +165,19 @@ function SectionMedia({ name, className = '' }: { name: string; className?: stri
         src={`/posters/${name}.jpg`}
         alt=""
         aria-hidden="true"
-        className={`absolute inset-0 h-full w-full object-cover md:hidden ${className}`}
+        className={`absolute inset-0 h-full w-full object-cover md:motion-safe:hidden ${className}`}
       />
       <video
-        className={`absolute inset-0 hidden h-full w-full object-cover md:block ${className}`}
-        src={`/videos/${name}.mp4`}
+        className={`absolute inset-0 hidden h-full w-full object-cover md:motion-safe:block ${className}`}
+        poster={`/posters/${name}.jpg`}
         autoPlay
         muted
         loop
         playsInline
         aria-hidden="true"
-      />
+      >
+        <source media="(min-width: 768px) and (prefers-reduced-motion: no-preference)" src={`/videos/${name}.mp4`} type="video/mp4" />
+      </video>
     </>
   );
 }
@@ -788,7 +789,7 @@ export default function BobbyProtocolLanding() {
               <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">07 / Track record</div>
               <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />The live protocol is Base.</h2>
               <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">
-                Seven contracts on Base, owned by a 2-of-3 Safe. The debate ledger is read live from the database; calls the cycle commits in live mode are also anchored on Base. Today the daily cycle runs in paper mode, so its calls are graded in the public ledger; the first mainnet commit and resolve on TrackRecordV2 landed on Aug 22, 2026. Wallets stay self-custodial: on the web Bobby prepares bounded swap calldata on Base, records confirmed receipts and never holds funds or exchange credentials.
+                Seven contracts on Base, owned by a 2-of-3 Safe. The debate ledger is read live from the database; a daily-cycle call with complete levels and conviction ≥ 0.35 is also committed to TrackRecordV2 on Base before its outcome. The first mainnet commit and resolve landed on Aug 22, 2026; from then until Oct 29 a bug kept the cycle from recording calls, so none was published or committed in that window. Wallets stay self-custodial: on the web Bobby prepares bounded swap calldata on Base, records confirmed receipts and never holds funds or exchange credentials.
               </p>
             </div>
 

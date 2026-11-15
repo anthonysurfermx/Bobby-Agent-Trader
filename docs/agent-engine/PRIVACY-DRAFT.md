@@ -104,3 +104,52 @@ Tage aufbewahrt, ohne Text und ohne etwas, das dich identifiziert.
   The Portuguese is Brazil's, as on the rest of the page.
 - The retention number lives in two places that must say the same: `AGENT_KEEP_HOURS` in `api/agent-task.ts` and the
   paragraph.
+
+## Watches ("tell me if…") · DRAFT, added 2026-11-12, not published
+
+A watch is the first thing Bobby keeps **tied to an account** on its servers for longer than a day, so it needs its
+own paragraph before `BOBBY_AGENT_WATCHES=on` is set for anyone outside the pilot.
+
+| What | Where | For how long | Tied to |
+|---|---|---|---|
+| The asset, the direction, the size (3, 5 or 10 %) and the length (7 or 30 days) the person chose | `agent_watches` | while it is looking (at most 30 days), then 7 days | the account |
+| The closing price it is measured from, and the last day it was checked | `agent_watches` | the same | the watch |
+| Once met: the two closing prices and what code wrote that day | `agent_watches.result` | 7 days after it was met | the watch |
+
+Never a word the person typed or said: a watch is made of choices among fixed values. No model reads or writes
+anything about it. The notification names no asset and no number. Cancelling a watch, or deleting the account,
+removes it. The purge is `agent_watch_purge`, run by the scheduler every fifteen minutes.
+
+**en** · When you ask Bobby to watch an asset, it keeps the asset, the condition you chose and the closing price it
+is measured from, tied to your account, while it is watching (30 days at most) and for 7 days after it ends. It keeps
+no words of yours for this. You can cancel a watch at any time, and deleting your account removes them all.
+
+**es** · Cuando le pides a Bobby que vigile un activo, guarda el activo, la condición que elegiste y el precio de
+cierre desde el que se mide, ligados a tu cuenta, mientras vigila (30 días como máximo) y 7 días después de que
+termine. Para esto no guarda ninguna palabra tuya. Puedes cancelar un vigía cuando quieras, y al borrar tu cuenta se
+borran todos.
+
+**fr** · Quand tu demandes à Bobby de surveiller un actif, il conserve l’actif, la condition que tu as choisie et le
+cours de clôture à partir duquel elle est mesurée, liés à ton compte, tant qu’il surveille (30 jours au plus) et 7
+jours après la fin. Il ne conserve aucun mot de toi pour cela. Tu peux annuler une surveillance à tout moment, et
+supprimer ton compte les supprime toutes.
+
+**pt** · Quando pedes ao Bobby para vigiar um ativo, ele guarda o ativo, a condição que escolheste e o preço de fecho
+a partir do qual é medida, ligados à tua conta, enquanto vigia (30 dias no máximo) e durante 7 dias depois de
+terminar. Não guarda nenhuma palavra tua para isto. Podes cancelar uma vigia quando quiseres, e apagar a conta
+apaga todas.
+
+**pt-BR** · Quando você pede ao Bobby para vigiar um ativo, ele guarda o ativo, a condição que você escolheu e o
+preço de fechamento a partir do qual ela é medida, ligados à sua conta, enquanto vigia (30 dias no máximo) e por 7
+dias depois que termina. Ele não guarda nenhuma palavra sua para isso. Você pode cancelar uma vigia quando quiser, e
+excluir a conta exclui todas.
+
+**it** · Quando chiedi a Bobby di seguire un asset, conserva l’asset, la condizione che hai scelto e il prezzo di
+chiusura da cui è misurata, legati al tuo account, finché lo segue (30 giorni al massimo) e per 7 giorni dopo la
+fine. Per questo non conserva nessuna tua parola. Puoi annullare quando vuoi, ed eliminare l’account li elimina
+tutti.
+
+**de** · Wenn du Bobby bittest, einen Wert zu beobachten, speichert er den Wert, die Bedingung, die du gewählt hast,
+und den Schlusskurs, ab dem gemessen wird, verknüpft mit deinem Konto, solange er beobachtet (höchstens 30 Tage) und
+7 Tage danach. Dafür speichert er kein Wort von dir. Du kannst eine Beobachtung jederzeit beenden, und wenn du dein
+Konto löschst, werden alle gelöscht.

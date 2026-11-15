@@ -264,8 +264,8 @@ function renderRootLayout(b){
  const source=ts.createSourceFile('App.tsx',read('src/App.tsx'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
  const node=source.statements.find(item=>ts.isFunctionDeclaration(item)&&item.name?.text==='RootLayout');assert.ok(node);
  const code=ts.transpileModule(node.getText(source),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
- const factory=vm.runInContext('(function(require,React,useLocation,clientLocale,Helmet,ThemeProvider,Web3ContextProvider,AuthProvider,Outlet,ScrollRestoration,Toaster,Analytics){const exports={};'+code+';return RootLayout;})',b.context);
- const component=factory(name=>{assert.equal(name,'react/jsx-runtime');return jsx;},b.stubs.react,b.stubs['react-router-dom'].useLocation,b.load('src/lib/client-language.ts').clientLocale,'Helmet','ThemeProvider','Web3ContextProvider','AuthProvider','Outlet','ScrollRestoration','Toaster','Analytics');
+ const factory=vm.runInContext('(function(require,React,useLocation,clientLocale,Helmet,ThemeProvider,WalletRoute,AuthProvider,Outlet,ScrollRestoration,Toaster,Analytics){const exports={};'+code+';return RootLayout;})',b.context);
+ const component=factory(name=>{assert.equal(name,'react/jsx-runtime');return jsx;},b.stubs.react,b.stubs['react-router-dom'].useLocation,b.load('src/lib/client-language.ts').clientLocale,'Helmet','ThemeProvider','WalletRoute','AuthProvider','Outlet','ScrollRestoration','Toaster','Analytics');
  return component();
 }
 for(const [language,locale] of locales){

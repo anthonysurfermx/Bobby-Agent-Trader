@@ -135,14 +135,12 @@ function PosterCopy({ kicker, title, body, dark = false, size = 'lg', children }
 /** Byte standing on the studio floor, pointing at his pet. `byteRef` wraps his image so LedgeByte can take his place. */
 function HeroBobby({ className, byteRef }: { className: string; byteRef?: React.Ref<HTMLDivElement> }) {
   const reduceMotion = useReducedMotion();
-  const rise = reduceMotion ? {} : { initial: { opacity: 0, y: 30 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.8, ease: EASE } };
-  const pop = reduceMotion ? {} : { initial: { opacity: 0, scale: 0.6, y: 20 }, animate: { opacity: 1, scale: 1, y: 0 }, transition: { delay: 0.55, type: 'spring' as const, stiffness: 260, damping: 16 } };
+  const pop = reduceMotion ? {} : { initial: { scale: 0.9 }, animate: { scale: 1 }, transition: { type: 'spring' as const, stiffness: 260, damping: 16 } };
   return (
     <div className={`relative ${className}`}>
       <div className="absolute bottom-[1.5%] left-[8%] h-[8%] w-[84%] rounded-[50%] bg-[radial-gradient(closest-side,rgba(5,7,6,.2),rgba(5,7,6,0))]" />
       <div ref={byteRef} className="absolute bottom-[3%] left-[4%] aspect-[571/960] h-[94%]">
-        <motion.img
-          {...rise}
+        <img
           src={`${P}/byte-standing.webp`}
           alt={t('Byte, Bobby’s hoodie robot, standing and pointing at his pet', 'Byte, el robot con sudadera de Bobby, de pie señalando a su mascota')}
           draggable={false}
@@ -555,7 +553,6 @@ export default function BobbyAppLandingWorld() {
     'Pregúntale a Bobby por Bitcoin, Nvidia, oro y 600 activos más. Te discute antes de que entre tu dinero, escribe cada llamada antes de que el mercado responda, y tu disciplina construye un mundo que puedes recorrer.',
   );
   useEffect(() => { document.title = pageTitle; }, [pageTitle]);
-  const heroReveal = reduceMotion ? {} : { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.7 } };
 
   return (
     <div className="min-h-screen bg-[#08130E] text-[#050706] antialiased [font-family:Archivo,system-ui,sans-serif] selection:bg-[#7FFABD] selection:text-[#050706]">
@@ -597,7 +594,7 @@ export default function BobbyAppLandingWorld() {
         </header>
 
         <div className="relative mx-auto grid max-w-[1440px] gap-6 px-5 pb-14 pt-6 lg:h-[calc(100%-96px)] lg:grid-cols-[minmax(0,1fr)_460px] lg:items-center lg:gap-10 lg:px-16 lg:pb-16 lg:pt-0 xl:grid-cols-[minmax(0,1fr)_620px]">
-          <motion.div {...heroReveal} className="relative z-10">
+          <div className="relative z-10">
             <h1 className="text-[clamp(3.3rem,15vw,4rem)] font-black leading-[0.88] tracking-[-0.055em] lg:text-[4.25rem] xl:text-[clamp(5.5rem,7.1vw,7.5rem)]">
               {t('Fun to ask.', 'Divertido de usar.')}<br />{t('Hard to fool.', 'Difícil de engañar.')}
             </h1>
@@ -614,7 +611,7 @@ export default function BobbyAppLandingWorld() {
             <div className="relative mt-12 hidden h-14 lg:block">
               <TextSticker tone="gold" rotate={-5} className="left-1">{t('ANALYSIS, NEVER ADVICE.', 'ANÁLISIS, NUNCA ASESORÍA.')}</TextSticker>
             </div>
-          </motion.div>
+          </div>
 
           {/* Byte and his pet — phones */}
           <div className="lg:hidden">
