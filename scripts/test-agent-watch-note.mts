@@ -66,7 +66,7 @@ const ask = (search = true) => note.callNoteOnce({ model: 'claude-sonnet-5-5', s
     eq(good.usd, Number((20_000 * 2 / 1e6 + 400 * 10 / 1e6 + 2 * 0.01).toFixed(6)), 'the cost is the tokens at list price plus each search');
   }
   const sentRequest = requests.at(-1)!;
-  eq([sentRequest.model, sentRequest.tools.length, sentRequest.tools[0].type, sentRequest.tools[0].max_uses, sentRequest.tools[0].allowed_domains.includes('reuters.com'), sentRequest.messages.length, sentRequest.output_config.effort],
+  eq([sentRequest.model, sentRequest.tools.length, sentRequest.tools[0].type, sentRequest.tools[0].max_uses, JSON.stringify(sentRequest.tools[0].allowed_domains) === JSON.stringify(note.NOTE_DOMAINS), sentRequest.messages.length, sentRequest.output_config.effort],
     ['claude-sonnet-5-5', 1, 'web_search_20260209', note.NOTE_MAX_SEARCHES, true, 1, 'low'], 'one tool, search, with its ceiling and its list of sites; one message; low effort');
   ok(!('tool_choice' in sentRequest) && !('thinking' in sentRequest) && !('temperature' in sentRequest), 'nothing this model refuses is sent');
 
