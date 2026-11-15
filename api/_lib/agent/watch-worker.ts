@@ -7,7 +7,10 @@
 //   2. notify   claim the met watches that owe their notification and send it to the account's devices.
 //   3. purge    remove what ended more than WATCH_KEEP_DAYS ago.
 // Invariants:
-//   · no model call, no provider money: a tick costs source requests and nothing else;
+//   · no model call and no provider money, with ONE exception that is off unless BOBBY_AGENT_WATCH_NOTES is "on":
+//     a met watch may get a note (watch-note.ts: what was published about the move, with its sources), one paid
+//     call inside the briefings' reservation. A note that cannot be written changes nothing else: the watch ends
+//     with what code wrote. A met watch there is no time left to write a note for is left for the next tick;
 //   · a watch that cannot be read is never met and never silently dropped: it is looked at again, and when its
 //     last day passes it ends saying it could not be followed;
 //   · a notification is claimed before it is sent and never claimed twice: an ambiguous send is not repeated;
@@ -20,17 +23,20 @@ import { apnsConfig, pushMasterKey, type ApnsConfig } from '../briefings/config.
 import { closeApns, sendApnsPayload, type ApnsDelivery, type ApnsOutcome } from '../briefings/apns.js';
 import { decryptToken } from '../briefings/push-crypto.js';
 import { readAssets, readDaily, type ToolContext } from './tools.js';
-import { WATCH_KEEP_DAYS, checkWatch, watchPayload, watchResult } from './watch.js';
+import { WATCH_KEEP_DAYS, checkWatch, watchPayload, watchResult, type Watch, type WatchMet } from './watch.js';
+import { NOTE_TIMEOUT_MS, noteDeps, watchNotesOn, writeWatchNote, type WatchNote } from './watch-note.js';
 import type { WatchClaim, WatchStore } from './watch-store.js';
 import type { DailyBar } from '../harness/bars.js';
 
-export interface WatchTickReport { looked: number; met: number; quiet: number; unreadable: number; expired: number; lost: number; notified: number; undelivered: number; purged: number; codes: string | null; stoppedEarly: boolean }
+export interface WatchTickReport { looked: number; met: number; noted: number; deferred: number; quiet: number; unreadable: number; expired: number; lost: number; notified: number; undelivered: number; purged: number; codes: string | null; stoppedEarly: boolean }
 export interface WatchWorkerDeps {
   store: WatchStore; tools: ToolContext; now: () => number; worker: string;
   apnsConfig: () => ApnsConfig | null; pushMasterKey: () => Buffer | null;
   decryptToken: (sealed: string, master: Buffer) => string;
   send: (cfg: ApnsConfig, n: ApnsDelivery, payload: Record<string, unknown>, now: Date) => Promise<ApnsOutcome>;
   close: () => void;
+  /** Writes the note of a watch that was just met; null when notes are off. Never throws. */
+  note: ((watch: Watch, met: WatchMet) => Promise<WatchNote | null>) | null;
   logger: { error: (...args: unknown[]) => void };
 }
 
@@ -43,6 +49,8 @@ export const PUSH_BATCH = 50;
 /** How long Apple keeps trying a notification for a phone that is off. */
 const PUSH_LIVES_MS = 24 * 3_600_000;
 const STAGE_MIN_MS = 4_000, PUSH_MIN_MS = 12_000;
+/** What must be left of the tick to start a note: its own timeout, the write, and the notification after it. */
+export const NOTE_NEED_MS = NOTE_TIMEOUT_MS + STAGE_MIN_MS;
 
 export function watchWorkerDeps(store: WatchStore, over: Partial<WatchWorkerDeps> = {}): WatchWorkerDeps {
   const now = over.now ?? (() => Date.now());
@@ -61,6 +69,7 @@ export function watchWorkerDeps(store: WatchStore, over: Partial<WatchWorkerDeps
     decryptToken: over.decryptToken ?? decryptToken,
     send: over.send ?? ((cfg, n, payload, at) => sendApnsPayload(cfg, n, payload, undefined, at)),
     close: over.close ?? closeApns, logger: over.logger ?? console,
+    note: over.note !== undefined ? over.note : (watchNotesOn() ? (watch, met) => writeWatchNote(watch, met, noteDeps({ now, worker: 'watch-note' })) : null),
   };
 }
 
@@ -71,7 +80,7 @@ const apnsIdFor = (watchId: string, token: string) => {
 };
 
 export async function runWatchTick(d: WatchWorkerDeps, deadlineAt: number): Promise<WatchTickReport> {
-  const report: WatchTickReport = { looked: 0, met: 0, quiet: 0, unreadable: 0, expired: 0, lost: 0, notified: 0, undelivered: 0, purged: 0, codes: null, stoppedEarly: false };
+  const report: WatchTickReport = { looked: 0, met: 0, noted: 0, deferred: 0, quiet: 0, unreadable: 0, expired: 0, lost: 0, notified: 0, undelivered: 0, purged: 0, codes: null, stoppedEarly: false };
   const codes = new Set<string>(), left = () => deadlineAt - d.now();
 
   // 1. look
@@ -93,8 +102,11 @@ export async function runWatchTick(d: WatchWorkerDeps, deadlineAt: number): Prom
       if (check.kind === 'met') {
         // The plain reading of the asset's last thirty days, by code. When it does not come back the two closes are told alone.
         const analysis = await readAssets({ symbols: [watch.symbol], windowDays: 30 }, d.tools).then((out) => out.analysis ?? null).catch(() => null);
-        wrote = await d.store.met(watch.id, fence, check.met, watchResult(watch, check.met, analysis), d.now());
-        if (wrote) report.met++;
+        // No time for its note in this tick: it keeps its lease until it runs out and the next tick meets it first.
+        if (d.note && left() < NOTE_NEED_MS) { report.deferred++; report.looked--; continue; }
+        const note = d.note ? await d.note(watch, check.met).catch(() => null) : null;
+        wrote = await d.store.met(watch.id, fence, check.met, { ...watchResult(watch, check.met, analysis), ...(note ? { note } : {}) } as never, d.now());
+        if (wrote) { report.met++; if (note) report.noted++; }
       } else if (over) {
         wrote = await d.store.expire(watch.id, fence, check.kind === 'unreadable', d.now());
         if (wrote) report.expired++;

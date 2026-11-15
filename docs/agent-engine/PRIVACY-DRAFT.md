@@ -116,6 +116,13 @@ own paragraph before `BOBBY_AGENT_WATCHES=on` is set for anyone outside the pilo
 | The closing price it is measured from, and the last day it was checked | `agent_watches` | the same | the watch |
 | Once met: the two closing prices and what code wrote that day | `agent_watches.result` | 7 days after it was met | the watch |
 
+**If the note is turned on** (`BOBBY_AGENT_WATCH_NOTES`, off; needs its own yes): when a watch is met, the asset and
+the two dates are sent to Anthropic, which searches a fixed list of news sites; the sentences it writes and the
+links it read are kept in `agent_watches.result` for the same 7 days. No account, no thesis and no word of the
+person is in that request. Opening a met watch on a phone that holds a thesis about that asset sends the thesis
+text to Bobby's server and to Anthropic for one answer; it is not stored and not logged. The published text must
+say both before the flag goes on (en and es below are not written yet for this part).
+
 Never a word the person typed or said: a watch is made of choices among fixed values. No model reads or writes
 anything about it. The notification names no asset and no number. Cancelling a watch, or deleting the account,
 removes it. The purge is `agent_watch_purge`, run by the scheduler every fifteen minutes.

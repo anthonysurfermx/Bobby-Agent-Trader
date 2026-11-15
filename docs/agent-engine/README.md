@@ -144,7 +144,7 @@ reasons: `PLAN-PROACTIVE.md`. Code: `api/_lib/agent/watch.ts` (what a watch is, 
 `watch-store.ts` (the storage contract, memory and Postgres), `watch-worker.ts` (one tick), door `api/agent-watch.ts`,
 SQL `agent-watches.sql`, tests `scripts/test-agent-watch.mts` (`npm run test:agent-watch`, in CI).
 
-- **No model, no provider money.** The condition is a choice among fixed values (falls, rises or moves; 3, 5 or 10%;
+- **No model, no provider money** (the note below is the one exception, and it is off)**.** The condition is a choice among fixed values (falls, rises or moves; 3, 5 or 10%;
   7 or 30 days), the check is arithmetic on closes the strict reader accepted, and the answer the day it is met is
   written by code: the two closes and the distance between them, then the same plain reading of the last thirty days
   that `composeByCode` gives. So the engine's instructions and toolset, and every blind set that measured them, are
@@ -171,6 +171,28 @@ npm run test:agent-watch
 ```bash
 DATABASE_URL=postgres://postgres@127.0.0.1:54329/agent_engine_test npm run test:agent-watch
 ```
+
+### The note of a met watch (2026-11-14, built, OFF: `BOBBY_AGENT_WATCH_NOTES`)
+
+A watch that is met says what happened by code. With the flag on it also says **what was published about it**, and
+the phone can ask what it means **for the thesis the person saved**. Code: `api/_lib/agent/watch-note.ts`, tests
+`scripts/test-agent-watch-note.mts` (`npm run test:agent-watch-note`, in CI, no provider is called).
+
+- **One paid call per met watch**, Sonnet 5.5 at low effort with the provider's web search (`web_search_20260209`,
+  at most 3 searches, only the sites in `NOTE_DOMAINS`). Reserved before it leaves, inside the briefings' day and
+  month caps (`withReservation`): no caps, no key or no money left means no call, and the watch ends as before.
+  Worst case reserved: about US$0.18; expected about US$0.05 to 0.10. Not measured yet.
+- **Kept only if it can be traced.** Every text block of the answer must cite an allowed site over https. A reply
+  with no citation, a paused, refused or cut-off turn, more than 700 characters, or a sentence that tells the person
+  what to do, is dropped whole. "Nothing published explains it" is the model's sentinel and code's sentence.
+- **The numbers stay code's.** The question carries the asset and the two days, never the percentage or a price,
+  and the instructions forbid any other price or forecast.
+- **The thesis is not stored.** `POST { op: "thesis" }` carries the person's words for one answer (no search, no
+  tool), like the thesis review of `desk-debate`. Nothing of it is written to the watch or to a log.
+- **In the tick**, a note needs `NOTE_NEED_MS` (32 s) of the 45 s budget: the first met watch of a tick gets its
+  note, a second one waits for the next tick (fifteen minutes) instead of ending without one.
+- **Not measured.** The kit is `scripts/agent-watch-note-eval/` (cases from real closes, a runner that refuses
+  production's key, a blind grading sheet). It has not been run: it needs a key and a budget of its own.
 
 ## Reproduce
 
