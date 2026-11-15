@@ -209,7 +209,7 @@ export default function NucleoDesk() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteNotice, setInviteNotice] = useState<string | null>(null);
   const [signinNote, setSigninNote] = useState<{ title: string; body: string } | null>(null);
-  const [billing, setBilling] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
+  const [billing, setBilling] = useState<{ busy: boolean; error: string | null; source?: 'limit' | 'profile' }>({ busy: false, error: null });
   const [proNotice, setProNotice] = useState<'welcome' | 'cancelled' | null>(() => (params.get('pro') === 'welcome' ? 'welcome' : params.get('pro') === 'cancelled' ? 'cancelled' : null));
   const meter: Access | null = accessState?.access ?? null;
   accessRef.current = accessState;
@@ -250,7 +250,7 @@ export default function NucleoDesk() {
   // The live desk: each argument as it arrives; a debate that did not finish; what "Retry" re-runs.
   const [live, setLive] = useState<LiveArgs>({});
   const [agentsFailed, setAgentsFailed] = useState<{ level: DeskLevel; symbol: string; refunded: boolean } | null>(null);
-  const [deskRetry, setDeskRetry] = useState<{ symbol: string; level: DeskLevel } | null>(null);
+  const [deskRetry, setDeskRetry] = useState<{ question: string; level: DeskLevel } | null>(null);
   const [showDebate, setShowDebate] = useState(false);
   const phaseRef = useRef<Phase>(phase);
   phaseRef.current = phase;
@@ -264,6 +264,7 @@ export default function NucleoDesk() {
     accessGate.current.invalidate();
     accessRef.current = null;
     setAccessState(null);
+    setBilling({ busy: false, error: null });
     requestRef.current?.abort();
     if (!WORKING.includes(phaseRef.current) && phaseRef.current !== 'reveal') return;
     if (revealRef.current) clearTimeout(revealRef.current);
@@ -375,7 +376,7 @@ export default function NucleoDesk() {
         : t(`The agents did not finish for ${snap.symbol}. Try again.`, `Los agentes no terminaron con ${snap.symbol}. Inténtalo de nuevo.`, `Os agentes não terminaram com ${snap.symbol}. Tente de novo.`);
       setPhase('error');
       setDeskError(msg);
-      setDeskRetry(run.failure === 'budget_paused' ? { symbol: snap.symbol, level: 'rapido' } : { symbol: snap.symbol, level: runLevel });
+      setDeskRetry({ question: questionRef.current || snap.symbol, level: run.failure === 'budget_paused' ? 'rapido' : runLevel });
       setMessages((m) => [...m, { from: 'bobby', text: msg }]);
       say(msg);
       return;
@@ -388,7 +389,7 @@ export default function NucleoDesk() {
       setPhase('error');
       const msg = t(`The desk did not answer for ${snap.symbol}. Try again in a moment.`, `El desk no respondió por ${snap.symbol}. Inténtalo de nuevo en un momento.`, `O desk não respondeu sobre ${snap.symbol}. Tente de novo em instantes.`);
       setDeskError(msg);
-      setDeskRetry({ symbol: snap.symbol, level: runLevel });
+      setDeskRetry({ question: questionRef.current || snap.symbol, level: runLevel });
       setMessages((m) => [...m, { from: 'bobby', text: msg }]);
       say(msg);
       return;
@@ -455,6 +456,7 @@ export default function NucleoDesk() {
     setDeskError(null);
     setGuide(null);
     setGuideRetry(null);
+    setDeskRetry(null);
     setAnswer(null);
     setSnapshot(null);
     setPending(null);
@@ -473,11 +475,23 @@ export default function NucleoDesk() {
     // "bitcoin" in it must not open a market read the person did not ask for.
     const { found: r, unavailable } = via === 'guide' ? { found: null, unavailable: false } : await resolveQuestion(q, controller.signal);
     if (controller.signal.aborted) return;
-    // A question that names no asset is the companion's, when the pilot is on. A search that did not answer is
-    // not "no asset": it keeps today's message. Off, or unable to answer, the desk does what it did before.
+    if (unavailable) {
+      const msg = t(
+        'Asset search is unavailable. Try your question again.', 'La búsqueda de activos no está disponible. Vuelve a intentar tu pregunta.',
+        'A busca de ativos está indisponível. Tente fazer sua pergunta novamente.', 'La recherche d’actifs est indisponible. Réessayez votre question.',
+        'La ricerca degli asset non è disponibile. Riprova con la tua domanda.', 'Die Asset-Suche ist nicht verfügbar. Versuche es mit deiner Frage erneut.',
+      );
+      exchangeRef.current = previous;
+      setDeskError(msg);
+      setDeskRetry({ question: q, level: lv });
+      setMessages((m) => [...m, { from: 'bobby', text: msg }]);
+      setPhase('error');
+      return;
+    }
+    // A question that names no asset is the companion's, when the pilot is on.
     // A look-alike the search offered for a whole sentence travels with the question: the companion says
     // whether the person meant that asset ("qué opinas de ethereun hoy") or not ("Tengo 1,000 pesos…" → MENGO).
-    if (!unavailable && (!r || readsAsAQuestion(q, r))) {
+    if (!r || readsAsAQuestion(q, r)) {
       const turn = await companionTurn(q, controller.signal, r ? { symbol: r.snapshot.symbol, name: r.confirmName } : undefined, previous);
       if (controller.signal.aborted) return;
       // An offer the person has not taken is what is on screen until they take it or ask something else.
@@ -622,10 +636,10 @@ export default function NucleoDesk() {
     setLive({}); setAgentsFailed(null); setDeskRetry(null); setGuideRetry(null); setShowDebate(false);
   };
   // "Retry" re-asks the same question, on the level that failed (or Rápido when the premium pause said so).
-  const retry = (r: { symbol: string; level: DeskLevel }) => {
+  const retry = (r: { question: string; level: DeskLevel }) => {
     sfxTock();
     if (r.level !== deskLevelRef.current) { setDeskLevel(r.level); deskLevelRef.current = r.level; }
-    void ask(questionRef.current || r.symbol);
+    void ask(r.question);
   };
 
   const chartSymbol = snapshot?.symbol ?? initialScreen.symbol;
@@ -923,7 +937,7 @@ export default function NucleoDesk() {
           <div className="n-label">{t('No verdict this time', 'Sin veredicto esta vez', 'Sem veredito desta vez')}</div>
           <p className="n-synth-head">{t('The agents did not finish, so nothing was decided. The market read below is data, not a thesis.', 'Los agentes no terminaron, así que no se decidió nada. La lectura de abajo son datos, no una tesis.', 'Os agentes não terminaram, então nada foi decidido. A leitura abaixo são dados, não uma tese.')}</p>
           {agentsFailed.level !== 'rapido' && agentsFailed.refunded && <p className="n-synth-note">{t(`Your ${levelName(agentsFailed.level)} was not used.`, `No se descontó tu ${levelName(agentsFailed.level)}.`, `Seu ${levelName(agentsFailed.level)} não foi descontado.`)}</p>}
-          <button type="button" className="n-send mt-4" onClick={() => retry({ symbol: agentsFailed.symbol, level: agentsFailed.level })}>{t('Try again', 'Reintentar', 'Tentar de novo')}</button>
+          <button type="button" className="n-send mt-4" onClick={() => retry({ question: questionRef.current || agentsFailed.symbol, level: agentsFailed.level })}>{t('Try again', 'Reintentar', 'Tentar de novo')}</button>
         </div>
       ) : agents?.synthesis ? (
         <div className="n-synth mt-8 w-full">
@@ -1060,10 +1074,13 @@ export default function NucleoDesk() {
     </div>
   ) : null;
 
-  const subscribe = async () => {
-    setBilling({ busy: true, error: null });
-    const err = await startBilling('checkout', { symbol: chartSymbol, timeframe: initialScreen.timeframe });
-    if (err) setBilling({ busy: false, error: err });
+  const openBilling = async (action: 'checkout' | 'portal', source: 'limit' | 'profile') => {
+    if (billing.busy) return;
+    const epoch = accessGate.current.revision;
+    const accountIsCurrent = () => accessGate.current.sameEpoch(epoch);
+    setBilling({ busy: true, error: null, source });
+    const error = await startBilling(action, { symbol: chartSymbol, timeframe: initialScreen.timeframe }, accountIsCurrent);
+    if (accountIsCurrent()) setBilling({ busy: false, error, source });
   };
   const meterLine = meter && meter.paywall && meter.tier !== 'pro' && meter.remaining !== null && meter.limit !== null
     ? meter.tier === 'anon'
@@ -1216,6 +1233,7 @@ export default function NucleoDesk() {
               max: accessState?.levels?.levels.maximo.bonus ?? 0,
             }}
             pro={{
+              billing: { busy: billing.busy, error: billing.source === 'profile' ? billing.error : null },
               label: meter?.tier === 'pro'
                 ? giftedPro ? t('Bobby Pro · gifted', 'Bobby Pro · regalado', 'Bobby Pro · presente')
                   : t('Bobby Pro · active', 'Bobby Pro · activo', 'Bobby Pro · ativo')
@@ -1232,12 +1250,11 @@ export default function NucleoDesk() {
                   ? t('Coming to the web · earn it by inviting friends', 'Muy pronto en la web · gánalo invitando amigos', 'Em breve na web · ganhe convidando amigos')
                   : t('Unlimited Quick reads · fair use · US$4.90/month', 'Lecturas Rápidas sin límite · uso razonable · US$4.90/mes', 'Análises Rápidas ilimitadas · uso razoável · US$ 4,90/mês', 'Analyses Rapides illimitées · usage raisonnable · 4,90 USD/mois', 'Analisi Rapide illimitate · uso corretto · 4,90 USD/mese', 'Unbegrenzte Schnellanalysen · angemessene Nutzung · 4,90 USD/Monat')),
               action: !subscription?.cardPlan && meter?.tier === 'pro' && (!paidPro || subscription?.provider !== 'stripe') ? undefined : () => {
-                if (subscription?.cardPlan) { void startBilling('portal', { symbol: chartSymbol, timeframe: initialScreen.timeframe }); return; }
-                if (meter?.tier === 'pro') { void startBilling('portal', { symbol: chartSymbol, timeframe: initialScreen.timeframe }); return; }
+                if (subscription?.cardPlan || meter?.tier === 'pro') { void openBilling('portal', 'profile'); return; }
                 if (!accessState?.signedIn) { setSheet('none'); setSignInPrompt(true); return; }
                 // Web checkout is off until Stripe is live: a tap must still lead somewhere, and the invite is how Pro is earned today.
                 if (!accessState.payments.stripe) { setSheet('none'); setInviteOpen(true); void refreshAccess(); return; }
-                void subscribe();
+                void openBilling('checkout', 'profile');
               },
             }}
             invite={{
@@ -1271,7 +1288,7 @@ export default function NucleoDesk() {
         {!evolution && drops[0] && <ToolUnlockOverlay key="drop" companion={companion} tool={drops[0]} onDone={() => { const tool = drops[0]; setDrops((d) => d.slice(1)); if (toolHasArt(tool)) { setSheet('profile'); setTimeout(() => setEquip((e) => ({ url: toolArt(tool), token: e.token + 1 })), 520); } }} />}
       </AnimatePresence>
 
-      <LimitDialog limit={limit} state={accessState} billing={billing} onClose={() => setLimit(null)}
+      <LimitDialog limit={limit} state={accessState} billing={{ busy: billing.busy, error: billing.source === 'limit' ? billing.error : null }} onClose={() => setLimit(null)}
         onSignIn={() => {
           const lv = limit?.level ?? 'rapido';
           setSigninNote({
@@ -1282,7 +1299,7 @@ export default function NucleoDesk() {
           });
           setLimit(null); setSheet('none'); setSignInPrompt(true);
         }}
-        onSubscribe={() => void subscribe()} onLevel={setDeskLevel} />
+        onSubscribe={() => void openBilling('checkout', 'limit')} onLevel={setDeskLevel} />
       <Dialog.Root open={inviteOpen} onOpenChange={setInviteOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="n-dlg-overlay" />

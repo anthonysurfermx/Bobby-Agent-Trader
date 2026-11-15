@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&family=Sora:wght@200;300;400;500&display=swap');
 .land-studio{--land-mint:#a3f5c8;--land-ink:#071111;--land-border:rgba(183,225,207,.12);height:100dvh;min-height:520px;display:flex;flex-direction:column;background:#081312;color:#e7f2eb;font-family:Inter,system-ui,sans-serif;overflow:hidden;color-scheme:dark}
 .land-studio button,.land-studio a{-webkit-tap-highlight-color:transparent}
 .land-studio button{cursor:pointer}

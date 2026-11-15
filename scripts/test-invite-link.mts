@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const require = createRequire(`${root}/package.json`);
@@ -330,7 +331,32 @@ for (const path of ['/i/ABCDEFGI', '/i/ABC', '/i/ABCD2345X', '/i']) for (const l
 // ---- the route is declared, and the visit is counted without the code ----
 {
   const app = read('src/App.tsx');
-  ok(/lazy\(\(\) => import\('@\/pages\/BobbyInvitePage'\)\)/.test(app) && /path: 'i\/:code',\s*\n\s*element: \(<Suspense fallback=\{<PageLoader \/>\}><BobbyInvitePage \/><\/Suspense>\)/.test(app), 'src/App.tsx declares /i/:code as a lazy route');
+  ok(/const BobbyInvitePage = lazy\(\(\) => import\('@\/pages\/BobbyInvitePage'\)\)/.test(app), 'the invitation page is lazy-loaded');
+  const source = ts.createSourceFile('App.tsx', app, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const routes = new Map<string, ts.Expression[]>();
+  function visit(node: ts.Node) {
+    if (ts.isObjectLiteralExpression(node)) {
+      const properties = node.properties.filter(ts.isPropertyAssignment);
+      const path = properties.find(property => property.name.getText(source) === 'path')?.initializer;
+      const element = properties.find(property => property.name.getText(source) === 'element')?.initializer;
+      if (path && ts.isStringLiteral(path) && element) {
+        routes.set(path.text, [...(routes.get(path.text) ?? []), element]);
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(source);
+  for (const path of ['i/:code', 'i']) {
+    const elements = routes.get(path) ?? [];
+    eq(elements.length, 1, `/${path} has one route element`);
+    const components: string[] = [];
+    function collectComponents(node: ts.Node) {
+      if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) components.push(node.tagName.getText(source));
+      ts.forEachChild(node, collectComponents);
+    }
+    collectComponents(elements[0]);
+    eq(components, ['Suspense', 'PageLoader', 'BobbyInvitePage'], `/${path} renders the lazy invitation page`);
+  }
   ok(/\[\/\^\\\/i\(\\\/\|\$\)\/, 'invite'\]/.test(read('src/lib/track.ts')), 'visits and App Store taps on the page are counted under the surface "invite"');
 }
 
