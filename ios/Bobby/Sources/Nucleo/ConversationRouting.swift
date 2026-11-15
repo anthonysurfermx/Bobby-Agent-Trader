@@ -27,10 +27,14 @@ enum ConversationRouting {
             return words.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         }
         if names.contains(where: { q == $0 || bare(q) == bare($0) }) { return true }
-        for template in reads[language] ?? [] {
-            for name in names {
-                let match = normalize(template.replacingOccurrences(of: "X", with: name))
-                if q == match || (endings[language] ?? []).contains(where: { q == match + " " + $0 }) { return true }
+        // A reader can ask in a different language from the interface. Keep exact whole-question
+        // matching so an explanation that happens to mention a read cannot start one.
+        for (phraseLanguage, templates) in reads {
+            for template in templates {
+                for name in names {
+                    let match = normalize(template.replacingOccurrences(of: "X", with: name))
+                    if q == match || (endings[phraseLanguage] ?? []).contains(where: { q == match + " " + $0 }) { return true }
+                }
             }
         }
         return false

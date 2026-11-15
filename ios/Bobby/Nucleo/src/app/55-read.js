@@ -72,24 +72,35 @@ function onStage(p){
 /* Acknowledgment after two real animation frames with a settled, visible result card.
    Native retains the signed receipt; this trusted page only names the current request UUID. */
 function observePresentedRead(){
-  if (ST.name === 'THESIS_VIEW' || A.viewOnly) return;
   var r = READ;
-  if (!r || !r.model || !r.reply || r.reply.status !== 'ok' || !r.requestId || r.presented || !canRun()) return;
-  var visible = false;
+  if (!r || !r.model || !r.reply || r.reply.status !== 'ok' || !r.requestId || r.presented || r.presentationPending || r.presentationAttempts >= 3) return;
+  if (ST.name === 'THESIS_VIEW' || A.viewOnly || !canRun()){ r.visibleFrames = 0; return; }
+  if (r.presentationRetryAt && performance.now() < r.presentationRetryAt) return;
+  var visibleCard = -1;
   if (A.cardsOn){
     for (var i = 0; i < el.cards.length; i++){
+      if (r.presentationCard != null && r.presentationCard !== i) continue;
       var c = el.cards[i];
       if (!A.rev[i] || A.rev[i].x < 0.999 || !c.textContent.trim()) continue;
       var box = c.getBoundingClientRect(), style = W.getComputedStyle(c);
       if (style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity) >= 0.5 &&
-          box.width > 0 && box.height > 0 && box.right > 0 && box.bottom > 0 && box.left < W.innerWidth && box.top < W.innerHeight){ visible = true; break; }
+          box.width > 0 && box.height > 0 && box.right > 0 && box.bottom > 0 && box.left < W.innerWidth && box.top < W.innerHeight){ visibleCard = i; break; }
     }
   }
-  if (!visible){ r.visibleFrames = 0; return; }
+  if (visibleCard < 0){ r.visibleFrames = 0; return; }
   r.visibleFrames = (r.visibleFrames || 0) + 1;
   if (r.visibleFrames < 2) return;
-  r.presented = true;
-  bcall('read.rendered', { requestId: r.requestId }).catch(noop);
+  r.presentationCard = visibleCard;
+  r.presentationPending = true;
+  r.presentationAttempts = (r.presentationAttempts || 0) + 1;
+  function finished(reply){
+    r.presentationPending = false;
+    if (reply && reply.accepted === true){ r.presented = true; return; }
+    // Only a later pair of visible frames can retry. A closed or replaced read has no timer.
+    r.visibleFrames = 0;
+    r.presentationRetryAt = performance.now() + 1000 * r.presentationAttempts;
+  }
+  bcall('read.rendered', { requestId: r.requestId }).then(finished, function(){ finished(null); });
 }
 /* the header's second line: the real asset and price from ask.stage (never a JS guess) */
 function dockAsset(){

@@ -5,17 +5,7 @@
 // an exception is re-examined instead of forgotten. Anything else rated high or critical fails the build.
 import { spawnSync } from 'node:child_process';
 
-const EXCEPTIONS = [
-  {
-    id: 'GHSA-qr28-fpjm-wq7f',
-    until: '2026-11-28',
-    why: 'decode-uri-component, quadratic decoding of malformed percent-encoded input. It arrives only through '
-      + 'query-string@7 inside WalletConnect (@walletconnect/utils 2.21.x, via @wagmi/connectors 8.0.1 and the second '
-      + '@reown/appkit 1.7.8), which runs in the browser and never in api/. The fix, 0.5.1, is ESM-only and cannot be '
-      + 'require()d by query-string@7; @walletconnect/utils dropped query-string from 2.21.9, so the real fix is moving '
-      + 'the wallet stack (appkit / wagmi connectors) onto it before this date.',
-  },
-];
+const EXCEPTIONS = [];
 
 const today = process.env.AUDIT_GATE_TODAY || new Date().toISOString().slice(0, 10);
 const run = spawnSync('npm', ['audit', '--json'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });

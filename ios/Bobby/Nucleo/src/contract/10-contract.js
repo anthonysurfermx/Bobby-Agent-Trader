@@ -31,6 +31,17 @@
     return errs;
   }
   function strip(o, keys) { var c = JSON.parse(JSON.stringify(o)); keys.forEach(function (k) { delete c[k]; }); return c; }
+  // Native assigns a fresh request ID even when a completed ask has no market read.
+  function compareAsk(reply, golden, volatileKeys) {
+    if (B.native) {
+      if (typeof reply.requestId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(reply.requestId)) {
+        throw new Error('Missing or invalid native requestId');
+      }
+      volatileKeys = volatileKeys.concat('requestId');
+    }
+    var differences = diff(strip(reply, volatileKeys), strip(golden, volatileKeys));
+    if (differences.length) throw new Error(differences.join('\n'));
+  }
   // Native reads add the active regional context and the recorded equity currency.
   // Keep the golden comparison strict: these fields must match the declared fixture/session.
   function expectedRead(golden) {
@@ -200,17 +211,17 @@
   test('unknown asset -> unknown_asset (no desk call)', function () {
     var s = fixturesOnly(); if (s) return Promise.resolve(s);
     return B.api.ask({ question: 'hello how are you' }).then(function (r) {
-      var d = diff(strip(r, []), FX.ask.unknown); if (d.length) throw new Error(d.join('\n'));
+      compareAsk(r, FX.ask.unknown, []);
     });
   });
   test('proxy asset -> confirm(token) -> unsupported(asset_class), no desk call', function () {
     var s = fixturesOnly(); if (s) return Promise.resolve(s);
     return B.api.ask({ question: 'Should I buy gold?' }).then(function (r) {
-      var d = diff(strip(r, ['token']), strip(FX.ask['confirm-proxy'], ['token'])); if (d.length) throw new Error(d.join('\n'));
+      compareAsk(r, FX.ask['confirm-proxy'], ['token']);
       if (!r.token) throw new Error('no token');
       return B.api.ask({ token: r.token });
     }).then(function (r) {
-      var d = diff(r, FX.ask['unsupported-proxy']); if (d.length) throw new Error(d.join('\n'));
+      compareAsk(r, FX.ask['unsupported-proxy'], []);
     });
   });
   test('NVDA read == golden (minus volatile) and ask.stage order', function () {
@@ -251,7 +262,7 @@
     var s = fixturesOnly(); if (s) return Promise.resolve(s);
     var g = gateScenario(); if (!g) return Promise.resolve('skip: not a gate scenario (?scenario=signin_required|subscription_required)');
     return B.api.ask({ question: 'Should I buy NVIDIA right now?' }).then(function (r) {
-      var d = diff(strip(r, ['token']), strip(FX.ask[g], ['token'])); if (d.length) throw new Error('golden drift:\n' + d.join('\n'));
+      compareAsk(r, FX.ask[g], ['token']);
       if (!r.token) throw new Error('no retry token');
       var e = check(r.access, ACCESS); if (e.length) throw new Error(e.join('\n'));
       if ('agents' in r) throw new Error('a refused read carries no verdict');

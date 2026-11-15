@@ -31,7 +31,7 @@ final class BriefingIntent: ObservableObject {
     @discardableResult
     func store(_ raw: Any?) -> Bool {
         guard let id = BriefingJSON.uuid(raw) else { return false }
-        pending = id
+        if id != openBriefId { pending = id }
         return true
     }
 
@@ -48,6 +48,8 @@ final class BriefingIntent: ObservableObject {
     /// The report screen says which briefing it shows (nil when it closes).
     func markOpen(_ id: String?) {
         openBriefId = id.flatMap { BriefingJSON.uuid($0) }
+        // A tap may arrive between presenting the report's sheet and its onAppear.
+        if let openBriefId, pending == openBriefId { clear() }
     }
 
     /// The `briefId` of a briefing push payload (`apnsPayload`: generic copy + {briefId} only).

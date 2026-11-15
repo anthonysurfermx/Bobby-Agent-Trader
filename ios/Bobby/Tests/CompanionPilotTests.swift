@@ -120,9 +120,13 @@ final class CompanionPilotTests: XCTestCase {
         let reads=["en":"Analyze Bitcoin today!","es":"¡Analiza Bitcoin hoy!","fr":"Analyse Bitcoin aujourd’hui","pt":"Analisa Bitcoin hoje","it":"Analizza Bitcoin oggi","de":"Analysiere Bitcoin heute"]
         let explanations=["en":"What is Bitcoin?","es":"¿Qué es Bitcoin?","fr":"C’est quoi Bitcoin ?","pt":"O que é Bitcoin?","it":"Che cos’è Bitcoin?","de":"Was ist Bitcoin?"]
         for language in reads.keys {
-            XCTAssertTrue(ConversationRouting.isRead(reads[language]!,asset:asset,language:language),language)
+            for request in reads.values {
+                XCTAssertTrue(ConversationRouting.isRead(request, asset: asset, language: language), "\(language): \(request)")
+            }
             XCTAssertTrue(ConversationRouting.isRead("BTC",asset:asset,language:language))
-            XCTAssertFalse(ConversationRouting.isRead(explanations[language]!,asset:asset,language:language),language)
+            for question in Array(explanations.values) + ["What does ‘Analyze Bitcoin’ mean?", "Analyze Bitcoin and Ethereum"] {
+                XCTAssertFalse(ConversationRouting.isRead(question, asset: asset, language: language), "\(language): \(question)")
+            }
         }
     }
     func testLimitDatesDoNotInventTimeAndFollowLocalDay() {

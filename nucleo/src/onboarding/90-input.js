@@ -150,7 +150,11 @@ if (!window.PointerEvent){
 document.addEventListener('click', function(e){
   if (e.detail !== 0 || HARNESS || inTypeBox(e.target)) return;
   var h = hitOf(e.target); if (!h[0]) return;
-  if (h[0] === 'pill'){ W.pr.pill = [T, T + 0.1]; pillDown(); pillUp(false); }
+  /* a hold cannot be performed from a keyboard or VoiceOver: activation agrees outright, as on iOS */
+  if (h[0] === 'pill' && W.state === 'RISK'){
+    if (W.agreeReady && !W.agreeBusy && RISK_NOTICE) agreeComplete();
+  }
+  else if (h[0] === 'pill'){ W.pr.pill = [T, T + 0.1]; pillDown(); pillUp(false); }
   else action(h[0], h[1]);
 });
 // The scaled stage disables touch scrolling; keep the complete consent copy scrollable by pointer,

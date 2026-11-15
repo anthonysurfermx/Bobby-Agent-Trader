@@ -39,7 +39,7 @@ struct CompanionTool: Identifiable, Equatable {
 enum CompanionToolkit {
     static func tools(for companionId: String) -> [CompanionTool] {
         func t(_ tier: Int, _ symbol: String, _ en: String, _ es: String, _ loreEn: String, _ loreEs: String) -> CompanionTool {
-            CompanionTool(companionId: companionId, tier: tier, name: L.t(en, es), lore: L.t(loreEn, loreEs), symbol: symbol,
+            CompanionTool(companionId: companionId, tier: tier, name: L.t(LocalizedText(en), es), lore: L.t(LocalizedText(loreEn), loreEs), symbol: symbol,
                           slot: slots["\(companionId)-\(tier)"] ?? .hand)
         }
         switch companionId {

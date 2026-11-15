@@ -1,4 +1,5 @@
 import Foundation
+import RevenueCat
 import XCTest
 @testable import Bobby
 
@@ -102,6 +103,109 @@ final class BobbyAccessTests: XCTestCase {
         XCTAssertTrue(BobbyStore.serverConfirmedPro(.accepted(BobbyReadAccess(tier: "pro", used: 0, limit: nil, remaining: nil, resetsAt: nil, paywall: false))))
     }
 
+    func testRestoreRequiresAnActiveAppStorePurchaseEvenIfWebBillingGrantsPro() throws {
+        let apple = BobbyStore.proMonthlyID
+        let web = "web-monthly"
+        let future = "2099-01-01T00:00:00Z"
+        let previous = "2020-01-01T00:00:00Z"
+        let applePlan = ["store": "app_store", "purchase_date": previous, "expires_date": future]
+        let webPlan = ["store": "rc_billing", "purchase_date": previous, "expires_date": future]
+        func restorable(_ entitlementProduct: String, _ subscriptions: [String: [String: String]], entitlementEnd: String? = nil) throws -> Bool {
+            let body: [String: Any] = [
+                "request_date": "2026-11-10T00:00:00Z",
+                "subscriber": [
+                    "original_app_user_id": "account-a", "first_seen": previous,
+                    "entitlements": ["pro": ["product_identifier": entitlementProduct, "purchase_date": previous, "expires_date": entitlementEnd ?? future]],
+                    "subscriptions": subscriptions
+                ] as [String: Any]
+            ]
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            decoder.dateDecodingStrategy = .iso8601
+            let customer = try decoder.decode(CustomerInfo.self, from: JSONSerialization.data(withJSONObject: body))
+            return BobbyStore.hasRestorableApplePro(customer)
+        }
+        XCTAssertFalse(try restorable(web, [web: webPlan]))
+        XCTAssertTrue(try restorable(apple, [apple: applePlan]))
+        XCTAssertTrue(try restorable(web, [web: webPlan, apple: applePlan]))
+        var lapsed = applePlan
+        lapsed["expires_date"] = previous
+        XCTAssertFalse(try restorable(web, [web: webPlan, apple: lapsed]))
+        var refunded = applePlan
+        refunded["refunded_at"] = previous
+        XCTAssertFalse(try restorable(web, [web: webPlan, apple: refunded]))
+        var shared = applePlan
+        shared["ownership_type"] = "FAMILY_SHARED"
+        XCTAssertTrue(try restorable(apple, [apple: shared]))
+        var ending = applePlan
+        ending["unsubscribe_detected_at"] = previous
+        XCTAssertTrue(try restorable(apple, [apple: ending]))
+        var grace = lapsed
+        grace["grace_period_expires_date"] = future
+        XCTAssertTrue(try restorable(apple, [apple: grace], entitlementEnd: previous))
+        grace["grace_period_expires_date"] = previous
+        XCTAssertFalse(try restorable(apple, [apple: grace], entitlementEnd: previous))
+    }
+
+    @MainActor func testChangingAccountsDuringPostSignInSyncDoesNotStartRestoreForTheReplacementAccount() async {
+        let signedIn = UUID()
+        var current = signedIn
+        var restores = 0
+        let restore: () async -> BobbyStore.Outcome = { restores += 1; return .subscribed }
+        let switched = await BobbyProRestore.restoreAfterSignIn(
+            generation: signedIn, currentGeneration: { current }, afterSignIn: { current = UUID() }, restore: restore
+        )
+        XCTAssertEqual(switched, .needsSignIn)
+        XCTAssertEqual(restores, 0)
+        let same = await BobbyProRestore.restoreAfterSignIn(
+            generation: current, currentGeneration: { current }, afterSignIn: {}, restore: restore
+        )
+        XCTAssertEqual(same, .subscribed)
+        XCTAssertEqual(restores, 1)
+    }
+
+    @MainActor func testGuestPricingCannotAuthorizeAnAppStorePurchaseForASignedInAccount() async {
+        let center = BobbyAccessCenter(observeAccount: false)
+        var user: String? = "account-a"
+        center.currentUser = { user }
+        center.auth = .none
+        let salesOpen = ["apple": true, "revenuecat": true]
+        let cardPlan = ["provider": "stripe", "status": "active"]
+        center.load = { _ in
+            ["signedIn": true, "access": ["tier": "pro"], "subscription": cardPlan,
+             "payments": ["apple": false, "revenuecat": true]]
+        }
+        let cardLoaded = await center.refresh()
+        XCTAssertTrue(cardLoaded)
+        XCTAssertEqual(center.applePayments, false)
+
+        var guest: [String: Any] = ["access": ["tier": "anon"], "subscription": NSNull(), "payments": salesOpen]
+        for flag: Any? in [false, nil, 1, "true"] {
+            guest["signedIn"] = flag
+            center.load = { _ in guest }
+            let refreshed = await center.refresh()
+            XCTAssertFalse(refreshed)
+            XCTAssertEqual(center.applePayments, false)
+            XCTAssertEqual(center.access?.tier, "pro")
+            XCTAssertEqual(center.subscription?.provider, "stripe")
+        }
+
+        center.load = { _ in ["signedIn": true, "access": ["tier": "free"], "subscription": NSNull(), "payments": salesOpen] }
+        let recovered = await center.refresh()
+        XCTAssertTrue(recovered)
+        XCTAssertEqual(center.applePayments, true)
+        XCTAssertEqual(center.access?.tier, "free")
+        XCTAssertNil(center.subscription)
+
+        user = nil
+        guest["signedIn"] = false
+        center.load = { _ in guest }
+        let guestLoaded = await center.refresh()
+        XCTAssertTrue(guestLoaded)
+        XCTAssertEqual(center.access?.tier, "anon")
+        XCTAssertEqual(center.applePayments, true)
+    }
+
     func testFailedSubscriptionSyncCanRetryTheSameExpiry() throws {
         var state = BobbySubscriptionSyncState()
         let key = BobbySubscriptionSyncState.Key(userID: "account-a", generation: UUID(), expiry: nil)
@@ -155,7 +259,7 @@ final class BobbyAccessTests: XCTestCase {
         XCTAssertNotNil(anonRow.detail)
 
         let pro = BobbyReadAccess(tier: "pro", used: 12, limit: nil, remaining: nil, resetsAt: nil, paywall: false)
-        let apple = BobbySubscription(provider: "apple", status: "active", currentPeriodEnd: "2026-10-27T12:00:00Z")
+        let apple = BobbySubscription(provider: "apple", status: "active", currentPeriodEnd: "2099-10-27T12:00:00Z")
         let proRow = try XCTUnwrap(ReadsRow.content(access: pro, subscription: apple, signedIn: true, spanish: false))
         XCTAssertEqual(proRow.title, "Bobby Pro · Active")
         XCTAssertTrue(proRow.detail?.hasPrefix("Unlimited Quick reads (fair use) · 60 Deep and 10 Max every 30 days") == true, proRow.detail ?? "")
@@ -194,7 +298,7 @@ final class BobbyAccessTests: XCTestCase {
             .profundo: try XCTUnwrap(NucleoLevelMeter(json: ["used": 60, "limit": 60, "remaining": 0, "bonus": 3])),
             .maximo: try XCTUnwrap(NucleoLevelMeter(json: ["used": 10, "limit": 10, "remaining": 0, "bonus": 1]))
         ]
-        let subscription = BobbySubscription(provider: "apple", status: "active", currentPeriodEnd: "2026-10-27T12:00:00Z")
+        let subscription = BobbySubscription(provider: "apple", status: "active", currentPeriodEnd: "2099-10-27T12:00:00Z")
         let plan = try XCTUnwrap(ReadsRow.content(access: access, subscription: subscription, signedIn: true, spanish: true))
         XCTAssertEqual(plan.title, "Bobby Pro · Activo")
         XCTAssertTrue(plan.manage)

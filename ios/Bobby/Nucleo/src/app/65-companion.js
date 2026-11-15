@@ -74,15 +74,26 @@ function guideLayout(){
  guideReply.style.fontSize=((GUIDE.reading||error)?22:26)*k+'px';guideReply.style.lineHeight=((GUIDE.reading||error)?27:32)*k+'px';
  guideBody.style.fontSize=guideFact.style.fontSize=17*k+'px';guideBody.style.lineHeight=guideFact.style.lineHeight=25*k+'px';
  guideDisclosure.style.fontSize=15*k+'px';guideDisclosure.style.minHeight=target+'px';
- guideNarrative.classList.toggle('conversation-reading',!!GUIDE.reading);guideNarrative.setAttribute('role','region');guideNarrative.setAttribute('aria-label',tt('aria.answer'));
+ guideNarrative.classList.toggle('conversation-reading',!!GUIDE.reading);guideNarrative.setAttribute('role','region');guideNarrative.setAttribute('aria-label',tt('aria.answer'));guideNarrative.tabIndex=GUIDE.reading?0:-1;
  guideReply.style.textAlign=GUIDE.reading?'left':'center';guideReply.style.display=guideReply.textContent?'block':'none';
- if(GUIDE.reading){guidePanel.style.top='240px';guideNarrative.style.height=(Math.floor((700-slot-16-240)/(25*k))*25*k)+'px';moveSphere(160,Math.max(48,44/scale));}
+ // An error enters reading only for overflow; smaller type can restore its approved layout.
+ if(error&&GUIDE.reading){
+  var errorHeight=guideReply.offsetHeight,errorNotes=GUIDE.notes&&GUIDE.notes.length?target:0,errorRadius=clamp((602-12-32-errorHeight-4-errorNotes-16-slot)/2,Math.max(44,44/scale),98);
+  if(602-(12+2*errorRadius+32+errorHeight+4+errorNotes+16+slot)>=0){GUIDE.reading=false;guideNarrative.scrollTop=0;guideRender();return;}
+ }
+ if(GUIDE.reading){
+  var line=27*k,room=700-slot-16-240,height=Math.floor(room/(25*k))*25*k;
+  // At the largest type, recover unused slot space before shortening the answer.
+  // A lead uses 27*k, unlike the 25*k body grid. It must retain one complete line.
+  if(error||height<line){var action=guideActions.children[0],compact=Math.max(target,action&&action.offsetHeight||target);slot=Math.min(slot,compact);guideActions.style.top=(700-slot)+'px';guideActions.style.minHeight=slot+'px';room=700-slot-16-240;height=Math.max(line,Math.floor(room/(25*k))*25*k);}
+  guidePanel.style.top=Math.min(240,700-slot-16-height)+'px';guideNarrative.style.height=height+'px';moveSphere(160,Math.max(48,44/scale));
+ }
  else{
   guideNarrative.style.height='auto';
   if(guideReply.offsetHeight>96*k&&!error){guideReply.style.fontSize=22*k+'px';guideReply.style.lineHeight=27*k+'px';}
   var p=guideReply.offsetHeight,d=(guideDisclosure.style.display==='none'?0:target)+(GUIDE.notes&&GUIDE.notes.length?target:0),r=clamp((602-12-32-p-4-d-16-slot)/2,Math.max(44,44/scale),98);
   var spare=602-(12+2*r+32+p+4+d+16+slot),top=110+.4*Math.max(0,spare);
-  if(!error&&spare<0){GUIDE.reading=true;guideRender();return;}
+  if(spare<0){GUIDE.reading=true;guideRender();return;}
   moveSphere(top+r,r);guidePanel.style.top=(top+2*r+32)+'px';
  }
 }
@@ -106,7 +117,19 @@ STATES.COMPANION={
  exit:function(next){conversationRetire(guidePanel,'sphere');conversationRetire(guideActions,'pill');GUIDE_EPOCH++;guidePanel.style.display=guideActions.style.display='none';if(VOICE.id&&!VOICE.ended)guideStopVoice();if(['LISTENING','TYPING','PRE_PERMISSION'].indexOf(next)<0&&['COMPANION','PERSONAL_QUESTION','PERSONAL_SENDING','SPEAKING_DIAL'].indexOf(next)<0)GUIDE=null;},
  tick:function(){if(!GUIDE||GUIDE.status!=='companion')return;var ready=GUIDE.questionSpoken&&!GUIDE.voiceOff?GUIDE.voiceDone:clk-GUIDE.settledAt>=1.5;if(ready&&!GUIDE.slotReady&&!GUIDE.slotSuppressed){GUIDE.slotReady=true;guideRender();}if(!VOICE.started&&!VOICE.ended&&clk-VOICE.reqT>VOICE_WAIT){guideStopVoice();GUIDE.voiceOff=true;hint(tt('cap.voiceUnavailable'));guideRender();}},
  on:function(name,p){if(name==='voice.start'){pillMode('stop');att(el.sphereA,'aria-label',tt('aria.speaking'));}else if(name==='voice.end'){if(GUIDE)GUIDE.voiceDone=true;pillMode(idleMode());if(p&&p.reason==='failed'){GUIDE.voiceOff=true;hint(tt('cap.voiceUnavailable'));guideRender();}}},
- down:function(hit,p){if(hit==='pill')return pillDown(p,true);if(hit==='avatar')return tapG(function(){guideStopVoice();openNative('account');});if(hit==='close')return tapG(function(){var draft=GUIDE.status==='companion_error'&&READ?READ.question:'',spoken=!!GUIDE.questionSpoken,retry=draft?{retry:GUIDE.requestId}:null;GUIDE=null;READ=null;if(draft)holdDraft(draft,'',spoken,retry);else go('RETURNING');});return null;}
+ down:function(hit,p){
+  if(hit==='pill')return pillDown(p,true);
+  if(hit==='avatar')return tapG(function(){guideStopVoice();openNative('account');});
+  if(hit==='close')return tapG(function(){
+   var draft=GUIDE.status==='companion_error'&&READ?READ.question:'';
+   var spoken=!!GUIDE.questionSpoken;
+   // Before native issues an ID, the original question is the only valid retry.
+   var params=draft&&(GUIDE.requestId?{retry:GUIDE.requestId}:READ.params);
+   GUIDE=null;READ=null;
+   if(draft)holdDraft(draft,'',spoken,params);else go('RETURNING');
+  });
+  return null;
+ }
 };
 function guideFade(){var more=guideNarrative.scrollTop+guideNarrative.clientHeight<guideNarrative.scrollHeight-1;guideNarrative.style.setProperty('--fade-top',guideNarrative.scrollTop>0?'20px':'0px');guideNarrative.style.setProperty('--fade-bottom',more?'28px':'0px');}
 var guideDrag=null;

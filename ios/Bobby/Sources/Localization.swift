@@ -124,8 +124,9 @@ enum L {
         let template = NativeTranslations.rows[en.key]?[selected] ?? en.key
         return en.render(template)
     }
-    @_disfavoredOverload
-    static func t(_ en: String, _ es: String, spanish: Bool? = nil) -> String { t(LocalizedText(en), es, spanish: spanish) }
+    // No `String` overload: Swift 6.4 (Xcode 27) prefers a `String` parameter for literals even when
+    // it is `@_disfavoredOverload`, which keyed interpolations by their values and lost every
+    // fr/pt/it/de catalog row. A runtime string is passed as `LocalizedText(value)`.
 
     static func site(_ path: String) -> URL {
         var c = URLComponents()
