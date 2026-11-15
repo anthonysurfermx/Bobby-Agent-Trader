@@ -220,6 +220,12 @@ struct BriefingsAPI {
     }
 
     static func receipt(_ reply: BriefingsReply) throws -> BriefingDeviceReceipt {
+        // The device endpoint uses this response when the same idempotent write is still in progress.
+        // Its eventual receipt contains the binding credential, so the next attempt must keep its key.
+        if reply.status == 409, reply.headers["retry-after"] != nil,
+           (reply.json as? [String: Any])?["code"] as? String == "conflict" {
+            throw BriefingsError.unavailable
+        }
         guard (200..<300).contains(reply.status) else { throw error(reply) }
         guard let receipt = BriefingDeviceReceipt(json: reply.json) else { throw BriefingsError.unavailable }
         return receipt

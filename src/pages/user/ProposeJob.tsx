@@ -71,7 +71,7 @@ export default function ProposeJob() {
     formState: { errors },
     setValue,
     watch,
-  } = useForm<JobFormData>({
+  } = useForm<z.input<typeof jobSchema>, unknown, JobFormData>({
     resolver: zodResolver(jobSchema),
     defaultValues: {
       salary_currency: 'USD',

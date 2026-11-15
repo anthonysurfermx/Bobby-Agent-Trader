@@ -36,12 +36,12 @@ export const companionReaderModel = (env: NodeJS.ProcessEnv = process.env): stri
 /** A request that answers one of Bobby's questions. It carries no question of the person's own: exactly one of the two. */
 export const CompanionAnswerRequest = z.object({
   version: z.literal(COMPANION_VERSION),
-  requestId: z.string().uuid().optional(),
+  requestId: z.guid().optional(),
   question: z.null().optional(),
   answer: z.object({ questionId: z.enum(QUESTION_IDS), text: z.string().trim().min(1).max(ANSWER_MAX) }).strict(),
   language: z.enum(APP_LANGUAGES).default('en'),
   locale: z.enum(APP_LOCALES).optional(),
-  context: z.unknown(),
+  context: z.unknown().optional(),
 });
 
 export interface CompanionAnswer { question: CatalogQuestion; text: string; language: AppLanguage; locale?: string; context: PersonContext }

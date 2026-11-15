@@ -26,7 +26,7 @@ const referentSchema = z.object({
   description: z.string().min(50, 'La descripción debe tener al menos 50 caracteres'),
   avatar_url: z.string().url('Debe ser una URL válida').optional().or(z.literal('')),
   category: z.enum(['programadores', 'abogados', 'financieros', 'diseñadores', 'marketers', 'otros'], {
-    required_error: 'Debes seleccionar una categoría',
+    error: 'Debes seleccionar una categoría',
   }),
   twitter_url: z.string().url('Debe ser una URL válida').optional().or(z.literal('')),
   github_url: z.string().url('Debe ser una URL válida').optional().or(z.literal('')),

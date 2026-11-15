@@ -33,7 +33,7 @@ const PostSchema = z.object({
   wallet: z.string().regex(WALLET_RE),
   stockEligibilityConfirmed: z.boolean().optional(),
   /** The agent cycle whose intent this builds; only with a matching intentToken. */
-  cycleId: z.string().uuid().optional(),
+  cycleId: z.guid().optional(),
   intentToken: z.string().min(16).max(256).optional(),
   intentExpiresAt: z.number().int().positive().optional(),
   intentJti: z.string().regex(/^[0-9a-f]{32}$/).optional(),

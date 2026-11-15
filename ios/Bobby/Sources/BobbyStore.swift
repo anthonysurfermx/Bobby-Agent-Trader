@@ -209,19 +209,19 @@ final class BobbyStore: NSObject, ObservableObject {
     }
 
     /// Restore Purchases: RevenueCat re-reads the Apple Account's purchases for this Bobby account.
-    func restore() async -> Outcome {
+    func restore(for generation: UUID) async -> Outcome {
+        guard AccountSession.shared.generation == generation else { return .needsSignIn }
         guard !busy, configured else { return .failed(Copy.unavailable) }
         guard let userId = AccountSession.shared.session?.userId else { return .needsSignIn }
         busy = true
         defer { busy = false }
-        let generation = AccountSession.shared.generation
         guard await ensureIdentity(userId), AccountSession.shared.session?.userId == userId,
               AccountSession.shared.generation == generation else { return .needsSignIn }
         do {
             let info = try await Purchases.shared.restorePurchases()
             guard AccountSession.shared.session?.userId == userId,
                   AccountSession.shared.generation == generation else { return .needsSignIn }
-            guard Self.isPro(info) else { return .nothingToRestore }
+            guard Self.hasRestorableApplePro(info) else { return .nothingToRestore }
             return await confirmWithServer(info)
         } catch {
             return Self.outcome(error)
@@ -235,6 +235,15 @@ final class BobbyStore: NSObject, ObservableObject {
     }
 
     nonisolated static func isPro(_ info: CustomerInfo) -> Bool { info.entitlements[entitlementID]?.isActive == true }
+
+    nonisolated static func hasRestorableApplePro(_ info: CustomerInfo) -> Bool {
+        guard let pro = info.entitlements[entitlementID] else { return false }
+        // One Pro entitlement can be shared by a web subscription and the App Store product.
+        let product = (pro.store == .appStore || pro.store == .macAppStore) ? pro.productIdentifier : proMonthlyID
+        guard let subscription = info.subscriptionsByProductIdentifier[product], subscription.refundedAt == nil,
+              subscription.store == .appStore || subscription.store == .macAppStore else { return false }
+        return (pro.isActive && subscription.isActive) || (subscription.gracePeriodExpiresDate ?? .distantPast) > info.requestDate
+    }
 
     nonisolated static func outcome(_ error: Error) -> Outcome {
         switch error as? ErrorCode {

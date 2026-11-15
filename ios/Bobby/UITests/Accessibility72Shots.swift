@@ -139,7 +139,18 @@ final class Accessibility72Shots: ConversationFixtureCase {
 
     func test03RetryError() {
         launch("companion-error", contentSize: contentSize)
-        ask()
+        type()
+        let field = web.textViews.firstMatch, keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 10))
+        let editorIsVisible = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let bounds = field.frame
+            return !bounds.isEmpty && bounds.minY >= 0 && bounds.maxY <= keyboard.frame.minY
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [editorIsVisible], timeout: 10), .completed,
+                       "The entire editor must stay on screen above the keyboard")
+        field.typeText(word("ex.1"))
+        let send = button("type.send")
+        ready(send); send.tap()
         let retry = button("fail.retry")
         ready(retry)
         let region = readingRegion(word("aria.answer"))

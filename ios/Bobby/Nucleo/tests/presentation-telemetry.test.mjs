@@ -4,13 +4,14 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const source = fs.readFileSync(new URL('../src/app/55-read.js', import.meta.url), 'utf8');
 const observe = source.slice(source.indexOf('function observePresentedRead(){'), source.indexOf("/* the header's second line"));
-function harness() {
+function harness(reply = () => Promise.resolve({accepted: true})) {
+  let now = 0;
   const calls = [], card = { textContent: 'Actual result', getBoundingClientRect: () => ({ left: 10, top: 200, right: 300, bottom: 400, width: 290, height: 200 }) };
   const context = vm.createContext({ ST: { name: 'CARDS' }, READ: { model: {}, reply: {status: 'ok'}, requestId: 'test-id' }, A: {cardsOn: true, rev: [{x: 1}]}, el: { cards: [card] },
     W: { innerWidth: 390, innerHeight: 844, getComputedStyle: () => ({visibility: 'visible', display: 'block', opacity: '1'}) },
-    canRun: () => true, bcall: (method, body) => {calls.push({method,body}); return Promise.resolve({accepted: true});}, noop() {} });
+    performance: {now: () => now}, canRun: () => true, bcall: (method, body) => {calls.push({method,body}); return reply();}, noop() {} });
   vm.runInContext(observe, context);
-  return { context, calls, card, tick: () => context.observePresentedRead() };
+  return { context, calls, card, tick: () => context.observePresentedRead(), advance: ms => { now += ms; } };
 }
 test('valid parsed response alone does not claim presentation', () => { const h=harness(); h.context.A.cardsOn=false; h.tick(); h.tick(); assert.equal(h.calls.length,0); });
 test('two visible settled frames acknowledge current request once without receipt/content', () => { const h=harness(); h.tick(); assert.equal(h.calls.length,0); h.tick(); h.tick(); assert.equal(h.calls.length,1); assert.equal(h.calls[0].method,'read.rendered'); assert.deepEqual(Object.keys(h.calls[0].body),['requestId']); });
@@ -27,4 +28,59 @@ test('saved snapshots never acknowledge a live read behind them', () => {
     h.context.ST.name = 'CARDS'; h.context.A.viewOnly = false;
     h.tick(); h.tick(); assert.equal(h.calls.length, 1, 'a real live result remains eligible');
   }
+});
+
+test('a pending acknowledgment stays single-flight; a refusal or transport failure can retry after two fresh frames', async () => {
+  for (const transportError of [false, true]) {
+    const replies = [];
+    const h = harness(() => new Promise((resolve, reject) => replies.push({resolve, reject})));
+    h.tick(); h.tick();
+    h.advance(10000); h.tick(); h.tick();
+    assert.equal(h.calls.length, 1);
+    if (transportError) replies[0].reject(new Error('bridge unavailable'));
+    else replies[0].resolve({accepted: false});
+    await Promise.resolve();
+    for (let i = 0; i < 30; i++) h.tick();
+    assert.equal(h.calls.length, 1, 'no retry storm at frame rate');
+    h.advance(2000); h.tick();
+    assert.equal(h.calls.length, 1);
+    h.tick();
+    assert.equal(h.calls.length, 2);
+    assert.equal(h.calls[1].body.requestId, 'test-id');
+    replies[1].resolve({accepted: true}); await Promise.resolve();
+    h.advance(10000); h.tick(); h.tick();
+    assert.equal(h.calls.length, 2);
+    assert.equal(h.context.READ.presented, true);
+  }
+});
+
+test('retries stop after three rejected acknowledgments and never send while the original result is offscreen', async () => {
+  const h = harness(() => Promise.resolve({accepted: false}));
+  h.tick(); h.tick(); await Promise.resolve();
+  h.advance(2000);
+  const originalRect = h.card.getBoundingClientRect;
+  h.card.getBoundingClientRect = () => ({left: 400, top: 10, right: 700, bottom: 100, width: 300, height: 90});
+  h.context.el.cards.push({textContent: 'Another visible card', getBoundingClientRect: originalRect});
+  h.context.A.rev.push({x: 1});
+  h.tick(); h.tick(); assert.equal(h.calls.length, 1);
+  h.card.getBoundingClientRect = originalRect;
+  h.tick(); assert.equal(h.calls.length, 1);
+  h.tick(); await Promise.resolve();
+  assert.equal(h.calls.length, 2);
+  for (let i = 0; i < 8; i++) { h.advance(10000); h.tick(); h.tick(); await Promise.resolve(); }
+  assert.equal(h.calls.length, 3);
+  assert.notEqual(h.context.READ.presented, true);
+});
+
+test('closing the result while the acknowledgment is pending cannot retry its request from a new read', async () => {
+  let refuse;
+  const h = harness(() => new Promise(resolve => { refuse = resolve; }));
+  h.tick(); h.tick();
+  h.context.READ = null;
+  refuse({accepted: false}); await Promise.resolve();
+  h.advance(10000); h.tick(); h.tick();
+  assert.equal(h.calls.length, 1);
+  h.context.READ = {model: {}, reply: {status: 'ok'}, requestId: 'replacement'};
+  h.tick(); h.tick();
+  assert.deepEqual(h.calls.map(({body}) => body.requestId), ['test-id', 'replacement']);
 });

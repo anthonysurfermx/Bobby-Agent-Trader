@@ -117,7 +117,19 @@ STATES.COMPANION={
  exit:function(next){conversationRetire(guidePanel,'sphere');conversationRetire(guideActions,'pill');GUIDE_EPOCH++;guidePanel.style.display=guideActions.style.display='none';if(VOICE.id&&!VOICE.ended)guideStopVoice();if(['LISTENING','TYPING','PRE_PERMISSION'].indexOf(next)<0&&['COMPANION','PERSONAL_QUESTION','PERSONAL_SENDING','SPEAKING_DIAL'].indexOf(next)<0)GUIDE=null;},
  tick:function(){if(!GUIDE||GUIDE.status!=='companion')return;var ready=GUIDE.questionSpoken&&!GUIDE.voiceOff?GUIDE.voiceDone:clk-GUIDE.settledAt>=1.5;if(ready&&!GUIDE.slotReady&&!GUIDE.slotSuppressed){GUIDE.slotReady=true;guideRender();}if(!VOICE.started&&!VOICE.ended&&clk-VOICE.reqT>VOICE_WAIT){guideStopVoice();GUIDE.voiceOff=true;hint(tt('cap.voiceUnavailable'));guideRender();}},
  on:function(name,p){if(name==='voice.start'){pillMode('stop');att(el.sphereA,'aria-label',tt('aria.speaking'));}else if(name==='voice.end'){if(GUIDE)GUIDE.voiceDone=true;pillMode(idleMode());if(p&&p.reason==='failed'){GUIDE.voiceOff=true;hint(tt('cap.voiceUnavailable'));guideRender();}}},
- down:function(hit,p){if(hit==='pill')return pillDown(p,true);if(hit==='avatar')return tapG(function(){guideStopVoice();openNative('account');});if(hit==='close')return tapG(function(){var draft=GUIDE.status==='companion_error'&&READ?READ.question:'',spoken=!!GUIDE.questionSpoken,retry=draft?{retry:GUIDE.requestId}:null;GUIDE=null;READ=null;if(draft)holdDraft(draft,'',spoken,retry);else go('RETURNING');});return null;}
+ down:function(hit,p){
+  if(hit==='pill')return pillDown(p,true);
+  if(hit==='avatar')return tapG(function(){guideStopVoice();openNative('account');});
+  if(hit==='close')return tapG(function(){
+   var draft=GUIDE.status==='companion_error'&&READ?READ.question:'';
+   var spoken=!!GUIDE.questionSpoken;
+   // Before native issues an ID, the original question is the only valid retry.
+   var params=draft&&(GUIDE.requestId?{retry:GUIDE.requestId}:READ.params);
+   GUIDE=null;READ=null;
+   if(draft)holdDraft(draft,'',spoken,params);else go('RETURNING');
+  });
+  return null;
+ }
 };
 function guideFade(){var more=guideNarrative.scrollTop+guideNarrative.clientHeight<guideNarrative.scrollHeight-1;guideNarrative.style.setProperty('--fade-top',guideNarrative.scrollTop>0?'20px':'0px');guideNarrative.style.setProperty('--fade-bottom',more?'28px':'0px');}
 var guideDrag=null;

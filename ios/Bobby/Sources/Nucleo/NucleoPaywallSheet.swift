@@ -383,16 +383,24 @@ enum BobbyProRestore {
         let account = AccountSession.shared
         if !account.isSignedIn {
             let result = await NucleoAppleSignIn().run()
-            await account.completeApple(result)
-            guard account.isSignedIn else {
+            guard let generation = await account.completeApple(result) else {
                 if case let .failure(error) = result, (error as? ASAuthorizationError)?.code == .canceled {
                     account.lastError = nil
                     return .cancelled
                 }
                 return .needsSignIn
             }
-            await afterSignIn()
+            return await restoreAfterSignIn(generation: generation, currentGeneration: { account.generation },
+                                            afterSignIn: afterSignIn, restore: { await store.restore(for: generation) })
         }
-        return await store.restore()
+        return await store.restore(for: account.generation)
+    }
+
+    static func restoreAfterSignIn(generation: UUID, currentGeneration: () -> UUID,
+                                   afterSignIn: () async -> Void, restore: () async -> BobbyStore.Outcome) async -> BobbyStore.Outcome {
+        guard currentGeneration() == generation else { return .needsSignIn }
+        await afterSignIn()
+        guard currentGeneration() == generation else { return .needsSignIn }
+        return await restore()
     }
 }
