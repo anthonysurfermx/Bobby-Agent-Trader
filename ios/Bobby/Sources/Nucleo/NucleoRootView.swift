@@ -50,6 +50,7 @@ final class NucleoHost: ObservableObject {
         if !BobbyApp.isUnitTestHost { V18.registerNudges() }
 #if DEBUG
         if let name = BobbyApp.argument(after: "-qa-v18-nudge") { V18QA.installGlassNudge(named: name, session: session) }
+        if ProcessInfo.processInfo.arguments.contains("-qa-watches") { WatchQA.installOnGlass() }
 #endif
         bridge = NucleoBridge(session: session)
         controller = NucleoWebController(handler: bridge)

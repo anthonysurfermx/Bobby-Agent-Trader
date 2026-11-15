@@ -62,10 +62,15 @@ private struct WatchNoteBelow: ViewModifier {
             if let note {
                 section(WatchCopy.why, note.why, "watches-why-\(id)")
                 if !note.sources.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
+                    // Where it was read: the sites' names on one quiet line, each a link.
+                    HStack(spacing: 16) {
                         ForEach(note.sources) { source in
-                            QuietTextLink(title: source.host, id: "watches-source-\(source.host)", destination: source.url)
-                                .accessibilityLabel(source.title)
+                            Link(destination: source.url) {
+                                Text(source.host).quietFont(14, relativeTo: .subheadline).underline().foregroundStyle(Theme.warmMuted)
+                                    .frame(minHeight: 44).contentShape(Rectangle())
+                            }
+                            .accessibilityLabel(source.title)
+                            .accessibilityIdentifier("watches-source-\(source.host)")
                         }
                     }
                 }

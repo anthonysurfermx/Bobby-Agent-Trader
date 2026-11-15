@@ -9,7 +9,7 @@ enum V18QA {
     /// name → screen. Names are `<feature>-<state>`, for example `credits-free` or `theses-three`.
     static var fixtures: [String: () -> AnyView] {
         var all: [String: () -> AnyView] = [:]
-        for table in [CreditsQA.fixtures, MemoryQA.fixtures, ThesesQA.fixtures, RemindersQA.fixtures, InviteQA.fixtures, HarnessQA.fixtures] {
+        for table in [CreditsQA.fixtures, MemoryQA.fixtures, ThesesQA.fixtures, RemindersQA.fixtures, InviteQA.fixtures, HarnessQA.fixtures, WatchQA.fixtures] {
             all.merge(table) { first, _ in first }
         }
         return all
