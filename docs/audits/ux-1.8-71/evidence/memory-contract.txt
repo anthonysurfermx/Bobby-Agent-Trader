@@ -1,0 +1,2 @@
+MEMORY_OFF_WRITE_FAILURE accepted=true storageError=true noteCount=1 wireContainsNotes=true
+PASS happy-path: opt-in, correction, delete-one, delete-all, different-account clearing, successful memory-off
