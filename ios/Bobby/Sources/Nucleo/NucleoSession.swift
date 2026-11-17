@@ -385,6 +385,15 @@ final class NucleoSession: ObservableObject {
         case "confirm.refresh":
             return try desk.refreshConfirmation(p)
         case "ask":
+            if p.has("opening") {
+                guard Set(p.raw.keys) == ["opening"], !desk.isBusy, !speechPromptOpen,
+                      let line = currentOpening, try p.string("opening") == line.id else {
+                    return ["v": 1, "status": "cancelled"]
+                }
+                clearOpening()
+                sessionChanged()
+                return desk.openingConfirmation(for: line.reference.asset, question: line.reference.question(line.change))
+            }
 #if DEBUG
             if fixtures, let start = fixtureHandoverStart {
                 print("I1B_HANDOVER_ASK_SECONDS=\(ProcessInfo.processInfo.systemUptime - start)")
@@ -594,6 +603,88 @@ final class NucleoSession: ObservableObject {
         return defaults.integer(forKey: indexKey) % 6
     }
 
+    private struct Opening {
+        let id = UUID().uuidString.lowercased()
+        let reference: OpeningReference
+        let change: Double
+        let expires: Date
+    }
+    private var opening: Opening?
+    private var openingTask: Task<Void, Never>?
+
+    private func openingReference(now: Date) -> OpeningReference? {
+        guard !tornDown, onboarded, profile.acceptedRiskNotice, currentPage == NucleoPage.app.name else { return nil }
+        if fixtures {
+#if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-qa-opening-line") {
+                let day = Calendar.current.startOfDay(for: now).addingTimeInterval(-86_400)
+                return OpeningReference("NVDA", "NVIDIA", true, at: day, price: 100)
+            }
+#endif
+            return nil
+        }
+        let owner = accountUserID
+        var refs: [OpeningReference] = []
+        if let harness, harness.owner == owner {
+            refs = harness.ledger.assets(since: now.addingTimeInterval(-14 * 86_400), now: now).map {
+                OpeningReference($0.symbol, $0.name, $0.isEquity, at: $0.lastAskedAt, price: $0.lastPrice)
+            }
+        }
+        for read in desk.ledger.items(owner: owner) {
+            guard let at = BobbyAccessAPI.date(read.asOf) else { continue }
+            refs.append(OpeningReference(read.symbol, read.name, read.isEquity, at: at, price: read.price))
+        }
+        for thesis in ThesisBook(defaults: defaults).active(owner: owner) {
+            guard let revision = thesis.revisions.last(where: { $0.kind == .reviewed || $0.kind == .created }),
+                  let stamp = revision.asOf, let at = BobbyAccessAPI.date(stamp) else { continue }
+            refs.append(OpeningReference(thesis.symbol, thesis.name, thesis.isEquity, at: at, price: revision.price))
+        }
+        return OpeningReference.latest(refs, now: now)
+    }
+
+    private func clearOpening() {
+        openingTask?.cancel()
+        openingTask = nil
+        opening = nil
+    }
+
+    private func refreshOpening() {
+        clearOpening()
+        guard let reference = openingReference(now: Date()) else { return }
+        let generation = accountGeneration
+        openingTask = Task { [weak self] in
+            guard let self else { return }
+            let bars: [NucleoDeskIO.Bar]
+            if fixtures {
+#if DEBUG
+                bars = [.init(t: Int(Date().addingTimeInterval(-1800).timeIntervalSince1970 * 1000),
+                              o: 100, h: 104, l: 100, c: 103.2, v: 0)]
+#else
+                return
+#endif
+            } else {
+                guard case .bars(let result) = await NucleoDeskIO.candles(symbol: reference.asset.symbol, isEquity: reference.asset.isEquity) else { return }
+                bars = result
+            }
+            let now = Date()
+            guard !Task.isCancelled, generation == accountGeneration, openingReference(now: now) == reference,
+                  let change = reference.move(bars: bars, now: now) else { return }
+            opening = Opening(reference: reference, change: change, expires: now.addingTimeInterval(600))
+            sessionChanged()
+            try? await Task.sleep(nanoseconds: 600_000_000_000)
+            guard !Task.isCancelled else { return }
+            opening = nil
+            sessionChanged()
+        }
+    }
+
+    private var currentOpening: Opening? {
+        let now = Date()
+        guard let opening, opening.expires > now, sheet == nil, openSheet == nil,
+              openingReference(now: now) == opening.reference else { return nil }
+        return opening
+    }
+
     func sessionJSON() -> [String: Any] {
         synchronizeAccountState()
         let c = companions.companion
@@ -631,6 +722,14 @@ final class NucleoSession: ObservableObject {
         // Bobby never invites someone into a wall: when the phone KNOWS the next read is refused, the
         // home offers no chip that asks by itself. Not knowing (a first launch, no network) changes
         // nothing, and without the key the session is what it always was.
+        if let line = currentOpening {
+            if let nudge = json["nudge"] as? [String: Any],
+               let id = nudge["id"] as? String, id.hasPrefix(HarnessNudges.movePrefix(line.reference.asset.symbol)) {
+                json["nudge"] = NSNull()
+            }
+            json["opening"] = ["id": line.id, "text": line.reference.text(line.change),
+                               "question": line.reference.question(line.change), "action": ConversationCopy.readLabel(line.reference.asset.name)]
+        }
         if homeIsAtTheWall { json["oneTap"] = false }
         return json
     }
@@ -924,6 +1023,7 @@ final class NucleoSession: ObservableObject {
     private func pageStarted(_ page: String?) -> [String: Any] {
         if let page { currentPage = page }
         emitter?.pageReady()
+        refreshOpening()
         bootOnce()
         // A page that has just loaded: a board waits for it (`pageAwake`), counted from here.
         pageAwake = wakeTick <= 0
@@ -1226,6 +1326,7 @@ final class NucleoSession: ObservableObject {
     func revokeRiskNoticeConsent() {
         guard !tornDown else { return }
         consentGeneration = UUID()
+        clearOpening()
         profile.riskNoticeVersion = 0
         pendingFirstAsk = nil
         telemetry.consentChanged()
@@ -1516,6 +1617,7 @@ final class NucleoSession: ObservableObject {
     // MARK: - Lifecycle
 
     func appBecameActive() {
+        refreshOpening()
         companionPilot.invalidateProbe()
         refreshCompanionCapability()
         companionContext.opened()
@@ -1679,6 +1781,7 @@ final class NucleoSession: ObservableObject {
     /// not taken yet is dropped, and so is one still waiting for its sheet to go: it never starts
     /// by itself when they come back.
     func appWentBackground() {
+        clearOpening()
         pendingFirstAsk = nil
         readHandoff = nil
         dropReadOffer()
@@ -1699,6 +1802,7 @@ final class NucleoSession: ObservableObject {
     /// Before the classic app appears: nothing of this session may keep writing.
     func teardown() {
         guard !tornDown else { return }
+        clearOpening()
         heldBriefId = nil
         dropReadOffer()
         finishPaywall()
@@ -1805,6 +1909,7 @@ final class NucleoSession: ObservableObject {
         guard accountGeneration != account.generation else { return }
         let wasAnonymous = accountUserID == nil
         accountGeneration = account.generation
+        clearOpening()
         pendingFirstAsk = nil
         accountUserID = account.session?.userId
         if companionContext.bindOwner(accountUserID, defaults: defaults) { companionPacing.reset(); companionQuestionId = nil; companionAnswerEpoch += 1 }

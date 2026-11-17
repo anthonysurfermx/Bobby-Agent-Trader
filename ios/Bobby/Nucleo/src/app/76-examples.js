@@ -41,3 +41,29 @@ chipAct=function(c){
   if(a&&a.companion&&a.starter){go('SENDING',{question:a.question,params:{question:a.question,chip:true,companion:true},origin:'chip',cx:c.x+c.w/2,cy:c.y});return;}
   return exampleChipAct(c);
 };
+
+/* The opening is in the greeting's place. Only an explicit tap requests the cost sheet. */
+var openingButton = mk('button', 'opening-line');
+openingButton.id = 'opening-line';
+openingButton.type = 'button';
+openingButton.hidden = true;
+uiEl.appendChild(openingButton);
+var visibleOpening = null;
+function renderOpening(){
+  var line = ST && ST.name === 'IDLE' && !SHEET && SES && SES.riskAccepted && SES.opening;
+  if (line === visibleOpening) return;
+  visibleOpening = line;
+  stage.classList.toggle('has-opening', !!line);
+  openingButton.hidden = !line;
+  openingButton.textContent = line ? line.text : '';
+  if (line) {
+    openingButton.setAttribute('aria-label', line.text + ' ' + line.action);
+    openingButton.style.fontSize = (16 * Math.max(1, SES.textScale || 1)) + 'px';
+    openingButton.style.lineHeight = '1.35';
+  }
+}
+quietAction(openingButton, function(){
+  var line = visibleOpening;
+  if (!line || ST.name !== 'IDLE' || SHEET || !SES || SES.opening !== line) return;
+  go('SENDING', {question:line.question, params:{opening:line.id}, origin:'chip', cx:195, cy:535});
+});
