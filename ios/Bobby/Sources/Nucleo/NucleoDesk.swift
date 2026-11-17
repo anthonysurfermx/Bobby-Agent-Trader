@@ -1017,6 +1017,12 @@ final class NucleoDesk {
         return nil
     }
 
+    func openingConfirmation(for asset: NucleoAsset, question: String) -> [String: Any] {
+        let job = Job(requestId: UUID().uuidString.lowercased(), question: question, asset: asset,
+                      generation: generation(), startedAt: Date(), level: currentLevel(), origin: .followUp)
+        return confirmation(asset, job: job, exact: true)
+    }
+
     private func confirmation(_ asset: NucleoAsset, job: Job, exact: Bool) -> [String: Any] {
         if let refusal = knownRefusal(asset, job: job) { return refusal }
         return ["v": 1, "status": "confirm", "requestId": job.requestId, "asset": asset.jsonWithClass, "exact": exact,
