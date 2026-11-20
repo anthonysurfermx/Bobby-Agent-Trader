@@ -100,7 +100,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",
-    "@hookform/resolvers": "^3.10.0",
+    "@hookform/resolvers": "^5.9.2",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-aspect-ratio": "^1.1.7",
@@ -178,7 +178,7 @@
     "viem": "^2.55.13",
     "wagmi": "^2.17.5",
     "ws": "^8.21.3",
-    "zod": "^3.25.76"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
@@ -217,6 +217,9 @@
     "@vercel/node": {
       "undici": "^6.28.1",
       "path-to-regexp": "^6.3.0"
+    },
+    "@vercel/cli-config": {
+      "zod": "$zod"
     },
     "js-yaml@^4.1.0": "^4.3.2"
   }

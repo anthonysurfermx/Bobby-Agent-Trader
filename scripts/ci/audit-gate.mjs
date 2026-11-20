@@ -8,14 +8,16 @@ import { spawnSync } from 'node:child_process';
 const EXCEPTIONS = [
   {
     id: 'GHSA-mrhx-c7xc-m3w5',
-    until: '2026-11-30',
-    why: 'zod, memory exhaustion when an array schema validates a huge array: zod 3 records an issue for every failing '
-      + 'element even after .max() has failed. No zod 3 release is fixed (3.25.76 is the last); the fix is zod 4.6.6. '
-      + 'The API validates request bodies with zod 3 only after a byte cap measured on the parsed body (write-guard '
-      + '16 KB by default, companion-turn 8 KB, push-news 4 KB, briefings 2 KB), which bounds one failed parse to '
-      + 'about 16k issues, 12 ms and 3 MB. The other copies (@reown/appkit-wallet and @walletconnect/ethereum-provider '
-      + 'in the browser, @vercel/cli-config reading the local CLI config) never validate a request body. Expires when '
-      + 'the API moves to zod 4.6.6 (option B of the PR that added it).',
+    until: '2027-01-31',
+    why: 'zod, memory exhaustion when an array schema validates a huge array: zod < 4.6.6 records an issue for every '
+      + 'failing element even after .max() has failed. No request body is validated by a vulnerable copy any more: the '
+      + 'API and the browser forms run zod ^4.6.6 (bundled, every api/ entrypoint reaches node_modules/zod 4 and nothing '
+      + 'else; check:api refuses zod/v3, which inside zod 4 is still the old code), @vercel/cli-config is overridden '
+      + 'onto the same zod, and write-guard keeps its byte cap. What npm still reports is pinned by wallet SDKs in the '
+      + 'browser bundle that have no release on zod 4: @reown/appkit-wallet (zod 3.22.4, under '
+      + '@reown/appkit-adapter-wagmi and @walletconnect/ethereum-provider) checks the messages of its own wallet iframe, '
+      + 'and @coinbase/cdp-sdk (zod ^3.25.76, under @base-org/account, not imported by api/) its policy schemas. '
+      + 'Re-examine then: drop the exception once those SDKs move to zod 4.',
   },
 ];
 

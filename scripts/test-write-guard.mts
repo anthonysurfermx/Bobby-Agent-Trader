@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { guardWrite } from '../api/_lib/write-guard.js';
 
 // write-guard's byte cap holds whatever the headers say: without Content-Length (a chunked upload), and on a body the
-// runtime already parsed. Those requests reached the schema before, and zod 3 validates every element of an array
-// even after .max() has failed (GHSA-mrhx-c7xc-m3w5), so a refused body must never be walked.
+// runtime already parsed. Those requests reached the schema before, and zod 3 validated every element of an array
+// even after .max() had failed (GHSA-mrhx-c7xc-m3w5), so a refused body must never be walked, whatever the parser.
 
 function responseRecorder() {
   const state: { status?: number; body?: any; headers: Record<string, string> } = { headers: {} };

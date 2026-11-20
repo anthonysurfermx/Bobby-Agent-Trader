@@ -5,11 +5,14 @@
 // This walks the import graph from every api/**/*.ts entry (including what it reaches under src/ and shared/) and
 // fails when a relative, non-type import has no runtime extension. It runs inside `npm run check:api`, so both CI and
 // the Vercel build stop before such a deployment exists.
+// The same walk refuses `zod/v3`: inside zod 4 it is still zod 3's code, which walks every element of an oversized
+// array (GHSA-mrhx-c7xc-m3w5). The audit gate excepts that advisory only because no function validates with it.
 import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
 const RUNTIME_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.json']);
+const ZOD_V3 = /^zod\/v3(?:\/|$)/;
 const IMPORT = /(?:^|\n)[ \t]*(?:import|export)\s+(type\s+)?(?:[^'"\n;]*?from\s+)?['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g;
 
 const entries = [];
@@ -23,6 +26,7 @@ const entries = [];
 
 const seen = new Set();
 const unresolvable = [];
+const zodV3 = [];
 function visit(file) {
   if (seen.has(file)) return;
   seen.add(file);
@@ -30,6 +34,7 @@ function visit(file) {
   for (const match of source.matchAll(IMPORT)) {
     const typeOnly = Boolean(match[1]);
     const specifier = match[2] ?? match[3];
+    if (specifier && !typeOnly && ZOD_V3.test(specifier)) zodV3.push(`${path.relative(root, file)}: '${specifier}'`);
     if (!specifier || !specifier.startsWith('.') || typeOnly) continue; // type-only imports are erased
     if (!RUNTIME_EXTENSIONS.has(path.extname(specifier))) unresolvable.push(`${path.relative(root, file)}: '${specifier}'`);
     const base = path.resolve(path.dirname(file), specifier.replace(/\.(?:js|mjs|cjs)$/, ''));
@@ -42,6 +47,11 @@ entries.forEach(visit);
 if (unresolvable.length) {
   console.error(`api-esm-imports: ${unresolvable.length} relative import(s) without a runtime extension (add ".js"):`);
   for (const line of unresolvable) console.error(`  ${line}`);
+  process.exit(1);
+}
+if (zodV3.length) {
+  console.error(`api-esm-imports: ${zodV3.length} import(s) of zod/v3 in the API graph (GHSA-mrhx-c7xc-m3w5; import 'zod'):`);
+  for (const line of zodV3) console.error(`  ${line}`);
   process.exit(1);
 }
 console.log(`api-esm-imports: ${entries.length} API entries, ${seen.size} modules, every relative import names its extension`);

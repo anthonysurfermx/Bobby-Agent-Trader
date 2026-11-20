@@ -54,7 +54,7 @@ export default function ProposeStartup() {
     handleSubmit,
     formState: { errors },
     setValue,
-  } = useForm<StartupFormData>({
+  } = useForm<z.input<typeof startupSchema>, unknown, StartupFormData>({
     resolver: zodResolver(startupSchema),
     defaultValues: {
       country: 'Mexico',

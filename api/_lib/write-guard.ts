@@ -99,8 +99,9 @@ export async function guardWrite<S extends ZodTypeAny>(req: VercelRequest, res: 
     return null;
   }
   // The header is only the cheap first answer: a chunked upload carries none, and the runtime may already have parsed
-  // the body. What arrived is measured as well, before any schema walks it: zod 3 spends work on every element of an
-  // oversized array (GHSA-mrhx-c7xc-m3w5), so the cap must hold whatever the headers say.
+  // the body. What arrived is measured as well, before any schema walks it: zod 3 spent work on every element of an
+  // oversized array (GHSA-mrhx-c7xc-m3w5). zod 4 stops at the first issue, but the cap is the bound that holds
+  // whatever the parser does and whatever the headers say.
   let raw: unknown = req.body;
   if (bodyBytes(raw) > maxBytes) {
     res.status(413).json({ error: `Body too large (max ${maxBytes} bytes)` });
