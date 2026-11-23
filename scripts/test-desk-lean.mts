@@ -168,18 +168,24 @@ const wave = (n: number, base: number, amp: number) => Array.from({ length: n },
   // Every session trades three times as much in its first hour as in the others.
   const shape = (i: number) => (i % 7 === 0 ? 3_000_000 : 1_000_000);
   const ordinaryOpen = stock(Array(98).fill(100), shape);
-  ok(priceAction(ordinaryOpen, HOUR, true).volumeRatio === 1, 'finished session: its usual intraday shape reads as usual volume');
+  ok(priceAction(ordinaryOpen, HOUR, true, { sessionLive: false }).volumeRatio === 1, 'finished session: its usual intraday shape reads as usual volume');
   const heavy = stock(Array(98).fill(100), i => (i >= 91 ? shape(i) * 4 : shape(i)));
-  ok(priceAction(heavy, HOUR, true).volumeRatio === 4, 'finished session: four times the same hours reads as 4x');
+  ok(priceAction(heavy, HOUR, true, { sessionLive: false }).volumeRatio === 4, 'finished session: four times the same hours reads as 4x');
   const holes = stock(Array(98).fill(100), i => (i % 7 === 6 && i % 2 === 0 ? 0 : 1_000_000));
-  ok(priceAction(holes, HOUR, true).volumeRatio === 1, 'bars with no volume are holes in the feed, not a low base');
+  ok(priceAction(holes, HOUR, true, { sessionLive: false }).volumeRatio === 1, 'bars with no volume are holes in the feed, not a low base');
   const coin = crypto([...Array(79).fill(100), 110], i => (i === 79 ? 20_000 : 500));
   ok(priceAction(coin, HOUR, false, { now: coin.at(-1)!.time + 900 }).volumeRatio! > 5, 'crypto bar in progress: a surge is seen before it closes');
   const quietCoin = crypto([...Array(79).fill(100), 100.1], i => (i === 79 ? 10 : 500));
   ok(priceAction(quietCoin, HOUR, false, { now: quietCoin.at(-1)!.time + 60 }).volumeRatio === 1, 'crypto bar in progress: a quiet first minute does not discount the closed bars');
   // A daily bar read after its session ended counts as closed when the loader passes no clock.
   const days = stock(Array(40).fill(100)).map((c, i) => ({ ...c, time: 1_790_000_000 + i * DAY, volume: i === 39 ? 500_000 : 1_000_000 }));
-  ok(priceAction(days, DAY, true).volumeRatio === 0.5, 'finished daily bar: its thin volume is reported');
+  ok(priceAction(days, DAY, true, { now: days.at(-1)!.time + 8 * HOUR, sessionLive: false }).volumeRatio === 0.5, 'finished daily bar: its thin volume is reported the same day');
+  ok(priceAction(days, DAY, true, { now: days.at(-1)!.time + 2 * HOUR, sessionLive: true }).volumeRatio === null, 'daily bar of an open session: a partial volume is not called thin');
+  // An illiquid stock: the session is open, its last real bar is hours old, and it must not report that bar or Friday's.
+  const illiquid = stock(Array(98).fill(100), () => 1_000_000);
+  const hoursLater = illiquid.at(-1)!.time + 5 * HOUR;
+  ok(priceAction(illiquid, HOUR, true, { now: hoursLater, sessionLive: true }).volumeRatio === null, 'open session, no recent bar: no hourly volume');
+  ok(priceAction(illiquid, HOUR, true, { now: hoursLater }).volumeRatio === null, 'no calendar from the feed: no hourly volume');
 }
 
 // The 24-hour base only exists on hourly bars: on 1D the nearest close can be minutes old.

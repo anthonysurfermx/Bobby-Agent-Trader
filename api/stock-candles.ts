@@ -46,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const data = await response.json() as {
       chart?: {
         result?: Array<{
-          meta?: { symbol?: string; currency?: string; exchangeName?: string; fullExchangeName?: string; regularMarketTime?: number };
+          meta?: { symbol?: string; currency?: string; exchangeName?: string; fullExchangeName?: string; regularMarketTime?: number; currentTradingPeriod?: { regular?: { start?: number; end?: number } } };
           timestamp?: number[];
           indicators?: {
             quote?: Array<{
@@ -82,9 +82,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       volume: quote.volume?.[i] ?? 0,
     })).filter(c => [c.ts, c.close, c.open, c.high, c.low].every(v => typeof v === 'number' && Number.isFinite(v)) && c.close! > 0 && c.open! > 0 && c.low! > 0 && c.high! >= c.low!); // Remove null/zero entries
 
+    // The exchange's own regular session, in epoch seconds: the one way to tell an open session with no recent trade from a closed one.
+    const regular = result.meta?.currentTradingPeriod?.regular;
+    const tradingPeriod = Number.isFinite(regular?.start) && Number.isFinite(regular?.end) ? { start: regular!.start!, end: regular!.end! } : null;
+
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
 
-    return res.status(200).json({ ok: true, symbol, candles, currency: result.meta?.currency ?? null, exchange: result.meta?.fullExchangeName ?? result.meta?.exchangeName ?? null, asOf: candles.length ? new Date(candles.at(-1)!.ts).toISOString() : null, provider: 'Yahoo Finance' });
+    return res.status(200).json({ ok: true, symbol, candles, tradingPeriod, currency: result.meta?.currency ?? null, exchange: result.meta?.fullExchangeName ?? result.meta?.exchangeName ?? null, asOf: candles.length ? new Date(candles.at(-1)!.ts).toISOString() : null, provider: 'Yahoo Finance' });
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('[Stock Candles] Error:', msg);

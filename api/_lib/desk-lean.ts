@@ -138,8 +138,11 @@ function sessionVolumeRatio(closed: Candle[], barSeconds: number): number | null
 /**
  * Recent price behaviour, from the candles of one timeframe. `now` (seconds) tells a bar still in progress from a
  * closed one when the feed carries no live quote after it; without either, every bar counts as closed.
+ * `sessionLive` is the exchange's own calendar for a stock: true while its regular session runs, false outside it,
+ * null or absent when the feed did not say. A thinly traded stock can go hours without a bar in an open session,
+ * so the age of its last bar cannot answer this.
  */
-export function priceAction(candles: Candle[], barSeconds: number, equity: boolean, opts: { now?: number } = {}): PriceAction {
+export function priceAction(candles: Candle[], barSeconds: number, equity: boolean, opts: { now?: number; sessionLive?: boolean | null } = {}): PriceAction {
   const empty: PriceAction = { lastBarPct: null, sessionChangePct: null, sessionChangeFrom: null, openingGapPct: null, windowChangePct: null, window: null, volumeRatio: null, rangePositionPct: null, moveInAtr: null, againstPriorRange: null, priorSessionHigh: null, priorSessionLow: null, againstPriorSession: null };
   if (candles.length < 3) return empty;
   const price = candles.at(-1)!.close;
@@ -168,14 +171,13 @@ export function priceAction(candles: Candle[], barSeconds: number, equity: boole
   // Volume compares closed bars. A bar still in progress can only understate its volume, so it joins them only
   // once it already holds more than the average: that is how a surge is seen before the bar closes.
   const asOf = opts.now ?? stub?.time ?? null;
-  const inProgress = asOf !== null && last.time + barSeconds > asOf ? last : null;
+  const inProgress = !(equity && opts.sessionLive === false) && asOf !== null && last.time + barSeconds > asOf ? last : null;
   const closed = inProgress ? traded.slice(0, -1) : traded;
   let volumeRatio: number | null = null;
   if (equity && barSeconds < DAY_SECONDS && reference?.session) {
     // Yahoo's hourly bars of a session still trading are not usable: on 2026-11-23 they summed to 2-9 times that
-    // day's own daily volume and changed between two fetches. They are read only once the session is over.
-    const sessionLive = asOf !== null && asOf - last.time < barSeconds * 2;
-    if (!sessionLive) volumeRatio = sessionVolumeRatio(closed, barSeconds);
+    // day's own daily volume and changed between two fetches. They are read only once the calendar says it is over.
+    if (opts.sessionLive === false) volumeRatio = sessionVolumeRatio(closed, barSeconds);
   } else {
     const recentCount = reference?.session ? Math.min(3, Math.max(0, closed.length - reference.start)) : 3;
     const base = closed.slice(Math.max(0, closed.length - recentCount - 20), closed.length - recentCount).filter(c => c.volume > 0);

@@ -95,13 +95,22 @@ const deskBase = () => process.env.BOBBY_PROTOCOL_BASE_URL || 'https://bobbyprot
 async function fetchCandlePacket(path: string) {
   const response = await fetch(`${deskBase()}${path}`, { signal: AbortSignal.timeout(12000) });
   if (!response.ok) throw new Error('Market evidence unavailable');
-  const payload = await response.json() as { candles?: Array<Record<string, unknown>>; symbol?: string; currency?: string | null; exchange?: string | null };
+  const payload = await response.json() as { candles?: Array<Record<string, unknown>>; symbol?: string; currency?: string | null; exchange?: string | null; tradingPeriod?: { start?: unknown; end?: unknown } | null };
   const candles = (payload.candles ?? []).map(row => ({
     time: Number(row.ts) / 1000, open: Number(row.open), high: Number(row.high),
     low: Number(row.low), close: Number(row.close), volume: Number(row.volume ?? 0),
   })).filter(row => Object.values(row).every(Number.isFinite) && row.close > 0 && row.low > 0 && row.high >= row.low)
     .sort((a, b) => a.time - b.time);
-  return { candles, symbol: payload.symbol, currency: payload.currency ?? null, exchange: payload.exchange ?? null };
+  return { candles, symbol: payload.symbol, currency: payload.currency ?? null, exchange: payload.exchange ?? null, tradingPeriod: payload.tradingPeriod ?? null };
+}
+
+/**
+ * Whether the exchange's regular session is running at `now` (seconds); null when the feed did not say. Both bounds
+ * are read, so it holds whichever session the feed names outside hours (the last one or the next one).
+ */
+function sessionLiveAt(period: { start?: unknown; end?: unknown } | null, now: number): boolean | null {
+  const start = Number(period?.start), end = Number(period?.end);
+  return period && Number.isFinite(start) && Number.isFinite(end) && end > start ? start <= now && now < end : null;
 }
 
 const isEquity = (symbol: string, assetType?: 'equity'|'crypto') => assetType ? assetType === 'equity' : isEquitySymbol(symbol) || isListedStockSymbol(symbol);
@@ -131,7 +140,7 @@ export async function loadDeskEvidence(symbol: string, assetType?: 'equity'|'cry
   // Weekends/holidays can leave a stock's last session several days old.
   if (Date.now()/1000 - latest.time > (equity ? 5*86400 : 3*3600) || latest.time > Date.now()/1000+60) throw new Error('Market evidence is stale');
   return {
-    symbol, technicals: { ...analysisSummary(analyzeCandles(candles)), action: priceAction(candles, LEAN_BAR_SECONDS['1H'], equity, { now: Date.now() / 1000 }) } as Technicals,
+    symbol, technicals: { ...analysisSummary(analyzeCandles(candles)), action: priceAction(candles, LEAN_BAR_SECONDS['1H'], equity, { now: Date.now() / 1000, sessionLive: sessionLiveAt(packet.tradingPeriod, Date.now() / 1000) }) } as Technicals,
     provenance: { provider: equity ? 'Yahoo Finance' : 'OKX', instrument: equity ? symbol : `${symbol}-USDT`, assetType: equity ? 'equity' : 'crypto', currency: equity ? packet.currency : 'USDT', exchange: equity ? packet.exchange : null, timeframe: '1H', asOf: new Date(latest.time*1000).toISOString() },
   };
 }
@@ -193,18 +202,14 @@ const higherTimeframes = (symbol: string, equity: boolean): Array<[string, strin
  * its last bar is more than one bar behind (a stock's daily bar is stamped at its session open: the hourly
  * rule's five days plus that session). Under MIN_DESK_BARS the block is kept without a trend reading.
  */
-async function loadTimeframe(symbol: string, equity: boolean, tf: string, path: string, hourly: Promise<DeskEvidence>): Promise<readonly [string, TimeframeBlock] | null> {
+async function loadTimeframe(symbol: string, equity: boolean, tf: string, path: string): Promise<readonly [string, TimeframeBlock] | null> {
   try {
     const packet = await fetchCandlePacket(path);
     const candles = packet.candles;
     if (candles.length < 30 || (equity && packet.symbol && packet.symbol !== symbol)) return null;
     const latest = candles.at(-1)!.time, now = Date.now() / 1000;
     if (now - latest > (equity ? 6 * 86_400 : 2 * BAR_SECONDS[tf]) || latest > now + 60) return null;
-    // A stock's daily bar is stamped at its open and sessions differ in length by market: the hourly feed says
-    // whether it is still printing. Once it stopped, the daily bar is a finished session.
-    const hourlyAt = equity ? await hourly.then(e => Date.parse(e.provenance.asOf) / 1000).catch(() => null) : null;
-    const sessionOver = hourlyAt !== null && now - hourlyAt > 1.5 * 3600;
-    const block: TimeframeBlock = { ...analysisSummary(analyzeCandles(candles)), action: priceAction(candles, BAR_SECONDS[tf], equity, sessionOver ? {} : { now }), bars: candles.length, asOf: new Date(latest * 1000).toISOString() };
+    const block: TimeframeBlock = { ...analysisSummary(analyzeCandles(candles)), action: priceAction(candles, BAR_SECONDS[tf], equity, { now, sessionLive: sessionLiveAt(packet.tradingPeriod, now) }), bars: candles.length, asOf: new Date(latest * 1000).toISOString() };
     if (candles.length < MIN_DESK_BARS) block.trend = 'insufficient_history';
     return [tf, block] as const;
   } catch { return null; }
@@ -219,7 +224,7 @@ export async function loadDeskEvidenceV2(symbol: string, assetType?: 'equity'|'c
   const base = await loadDeskEvidence(symbol, assetType);
   const equity = base.provenance.assetType === 'equity';
   const [higher, derivatives, record] = await Promise.all([
-    Promise.all(higherTimeframes(symbol, equity).map(([tf, path]) => loadTimeframe(symbol, equity, tf, path, Promise.resolve(base)))),
+    Promise.all(higherTimeframes(symbol, equity).map(([tf, path]) => loadTimeframe(symbol, equity, tf, path))),
     equity ? Promise.resolve(null) : loadDerivatives(symbol),
     loadBobbyRecord(symbol),
   ]);
@@ -274,10 +279,9 @@ export async function loadDeskEvidenceFor(symbol: string, assetType: 'equity'|'c
   const names = ['1H', ...offered.map(([tf]) => tf)];
   const direct: string[] = requested.filter(tf => names.includes(tf));
   const wanted = direct.length ? direct : [nearestTimeframe(requested.at(-1)!, names)];
-  const hourly = loadDeskEvidence(symbol, assetType);
   const [base, higher] = await Promise.all([
-    hourly,
-    Promise.all(offered.filter(([tf]) => wanted.includes(tf)).map(([tf, path]) => loadTimeframe(symbol, equity, tf, path, hourly))),
+    loadDeskEvidence(symbol, assetType),
+    Promise.all(offered.filter(([tf]) => wanted.includes(tf)).map(([tf, path]) => loadTimeframe(symbol, equity, tf, path))),
   ]);
   const timeframes: Record<string, TimeframeBlock> = { '1H': base.technicals };
   for (const entry of higher) if (entry) timeframes[entry[0]] = entry[1];
@@ -980,9 +984,9 @@ export async function runDeskDebate(
   const plain = speech === 'plain';
   const plainRule = speechRule(speech);
   const scenariosRule = ' Also return scenarios: confirm is one sentence naming the observable condition in the evidence that would confirm the conditional thesis, invalidate is one sentence naming the condition that would invalidate it.';
-  const askCio = (name: string, extraRule: string, extraInput: Record<string, unknown>, callCtx: RoleCtx = ctx) => plan.scenarios
-    ? role(plan.cio, name, `${cioPrompt}${readerRule}${plainRule}${extraRule}${scenariosRule} Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape},"scenarios":{"confirm":"...","invalidate":"..."}}.`, { ...cioInput, ...extraInput }, VerdictWithScenarios, VERDICT_SCENARIOS_SCHEMA, callCtx)
-    : role(plan.cio, name, `${cioPrompt}${readerRule}${plainRule}${extraRule} Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape}}.`, { ...cioInput, ...extraInput }, Verdict, VERDICT_SCHEMA, callCtx);
+  const askCio = (name: string, extraRule: string, extraInput: Record<string, unknown>) => plan.scenarios
+    ? role(plan.cio, name, `${cioPrompt}${readerRule}${plainRule}${extraRule}${scenariosRule} Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape},"scenarios":{"confirm":"...","invalidate":"..."}}.`, { ...cioInput, ...extraInput }, VerdictWithScenarios, VERDICT_SCENARIOS_SCHEMA, ctx)
+    : role(plan.cio, name, `${cioPrompt}${readerRule}${plainRule}${extraRule} Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape}}.`, { ...cioInput, ...extraInput }, Verdict, VERDICT_SCHEMA, ctx);
   let cio: z.infer<typeof Verdict> | z.infer<typeof VerdictWithScenarios> = await askCio('cio', '', {});
   // One bounded repair of the whole answer. If it fails or is still incoherent no verdict is issued: the draft's
   // text argues the rejected side, so relabelling it "wait" would show a contradiction, and the read is refunded.
@@ -990,10 +994,9 @@ export async function runDeskDebate(
   if (verdictIssue) {
     const previous = { verdict: cio.verdict, direction: cio.direction, analysis: cio.analysis, synthesis: cio.synthesis };
     const left = ctx.deadline - Date.now();
-    // A saved thesis still needs its reviewer afterwards: its time is kept whenever the budget allows both.
-    const reserve = opts.thesis && left >= VERDICT_REPAIR_MIN_MS + REVIEWER_MIN_LEFT_MS ? REVIEWER_MIN_LEFT_MS : 0;
+    // The read comes first: a repair that leaves no time for a thesis review costs the lists, never the answer.
     const repaired = left >= VERDICT_REPAIR_MIN_MS
-      ? await askCio('cio_repair', VERDICT_REPAIR_RULE, { repair: { problem: verdictIssue, previous } }, { ...ctx, deadline: ctx.deadline - reserve }).catch(() => null)
+      ? await askCio('cio_repair', VERDICT_REPAIR_RULE, { repair: { problem: verdictIssue, previous } }).catch(() => null)
       : null;
     if (!repaired || verdictProblem(repaired.verdict, repaired.direction, lean.label)) {
       if (!opts.signal?.aborted) console.error(JSON.stringify({ route: 'desk-debate', event: 'verdict_repair_failed', problem: verdictIssue, attempted: left >= VERDICT_REPAIR_MIN_MS, lean: lean.label, level }));
