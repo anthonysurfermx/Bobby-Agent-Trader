@@ -22,6 +22,9 @@
 // And on 2026-11-23 (the lean, api/_lib/desk-lean.ts): every role's input gained `lean` and each technicals block
 // its `action`, the rules explain both, Red Team separates what is wrong from what is only unknown, the CIO's
 // verdict rule is VERDICT_RULE ("wait" is a finding, not the safe word), and the reply carries `lean`.
+// Same day, after the review of that change: `action` measures the move against the range usual over its bars and
+// names the prior session, and Alpha looks for the best-supported interpretation rather than the strongest opportunity.
+// A stock's live hourly volume is no longer quoted (the feed is unreliable until the session ends).
 // One key is left out of the compared reply on purpose: `memory` (the receipt of what memory kept), which
 // 1.8 adds for an account whose memory applies. Everything around it must stay identical.
 import assert from 'node:assert/strict';

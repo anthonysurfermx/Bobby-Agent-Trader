@@ -26,14 +26,18 @@ export interface PriceAction {
   /** Change over the last `window.bars` bars, in %. */
   windowChangePct: number | null;
   window: { bars: number } | null;
-  /** Volume of the latest bars against the average of the 20 before them (1 = usual). */
+  /** Volume of the latest bars against what is usual for them (1 = usual); null when the feed cannot say. */
   volumeRatio: number | null;
   /** Where the price sits between the lowest low (0) and the highest high (100) of the last 30 bars. */
   rangePositionPct: number | null;
-  /** The move of the session (or window) measured in ATRs: how unusual it is for this instrument. */
+  /** The move of the session (or window) against the range usual over that many bars: how unusual it is. */
   moveInAtr: number | null;
   /** The price against the range of the 30 bars before the latest move: a breakout, a breakdown, or still inside it. */
   againstPriorRange: 'above' | 'below' | 'inside' | null;
+  /** The previous session's high and low (a stock), and the price against them. */
+  priorSessionHigh: number | null;
+  priorSessionLow: number | null;
+  againstPriorSession: 'above' | 'below' | 'inside' | null;
 }
 
 const pct = (from: number, to: number) => Number(((to - from) / from * 100).toFixed(2));
@@ -53,72 +57,164 @@ function atrAt(candles: Candle[], end: number, period = 14): number | null {
   return total / period;
 }
 
+/** Longest pause inside one trading session (Asian lunch breaks run to 90 minutes); past it a new session began. */
+const SESSION_PAUSE_SECONDS = 4 * 3600;
+const DAY_SECONDS = 86_400;
+
+/** What the latest move is measured from: the index of its first bar in `candles` and the close before it. */
+interface MoveReference { start: number; close: number; from: NonNullable<PriceAction['sessionChangeFrom']>; session: boolean }
+
 /**
- * Recent price behaviour, from the candles of one timeframe. `barSeconds` is the timeframe's bar; a break
- * between two bars longer than 1.5 bars is a session boundary (a stock overnight), which crypto never has.
+ * The close 24 hours before the latest price, found by when each bar closed. Only hourly bars can say it: on 4H and
+ * above the nearest close can be minutes or a full bar away from 24 hours, so those timeframes use their window.
  */
-export function priceAction(candles: Candle[], barSeconds: number, equity: boolean): PriceAction {
-  const empty: PriceAction = { lastBarPct: null, sessionChangePct: null, sessionChangeFrom: null, openingGapPct: null, windowChangePct: null, window: null, volumeRatio: null, rangePositionPct: null, moveInAtr: null, againstPriorRange: null };
+function dayAgoReference(traded: Candle[], barSeconds: number, priceTime: number): MoveReference | null {
+  if (barSeconds > 3600) return null;
+  const target = priceTime - DAY_SECONDS;
+  for (let i = traded.length - 1; i >= 0; i--) {
+    const closedAt = traded[i].time + barSeconds;
+    if (closedAt > target) continue;
+    // A hole in the feed around that time gives no honest 24-hour base.
+    return target - closedAt > barSeconds * 1.5 ? null : { start: i + 1, close: traded[i].close, from: '24 hours ago', session: false };
+  }
+  return null;
+}
+
+/**
+ * Where the latest session starts. A daily bar is a session by itself, so its base is the bar before, whatever the
+ * calendar between them. Intraday, a session starts after a pause too long to be a missing bar or a lunch break. A
+ * market with no such pause in the last day (a future trading around the clock) is read like crypto.
+ */
+function sessionReference(candles: Candle[], traded: Candle[], barSeconds: number, priceTime: number): MoveReference | null {
+  if (barSeconds >= DAY_SECONDS) {
+    const quote = candles.at(-1)!, last = traded.at(-1)!;
+    const start = quote !== last && quote.time >= last.time + barSeconds ? candles.length - 1 : traded.length - 1;
+    return start > 0 ? { start, close: candles[start - 1].close, from: 'previous session close', session: true } : null;
+  }
+  const pause = Math.max(SESSION_PAUSE_SECONDS, barSeconds * 1.5);
+  for (let i = candles.length - 1; i > 0; i--) {
+    if (candles.at(-1)!.time - candles[i].time > DAY_SECONDS) break;
+    if (candles[i].time - candles[i - 1].time > pause) return { start: i, close: candles[i - 1].close, from: 'previous session close', session: true };
+  }
+  return dayAgoReference(traded, barSeconds, priceTime);
+}
+
+/** The high and low of the session before the one that starts at `start`. */
+function priorSession(candles: Candle[], start: number, barSeconds: number): { high: number; low: number } | null {
+  if (start < 1) return null;
+  let from = start - 1;
+  if (barSeconds < DAY_SECONDS) {
+    const pause = Math.max(SESSION_PAUSE_SECONDS, barSeconds * 1.5);
+    while (from > 0 && candles[from].time - candles[from - 1].time <= pause) from--;
+  }
+  const rows = candles.slice(from, start);
+  return { high: Math.max(...rows.map(c => c.high)), low: Math.min(...rows.map(c => c.low)) };
+}
+
+/**
+ * A finished stock session's volume against the same hours of the sessions before it: the first hour of any session
+ * trades about twice the last, so a contiguous average would read every ordinary open as a surge. Bars with no
+ * volume are holes in the feed (past first bars of several European and Brazilian listings) and are left out.
+ */
+function sessionVolumeRatio(closed: Candle[], barSeconds: number): number | null {
+  const pause = Math.max(SESSION_PAUSE_SECONDS, barSeconds * 1.5);
+  const sessions: Candle[][] = [];
+  closed.forEach((bar, i) => {
+    if (i === 0 || bar.time - closed[i - 1].time > pause) sessions.push([]);
+    sessions.at(-1)!.push(bar);
+  });
+  const prior = sessions.slice(-21, -1);
+  const current = (sessions.at(-1) ?? []).map((bar, position) => ({ bar, position })).filter(({ bar }) => bar.volume > 0).slice(-3);
+  let traded = 0, usual = 0;
+  for (const { bar, position } of current) {
+    const same = prior.map(session => session[position]?.volume ?? 0).filter(volume => volume > 0);
+    if (same.length < 5) continue;
+    traded += bar.volume;
+    usual += same.reduce((sum, volume) => sum + volume, 0) / same.length;
+  }
+  return usual > 0 ? Number((traded / usual).toFixed(2)) : null;
+}
+
+/**
+ * Recent price behaviour, from the candles of one timeframe. `now` (seconds) tells a bar still in progress from a
+ * closed one when the feed carries no live quote after it; without either, every bar counts as closed.
+ */
+export function priceAction(candles: Candle[], barSeconds: number, equity: boolean, opts: { now?: number } = {}): PriceAction {
+  const empty: PriceAction = { lastBarPct: null, sessionChangePct: null, sessionChangeFrom: null, openingGapPct: null, windowChangePct: null, window: null, volumeRatio: null, rangePositionPct: null, moveInAtr: null, againstPriorRange: null, priorSessionHigh: null, priorSessionLow: null, againstPriorSession: null };
   if (candles.length < 3) return empty;
   const price = candles.at(-1)!.close;
   // Bars that really traded: the stub still gives the price, never a volume or a range.
-  const traded = isStub(candles.at(-1)!) ? candles.slice(0, -1) : candles;
+  const stub = isStub(candles.at(-1)!) ? candles.at(-1)! : null;
+  const traded = stub ? candles.slice(0, -1) : candles;
   const last = traded.at(-1)!, before = traded.at(-2);
   const lastBarPct = before ? pct(before.close, last.close) : null;
 
-  // The latest session: the bars after the last break in time.
-  let sessionStart = -1;
-  if (equity) {
-    for (let i = traded.length - 1; i > 0; i--) {
-      if (traded[i].time - traded[i - 1].time > barSeconds * 1.5) { sessionStart = i; break; }
-    }
-  }
-  let sessionChangePct: number | null = null, sessionChangeFrom: PriceAction['sessionChangeFrom'] = null, openingGapPct: number | null = null;
-  let sessionBars = 0;
-  if (equity && sessionStart > 0) {
-    const prevClose = traded[sessionStart - 1].close;
-    sessionChangePct = pct(prevClose, price);
-    sessionChangeFrom = 'previous session close';
-    sessionBars = traded.length - sessionStart;
-    const gap = pct(prevClose, traded[sessionStart].open);
+  // When the latest price is from: its live quote, or the close of its last bar, never later than now.
+  const priceTime = Math.min(opts.now ?? Infinity, stub?.time ?? last.time + barSeconds);
+  const reference = equity ? sessionReference(candles, traded, barSeconds, priceTime) : dayAgoReference(traded, barSeconds, priceTime);
+  const sessionChangePct = reference ? pct(reference.close, price) : null;
+  const sessionChangeFrom = reference?.from ?? null;
+  let openingGapPct: number | null = null;
+  if (reference?.session) {
+    const atr = atrAt(candles, reference.start);
+    const opened = candles[reference.start].open;
     // The range the instrument had before the gap: an ATR that already holds the gap bar hides the gap.
-    const atr = atrAt(traded, sessionStart);
-    if (atr !== null && Math.abs(traded[sessionStart].open - prevClose) >= atr * 0.5) openingGapPct = gap;
-  } else if (!equity) {
-    const bars24h = Math.round(86_400 / barSeconds);
-    if (bars24h >= 1 && traded.length > bars24h) {
-      sessionChangePct = pct(traded[traded.length - 1 - bars24h].close, price);
-      sessionChangeFrom = '24 hours ago';
-      sessionBars = bars24h;
-    }
+    if (atr !== null && Math.abs(opened - reference.close) >= atr * 0.5) openingGapPct = pct(reference.close, opened);
   }
 
   const windowBars = Math.min(10, traded.length - 1);
   const windowChangePct = windowBars >= 2 ? pct(traded[traded.length - 1 - windowBars].close, price) : null;
 
-  // Volume: the latest session's bars (up to 3) against the 20 before them. A feed without volume gives none.
-  const recentCount = Math.max(1, Math.min(3, sessionBars || 3));
-  const recent = traded.slice(-recentCount), base = traded.slice(-recentCount - 20, -recentCount);
-  const mean = (rows: Candle[]) => rows.reduce((sum, c) => sum + c.volume, 0) / rows.length;
-  const baseMean = base.length >= 10 ? mean(base) : 0;
-  const volumeRatio = baseMean > 0 ? Number((mean(recent) / baseMean).toFixed(2)) : null;
+  // Volume compares closed bars. A bar still in progress can only understate its volume, so it joins them only
+  // once it already holds more than the average: that is how a surge is seen before the bar closes.
+  const asOf = opts.now ?? stub?.time ?? null;
+  const inProgress = asOf !== null && last.time + barSeconds > asOf ? last : null;
+  const closed = inProgress ? traded.slice(0, -1) : traded;
+  let volumeRatio: number | null = null;
+  if (equity && barSeconds < DAY_SECONDS && reference?.session) {
+    // Yahoo's hourly bars of a session still trading are not usable: on 2026-11-23 they summed to 2-9 times that
+    // day's own daily volume and changed between two fetches. They are read only once the session is over.
+    const sessionLive = asOf !== null && asOf - last.time < barSeconds * 2;
+    if (!sessionLive) volumeRatio = sessionVolumeRatio(closed, barSeconds);
+  } else {
+    const recentCount = reference?.session ? Math.min(3, Math.max(0, closed.length - reference.start)) : 3;
+    const base = closed.slice(Math.max(0, closed.length - recentCount - 20), closed.length - recentCount).filter(c => c.volume > 0);
+    const mean = (rows: Candle[]) => rows.reduce((sum, c) => sum + c.volume, 0) / rows.length;
+    const baseMean = base.length >= 10 ? mean(base) : 0;
+    const recent = (recentCount ? closed.slice(-recentCount) : []).filter(c => c.volume > 0);
+    if (inProgress && baseMean > 0 && inProgress.volume >= baseMean) recent.push(inProgress);
+    if (baseMean > 0 && recent.length) volumeRatio = Number((mean(recent) / baseMean).toFixed(2));
+  }
 
   const window = candles.slice(-30);
   const low = Math.min(...window.map(c => c.low)), high = Math.max(...window.map(c => c.high));
   const rangePositionPct = high > low ? Number(((price - low) / (high - low) * 100).toFixed(1)) : null;
 
-  // How unusual the move is: against the ATR the instrument had before the move started.
-  const moveFrom = sessionChangePct !== null && sessionBars > 0 ? traded.length - sessionBars : traded.length - windowBars;
-  const atrBefore = atrAt(traded, Math.max(15, moveFrom));
-  const moved = sessionChangePct ?? windowChangePct;
-  const moveInAtr = atrBefore && moved !== null && price > 0 ? Number((Math.abs(moved) / (atrBefore / price * 100)).toFixed(1)) : null;
+  // How unusual the move is: its distance in price against the range the instrument had before it started,
+  // scaled to the bars it took (a range grows with the square root of time, so seven bars are not one).
+  const moveFrom = reference ? reference.start : traded.length - windowBars;
+  const moveBase = reference ? reference.close : traded[traded.length - 1 - windowBars]?.close ?? null;
+  const moveBars = Math.max(1, reference ? traded.length - reference.start : windowBars);
+  const atrBefore = atrAt(candles, moveFrom);
+  let moveInAtr: number | null = null;
+  if (atrBefore && moveBase !== null) {
+    const distance = price - moveBase;
+    // A gap happened at once: the part of it still standing is not diluted by the bars that followed.
+    const gap = reference?.session ? candles[reference.start].open - reference.close : 0;
+    const gapHeld = Math.sign(gap) === Math.sign(distance) ? Math.min(Math.abs(gap), Math.abs(distance)) : 0;
+    moveInAtr = Number(Math.max(gapHeld / atrBefore, Math.abs(distance) / (atrBefore * Math.sqrt(moveBars))).toFixed(1));
+  }
 
   // The range that stood before the move: leaving it is a breakout, moving inside it is not.
+  const rangeAgainst = (hi: number, lo: number): 'above' | 'below' | 'inside' => price > hi ? 'above' : price < lo ? 'below' : 'inside';
   const prior = traded.slice(Math.max(0, moveFrom - 30), moveFrom);
   const againstPriorRange: PriceAction['againstPriorRange'] = prior.length < 10 ? null
-    : price > Math.max(...prior.map(c => c.high)) ? 'above' : price < Math.min(...prior.map(c => c.low)) ? 'below' : 'inside';
+    : rangeAgainst(Math.max(...prior.map(c => c.high)), Math.min(...prior.map(c => c.low)));
+  // The narrower test beside it: a price can clear yesterday's high and still sit inside the month's range.
+  const session = reference?.session ? priorSession(candles, reference.start, barSeconds) : null;
 
-  return { lastBarPct, sessionChangePct, sessionChangeFrom, openingGapPct, windowChangePct, window: windowChangePct === null ? null : { bars: windowBars }, volumeRatio, rangePositionPct, moveInAtr, againstPriorRange };
+  return { lastBarPct, sessionChangePct, sessionChangeFrom, openingGapPct, windowChangePct, window: windowChangePct === null ? null : { bars: windowBars }, volumeRatio, rangePositionPct, moveInAtr, againstPriorRange,
+    priorSessionHigh: session ? Number(session.high.toFixed(4)) : null, priorSessionLow: session ? Number(session.low.toFixed(4)) : null, againstPriorSession: session ? rangeAgainst(session.high, session.low) : null };
 }
 
 /** What leanOf reads of one timeframe: its indicators and, when the candles were at hand, its price action. */
@@ -166,7 +262,8 @@ export function blockLean(block: LeanBlock): number | null {
   const moved = action?.sessionChangePct ?? action?.windowChangePct ?? null;
   if (action && moved !== null) {
     // Two ATRs in one direction is a full reading; a move on thin volume counts for six tenths of itself.
-    const size = action.moveInAtr !== null ? clamp(action.moveInAtr / 2, 0, 1) : typeof block.atrPct === 'number' && block.atrPct > 0 ? clamp(Math.abs(moved) / (block.atrPct * 2), 0, 1) : null;
+    // Without a full range from before the move there is no size to give it, and the reading is left out.
+    const size = action.moveInAtr !== null ? clamp(action.moveInAtr / 2, 0, 1) : null;
     if (size !== null) {
       const volume = action.volumeRatio === null ? 0.8 : action.volumeRatio >= 1 ? 1 : 0.6;
       parts.push([Math.sign(moved) * size * volume * ranging, 0.31]);
