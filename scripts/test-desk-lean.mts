@@ -98,6 +98,70 @@ const wave = (n: number, base: number, amp: number) => Array.from({ length: n },
   ok(priceAction([], HOUR, true).sessionChangePct === null, 'no candles: no figures');
 }
 
+// Opt-in reproductions against the current engine; each check states the expected invariant.
+if (process.argv.includes('--regressions')) {
+  // Seven hourly bars with a 2.6% session rise and a baseline true range of 0.95.
+  const ordinary = stock([...Array(56).fill(100), ...Array.from({ length: 7 }, (_, i) => 100 + 2.6 * (i + 1) / 7)]);
+  for (let i = 0; i < 56; i++) ordinary[i] = { ...ordinary[i], high: 100.475, low: 99.525 };
+  const ordinaryAction = priceAction(ordinary, HOUR, true);
+  const ordinaryLean = leanOf({ '1H': { trend: 'lateral', rsi14: 50, action: { ...ordinaryAction, rangePositionPct: 50 } } }, '1H');
+  ok(ordinaryAction.moveInAtr! < 2 && ordinaryLean.label === 'neutral', `ordinary session: momentum alone does not give a directional lean (${ordinaryAction.moveInAtr} ATR, ${ordinaryLean.label} ${ordinaryLean.score})`);
+
+  // The same dollar gap from the same close should have symmetric ATR magnitudes.
+  const gap = (open: number) => {
+    const series = stock([...Array(56).fill(100), open]);
+    series[56] = { ...series[56], open, high: open + 0.2, low: open - 0.2 };
+    return priceAction(series, HOUR, true);
+  };
+  const down = gap(90), up = gap(110);
+  ok(down.openingGapPct === -10 && down.againstPriorRange === 'below', 'gap down: reports a signed opening gap and a breakdown');
+  ok(down.moveInAtr === up.moveInAtr, `gap symmetry: identical absolute price moves (${down.moveInAtr} down, ${up.moveInAtr} up)`);
+
+  const limited = stock([...Array(14).fill(100), 110, 111, 112]);
+  const limitedAction = priceAction(limited, HOUR, true);
+  ok(limitedAction.moveInAtr === null, `short history: no full ATR exists before the session (${limitedAction.moveInAtr})`);
+
+  const missingBar = stock([...Array(56).fill(100), 101, 102, 103, 104]);
+  missingBar.splice(57, 1);
+  const missingAction = priceAction(missingBar, HOUR, true);
+  ok(missingAction.sessionChangePct === 4, `missing hourly bar: a gap in the feed is not a new session (${missingAction.sessionChangePct}%)`);
+
+  const partial = stock([...Array(56).fill(100), 101, 102, 103], i => i === 58 ? 100_000 : 1_000_000);
+  const last = partial.at(-1)!;
+  partial.push({ time: last.time + HOUR / 10, open: last.close, high: last.close, low: last.close, close: last.close, volume: 0 });
+  const partialVolume = priceAction(partial, HOUR, true).volumeRatio;
+  ok(partialVolume === 1, `partial bar: an in-progress bar should not discount the completed bars (${partialVolume}x)`);
+  const zeroVolume = stock(Array(56).fill(100), () => 0);
+  ok(priceAction(zeroVolume, HOUR, true).volumeRatio === null, 'zero-volume feed: no volume ratio');
+  const afterWeekend = stock([...Array(56).fill(100), 102, 103]);
+  for (const c of afterWeekend.slice(56)) c.time += 2 * DAY;
+  ok(priceAction(afterWeekend, HOUR, true).sessionChangePct === 3, 'hourly equity: Monday uses Friday close after a weekend');
+
+  // Daily equity bars are already separate sessions, including the bars after a weekend.
+  const daily = stock([...Array(20).fill(100), 103, 104, 105]).map((c, i) => ({
+    ...c, time: Date.UTC(2026, 9, 26) / 1000 + (i + 2 * Math.floor(i / 5)) * DAY,
+  }));
+  const dailyAction = priceAction(daily, DAY, true);
+  ok(dailyAction.sessionChangePct === 0.96, `daily equity: Wednesday compares to Tuesday's close (${dailyAction.sessionChangePct}%)`);
+
+  const withStub = crypto(Array.from({ length: 60 }, (_, i) => 100 + i));
+  const nextTime = withStub.at(-1)!.time + HOUR;
+  withStub.push({ time: nextTime, open: 160, high: 160, low: 160, close: 160, volume: 0 });
+  const stubAction = priceAction(withStub, HOUR, false);
+  ok(stubAction.sessionChangePct === 17.65, `crypto: a timestamped quote uses the matching 24-hour baseline (${stubAction.sessionChangePct}%)`);
+
+  const rebound = stock([...Array.from({ length: 56 }, (_, i) => 140 - i * 0.7), 99, 101, 103, 105, 107, 109, 111]);
+  const reboundBlock = block(rebound, HOUR, true);
+  const reboundLean = leanOf({ '1H': reboundBlock }, '1H');
+  ok(reboundLean.label !== 'long', `bearish rebound: a bounce inside the prior range should not imply a long continuation (${reboundBlock.trend}, ${reboundBlock.action.againstPriorRange}, ${reboundLean.label} ${reboundLean.score})`);
+
+  const oldHigh = stock([...Array(56).fill(100), ...Array(7).fill(103)]);
+  oldHigh[27] = { ...oldHigh[27], high: 110 };
+  const oldRange = priceAction(oldHigh, HOUR, true);
+  const recentHigh = Math.max(...oldHigh.slice(42, 56).map(c => c.high));
+  ok(oldRange.againstPriorRange === 'inside' && oldHigh.at(-1)!.close > recentHigh, `long range: above the last two sessions but inside the 30-bar range (recent high ${recentHigh})`);
+}
+
 if (process.argv.includes('--live')) {
   const base = process.env.BOBBY_PROTOCOL_BASE_URL || 'https://bobbyprotocol.xyz';
   const cases: Array<[string, boolean]> = [['NVDA', true], ['AAPL', true], ['TSLA', true], ['MSFT', true], ['AMZN', true], ['BTC', false], ['ETH', false], ['SOL', false], ['DOGE', false]];
@@ -108,6 +172,18 @@ if (process.argv.includes('--live')) {
       const candles = (payload.candles ?? []).map(r => ({ time: Number(r.ts) / 1000, open: Number(r.open), high: Number(r.high), low: Number(r.low), close: Number(r.close), volume: Number(r.volume ?? 0) })).sort((a, b) => a.time - b.time);
       const b = block(candles, HOUR, equity);
       const lean = leanOf({ '1H': b }, '1H');
+      if (symbol === 'TSLA') {
+        // As long as the 30-day feed still contains November 5, replay the completed selloff.
+        const start = candles.findIndex(c => new Date(c.time * 1000).toISOString().startsWith('2026-11-05'));
+        const next = candles.findIndex((c, i) => i > start && c.time - candles[i - 1].time > HOUR * 1.5);
+        if (start >= 50 && next > start) {
+          const selloff = block(candles.slice(0, next), HOUR, true);
+          const historicalLean = leanOf({ '1H': selloff }, '1H');
+          ok(selloff.action.openingGapPct! < -3 && selloff.action.sessionChangePct! < -10
+            && selloff.action.againstPriorRange === 'below' && historicalLean.label === 'short',
+          `live TSLA 2026-11-05: opening gap ${selloff.action.openingGapPct}%, session ${selloff.action.sessionChangePct}%, ${historicalLean.label} ${historicalLean.score}`);
+        }
+      }
       console.log(`live ${symbol.padEnd(5)} price ${String(b.price).padEnd(9)} trend ${String(b.trend).padEnd(8)} rsi ${String(b.rsi14).padEnd(5)} session ${String(b.action.sessionChangePct).padStart(7)}%  vol ${String(b.action.volumeRatio).padStart(5)}x  ${String(b.action.againstPriorRange).padEnd(6)} range ${String(b.action.rangePositionPct).padStart(5)}  atr× ${String(b.action.moveInAtr).padStart(5)}  → ${lean.label.toUpperCase()} ${lean.score} (${lean.strength})${lean.cautions.length ? '  ⚠ ' + lean.cautions.join('; ') : ''}`);
     } catch (error) { console.log(`live ${symbol}: unavailable (${(error as Error).message})`); }
   }

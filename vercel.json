@@ -441,6 +441,7 @@
   },
   "git": {
     "deploymentEnabled": {
+      "codex/desk-lean-regressions": false,
       "codex/dashboard-live-review": false,
       "codex/dashboard-remediation-20261003": false,
       "codex/admin-compass-20261004": false,
