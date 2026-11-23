@@ -19,6 +19,9 @@
 // And on 2026-10-09 (plain words, api/_lib/desk-plain-words.ts): the CIO's prompt gained PLAIN_RULE for every
 // reader who has not said they are experienced. Alpha's and Red Team's prompts, every input and every reply
 // stayed as they were.
+// And on 2026-11-23 (the lean, api/_lib/desk-lean.ts): every role's input gained `lean` and each technicals block
+// its `action`, the rules explain both, Red Team separates what is wrong from what is only unknown, the CIO's
+// verdict rule is VERDICT_RULE ("wait" is a finding, not the safe word), and the reply carries `lean`.
 // One key is left out of the compared reply on purpose: `memory` (the receipt of what memory kept), which
 // 1.8 adds for an account whose memory applies. Everything around it must stay identical.
 import assert from 'node:assert/strict';
