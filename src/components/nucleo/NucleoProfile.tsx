@@ -184,6 +184,9 @@ export default function NucleoProfile(p: Props) {
             detail={p.pro.billing.busy ? t('Opening…', 'Abriendo…', 'Abrindo…') : p.pro.detail}
             onClick={p.pro.action} disabled={p.pro.billing.busy} />
           {p.pro.billing.error && <p role="alert" className="px-3 py-2 text-sm" style={{ color: '#FFB3B5' }}>{p.pro.billing.error}</p>}
+          <a href="/support#contact" className="block px-3 py-2 text-sm underline underline-offset-4" style={{ color: '#F2EDE4' }}>
+            {t('Trouble paying? Report it', '¿Problemas para pagar? Repórtalo', 'Problemas para pagar? Avise a gente')}
+          </a>
           {giftedReads && <Row icon={<Zap size={16} />} label={t('Gifted reads', 'Lecturas regaladas', 'Leituras de presente')}
             detail={t(`Quick: ${p.giftBalances.quick} · Deep: ${p.giftBalances.deep} · Max: ${p.giftBalances.max}`, `Rápido: ${p.giftBalances.quick} · Profundo: ${p.giftBalances.deep} · Máximo: ${p.giftBalances.max}`, `Rápido: ${p.giftBalances.quick} · Profundo: ${p.giftBalances.deep} · Máximo: ${p.giftBalances.max}`)} />}
           <Row icon={<UserPlus size={16} />} label={p.invite.label} detail={p.invite.detail} onClick={p.invite.action} />
