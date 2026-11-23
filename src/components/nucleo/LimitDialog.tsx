@@ -81,6 +81,9 @@ export default function LimitDialog({ limit, state, billing, onClose, onSignIn, 
                   {billing.busy ? t('Opening…', 'Abriendo…', 'Abrindo…') : t('Get Pro', 'Obtener Pro', 'Assinar')}
                 </button>
               </div>
+              <a href="/support#contact" className="block px-3 py-2 text-sm underline underline-offset-4" style={{ color: '#F2EDE4' }}>
+                {t('Trouble paying? Report it', '¿Problemas para pagar? Repórtalo', 'Problemas para pagar? Avise a gente')}
+              </a>
               {billing.error && <p role="alert" className="mt-2 text-[13px]" style={{ color: '#FFB3B5' }}>{billing.error}</p>}
               <div className="n-dlg-or"><span>{t('or', 'o', 'ou')}</span></div></>}
               <InvitePanel state={state} onSignIn={onSignIn} />
