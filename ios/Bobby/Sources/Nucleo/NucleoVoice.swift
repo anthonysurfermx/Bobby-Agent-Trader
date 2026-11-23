@@ -73,7 +73,10 @@ final class NucleoVoice {
             return .queued
         }
 #endif
-        voice.obeysSilentSwitch = !spoken
+        // Bobby's answer is always heard, like any app the person asked to speak: a typed or tapped question used
+        // to play under `.ambient`, so a phone on silent showed the speaking state with no sound at all (reported
+        // 2026-11-23). The app's own mute is the way to read in silence.
+        voice.obeysSilentSwitch = false
         voice.speak(text, voiceId: voiceId, persona: persona, vibe: vibe, essential: true)
         return .queued
     }
