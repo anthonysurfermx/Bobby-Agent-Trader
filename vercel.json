@@ -441,6 +441,7 @@
   },
   "git": {
     "deploymentEnabled": {
+      "codex/ios-1.9.2-build-78": false,
       "codex/dashboard-live-review": false,
       "codex/dashboard-remediation-20261003": false,
       "codex/admin-compass-20261004": false,

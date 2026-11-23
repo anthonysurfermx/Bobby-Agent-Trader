@@ -30,6 +30,7 @@ struct AccountSheet: View {
     var onAIConsentWithdraw: (() -> Void)? = nil
     /// Opens a 1.8 screen of the Núcleo over the glass (My theses, Reminders); nil hides those rows (the classic desk).
     var onOpenRoute: ((NucleoRoute) -> Void)? = nil
+    @ObservedObject private var watches = WatchCenter.shared
     let onClose: () -> Void
     @ObservedObject private var account = AccountSession.shared
     @ObservedObject private var reads = BobbyAccessCenter.shared
@@ -352,6 +353,12 @@ struct AccountSheet: View {
                        detail: L.t("Review reminders you set", "Recordatorios de revisión que tú pusiste"),
                        action: { onOpenRoute(.reminders) }) { ProfileIcon(symbol: "bell") }
                 .accessibilityIdentifier("account-reminders")
+            // 1.9.x: only once the server listed this account's watches (the door exists for them).
+            if watches.board != nil {
+                ProfileRow(label: WatchCopy.row, detail: WatchCopy.rowDetail,
+                           action: { onOpenRoute(.watches) }) { ProfileIcon(symbol: "eye") }
+                    .accessibilityIdentifier("account-watches")
+            }
         }
         if let onOpenRoute {
             ProfileRow(label: invites.level.name,

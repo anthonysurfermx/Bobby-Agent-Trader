@@ -81,6 +81,11 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #readNext .links{display:flex;justify-content:center;gap:12px;margin-top:3px}
 #readNext .links button{min-height:36px;padding:4px 8px;font:400 13px/18px var(--sans);color:var(--ink2);cursor:pointer}
 
+#stage.has-opening #greet{display:none}
+#opening-line{position:absolute;left:16px;top:522px;width:358px;min-height:48px;padding:0 2px;border:0;background:transparent;color:var(--ink);font:400 16px/22px var(--serif);text-align:center;pointer-events:auto;cursor:pointer}
+#opening-line:not([hidden])::after{content:"›";color:var(--ink2);margin-left:4px}
+#opening-line:active{opacity:.7}
+#opening-line:focus-visible{outline:1px solid currentColor;border-radius:6px}
 /* greeting, notes, face text */
 #greet,#note{left:20px;top:512px;width:350px;text-align:center;pointer-events:none}
 #greet .t{font:300 34px/36px var(--serif);letter-spacing:-.035em;white-space:nowrap}
