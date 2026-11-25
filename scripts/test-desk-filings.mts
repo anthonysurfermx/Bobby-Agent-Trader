@@ -251,16 +251,16 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   throw new Error(`Unexpected fetch: ${url}`);
 }) as typeof fetch;
 
-// With flag OFF (default): zero SEC requests made!
-delete process.env.BOBBY_SEC_FILINGS;
-eq(secFilingsEnabled(), false, 'disabled by default');
+// With kill-switch OFF (`BOBBY_SEC_FILINGS=off`): zero SEC requests made!
+process.env.BOBBY_SEC_FILINGS = 'off';
+eq(secFilingsEnabled(), false, 'disabled when kill-switch BOBBY_SEC_FILINGS=off');
 const evOff = await loadDeskEvidenceV2('NVDA', 'equity');
-eq(secCalls, 0, 'zero SEC requests when BOBBY_SEC_FILINGS is off');
+eq(secCalls, 0, 'zero SEC requests when BOBBY_SEC_FILINGS=off');
 eq('filings' in evOff, false, 'no filings property attached when off');
 
-// With flag ON: SEC EDGAR loaded, concurrent calls deduplicated, injected into debate!
-process.env.BOBBY_SEC_FILINGS = 'on';
-eq(secFilingsEnabled(), true, 'enabled when BOBBY_SEC_FILINGS=on');
+// Default (unset): SEC EDGAR enabled by default, concurrent calls deduplicated, injected into debate!
+delete process.env.BOBBY_SEC_FILINGS;
+eq(secFilingsEnabled(), true, 'enabled by default when BOBBY_SEC_FILINGS is unset');
 const [evOn, evConcurrent] = await Promise.all([
   loadDeskEvidenceV2('NVDA', 'equity'),
   loadSecFilingEvidence('NVDA'),

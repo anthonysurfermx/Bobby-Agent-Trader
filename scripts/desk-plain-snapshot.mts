@@ -44,7 +44,7 @@ const ENV: Record<string, string> = {
  * Every switch the desk path reads from the environment (api/desk-debate.ts and what it imports). A scenario may
  * set some; every other run has them unset, whatever the shell that runs the capture carries.
  */
-const SWITCHES = ['BOBBY_APP_TEXT_MODEL', 'BOBBY_PRO_TEXT_MODEL', 'BOBBY_LLM_PRIMARY', 'BOBBY_MEMORY', 'BOBBY_THESIS_REVIEW', 'BOBBY_DESK_MODEL', 'BOBBY_AUTH_URL', 'BOBBY_AUTH_ANON_KEY', 'BOBBY_PAYWALL',
+const SWITCHES = ['BOBBY_APP_TEXT_MODEL', 'BOBBY_PRO_TEXT_MODEL', 'BOBBY_LLM_PRIMARY', 'BOBBY_MEMORY', 'BOBBY_THESIS_REVIEW', 'BOBBY_SEC_FILINGS', 'BOBBY_DESK_MODEL', 'BOBBY_AUTH_URL', 'BOBBY_AUTH_ANON_KEY', 'BOBBY_PAYWALL',
   'BOBBY_CLIENT_TELEMETRY', 'BOBBY_LLM_DAILY_CAP_USD', 'BOBBY_LLM_MONTHLY_CAP_USD', 'BOBBY_LLM_ALERT_USD', 'VERCEL_ENV'] as const;
 
 interface Scenario {
