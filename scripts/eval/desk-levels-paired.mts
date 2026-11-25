@@ -14,24 +14,29 @@ import { dirname, resolve } from 'node:path';
 import { execSync } from 'node:child_process';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const ENV_FILE = '/Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/.env.local';
-const env = Object.fromEntries(readFileSync(ENV_FILE, 'utf8').split('\n')
-  .map(l => l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean).map(m => [m![1], m![2].trim().replace(/^"|"$/g, '')]));
-if (!env.OPENAI_API_KEY || !env.ANTHROPIC_API_KEY) throw new Error('OPENAI_API_KEY / ANTHROPIC_API_KEY missing in .env.local');
+const ENV_FILE = process.env.EVAL_ENV_FILE || `${ROOT}/.env.local`;
+const fileEnv = existsSync(ENV_FILE)
+  ? Object.fromEntries(readFileSync(ENV_FILE, 'utf8').split('\n')
+    .map(l => l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean).map(m => [m![1], m![2].trim().replace(/^"|"$/g, '')]))
+  : {};
+const OPENAI_KEY = process.env.OPENAI_API_KEY || fileEnv.OPENAI_API_KEY || '';
+const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || fileEnv.ANTHROPIC_API_KEY || '';
+if (!OPENAI_KEY || !ANTHROPIC_KEY) throw new Error(`OPENAI_API_KEY / ANTHROPIC_API_KEY missing in process.env or ${ENV_FILE}`);
 // The desk modules need the Bobby DB env at import time; the publishable key only reads public rows.
 Object.assign(process.env, {
-  OPENAI_API_KEY: env.OPENAI_API_KEY, ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
-  BOBBY_SUPABASE_URL: 'https://qbvdqkknnuweatptjohi.supabase.co',
+  OPENAI_API_KEY: OPENAI_KEY, ANTHROPIC_API_KEY: ANTHROPIC_KEY,
+  BOBBY_SUPABASE_URL: process.env.BOBBY_SUPABASE_URL || fileEnv.BOBBY_SUPABASE_URL || 'https://qbvdqkknnuweatptjohi.supabase.co',
   // Public (publishable) key from the environment; only public rows are read.
-  BOBBY_SUPABASE_SERVICE_ROLE_KEY: env.VITE_BOBBY_SUPABASE_ANON_KEY ?? env.BOBBY_SUPABASE_ANON_KEY ?? '',
-  BOBBY_SUPABASE_ANON_KEY: env.VITE_BOBBY_SUPABASE_ANON_KEY ?? env.BOBBY_SUPABASE_ANON_KEY ?? '',
-  BOBBY_PROTOCOL_BASE_URL: 'https://bobbyprotocol.xyz',
+  BOBBY_SUPABASE_SERVICE_ROLE_KEY: process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY || fileEnv.VITE_BOBBY_SUPABASE_ANON_KEY || fileEnv.BOBBY_SUPABASE_ANON_KEY || '',
+  BOBBY_SUPABASE_ANON_KEY: process.env.BOBBY_SUPABASE_ANON_KEY || fileEnv.VITE_BOBBY_SUPABASE_ANON_KEY || fileEnv.BOBBY_SUPABASE_ANON_KEY || '',
+  BOBBY_PROTOCOL_BASE_URL: process.env.BOBBY_PROTOCOL_BASE_URL || 'https://bobbyprotocol.xyz',
 });
 const desk = await import(`${ROOT}/api/_lib/desk-debate.ts`);
 const { loadDeskEvidence, loadDeskEvidenceV2, runDeskDebate, reviewDeskOutput } = desk;
 
 const COMMIT = (() => { try { return execSync('git rev-parse --short HEAD', { cwd: ROOT }).toString().trim(); } catch { return null; } })();
-const OUT = process.env.EVAL_OUT || `${ROOT}/docs/ai/data/2026-09-29-levels-paired-eval.json`;
+const BRANCH = (() => { try { return execSync('git rev-parse --abbrev-ref HEAD', { cwd: ROOT }).toString().trim(); } catch { return null; } })();
+const OUT = process.env.EVAL_OUT || `${ROOT}/.ai/desk-levels-paired-${new Date().toISOString().slice(0, 10)}.json`;
 const BUDGET = Number(process.env.EVAL_BUDGET_USD || 1.8);
 const ARMS = ['BASELINE', 'RAPIDO', 'PROFUNDO', 'MAXIMO'] as const;
 type Arm = typeof ARMS[number];
@@ -94,7 +99,7 @@ interface ArmResult {
   calls: Array<{ role: string | null; model: string; ms: number; usd: number; tin: number; tout: number; stop: string | null }>;
   answer: null | { alpha: string; red: string; rebuttal?: string; cio: string; verdict: string; direction: string;
     synthesis?: { headline: string; why: string; risk: string; watch: string }; scenarios?: { confirm: string; invalidate: string } };
-  partial?: Record<string, string>; sufficiency?: unknown; validJson?: boolean;
+  partial?: Record<string, string>; sufficiency?: unknown; lean?: unknown; validJson?: boolean;
 }
 
 async function runBaseline(c: typeof CASES[number], v1: any): Promise<ArmResult> {
@@ -126,7 +131,7 @@ async function runLevel(arm: Exclude<Arm, 'BASELINE'>, c: typeof CASES[number], 
   try {
     const r = await runDeskDebate(c.question, ev, c.lang as 'es' | 'en', { level, usage, onEvent: (e: any) => { if (e.type === 'agent') partial[e.role] = e.text; } });
     const a = r.agents as any;
-    return { arm, ok: true, failure: null, totalMs: Date.now() - t0, ...tally(), sufficiency: r.sufficiency,
+    return { arm, ok: true, failure: null, totalMs: Date.now() - t0, ...tally(), sufficiency: r.sufficiency, lean: r.lean,
       answer: { alpha: a.alpha, red: a.red, ...(a.rebuttal ? { rebuttal: a.rebuttal } : {}), cio: a.cio, verdict: a.verdict, direction: a.direction, synthesis: a.synthesis, ...(a.scenarios ? { scenarios: a.scenarios } : {}) } };
   } catch (e: any) {
     const guard = e?.name === 'DeskOutputRejected';
@@ -195,7 +200,7 @@ const pct = (xs: number[], p: number) => { if (!xs.length) return null; const s 
 const frozen = process.env.EVAL_FROZEN && existsSync(process.env.EVAL_FROZEN) ? JSON.parse(readFileSync(process.env.EVAL_FROZEN, 'utf8')) : null;
 const results: any[] = [];
 const save = (extra: Record<string, unknown> = {}) => writeFileSync(OUT, JSON.stringify({
-  meta: { date: '2026-09-29', script: 'scripts/eval/desk-levels-paired.mts', branch: 'feat/analysis-levels-referrals', commit: COMMIT,
+  meta: { date: new Date().toISOString().slice(0, 10), script: 'scripts/eval/desk-levels-paired.mts', branch: BRANCH, commit: COMMIT,
     arms: { BASELINE: 'gpt-4o-mini ×3, old prompts, json_object, temperature 0.2, evidence v1 (+ output guard, as prod had)', RAPIDO: 'runDeskDebate level rapido, evidence v1', PROFUNDO: 'runDeskDebate level profundo, evidence v2', MAXIMO: 'runDeskDebate level maximo, evidence v2' },
     judges: ['claude-sonnet-5-5 (effort medium, json_schema)', 'gpt-6-sol (reasoning_effort medium, json_object)'], criteria: CRITERIA, spend },
   cases: results, ...extra }, null, 2));

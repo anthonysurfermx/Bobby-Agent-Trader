@@ -185,7 +185,7 @@ try {
   const plainCalls = [...calls];
   const plainModels = models();
   eq(plain.statusCode, 200, 'a plain question is served');
-  eq(Object.keys(plain.body), ['symbol', 'technicals', 'provenance', 'market', 'agents', 'level', 'sufficiency', 'evidenceUsed', 'access'], 'a plain reply has exactly the keys it had: no review, no memory');
+  eq(Object.keys(plain.body), ['symbol', 'technicals', 'provenance', 'market', 'agents', 'level', 'sufficiency', 'lean', 'evidenceUsed', 'access'], 'a plain reply has exactly the keys it had: no review, no memory');
   eq(plainModels.map(byRole), ['alpha', 'red', 'cio'], 'a plain Rápido read is three calls: no reviewer');
   eq(Object.keys(schemaOf(roleCall('cio')).properties), ['analysis', 'verdict', 'direction', 'synthesis'], 'a plain CIO contract has no review field, not even an optional one');
   eq(ceilingOf(roleCall('cio')), levelPlan('rapido').cio.maxTokens, 'a plain CIO keeps its own token ceiling');
