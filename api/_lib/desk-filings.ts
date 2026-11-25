@@ -121,7 +121,8 @@ const VALID_FORMS = new Set<SecFormType>(['10-K', '10-Q', '10-K/A', '10-Q/A']);
 // Deduplicates concurrent SEC cold-cache lookups for the same ticker in one instance.
 const inFlight = new Map<string, Promise<SecFilingEvidence | null>>();
 
-export const secFilingsEnabled = (): boolean => process.env.BOBBY_SEC_FILINGS === 'on';
+// Enabled by default in production; set BOBBY_SEC_FILINGS=off as an instant kill-switch.
+export const secFilingsEnabled = (): boolean => process.env.BOBBY_SEC_FILINGS !== 'off';
 
 /** Return the 10-digit SEC CIK if `symbol` is a US corporate equity, else null (never crypto, ETFs, or non-US listings). */
 export function secCikFor(symbol: string): string | null {
