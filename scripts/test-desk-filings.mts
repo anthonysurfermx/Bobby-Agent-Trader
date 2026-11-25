@@ -228,7 +228,9 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   if (url.includes('data.sec.gov/submissions')) { secCalls++; return jsonRes(MOCK_SUBMISSIONS); }
   if (url.includes('/api/stock-candles')) return jsonRes({ symbol: 'NVDA', currency: 'USD', exchange: 'NasdaqGS', candles: url.includes('interval=1d') ? daily : candles });
   if (url.includes('forum_threads')) return jsonRes([]);
-  if (url.includes('api.openai.com') || url.includes('api.anthropic.com')) {
+  // Matched on the parsed host: a substring would also match a look-alike such as api.openai.com.example.
+  const host = URL.canParse(url) ? new URL(url).hostname : '';
+  if (host === 'api.openai.com' || host === 'api.anthropic.com') {
     const body = JSON.parse(String(init?.body ?? '{}'));
     const sys = Array.isArray(body.system) ? body.system.map((b: any) => b.text).join('') : body.messages?.[0]?.content ?? '';
     const usr = Array.isArray(body.system) ? body.messages?.[0]?.content ?? '' : body.messages?.[1]?.content ?? '';
