@@ -60,6 +60,7 @@ function rimMask(x, y, cy, r){ var d = Math.sqrt((x - 195) * (x - 195) + (y - cy
 function render(){
   if (typeof dialRefine === "function") dialRefine();
   if (!S){ return; }
+  renderOpening();
   var i, k;
   var cy = S.cy.x + S.lean.x + S.sag.x, r = S.r.x * (1 + S.gulp.x + tickScale());
   var brK = RM ? 0.3 : U.breathK.x, breath = breathAt(P.bph) * brK, dimK = A.dim.x;

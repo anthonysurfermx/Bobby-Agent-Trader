@@ -377,10 +377,10 @@ final class NucleoNudgeTests: XCTestCase {
         V18.registerNudges(center: center)
         // Placeholders register nothing; a landed feature registers exactly its own keys (the harness
         // has two voices: coming back to an asset, and the offer to do so).
-        XCTAssertTrue(Set(center.sourceKeys).isSubset(of: ["invite", "memory", "theses", "reminders", "credits", "harness.move", "harness.offer"]))
+        XCTAssertTrue(Set(center.sourceKeys).isSubset(of: ["invite", "memory", "theses", "reminders", "credits", "harness.move", "harness.offer", "watches.met", "watches.offer"]))
         XCTAssertEqual(center.sourceKeys.first, "harness.move", "coming back to what they asked about speaks first")
         XCTAssertEqual(Set([NudgePriority.followUp, NudgePriority.invite, NudgePriority.followUpOffer, NudgePriority.theses, NudgePriority.memory,
-                            NudgePriority.reminders, NudgePriority.credits]).count, 7,
+                            NudgePriority.reminders, NudgePriority.credits, NudgePriority.watchMet, NudgePriority.watchOffer]).count, 9,
                        "two features never share a priority")
     }
 }

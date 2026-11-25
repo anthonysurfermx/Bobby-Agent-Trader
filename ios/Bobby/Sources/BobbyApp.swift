@@ -85,7 +85,7 @@ struct BobbyApp: App {
         if args.contains("-qa-coupon") {
             NucleoFixtures.activate(scenario: "default", liveVoice: false)
         }
-        if nucleoOptions.fixtures != nil && args.contains("-qa-stale-consent") {
+        if nucleoOptions.fixtures != nil && (args.contains("-qa-stale-consent") || args.contains("-qa-opening-line")) {
             UserDefaults.standard.set(true, forKey:"agent.onboarded")
         }
         if let scenario = nucleoOptions.fixtures {

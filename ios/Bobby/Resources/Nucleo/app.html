@@ -81,6 +81,11 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #readNext .links{display:flex;justify-content:center;gap:12px;margin-top:3px}
 #readNext .links button{min-height:36px;padding:4px 8px;font:400 13px/18px var(--sans);color:var(--ink2);cursor:pointer}
 
+#stage.has-opening #greet{display:none}
+#opening-line{position:absolute;left:16px;top:522px;width:358px;min-height:48px;padding:0 2px;border:0;background:transparent;color:var(--ink);font:400 16px/22px var(--serif);text-align:center;pointer-events:auto;cursor:pointer}
+#opening-line:not([hidden])::after{content:"›";color:var(--ink2);margin-left:4px}
+#opening-line:active{opacity:.7}
+#opening-line:focus-visible{outline:1px solid currentColor;border-radius:6px}
 /* greeting, notes, face text */
 #greet,#note{left:20px;top:512px;width:350px;text-align:center;pointer-events:none}
 #greet .t{font:300 34px/36px var(--serif);letter-spacing:-.035em;white-space:nowrap}
@@ -5781,6 +5786,32 @@ chipAct=function(c){
   return exampleChipAct(c);
 };
 
+/* The opening is in the greeting's place. Only an explicit tap requests the cost sheet. */
+var openingButton = mk('button', 'opening-line');
+openingButton.id = 'opening-line';
+openingButton.type = 'button';
+openingButton.hidden = true;
+uiEl.appendChild(openingButton);
+var visibleOpening = null;
+function renderOpening(){
+  var line = ST && ST.name === 'IDLE' && !SHEET && SES && SES.riskAccepted && SES.opening;
+  if (line === visibleOpening) return;
+  visibleOpening = line;
+  stage.classList.toggle('has-opening', !!line);
+  openingButton.hidden = !line;
+  openingButton.textContent = line ? line.text : '';
+  if (line) {
+    openingButton.setAttribute('aria-label', line.text + ' ' + line.action);
+    openingButton.style.fontSize = (16 * Math.max(1, SES.textScale || 1)) + 'px';
+    openingButton.style.lineHeight = '1.35';
+  }
+}
+quietAction(openingButton, function(){
+  var line = visibleOpening;
+  if (!line || ST.name !== 'IDLE' || SHEET || !SES || SES.opening !== line) return;
+  go('SENDING', {question:line.question, params:{opening:line.id}, origin:'chip', cx:195, cy:535});
+});
+
 /* ---- app/80-render.js ---- */
 /* =====================================================================
    14. Render (allocation-free on a settled frame; every write compared first;
@@ -5844,6 +5875,7 @@ function rimMask(x, y, cy, r){ var d = Math.sqrt((x - 195) * (x - 195) + (y - cy
 function render(){
   if (typeof dialRefine === "function") dialRefine();
   if (!S){ return; }
+  renderOpening();
   var i, k;
   var cy = S.cy.x + S.lean.x + S.sag.x, r = S.r.x * (1 + S.gulp.x + tickScale());
   var brK = RM ? 0.3 : U.breathK.x, breath = breathAt(P.bph) * brK, dimK = A.dim.x;

@@ -83,6 +83,9 @@ extension NativeTranslations18 {
         result["Memecoins"] = ["fr": "Memecoins", "pt": "Memecoins", "it": "Memecoin", "de": "Memecoins"]
         result["AI tokens"] = ["fr": "Tokens IA", "pt": "Tokens de IA", "it": "Token IA", "de": "KI-Token"]
         result["Payment coins"] = ["fr": "Cryptos de paiement", "pt": "Moedas de pagamento", "it": "Monete di pagamento", "de": "Zahlungscoins"]
+        result["I see strength in {0} ({1} since {2})."] = ["fr": "Je trouve {0} solide ({1} depuis le {2}).", "pt": "Vejo força em {0} ({1} desde {2}).", "it": "Vedo forza in {0} ({1} dal {2}).", "de": "{0} zeigt Stärke ({1} seit {2})."]
+        result["I see weakness in {0} ({1} since {2})."] = ["fr": "Je trouve {0} fragile ({1} depuis le {2}).", "pt": "Vejo fraqueza em {0} ({1} desde {2}).", "it": "Vedo debolezza in {0} ({1} dal {2}).", "de": "{0} zeigt Schwäche ({1} seit {2})."]
+        result["How do you read the move in {0} ({1} since {2})?"] = ["fr": "Comment interprètes-tu le mouvement de {0} ({1} depuis le {2}) ?", "pt": "Como interpretas o movimento de {0} ({1} desde {2})?", "it": "Come interpreti il movimento di {0} ({1} dal {2})?", "de": "Wie schätzt du die Kursbewegung von {0} ein ({1} seit {2})?"]
         return result
     }()
 }
