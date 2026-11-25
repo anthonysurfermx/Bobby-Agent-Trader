@@ -53,6 +53,7 @@
     "test:desk-audit": "tsx scripts/test-desk-audit.mts",
     "test:ios-remediation": "tsx scripts/test-ios-remediation.mts && tsx scripts/test-desk-debate.mts && tsx scripts/test-account-delete.mts",
     "test:desk-debate": "tsx scripts/test-desk-debate.mts",
+    "test:desk-filings": "tsx scripts/test-desk-filings.mts",
     "test:desk-timeframe": "tsx scripts/test-desk-timeframe.mts",
     "test:desk-plain-words": "tsx scripts/test-desk-plain-words.mts",
     "test:companion": "tsx scripts/test-companion.mts",
